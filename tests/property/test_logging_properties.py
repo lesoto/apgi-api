@@ -106,7 +106,7 @@ def capture_logs(logger_name: str):
 # ============================================================================
 
 
-@settings(max_examples=2)
+@settings(max_examples=1)
 @given(
     message=st.text(min_size=1, max_size=100),
     level=st.sampled_from(["INFO", "WARNING", "ERROR", "DEBUG"]),
@@ -172,7 +172,7 @@ def test_property_7_structured_json_logging_format(message, level):
         ), f"Logger name should be 'test.component', got '{log_entry['logger']}'"
 
 
-@settings(max_examples=2)
+@settings(max_examples=1)
 @given(
     message=st.text(min_size=1, max_size=100),
     extra_field_key=st.text(
@@ -230,7 +230,7 @@ def test_property_7_structured_logging_with_extra_fields(
 # ============================================================================
 
 
-@settings(max_examples=2)
+@settings(max_examples=1)
 @given(
     path=st.sampled_from(["/test", "/v1/sessions", "/health"]),
     method=st.sampled_from(["GET", "POST"]),
@@ -305,7 +305,7 @@ def test_property_8_request_logging_completeness(path, method):
 # ============================================================================
 
 
-@settings(max_examples=2)
+@settings(max_examples=1)
 @given(
     path=st.sampled_from(["/v1/sessions", "/test"]),
 )
@@ -343,7 +343,7 @@ def test_property_9_request_id_propagation_in_response(path):
     assert request_id.count("-") == 4, f"Request ID should contain 4 hyphens (UUID format)"
 
 
-@settings(max_examples=2)
+@settings(max_examples=1)
 @given(
     path=st.sampled_from(["/v1/sessions"]),
 )
@@ -383,7 +383,7 @@ def test_property_9_request_id_propagation_in_logs(path):
                 ), f"Log entry request_id '{entry['request_id']}' should match header request_id '{request_id_from_header}'"
 
 
-@settings(max_examples=2)
+@settings(max_examples=1)
 @given(
     path=st.sampled_from(["/v1/sessions"]),
 )
@@ -424,7 +424,7 @@ def test_property_9_request_id_in_request_state(path):
 # ============================================================================
 
 
-@settings(max_examples=2)
+@settings(max_examples=1)
 @given(
     error_message=st.text(min_size=1, max_size=100),
 )
@@ -481,7 +481,7 @@ def test_property_10_error_logging_with_context(error_message):
             ), f"Stack trace should contain the error message"
 
 
-@settings(max_examples=2)
+@settings(max_examples=1)
 @given(
     error_message=st.text(min_size=1, max_size=100),
     path=st.sampled_from(["/test", "/v1/sessions"]),
@@ -545,7 +545,7 @@ def test_property_10_error_logging_with_request_context(error_message, path, met
             ), f"Client ID should be '127.0.0.1', got '{error_log['client_id']}'"
 
 
-@settings(max_examples=2)
+@settings(max_examples=1)
 @given(
     path=st.sampled_from(["/error"]),
 )

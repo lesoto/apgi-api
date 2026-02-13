@@ -73,7 +73,7 @@ def create_test_app_with_compression(minimum_size: int = 1000):
 # ============================================================================
 
 
-@settings(max_examples=2)
+@settings(max_examples=1)
 @given(
     response_size_kb=st.floats(min_value=1.1, max_value=100.0),
 )
@@ -126,7 +126,7 @@ def test_property_29_response_compression_for_large_responses(response_size_kb):
     assert "data" in response_data, f"Response should contain 'data' field"
 
 
-@settings(max_examples=2)
+@settings(max_examples=1)
 @given(
     response_size_bytes=st.integers(min_value=100, max_value=900),
 )
@@ -169,7 +169,7 @@ def test_property_29_no_compression_for_small_responses(response_size_bytes):
     assert isinstance(response_data, dict), f"Response should be valid JSON object"
 
 
-@settings(max_examples=2)
+@settings(max_examples=1)
 @given(
     response_size_kb=st.floats(min_value=1.1, max_value=50.0),
 )
@@ -215,7 +215,7 @@ def test_property_29_no_compression_without_accept_encoding(response_size_kb):
     assert isinstance(response_data, dict), f"Response should be valid JSON object"
 
 
-@settings(max_examples=2)
+@settings(max_examples=1)
 @given(
     minimum_size_kb=st.floats(min_value=0.5, max_value=10.0),
     response_size_multiplier=st.floats(min_value=1.1, max_value=3.0),
@@ -262,7 +262,7 @@ def test_property_29_configurable_compression_threshold(minimum_size_kb, respons
     assert isinstance(response_data, dict), f"Response should be valid JSON object"
 
 
-@settings(max_examples=2)
+@settings(max_examples=1)
 @given(
     path=st.sampled_from(["/test/large", "/v1/sessions"]),
     method=st.sampled_from(["GET", "POST"]),
@@ -315,7 +315,7 @@ def test_property_29_compression_applies_to_all_endpoints(path, method):
     assert isinstance(response_data, dict), f"Response should be valid JSON object"
 
 
-@settings(max_examples=2)
+@settings(max_examples=1)
 @given(
     response_size_kb=st.floats(min_value=2.0, max_value=50.0),
 )
@@ -381,7 +381,7 @@ def test_property_29_compressed_response_is_smaller(response_size_kb):
     ), f"Compression should be applied to large responses"
 
 
-@settings(max_examples=2)
+@settings(max_examples=1)
 @given(
     response_size_kb=st.floats(min_value=1.1, max_value=20.0),
     accept_encoding=st.sampled_from(

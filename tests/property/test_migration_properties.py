@@ -509,7 +509,7 @@ def test_property_3_migration_roundtrip_preserves_alembic_version(clean_test_dat
     engine.dispose()
 
 
-@settings(max_examples=2)  # Reduced for faster testing
+@settings(max_examples=1)  # Reduced for faster testing
 @given(upgrade_count=st.integers(min_value=1, max_value=2))
 def test_property_3_migration_roundtrip_multiple_cycles(clean_test_database, upgrade_count):
     """

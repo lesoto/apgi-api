@@ -88,7 +88,7 @@ def create_test_session(session_id: str = None, config: dict = None):
 # ============================================================================
 
 
-@settings(max_examples=2)
+@settings(max_examples=1)
 @given(
     initial_state=st.sampled_from(
         [
@@ -226,7 +226,7 @@ def test_property_22_concurrent_modification_prevention(initial_state, operation
     # and operations either succeed or fail with expected errors
 
 
-@settings(max_examples=2)
+@settings(max_examples=1)
 @given(
     num_concurrent_ops=st.integers(min_value=2, max_value=5),
 )

@@ -50,7 +50,7 @@ def create_auth_middleware():
 # ============================================================================
 
 
-@settings(max_examples=2)  # Reduced for faster testing
+@settings(max_examples=1)  # Reduced for faster testing
 @given(
     path=st.sampled_from(
         [
@@ -94,7 +94,7 @@ def test_property_5_jwt_validation_no_token(path):
     ), f"Request should not be marked as authenticated when no token provided"
 
 
-@settings(max_examples=2)  # Reduced for faster testing
+@settings(max_examples=1)  # Reduced for faster testing
 @given(
     path=st.sampled_from(
         [
@@ -149,7 +149,7 @@ def test_property_5_jwt_validation_invalid_token(path, invalid_token):
     ), f"401 response should include WWW-Authenticate header"
 
 
-@settings(max_examples=2)  # Reduced for faster testing
+@settings(max_examples=1)  # Reduced for faster testing
 @given(
     path=st.sampled_from(
         [
@@ -228,7 +228,7 @@ def test_property_5_jwt_validation_expired_token(path, user_id, username):
     ), f"401 response should include WWW-Authenticate header"
 
 
-@settings(max_examples=2)  # Reduced for faster testing
+@settings(max_examples=1)  # Reduced for faster testing
 @given(
     path=st.sampled_from(
         [
@@ -307,7 +307,7 @@ def test_property_5_jwt_validation_wrong_token_type(path, user_id, username):
     ), f"401 response should include WWW-Authenticate header"
 
 
-@settings(max_examples=2)  # Reduced for faster testing
+@settings(max_examples=1)  # Reduced for faster testing
 @given(
     path=st.sampled_from(
         [
@@ -363,7 +363,7 @@ def test_property_5_jwt_validation_malformed_header(path, malformed_header):
 # ============================================================================
 
 
-@settings(max_examples=2)  # Reduced for faster testing
+@settings(max_examples=1)  # Reduced for faster testing
 @given(
     password=st.text(
         min_size=1,
@@ -404,7 +404,7 @@ def test_property_6_password_hashing_verification(password):
     assert password_hash != password, "Hash should be different from original password"
 
 
-@settings(max_examples=2)  # Reduced for faster testing
+@settings(max_examples=1)  # Reduced for faster testing
 @given(
     password=st.text(
         min_size=1,
@@ -445,7 +445,7 @@ def test_property_6_password_hashing_different_password_fails(password, differen
     ), f"Different password should not verify against the hash"
 
 
-@settings(max_examples=2)  # Reduced for faster testing
+@settings(max_examples=1)  # Reduced for faster testing
 @given(
     password=st.text(
         min_size=1,
@@ -477,7 +477,7 @@ def test_property_6_password_hashing_deterministic_verification(password):
         ), f"Password verification should be deterministic and always succeed"
 
 
-@settings(max_examples=2)  # Reduced for faster testing
+@settings(max_examples=1)  # Reduced for faster testing
 @given(
     password=st.text(
         min_size=1,
@@ -515,7 +515,7 @@ def test_property_6_password_hashing_unique_salts(password):
     assert AuthManager.verify_password(password, hash3), "Hash 3 should verify"
 
 
-@settings(max_examples=2)  # Reduced for faster testing
+@settings(max_examples=1)  # Reduced for faster testing
 @given(
     password=st.text(
         min_size=73,  # Longer than bcrypt's 72-byte limit

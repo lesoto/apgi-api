@@ -157,11 +157,11 @@ This implementation plan breaks down the migration of the APGI REST API into a s
     - **Property 14: Task Status Retrieval**
     - **Validates: Requirements 15.4**
   
-  - [~] 8.3 Write property test for task result retrieval
+  - [x] 8.3 Write property test for task result retrieval
     - **Property 15: Task Result Retrieval**
     - **Validates: Requirements 15.5**
   
-  - [~] 8.4 Write property test for task serialization round-trip
+  - [x] 8.4 Write property test for task serialization round-trip
     - **Property 16: Task Serialization Round-Trip**
     - **Validates: Requirements 15.8**
   

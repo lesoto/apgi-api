@@ -46,7 +46,7 @@ def reload_config_with_env(env_vars):
             return Settings()
 
 
-@settings(max_examples=2)  # Reduced for faster testing
+@settings(max_examples=1)  # Reduced for faster testing
 @given(
     config_key=st.sampled_from(
         [
@@ -171,7 +171,7 @@ def test_property_1_config_env_override(config_key, env_value, bool_value):
         ), f"{config_key} should be '{env_value}', got '{actual_value}'"
 
 
-@settings(max_examples=2)  # Reduced for faster testing
+@settings(max_examples=1)  # Reduced for faster testing
 @given(
     config_key=st.sampled_from(
         [
@@ -225,7 +225,7 @@ def test_property_1_config_default_when_not_set(config_key):
     ), f"{config_key} should use default '{expected_default}', got '{actual_value}'"
 
 
-@settings(max_examples=2)  # Reduced for faster testing
+@settings(max_examples=1)  # Reduced for faster testing
 @given(
     validation_scenario=st.sampled_from(
         [

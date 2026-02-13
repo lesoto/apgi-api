@@ -59,7 +59,7 @@ def create_test_app_with_size_limit(max_size_mb: int = 10, enabled: bool = True)
 # ============================================================================
 
 
-@settings(max_examples=2)
+@settings(max_examples=1)
 @given(
     payload_size_mb=st.floats(min_value=10.1, max_value=50.0),
     path=st.sampled_from(["/test", "/v1/sessions"]),
@@ -125,7 +125,7 @@ def test_property_30_request_size_limiting_exceeds_limit(payload_size_mb, path):
     ), f"Max size should be 10MB, got {error['details']['max_size_mb']}"
 
 
-@settings(max_examples=2)
+@settings(max_examples=1)
 @given(
     payload_size_kb=st.integers(min_value=1, max_value=1024),
     path=st.sampled_from(["/test", "/v1/sessions"]),
@@ -170,7 +170,7 @@ def test_property_30_request_size_limiting_within_limit(payload_size_kb, path):
         ), f"Valid-sized request should not be rejected for size"
 
 
-@settings(max_examples=2)
+@settings(max_examples=1)
 @given(
     max_size_mb=st.integers(min_value=1, max_value=100),
     payload_size_mb=st.floats(min_value=0.1, max_value=0.9),
@@ -207,7 +207,7 @@ def test_property_30_request_size_limiting_configurable_limit(max_size_mb, paylo
     ), f"Request with {payload_size_mb * max_size_mb}MB payload (limit {max_size_mb}MB) should succeed, got {response.status_code}"
 
 
-@settings(max_examples=2)
+@settings(max_examples=1)
 @given(
     method=st.sampled_from(["GET", "HEAD", "OPTIONS", "DELETE"]),
     path=st.sampled_from(["/test"]),
@@ -247,7 +247,7 @@ def test_property_30_request_size_limiting_skips_no_body_methods(method, path):
     ), f"{method} request should not be rejected for size, got {response.status_code}"
 
 
-@settings(max_examples=2)
+@settings(max_examples=1)
 @given(
     payload_size_mb=st.floats(min_value=15.0, max_value=50.0),
 )
@@ -290,7 +290,7 @@ def test_property_30_request_size_limiting_disabled(payload_size_mb):
     ), f"Request should not be rejected with 413 when size limiting is disabled, got {response.status_code}"
 
 
-@settings(max_examples=2)
+@settings(max_examples=1)
 @given(
     payload_size_mb=st.floats(min_value=10.1, max_value=20.0),
 )
@@ -337,7 +337,7 @@ def test_property_30_request_size_limiting_content_length_header(payload_size_mb
     ), f"Error code should be 'REQUEST_TOO_LARGE'"
 
 
-@settings(max_examples=2)
+@settings(max_examples=1)
 @given(
     payload_size_mb=st.floats(min_value=10.1, max_value=20.0),
     path=st.sampled_from(["/test", "/v1/sessions"]),

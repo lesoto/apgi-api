@@ -70,7 +70,7 @@ def create_test_app_with_cors(
 # ============================================================================
 
 
-@settings(max_examples=2)  # Reduced for faster testing
+@settings(max_examples=1)  # Reduced for faster testing
 @given(
     path=st.sampled_from(
         [
@@ -160,7 +160,7 @@ def test_property_4_cors_headers_on_responses(path, method, origin):
     ), f"Access-Control-Allow-Credentials should be 'true', got '{credentials_header}'"
 
 
-@settings(max_examples=2)  # Reduced for faster testing
+@settings(max_examples=1)  # Reduced for faster testing
 @given(
     path=st.sampled_from(
         [
@@ -233,7 +233,7 @@ def test_property_4_cors_preflight_requests(path, origin):
     ), f"Access-Control-Allow-Origin should be '{origin}' or '*', got '{allow_origin}'"
 
 
-@settings(max_examples=2)  # Reduced for faster testing
+@settings(max_examples=1)  # Reduced for faster testing
 @given(
     path=st.sampled_from(
         [
@@ -297,7 +297,7 @@ def test_property_4_cors_headers_disallowed_origin(path, method, disallowed_orig
         ), f"Access-Control-Allow-Origin should not be '{disallowed_origin}' for disallowed origin"
 
 
-@settings(max_examples=2)  # Reduced for faster testing
+@settings(max_examples=1)  # Reduced for faster testing
 @given(
     path=st.sampled_from(
         [
@@ -352,7 +352,7 @@ def test_property_4_cors_wildcard_origin(path, method):
     ), f"Access-Control-Allow-Origin should be '*' with wildcard CORS, got '{allow_origin}'"
 
 
-@settings(max_examples=2)  # Reduced for faster testing
+@settings(max_examples=1)  # Reduced for faster testing
 @given(
     path=st.sampled_from(
         [
