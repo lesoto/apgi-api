@@ -53,11 +53,13 @@ class TokenPayload:
     @classmethod
     def from_dict(cls, data: Dict[str, Any]) -> "TokenPayload":
         """Create from dictionary after JWT decoding."""
+        from datetime import timezone
+
         return cls(
             user_id=data["user_id"],
             username=data["username"],
             roles=data["roles"],
-            exp=datetime.fromtimestamp(data["exp"]),
+            exp=datetime.fromtimestamp(data["exp"], tz=timezone.utc),
             token_type=data.get("token_type", "access"),
         )
 

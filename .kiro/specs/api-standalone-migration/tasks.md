@@ -75,7 +75,7 @@ This implementation plan breaks down the migration of the APGI REST API into a s
     - **Property 6: Password Hashing with Bcrypt**
     - **Validates: Requirements 8.7**
   
-  - [~] 4.4 Write unit tests for JWT token generation and verification
+  - [x] 4.4 Write unit tests for JWT token generation and verification
     - Test access token creation and verification
     - Test refresh token creation and verification
     - Test token expiration handling
@@ -95,7 +95,7 @@ This implementation plan breaks down the migration of the APGI REST API into a s
     - Ensure environment variable configuration works
     - _Requirements: 7.1, 7.2, 7.3, 7.4, 7.5, 7.6_
   
-  - [~] 6.3 Write property test for CORS headers on all responses
+  - [x] 6.3 Write property test for CORS headers on all responses
     - **Property 4: CORS Headers on All Responses**
     - **Validates: Requirements 7.3, 7.4**
   
@@ -111,18 +111,18 @@ This implementation plan breaks down the migration of the APGI REST API into a s
     - Update all import paths to be self-contained
     - _Requirements: 8.5, 8.6, 10.2, 10.4, 16.3, 20.1, 20.2_
   
-  - [~] 6.5 Write property tests for logging middleware
+  - [x] 6.5 Write property tests for logging middleware
     - **Property 7: Structured JSON Logging Format**
     - **Property 8: Request Logging Completeness**
     - **Property 9: Request ID Propagation**
     - **Property 10: Error Logging with Context**
     - **Validates: Requirements 10.1, 10.2, 10.3, 10.7**
   
-  - [~] 6.6 Write property test for request size limiting
+  - [x] 6.6 Write property test for request size limiting
     - **Property 30: Request Size Limiting**
     - **Validates: Requirements 20.2**
   
-  - [~] 6.7 Write property test for response compression
+  - [x] 6.7 Write property test for response compression
     - **Property 29: Response Compression for Large Responses**
     - **Validates: Requirements 20.1**
 
@@ -133,11 +133,11 @@ This implementation plan breaks down the migration of the APGI REST API into a s
     - Ensure Redis and PostgreSQL integration works
     - _Requirements: 18.1, 18.2, 18.3, 18.4, 18.5, 18.6, 18.7_
   
-  - [~] 7.2 Write property test for session concurrent modification prevention
+  - [x] 7.2 Write property test for session concurrent modification prevention
     - **Property 22: Session Concurrent Modification Prevention**
     - **Validates: Requirements 18.8**
   
-  - [~] 7.3 Write unit tests for session lifecycle
+  - [x] 7.3 Write unit tests for session lifecycle
     - Test session creation
     - Test session state transitions (created → running → paused → stopped)
     - Test invalid state transition rejection
@@ -153,7 +153,7 @@ This implementation plan breaks down the migration of the APGI REST API into a s
     - Ensure Redis broker and backend configuration works
     - _Requirements: 15.1, 15.2, 15.3, 15.6_
   
-  - [~] 8.2 Write property test for task status retrieval
+  - [x] 8.2 Write property test for task status retrieval
     - **Property 14: Task Status Retrieval**
     - **Validates: Requirements 15.4**
   
