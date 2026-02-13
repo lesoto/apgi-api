@@ -54,11 +54,13 @@ jwt_secret = settings.jwt_secret_key
 **Required:** Yes
 
 **Example:**
+
 ```bash
 ENVIRONMENT=production
 ```
 
 **Behavior by Environment:**
+
 - `development`: Debug logging, relaxed security, auto-reload
 - `staging`: Production-like settings with verbose logging
 - `production`: Strict security validation, minimal logging
@@ -78,6 +80,7 @@ ENVIRONMENT=production
 **Required:** No
 
 **Example:**
+
 ```bash
 API_TITLE="APGI Consciousness Modeling API"
 ```
@@ -95,6 +98,7 @@ API_TITLE="APGI Consciousness Modeling API"
 **Required:** No
 
 **Example:**
+
 ```bash
 API_VERSION=1.2.0
 ```
@@ -112,6 +116,7 @@ API_VERSION=1.2.0
 **Required:** No
 
 **Example:**
+
 ```bash
 HOST=0.0.0.0  # Listen on all interfaces
 HOST=127.0.0.1  # Listen on localhost only
@@ -130,6 +135,7 @@ HOST=127.0.0.1  # Listen on localhost only
 **Required:** No
 
 **Example:**
+
 ```bash
 PORT=8000
 ```
@@ -149,11 +155,13 @@ PORT=8000
 **Required:** Yes
 
 **Format:**
-```
+
+```text
 postgresql://[user]:[password]@[host]:[port]/[database]?[options]
 ```
 
 **Examples:**
+
 ```bash
 # Basic connection
 DATABASE_URL=postgresql://apgi_user:password@localhost:5432/apgi_api
@@ -169,18 +177,21 @@ DATABASE_URL=postgresql://apgi_user:password@postgres:5432/apgi_api?connect_time
 ```
 
 **Connection Pool Options:**
+
 - `pool_size` - Number of connections to maintain (default: 10)
 - `max_overflow` - Maximum overflow connections (default: 20)
 - `pool_timeout` - Seconds to wait for connection (default: 30)
 - `pool_recycle` - Recycle connections after N seconds (default: 3600)
 
 **SSL Options:**
+
 - `sslmode=disable` - No SSL (not recommended for production)
 - `sslmode=require` - Require SSL connection
 - `sslmode=verify-ca` - Verify server certificate
 - `sslmode=verify-full` - Verify server certificate and hostname
 
 **Production Requirements:**
+
 - Must use SSL/TLS (`sslmode=require` or higher)
 - Should use connection pooling
 - Should set connection timeout
@@ -200,11 +211,13 @@ DATABASE_URL=postgresql://apgi_user:password@postgres:5432/apgi_api?connect_time
 **Required:** Yes
 
 **Format:**
-```
+
+```text
 redis://[password]@[host]:[port]/[database]
 ```
 
 **Examples:**
+
 ```bash
 # Basic connection
 REDIS_URL=redis://localhost:6379/0
@@ -220,12 +233,14 @@ REDIS_URL=redis://localhost:6379/0?socket_timeout=5&socket_connect_timeout=5
 ```
 
 **Database Numbers:**
+
 - `0` - Session state cache
 - `1` - Celery broker (if using Redis)
 - `2` - Celery result backend (if using Redis)
 - `15` - Test database (for testing)
 
 **Production Requirements:**
+
 - Should use password authentication
 - Should use SSL/TLS for remote connections
 - Should enable persistence (AOF or RDB)
@@ -245,6 +260,7 @@ REDIS_URL=redis://localhost:6379/0?socket_timeout=5&socket_connect_timeout=5
 **Required:** Yes (if using async tasks)
 
 **Examples:**
+
 ```bash
 # Redis broker
 CELERY_BROKER_URL=redis://localhost:6379/1
@@ -269,6 +285,7 @@ CELERY_BROKER_URL=redis://:password@redis:6379/1
 **Required:** Yes (if using async tasks)
 
 **Examples:**
+
 ```bash
 # Redis backend
 CELERY_RESULT_BACKEND=redis://localhost:6379/2
@@ -295,12 +312,14 @@ CELERY_RESULT_BACKEND=redis://:password@redis:6379/2
 **Required:** Yes
 
 **Production Requirements:**
+
 - Minimum 32 characters
 - Cryptographically random
 - Never committed to version control
 - Rotated periodically
 
 **Generate Secure Key:**
+
 ```bash
 # Python
 python -c "import secrets; print(secrets.token_urlsafe(32))"
@@ -313,11 +332,13 @@ head -c 32 /dev/urandom | base64
 ```
 
 **Example:**
+
 ```bash
 JWT_SECRET_KEY=xK8vN2mP9qR4sT6uW7yZ0aB1cD3eF5gH8iJ9kL2mN4oP6qR8sT0uV2wX4yZ6aB8c
 ```
 
 **Security Notes:**
+
 - Different keys for different environments
 - Store in secrets manager (AWS Secrets Manager, HashiCorp Vault)
 - Rotate every 90 days
@@ -336,12 +357,14 @@ JWT_SECRET_KEY=xK8vN2mP9qR4sT6uW7yZ0aB1cD3eF5gH8iJ9kL2mN4oP6qR8sT0uV2wX4yZ6aB8c
 **Required:** No
 
 **Supported Values:**
+
 - `HS256` - HMAC with SHA-256 (recommended)
 - `HS384` - HMAC with SHA-384
 - `HS512` - HMAC with SHA-512
 - `RS256` - RSA with SHA-256 (requires public/private key pair)
 
 **Example:**
+
 ```bash
 JWT_ALGORITHM=HS256
 ```
@@ -359,10 +382,12 @@ JWT_ALGORITHM=HS256
 **Required:** No
 
 **Recommended Values:**
+
 - Development: 60-120 minutes
 - Production: 15-30 minutes
 
 **Example:**
+
 ```bash
 JWT_ACCESS_TOKEN_EXPIRE_MINUTES=30
 ```
@@ -380,10 +405,12 @@ JWT_ACCESS_TOKEN_EXPIRE_MINUTES=30
 **Required:** No
 
 **Recommended Values:**
+
 - Development: 7-30 days
 - Production: 7-14 days
 
 **Example:**
+
 ```bash
 JWT_REFRESH_TOKEN_EXPIRE_DAYS=7
 ```
@@ -403,6 +430,7 @@ JWT_REFRESH_TOKEN_EXPIRE_DAYS=7
 **Required:** Yes (production)
 
 **Examples:**
+
 ```bash
 # Single origin
 CORS_ORIGINS=https://app.example.com
@@ -415,11 +443,13 @@ CORS_ORIGINS=*
 ```
 
 **Production Requirements:**
+
 - Must be explicitly configured (no wildcards)
 - Must use HTTPS URLs
 - Should include all frontend domains
 
 **Security Notes:**
+
 - Wildcard (`*`) not allowed with credentials in production
 - Subdomains must be listed explicitly
 - Protocol (http/https) must match exactly
@@ -437,12 +467,14 @@ CORS_ORIGINS=*
 **Required:** No
 
 **Examples:**
+
 ```bash
 CORS_ALLOW_CREDENTIALS=true
 CORS_ALLOW_CREDENTIALS=false
 ```
 
 **Security Notes:**
+
 - Cannot use wildcard origins when `true`
 - Required for cookie-based authentication
 - Required for Authorization header
@@ -462,12 +494,14 @@ CORS_ALLOW_CREDENTIALS=false
 **Required:** No
 
 **Examples:**
+
 ```bash
 RATE_LIMIT_ENABLED=true
 RATE_LIMIT_ENABLED=false
 ```
 
 **Recommendation:**
+
 - `true` for production
 - `false` for development (optional)
 
@@ -484,6 +518,7 @@ RATE_LIMIT_ENABLED=false
 **Required:** No
 
 **Examples:**
+
 ```bash
 RATE_LIMIT_PER_MINUTE=60   # 1 request per second
 RATE_LIMIT_PER_MINUTE=300  # 5 requests per second
@@ -491,6 +526,7 @@ RATE_LIMIT_PER_MINUTE=1200 # 20 requests per second
 ```
 
 **Recommendations:**
+
 - Development: 300-600
 - Production: 60-120
 - High-traffic: 300-600 with multiple API instances
@@ -510,6 +546,7 @@ RATE_LIMIT_PER_MINUTE=1200 # 20 requests per second
 **Required:** No
 
 **Values:**
+
 - `DEBUG` - Detailed debugging information
 - `INFO` - General informational messages
 - `WARNING` - Warning messages
@@ -517,6 +554,7 @@ RATE_LIMIT_PER_MINUTE=1200 # 20 requests per second
 - `CRITICAL` - Critical errors only
 
 **Examples:**
+
 ```bash
 LOG_LEVEL=INFO
 LOG_LEVEL=DEBUG
@@ -524,6 +562,7 @@ LOG_LEVEL=WARNING
 ```
 
 **Recommendations:**
+
 - Development: `DEBUG`
 - Staging: `INFO`
 - Production: `INFO` or `WARNING`
@@ -543,6 +582,7 @@ LOG_LEVEL=WARNING
 **Required:** No
 
 **Examples:**
+
 ```bash
 MAX_REQUEST_SIZE=10485760   # 10 MB
 MAX_REQUEST_SIZE=52428800   # 50 MB
@@ -550,6 +590,7 @@ MAX_REQUEST_SIZE=104857600  # 100 MB
 ```
 
 **Recommendations:**
+
 - API endpoints: 10 MB
 - File uploads: 50-100 MB
 - Adjust based on use case
@@ -561,6 +602,7 @@ MAX_REQUEST_SIZE=104857600  # 100 MB
 ### Development Environment
 
 **Characteristics:**
+
 - Relaxed security validation
 - Debug logging enabled
 - Auto-reload on code changes
@@ -568,6 +610,7 @@ MAX_REQUEST_SIZE=104857600  # 100 MB
 - CORS allows all origins
 
 **Example `.env.development`:**
+
 ```bash
 ENVIRONMENT=development
 DATABASE_URL=postgresql://apgi_dev:dev_password@localhost:5432/apgi_api_dev
@@ -582,6 +625,7 @@ LOG_LEVEL=DEBUG
 ```
 
 **Security Warnings:**
+
 - Default JWT secret triggers warning
 - Wildcard CORS triggers warning
 - Warnings are logged but don't prevent startup
@@ -591,6 +635,7 @@ LOG_LEVEL=DEBUG
 ### Staging Environment
 
 **Characteristics:**
+
 - Production-like configuration
 - Verbose logging for debugging
 - Explicit CORS origins
@@ -598,6 +643,7 @@ LOG_LEVEL=DEBUG
 - Rate limiting enabled
 
 **Example `.env.staging`:**
+
 ```bash
 ENVIRONMENT=staging
 DATABASE_URL=postgresql://apgi_user:secure_password@postgres-staging:5432/apgi_api?sslmode=require
@@ -617,6 +663,7 @@ LOG_LEVEL=INFO
 ### Production Environment
 
 **Characteristics:**
+
 - Strict security validation
 - Minimal logging (INFO or WARNING)
 - Explicit CORS origins required
@@ -626,6 +673,7 @@ LOG_LEVEL=INFO
 - Fails fast on missing/insecure configuration
 
 **Example `.env.production`:**
+
 ```bash
 ENVIRONMENT=production
 DATABASE_URL=postgresql://apgi_user:${DB_PASSWORD}@postgres-prod:5432/apgi_api?sslmode=require&pool_size=10&max_overflow=20

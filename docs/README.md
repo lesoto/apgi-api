@@ -1,6 +1,6 @@
-# Standalone APGI API
+# APGI API
 
-This is the standalone REST API for the APGI (Active Predictive Global Ignition) consciousness modeling system. The API provides a complete interface for managing simulation sessions, executing experimental tasks, and accessing consciousness modeling results.
+This is the REST API for the APGI consciousness modeling system. The API provides a complete interface for managing simulation sessions, executing experimental tasks, and accessing consciousness modeling results.
 
 ## Features
 
@@ -26,22 +26,26 @@ This is the standalone REST API for the APGI (Active Predictive Global Ignition)
 The fastest way to get started is using Docker Compose, which sets up all services automatically:
 
 1. **Clone the repository and navigate to the standalone-api directory:**
+
    ```bash
    cd standalone-api
    ```
 
 2. **Start all services:**
+
    ```bash
    docker-compose -f deployment/docker-compose.yml up
    ```
 
 3. **Access the API:**
-   - API: http://localhost:8000
-   - Interactive docs: http://localhost:8000/docs
-   - Health check: http://localhost:8000/health
-   - Metrics: http://localhost:8000/metrics
+
+- API: <http://localhost:8000>
+- Interactive docs: <http://localhost:8000/docs>
+- Health check: <http://localhost:8000/health>
+- Metrics: <http://localhost:8000/metrics>
 
 The Docker Compose setup includes:
+
 - API server with hot-reload
 - PostgreSQL database
 - Redis cache
@@ -52,50 +56,59 @@ The Docker Compose setup includes:
 If you prefer to run services manually:
 
 1. **Copy environment configuration:**
+
    ```bash
    cp .env.development .env
    ```
 
 2. **Install dependencies:**
+
    ```bash
    pip install -r requirements.txt
    pip install -r requirements-dev.txt  # For development tools
    ```
 
 3. **Start PostgreSQL and Redis:**
+
    ```bash
    # Using Docker Compose for just the data services
    docker-compose -f deployment/docker-compose.yml up -d postgres redis
    ```
 
 4. **Run database migrations:**
+
    ```bash
    alembic upgrade head
    ```
 
 5. **Start the API server:**
+
    ```bash
    uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
    ```
 
 6. **Start Celery worker (in a separate terminal):**
+
    ```bash
    celery -A app.celery_app worker --loglevel=info
    ```
 
 7. **Access the API:**
-   - API: http://localhost:8000
-   - Interactive docs: http://localhost:8000/docs
-   - Health check: http://localhost:8000/health
+
+- API: <http://localhost:8000>
+- Interactive docs: <http://localhost:8000/docs>
+- Health check: <http://localhost:8000/health>
 
 ## API Endpoints
 
 ### Authentication
+
 - `POST /v1/auth/login` - User login (returns access and refresh tokens)
 - `POST /v1/auth/refresh` - Refresh access token
 - `POST /v1/auth/logout` - Logout and invalidate tokens
 
 ### Sessions
+
 - `POST /v1/sessions` - Create new simulation session
 - `GET /v1/sessions/{id}` - Get session details
 - `POST /v1/sessions/{id}/start` - Start or resume session
@@ -105,27 +118,31 @@ If you prefer to run services manually:
 - `DELETE /v1/sessions/{id}` - Delete session
 
 ### State Queries
+
 - `GET /v1/sessions/{id}/state` - Get current simulation state
 - `GET /v1/sessions/{id}/metrics` - Get simulation metrics
 
 ### Async Tasks
+
 - `POST /v1/tasks` - Submit asynchronous task
 - `GET /v1/tasks/{task_id}` - Get task status
 - `GET /v1/tasks/{task_id}/result` - Get task result
 - `DELETE /v1/tasks/{task_id}` - Cancel task
 
 ### Data Export
+
 - `GET /v1/sessions/{id}/export/json` - Export session as JSON
 - `GET /v1/sessions/{id}/export/csv` - Export session as CSV
 
 ### Health & Monitoring
+
 - `GET /health` - Basic health check
 - `GET /health/ready` - Readiness probe (checks dependencies)
 - `GET /health/live` - Liveness probe
 - `GET /metrics` - Prometheus metrics
 - `GET /version` - API version information
 
-For detailed API documentation, visit http://localhost:8000/docs when the server is running.
+For detailed API documentation, visit <http://localhost:8000/docs> when the server is running.
 
 ## Configuration
 
@@ -139,23 +156,25 @@ The API uses environment variables for configuration. See `.env.example` for all
 
 ### Key Configuration Variables
 
-| Variable | Description | Required |
+|Variable|Description|Required|
 |----------|-------------|----------|
-| `ENVIRONMENT` | Environment: development, staging, or production | Yes |
-| `DATABASE_URL` | PostgreSQL connection string | Yes |
-| `REDIS_URL` | Redis connection string | Yes |
-| `JWT_SECRET_KEY` | Secret key for JWT token signing (32+ chars) | Yes |
-| `CORS_ORIGINS` | Comma-separated list of allowed origins | Yes (production) |
+|`ENVIRONMENT`|Environment: development, staging, or production|Yes|
+|`DATABASE_URL`|PostgreSQL connection string|Yes|
+|`REDIS_URL`|Redis connection string|Yes|
+|`JWT_SECRET_KEY`|Secret key for JWT token signing (32+ chars)|Yes|
+|`CORS_ORIGINS`|Comma-separated list of allowed origins|Yes (production)|
 
 ### Environment-Specific Behavior
 
 **Development:**
+
 - Debug logging enabled
 - Auto-reload on code changes
 - Relaxed security validation
 - Default JWT secret provided (with warning)
 
 **Production:**
+
 - Strict security validation
 - Requires explicit configuration
 - Fails fast on missing/insecure settings
@@ -163,7 +182,7 @@ The API uses environment variables for configuration. See `.env.example` for all
 
 ## Project Structure
 
-```
+```text
 standalone-api/
 ├── app/                    # Application code
 │   ├── config.py          # Configuration management
@@ -282,7 +301,7 @@ docker-compose -f deployment/docker-compose.yml up
 - [Deployment Guide](docs/DEPLOYMENT.md) - Production deployment instructions
 - [Migration Guide](docs/MIGRATION.md) - Migrating from legacy API
 - [Troubleshooting Guide](docs/TROUBLESHOOTING.md) - Common issues and solutions
-- [API Documentation](http://localhost:8000/docs) - Interactive API docs (when server is running)
+- [API Documentation](<http://localhost:8000/docs>) - Interactive API docs (when server is running)
 
 ## Architecture
 
@@ -296,6 +315,7 @@ The standalone API follows a layered architecture:
 - **Cache Layer**: Redis for session state and rate limiting
 
 Key design principles:
+
 - Stateless API instances for horizontal scaling
 - Request-scoped database sessions
 - JWT-based authentication with role-based access control
@@ -322,6 +342,7 @@ The API exposes comprehensive monitoring capabilities:
 - **Error Tracking**: Automatic error logging with context
 
 Key metrics tracked:
+
 - Request rate and response times (p50, p95, p99)
 - Error rates by endpoint
 - Active sessions and tasks
@@ -333,16 +354,19 @@ Key metrics tracked:
 ### Common Issues
 
 **API won't start:**
+
 - Check that PostgreSQL and Redis are running
 - Verify environment variables are set correctly
 - Check logs for configuration validation errors
 
 **Database connection errors:**
+
 - Verify `DATABASE_URL` is correct
 - Ensure PostgreSQL is accessible from the API container
 - Check database credentials
 
 **Authentication failures:**
+
 - Verify `JWT_SECRET_KEY` is set and matches across instances
 - Check token expiration times
 - Ensure clock synchronization across servers

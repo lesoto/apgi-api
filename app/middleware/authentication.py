@@ -193,7 +193,7 @@ class AuthenticationMiddleware(BaseHTTPMiddleware):
         Returns:
             JSONResponse with error details
         """
-        from datetime import datetime
+        from datetime import datetime, timezone
 
         return JSONResponse(
             status_code=status_code,
@@ -201,7 +201,7 @@ class AuthenticationMiddleware(BaseHTTPMiddleware):
                 "error": {
                     "code": code,
                     "message": message,
-                    "timestamp": datetime.utcnow().isoformat() + "Z",
+                    "timestamp": datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"),
                 }
             },
             headers={"WWW-Authenticate": "Bearer"} if status_code == 401 else {},

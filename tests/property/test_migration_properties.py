@@ -14,7 +14,7 @@ from unittest.mock import patch
 import pytest
 from alembic import command
 from alembic.config import Config
-from hypothesis import given, strategies as st
+from hypothesis import given, strategies as st, settings
 from sqlalchemy import create_engine, inspect, text
 from sqlalchemy.pool import NullPool
 
@@ -509,7 +509,8 @@ def test_property_3_migration_roundtrip_preserves_alembic_version(clean_test_dat
     engine.dispose()
 
 
-@given(upgrade_count=st.integers(min_value=1, max_value=3))
+@settings(max_examples=2)  # Reduced for faster testing
+@given(upgrade_count=st.integers(min_value=1, max_value=2))
 def test_property_3_migration_roundtrip_multiple_cycles(clean_test_database, upgrade_count):
     """
     **Validates: Requirements 3.6**

@@ -144,7 +144,11 @@ class AuthManager:
         Returns:
             Encoded JWT token string
         """
-        expires_at = datetime.utcnow() + timedelta(minutes=self.access_token_expire_minutes)
+        from datetime import timezone
+
+        expires_at = datetime.now(timezone.utc) + timedelta(
+            minutes=self.access_token_expire_minutes
+        )
 
         payload = TokenPayload(
             user_id=user_id, username=username, roles=roles, exp=expires_at, token_type="access"
@@ -166,7 +170,9 @@ class AuthManager:
         Returns:
             Encoded JWT refresh token string
         """
-        expires_at = datetime.utcnow() + timedelta(days=self.refresh_token_expire_days)
+        from datetime import timezone
+
+        expires_at = datetime.now(timezone.utc) + timedelta(days=self.refresh_token_expire_days)
 
         payload = TokenPayload(
             user_id=user_id, username=username, roles=roles, exp=expires_at, token_type="refresh"
@@ -209,7 +215,9 @@ class AuthManager:
                 )
 
             # Check expiration (jwt.decode already checks this, but we handle it explicitly)
-            if datetime.utcnow() > payload.exp:
+            from datetime import timezone
+
+            if datetime.now(timezone.utc) > payload.exp:
                 raise ExpiredTokenError("Token has expired")
 
             return payload
@@ -251,7 +259,9 @@ class AuthManager:
 
         # Update last login
         try:
-            user.last_login = datetime.utcnow()  # type: ignore[assignment]
+            from datetime import timezone
+
+            user.last_login = datetime.now(timezone.utc)  # type: ignore[assignment]
             self.db.commit()
         except Exception as e:
             self.db.rollback()
@@ -279,8 +289,10 @@ class AuthManager:
         )
 
         # Store refresh token in database
+        from datetime import timezone
+
         token_hash = self.hash_password(refresh_token)
-        expires_at = datetime.utcnow() + timedelta(days=self.refresh_token_expire_days)
+        expires_at = datetime.now(timezone.utc) + timedelta(days=self.refresh_token_expire_days)
 
         try:
             db_refresh_token = RefreshToken(
@@ -360,7 +372,9 @@ class AuthManager:
             raise AuthenticationError("Invalid refresh token")
 
         # Check expiration in database
-        if datetime.utcnow() > db_token.expires_at:
+        from datetime import timezone
+
+        if datetime.now(timezone.utc) > db_token.expires_at:
             raise ExpiredTokenError("Refresh token has expired")
 
         # Create new access token

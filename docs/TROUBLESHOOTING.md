@@ -79,12 +79,14 @@ kubectl describe pod <pod-name>
 #### 1. Configuration Validation Failure
 
 **Error Message:**
+
 ```
 Configuration validation failed:
 - JWT_SECRET_KEY must be at least 32 characters in production
 ```
 
 **Solution:**
+
 ```bash
 # Generate a secure JWT secret
 python -c "import secrets; print(secrets.token_urlsafe(32))"
@@ -99,11 +101,13 @@ echo "JWT_SECRET_KEY=<generated-key>" >> .env
 #### 2. Missing Required Environment Variables
 
 **Error Message:**
+
 ```
 DATABASE_URL is required
 ```
 
 **Solution:**
+
 ```bash
 # Check which variables are missing
 docker-compose config
@@ -122,11 +126,13 @@ EOF
 #### 3. Port Already in Use
 
 **Error Message:**
+
 ```
 Error: Address already in use
 ```
 
 **Solution:**
+
 ```bash
 # Find process using port 8000
 lsof -i :8000
@@ -143,11 +149,13 @@ export PORT=8001
 #### 4. Import Errors
 
 **Error Message:**
+
 ```
 ModuleNotFoundError: No module named 'fastapi'
 ```
 
 **Solution:**
+
 ```bash
 # Reinstall dependencies
 pip install -r requirements.txt
@@ -166,6 +174,7 @@ could not connect to server: Connection refused
 ```
 
 **Diagnosis:**
+
 ```bash
 # Check if PostgreSQL is running
 docker-compose ps postgres
@@ -182,6 +191,7 @@ psql -h localhost -U apgi_user -d apgi_api
 **Solutions:**
 
 1. **PostgreSQL not running:**
+
 ```bash
 # Start PostgreSQL
 docker-compose up -d postgres
@@ -189,6 +199,7 @@ kubectl apply -f postgres-deployment.yaml
 ```
 
 2. **Wrong connection string:**
+
 ```bash
 # Verify DATABASE_URL format
 echo $DATABASE_URL
@@ -199,6 +210,7 @@ export DATABASE_URL=postgresql://apgi_user:password@postgres:5432/apgi_api
 ```
 
 3. **Network connectivity:**
+
 ```bash
 # Test network connectivity
 ping postgres-host
@@ -210,6 +222,7 @@ docker network inspect <network-name>
 ```
 
 4. **Authentication failure:**
+
 ```bash
 # Verify credentials
 psql -h postgres-host -U apgi_user -d apgi_api
@@ -226,6 +239,7 @@ ALTER USER apgi_user WITH PASSWORD 'new_password';
 **Symptom:** API responses are slow, database queries taking too long
 
 **Diagnosis:**
+
 ```sql
 -- Check slow queries
 SELECT pid, now() - pg_stat_activity.query_start AS duration, query
@@ -248,6 +262,7 @@ ORDER BY abs(correlation) ASC;
 **Solutions:**
 
 1. **Add missing indexes:**
+
 ```sql
 -- Create index on frequently queried columns
 CREATE INDEX idx_sessions_user_id ON sessions(user_id);
@@ -255,12 +270,14 @@ CREATE INDEX idx_sessions_created_at ON sessions(created_at);
 ```
 
 2. **Increase connection pool:**
+
 ```bash
 # Update DATABASE_URL
 DATABASE_URL=postgresql://user:pass@host:5432/db?pool_size=20&max_overflow=40
 ```
 
 3. **Optimize queries:**
+
 ```python
 # Use select_related for foreign keys
 session = db.query(Session).options(selectinload(Session.user)).first()
@@ -279,6 +296,7 @@ sqlalchemy.exc.TimeoutError: QueuePool limit of size 10 overflow 20 reached
 ```
 
 **Diagnosis:**
+
 ```bash
 # Check active connections
 psql -h postgres-host -U apgi_user apgi_api -c "SELECT count(*) FROM pg_stat_activity;"
@@ -290,11 +308,13 @@ curl http://localhost:8000/metrics | grep database_connections
 **Solutions:**
 
 1. **Increase pool size:**
+
 ```bash
 DATABASE_URL=postgresql://user:pass@host:5432/db?pool_size=20&max_overflow=40
 ```
 
 2. **Fix connection leaks:**
+
 ```python
 # Always use context managers
 with get_db_context() as db:

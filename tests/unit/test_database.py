@@ -31,15 +31,102 @@ def test_db_url():
 @pytest.fixture
 def test_engine(test_db_url):
     """Create a test database engine using SQLite in-memory database."""
+    from sqlalchemy import Column, String, DateTime, Integer, Text, Float, Boolean, ForeignKey
+    from sqlalchemy.orm import declarative_base
+    from sqlalchemy.sql import func
+
+    # Create a test-specific Base with SQLite-compatible models
+    TestBase = declarative_base()
+
+    class TestUser(TestBase):
+        """Test user model compatible with SQLite."""
+
+        __tablename__ = "users"
+        user_id = Column(String(36), primary_key=True)
+        username = Column(String(100), unique=True, nullable=False, index=True)
+        email = Column(String(255), unique=True, nullable=False, index=True)
+        password_hash = Column(String(255), nullable=False)
+        roles = Column(Text, nullable=False, default="[]")  # JSON string instead of ARRAY
+        created_at = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
+        last_login = Column(DateTime(timezone=True), nullable=True)
+
+    class TestSession(TestBase):
+        """Test session model compatible with SQLite."""
+
+        __tablename__ = "sessions"
+        session_id = Column(String(36), primary_key=True)
+        user_id = Column(String(36), ForeignKey("users.user_id"), nullable=False, index=True)
+        config = Column(Text, nullable=False)  # JSON string
+        state = Column(String(20), nullable=False, default="created", index=True)
+        created_at = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
+        updated_at = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
+        description = Column(Text, nullable=True)
+        tags = Column(Text, nullable=True, default="[]")  # JSON string instead of ARRAY
+
+    class TestTask(TestBase):
+        """Test task model compatible with SQLite."""
+
+        __tablename__ = "tasks"
+        task_id = Column(String(36), primary_key=True)
+        session_id = Column(String(36), nullable=False, index=True)
+        task_type = Column(String(50), nullable=False, index=True)
+        parameters = Column(Text, nullable=False)  # JSON string
+        status = Column(String(20), nullable=False, default="pending", index=True)
+        progress = Column(Integer, nullable=True)
+        result_data = Column(Text, nullable=True)  # JSON string
+        created_at = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
+        started_at = Column(DateTime(timezone=True), nullable=True)
+        completed_at = Column(DateTime(timezone=True), nullable=True)
+        error_message = Column(Text, nullable=True)
+        webhook_url = Column(String(500), nullable=True)
+
+    class TestSessionData(TestBase):
+        """Test session data model compatible with SQLite."""
+
+        __tablename__ = "session_data"
+        id = Column(Integer, primary_key=True, autoincrement=True)
+        session_id = Column(String(36), nullable=False, index=True)
+        time_ms = Column(Float, nullable=False)
+        data = Column(Text, nullable=False)  # JSON string
+        created_at = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
+
+    class TestRefreshToken(TestBase):
+        """Test refresh token model compatible with SQLite."""
+
+        __tablename__ = "refresh_tokens"
+        token_id = Column(String(36), primary_key=True)
+        user_id = Column(String(36), nullable=False, index=True)
+        token_hash = Column(String(255), nullable=False, unique=True)
+        expires_at = Column(DateTime(timezone=True), nullable=False, index=True)
+        created_at = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
+        revoked = Column(Boolean, nullable=False, default=False)
+
+    class TestWebhookDelivery(TestBase):
+        """Test webhook delivery model compatible with SQLite."""
+
+        __tablename__ = "webhook_deliveries"
+        delivery_id = Column(String(36), primary_key=True)
+        task_id = Column(String(36), nullable=False, index=True)
+        webhook_url = Column(String(500), nullable=False)
+        payload = Column(Text, nullable=False)  # JSON string
+        status = Column(String(20), nullable=False, default="pending")
+        attempts = Column(Integer, nullable=False, default=0)
+        last_attempt_at = Column(DateTime(timezone=True), nullable=True)
+        next_retry_at = Column(DateTime(timezone=True), nullable=True)
+        response_status = Column(Integer, nullable=True)
+        response_body = Column(Text, nullable=True)
+        error_message = Column(Text, nullable=True)
+        created_at = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
+
     test_engine = create_engine(test_db_url, echo=False)
 
-    # Create all tables for test
-    Base.metadata.create_all(bind=test_engine)
+    # Create all tables for test using SQLite-compatible models
+    TestBase.metadata.create_all(bind=test_engine)
 
     yield test_engine
 
     # Clean up after test
-    Base.metadata.drop_all(bind=test_engine)
+    TestBase.metadata.drop_all(bind=test_engine)
     test_engine.dispose()
 
 

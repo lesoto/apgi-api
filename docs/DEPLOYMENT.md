@@ -20,6 +20,7 @@ This guide provides step-by-step instructions for deploying the APGI Standalone 
 ### Infrastructure Requirements
 
 **Minimum Requirements (Development/Staging):**
+
 - 2 CPU cores
 - 4 GB RAM
 - 20 GB disk space
@@ -27,6 +28,7 @@ This guide provides step-by-step instructions for deploying the APGI Standalone 
 - Redis 7+
 
 **Recommended Requirements (Production):**
+
 - 4+ CPU cores per API instance
 - 8+ GB RAM per API instance
 - 100+ GB disk space
@@ -97,6 +99,7 @@ LOG_LEVEL=INFO  # DEBUG, INFO, WARNING, ERROR, CRITICAL
 ### Security Considerations
 
 **Production Environment:**
+
 - `JWT_SECRET_KEY` must be at least 32 characters and cryptographically random
 - `CORS_ORIGINS` must be explicitly configured (no wildcards with credentials)
 - `DATABASE_URL` should use SSL/TLS connections
@@ -104,6 +107,7 @@ LOG_LEVEL=INFO  # DEBUG, INFO, WARNING, ERROR, CRITICAL
 - Use secrets management (AWS Secrets Manager, HashiCorp Vault, etc.)
 
 **Generate a secure JWT secret:**
+
 ```bash
 python -c "import secrets; print(secrets.token_urlsafe(32))"
 ```
@@ -113,12 +117,14 @@ python -c "import secrets; print(secrets.token_urlsafe(32))"
 ### Building the Docker Image
 
 **Production Image:**
+
 ```bash
 cd standalone-api
 docker build -t apgi-api:latest -f deployment/Dockerfile .
 ```
 
 **Development Image:**
+
 ```bash
 docker build -t apgi-api:dev -f deployment/Dockerfile.dev .
 ```
@@ -126,28 +132,33 @@ docker build -t apgi-api:dev -f deployment/Dockerfile.dev .
 ### Docker Compose Deployment
 
 **1. Create environment file:**
+
 ```bash
 cp .env.production .env
 # Edit .env with your configuration
 ```
 
 **2. Start all services:**
+
 ```bash
 docker-compose -f deployment/docker-compose.yml up -d
 ```
 
 This starts:
+
 - PostgreSQL database
 - Redis cache
 - API server (3 instances behind load balancer)
 - Celery worker (2 instances)
 
 **3. Run database migrations:**
+
 ```bash
 docker-compose -f deployment/docker-compose.yml exec api alembic upgrade head
 ```
 
 **4. Verify deployment:**
+
 ```bash
 # Check health
 curl http://localhost:8000/health
@@ -160,11 +171,13 @@ docker-compose -f deployment/docker-compose.yml logs -f api
 ```
 
 **5. Stop services:**
+
 ```bash
 docker-compose -f deployment/docker-compose.yml down
 ```
 
 **6. Stop and remove volumes (WARNING: deletes data):**
+
 ```bash
 docker-compose -f deployment/docker-compose.yml down -v
 ```
@@ -186,7 +199,7 @@ docker-compose -f deployment/docker-compose.prod.yml up -d --scale celery_worker
 
 ## Kubernetes Deployment
 
-### Prerequisites
+### Kubernetes Prerequisites
 
 - Kubernetes cluster (1.24+)
 - kubectl configured to access your cluster
@@ -218,6 +231,7 @@ kubectl get secrets apgi-secrets
 ### Step 3: Deploy PostgreSQL and Redis
 
 **PostgreSQL Deployment:**
+
 ```yaml
 # postgres-deployment.yaml
 apiVersion: apps/v1

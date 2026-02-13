@@ -53,7 +53,7 @@ This implementation plan breaks down the migration of the APGI REST API into a s
     - **Property 3: Database Migration Round-Trip**
     - **Validates: Requirements 3.6**
   
-  - [-] 3.4 Write unit tests for database connection and initialization
+  - [x] 3.4 Write unit tests for database connection and initialization
     - Test database initialization creates all tables
     - Test connection pooling configuration
     - Test database health check on startup
@@ -67,11 +67,11 @@ This implementation plan breaks down the migration of the APGI REST API into a s
     - Ensure JWT secret key validation is present
     - _Requirements: 8.1, 8.2, 8.3, 8.7_
   
-  - [~] 4.2 Write property test for JWT token validation on protected routes
+  - [x] 4.2 Write property test for JWT token validation on protected routes
     - **Property 5: JWT Token Validation on Protected Routes**
     - **Validates: Requirements 8.4**
   
-  - [~] 4.3 Write property test for password hashing with bcrypt
+  - [x] 4.3 Write property test for password hashing with bcrypt
     - **Property 6: Password Hashing with Bcrypt**
     - **Validates: Requirements 8.7**
   

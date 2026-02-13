@@ -30,6 +30,7 @@ The standalone API is a complete extraction of the APGI REST API from the main a
 ### Migration Timeline
 
 **Recommended Timeline:**
+
 - Week 1: Pre-migration preparation and testing
 - Week 2: Parallel deployment and traffic routing
 - Week 3: Gradual traffic migration (10% → 50% → 100%)
@@ -43,6 +44,7 @@ The standalone API is a complete extraction of the APGI REST API from the main a
 **Good News:** The standalone API maintains 100% backward compatibility with the legacy API.
 
 **No Changes Required:**
+
 - ✅ All endpoint paths remain the same
 - ✅ All request formats remain the same
 - ✅ All response formats remain the same
@@ -56,6 +58,7 @@ The standalone API is a complete extraction of the APGI REST API from the main a
 - **Standalone:** API deployed as separate service
 
 **Impact:**
+
 - Different deployment process
 - Separate configuration management
 - Independent scaling
@@ -68,6 +71,7 @@ The standalone API is a complete extraction of the APGI REST API from the main a
 - **Standalone:** Configuration via environment variables
 
 **Impact:**
+
 - Need to migrate configuration to environment variables
 - Need to set up separate secrets management
 - Need to configure CORS for new domain
@@ -79,6 +83,7 @@ The standalone API is a complete extraction of the APGI REST API from the main a
 - **Standalone:** Dedicated database (recommended) or shared database
 
 **Impact:**
+
 - May need to migrate data to new database
 - Need to run database migrations
 - Need to configure database connection
@@ -90,6 +95,7 @@ The standalone API is a complete extraction of the APGI REST API from the main a
 - **Standalone:** Independent dependency management
 
 **Impact:**
+
 - Separate requirements.txt
 - Independent version updates
 - Smaller Docker images
@@ -137,6 +143,7 @@ Deploy the standalone API alongside the legacy API and gradually migrate traffic
 Switch all traffic at once (not recommended for production).
 
 **Use Cases:**
+
 - Small deployments with low traffic
 - Development/staging environments
 - Maintenance window available
@@ -198,18 +205,21 @@ Switch all traffic at once (not recommended for production).
 ### Step 1: Deploy Standalone API in Staging
 
 **1.1 Build Docker Image:**
+
 ```bash
 cd standalone-api
 docker build -t apgi-api:1.0.0 -f deployment/Dockerfile .
 ```
 
 **1.2 Push to Registry:**
+
 ```bash
 docker tag apgi-api:1.0.0 your-registry.com/apgi-api:1.0.0
 docker push your-registry.com/apgi-api:1.0.0
 ```
 
 **1.3 Deploy to Staging:**
+
 ```bash
 # Using Docker Compose
 docker-compose -f deployment/docker-compose.yml up -d
@@ -219,6 +229,7 @@ kubectl apply -f deployment/k8s/
 ```
 
 **1.4 Run Database Migrations:**
+
 ```bash
 # Docker
 docker-compose exec api alembic upgrade head
@@ -228,6 +239,7 @@ kubectl exec -it <api-pod> -- alembic upgrade head
 ```
 
 **1.5 Verify Health:**
+
 ```bash
 curl https://api-staging.example.com/health
 curl https://api-staging.example.com/health/ready
@@ -236,11 +248,13 @@ curl https://api-staging.example.com/health/ready
 ### Step 2: Migrate Data (if using separate database)
 
 **2.1 Backup Legacy Database:**
+
 ```bash
 pg_dump -h legacy-db-host -U apgi_user apgi_db > legacy_backup_$(date +%Y%m%d).sql
 ```
 
 **2.2 Create Standalone Database:**
+
 ```bash
 psql -h standalone-db-host -U postgres -c "CREATE DATABASE apgi_api;"
 psql -h standalone-db-host -U postgres -c "CREATE USER apgi_user WITH PASSWORD 'secure_password';"
@@ -250,6 +264,7 @@ psql -h standalone-db-host -U postgres -c "GRANT ALL PRIVILEGES ON DATABASE apgi
 **2.3 Migrate Data:**
 
 **Option A: Full Database Copy**
+
 ```bash
 # Restore backup to new database
 psql -h standalone-db-host -U apgi_user apgi_api < legacy_backup_20240115.sql
@@ -259,6 +274,7 @@ alembic upgrade head
 ```
 
 **Option B: Selective Data Migration**
+
 ```bash
 # Export specific tables
 pg_dump -h legacy-db-host -U apgi_user -t users -t sessions -t tasks apgi_db > data_export.sql
@@ -271,6 +287,7 @@ alembic upgrade head
 ```
 
 **2.4 Verify Data Integrity:**
+
 ```bash
 # Compare record counts
 psql -h legacy-db-host -U apgi_user apgi_db -c "SELECT COUNT(*) FROM users;"
@@ -283,6 +300,7 @@ psql -h standalone-db-host -U apgi_user apgi_api -c "SELECT * FROM users LIMIT 1
 ### Step 3: Deploy to Production
 
 **3.1 Deploy Standalone API:**
+
 ```bash
 # Using Docker Compose
 docker-compose -f deployment/docker-compose.prod.yml up -d
@@ -292,6 +310,7 @@ kubectl apply -f deployment/k8s/production/
 ```
 
 **3.2 Verify Health:**
+
 ```bash
 curl https://api.example.com/health
 curl https://api.example.com/health/ready
