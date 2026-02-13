@@ -1,0 +1,141 @@
+version: '3.8'
+
+services:
+  # PostgreSQL Database
+  postgres:
+    image: postgres:14-alpine
+    container_name: apgi-postgres-prod
+    environment:
+      POSTGRES_DB: apgi_api_prod
+      POSTGRES_USER: apgi_prod
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-change-this-password}
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_prod_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U apgi_prod -d apgi_api_prod"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    networks:
+      - apgi-network
+    restart: unless-stopped
+
+  # Redis Cache and Message Broker
+  redis:
+    image: redis:7-alpine
+    container_name: apgi-redis-prod
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_prod_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 5s
+    networks:
+      - apgi-network
+    restart: unless-stopped
+    command: redis-server --appendonly yes
+
+  # API Service (Production Build)
+  api:
+    build:
+      context: ..
+      dockerfile: deployment/Dockerfile
+    container_name: apgi-api-prod
+    ports:
+      - "8000:8000"
+    environment:
+      # Environment
+      ENVIRONMENT: production
+      
+      # Database Configuration
+      DATABASE_URL: postgresql://apgi_prod:${POSTGRES_PASSWORD:-change-this-password}@postgres:5432/apgi_api_prod
+      
+      # Redis Configuration
+      REDIS_URL: redis://redis:6379/0
+      
+      # Celery Configuration
+      CELERY_BROKER_URL: redis://redis:6379/1
+      CELERY_RESULT_BACKEND: redis://redis:6379/2
+      
+      # Authentication (MUST be set via environment variable)
+      JWT_SECRET_KEY: ${JWT_SECRET_KEY}
+      JWT_ALGORITHM: HS256
+      JWT_ACCESS_TOKEN_EXPIRE_MINUTES: 30
+      
+      # CORS (MUST be explicitly configured)
+      CORS_ORIGINS: ${CORS_ORIGINS}
+      CORS_ALLOW_CREDENTIALS: "true"
+      
+      # Logging
+      LOG_LEVEL: WARNING
+      
+      # Rate Limiting
+      RATE_LIMIT_ENABLED: "true"
+      RATE_LIMIT_PER_MINUTE: 60
+      
+      # API Configuration
+      API_TITLE: APGI Standalone API
+      API_VERSION: 1.0.0
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - apgi-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+
+  # Celery Worker (Production Build)
+  celery_worker:
+    build:
+      context: ..
+      dockerfile: deployment/Dockerfile
+    container_name: apgi-celery-worker-prod
+    environment:
+      # Environment
+      ENVIRONMENT: production
+      
+      # Database Configuration
+      DATABASE_URL: postgresql://apgi_prod:${POSTGRES_PASSWORD:-change-this-password}@postgres:5432/apgi_api_prod
+      
+      # Redis Configuration
+      REDIS_URL: redis://redis:6379/0
+      
+      # Celery Configuration
+      CELERY_BROKER_URL: redis://redis:6379/1
+      CELERY_RESULT_BACKEND: redis://redis:6379/2
+      
+      # Logging
+      LOG_LEVEL: INFO
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - apgi-network
+    restart: unless-stopped
+    command: celery -A app.celery_app worker --loglevel=info --concurrency=4
+
+networks:
+  apgi-network:
+    driver: bridge
+
+volumes:
+  postgres_prod_data:
+    driver: local
+  redis_prod_data:
+    driver: local

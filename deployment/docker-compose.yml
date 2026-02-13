@@ -1,0 +1,138 @@
+version: '3.8'
+
+services:
+  # PostgreSQL Database
+  postgres:
+    image: postgres:14-alpine
+    container_name: apgi-postgres-dev
+    environment:
+      POSTGRES_DB: apgi_api_dev
+      POSTGRES_USER: apgi_dev
+      POSTGRES_PASSWORD: dev_password
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_dev_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U apgi_dev -d apgi_api_dev"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    networks:
+      - apgi-network
+
+  # Redis Cache and Message Broker
+  redis:
+    image: redis:7-alpine
+    container_name: apgi-redis-dev
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_dev_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 5s
+    networks:
+      - apgi-network
+
+  # API Service
+  api:
+    build:
+      context: ..
+      dockerfile: deployment/Dockerfile.dev
+    container_name: apgi-api-dev
+    ports:
+      - "8000:8000"
+    environment:
+      # Environment
+      ENVIRONMENT: development
+      
+      # Database Configuration
+      DATABASE_URL: postgresql://apgi_dev:dev_password@postgres:5432/apgi_api_dev
+      
+      # Redis Configuration
+      REDIS_URL: redis://redis:6379/0
+      
+      # Celery Configuration
+      CELERY_BROKER_URL: redis://redis:6379/1
+      CELERY_RESULT_BACKEND: redis://redis:6379/2
+      
+      # Authentication
+      JWT_SECRET_KEY: dev-secret-key-change-in-production-min-32-chars
+      JWT_ALGORITHM: HS256
+      JWT_ACCESS_TOKEN_EXPIRE_MINUTES: 30
+      
+      # CORS
+      CORS_ORIGINS: http://localhost:3000,http://localhost:8080
+      CORS_ALLOW_CREDENTIALS: "true"
+      
+      # Logging
+      LOG_LEVEL: DEBUG
+      
+      # Rate Limiting
+      RATE_LIMIT_ENABLED: "true"
+      RATE_LIMIT_PER_MINUTE: 60
+    volumes:
+      # Mount source code for hot-reload
+      - ../app:/app/app:ro
+      - ../alembic.ini:/app/alembic.ini:ro
+      # Mount configuration files
+      - ../.env.development:/app/.env:ro
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - apgi-network
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+
+  # Celery Worker
+  celery_worker:
+    build:
+      context: ..
+      dockerfile: deployment/Dockerfile.dev
+    container_name: apgi-celery-worker-dev
+    environment:
+      # Environment
+      ENVIRONMENT: development
+      
+      # Database Configuration
+      DATABASE_URL: postgresql://apgi_dev:dev_password@postgres:5432/apgi_api_dev
+      
+      # Redis Configuration
+      REDIS_URL: redis://redis:6379/0
+      
+      # Celery Configuration
+      CELERY_BROKER_URL: redis://redis:6379/1
+      CELERY_RESULT_BACKEND: redis://redis:6379/2
+      
+      # Logging
+      LOG_LEVEL: INFO
+    volumes:
+      # Mount source code for hot-reload
+      - ../app:/app/app:ro
+      # Mount configuration files
+      - ../.env.development:/app/.env:ro
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - apgi-network
+    command: celery -A app.celery_app worker --loglevel=info --concurrency=2
+
+networks:
+  apgi-network:
+    driver: bridge
+
+volumes:
+  postgres_dev_data:
+    driver: local
+  redis_dev_data:
+    driver: local

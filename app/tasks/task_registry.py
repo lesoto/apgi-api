@@ -1,0 +1,114 @@
+"""
+Task Registry Module
+
+Registry for mapping task types to their corresponding Celery task functions.
+"""
+
+from typing import Dict, Type
+from enum import Enum
+
+from app.tasks.experimental_tasks import (
+    execute_iowa_gambling_task,
+    execute_masking_paradigm_task,
+    execute_attentional_blink_task,
+    execute_change_blindness_task,
+    execute_binocular_rivalry_task,
+)
+
+
+class TaskType(str, Enum):
+    """Available experimental task types."""
+
+    IOWA_GAMBLING = "iowa_gambling"
+    MASKING_PARADIGM = "masking_paradigm"
+    ATTENTIONAL_BLINK = "attentional_blink"
+    CHANGE_BLINDNESS = "change_blindness"
+    BINOCULAR_RIVALRY = "binocular_rivalry"
+
+
+# Map task types to Celery task names
+TASK_REGISTRY: Dict[TaskType, str] = {
+    TaskType.IOWA_GAMBLING: "app.tasks.experimental_tasks.execute_iowa_gambling_task",
+    TaskType.MASKING_PARADIGM: "app.tasks.experimental_tasks.execute_masking_paradigm_task",
+    TaskType.ATTENTIONAL_BLINK: "app.tasks.experimental_tasks.execute_attentional_blink_task",
+    TaskType.CHANGE_BLINDNESS: "app.tasks.experimental_tasks.execute_change_blindness_task",
+    TaskType.BINOCULAR_RIVALRY: "app.tasks.experimental_tasks.execute_binocular_rivalry_task",
+}
+
+
+# Map task types to task functions (for direct execution)
+TASK_FUNCTIONS: Dict[TaskType, callable] = {
+    TaskType.IOWA_GAMBLING: execute_iowa_gambling_task,
+    TaskType.MASKING_PARADIGM: execute_masking_paradigm_task,
+    TaskType.ATTENTIONAL_BLINK: execute_attentional_blink_task,
+    TaskType.CHANGE_BLINDNESS: execute_change_blindness_task,
+    TaskType.BINOCULAR_RIVALRY: execute_binocular_rivalry_task,
+}
+
+
+def get_task_function(task_type: TaskType) -> callable:
+    """
+    Get the task function for a given task type.
+
+    Args:
+        task_type: The task type
+
+    Returns:
+        The corresponding task function
+
+    Raises:
+        ValueError: If task type is not supported
+    """
+    if task_type not in TASK_FUNCTIONS:
+        raise ValueError(f"Unsupported task type: {task_type}")
+
+    return TASK_FUNCTIONS[task_type]
+
+
+def get_task_name(task_type: TaskType) -> str:
+    """
+    Get the Celery task name for a given task type.
+
+    Args:
+        task_type: The task type
+
+    Returns:
+        The corresponding Celery task name
+
+    Raises:
+        ValueError: If task type is not supported
+    """
+    if task_type not in TASK_REGISTRY:
+        raise ValueError(f"Unsupported task type: {task_type}")
+
+    return TASK_REGISTRY[task_type]
+
+
+def list_available_tasks() -> list:
+    """
+    Get a list of all available task types.
+
+    Returns:
+        List of available task types
+    """
+    return list(TaskType)
+
+
+def validate_task_type(task_type: str) -> TaskType:
+    """
+    Validate and convert string to TaskType enum.
+
+    Args:
+        task_type: String representation of task type
+
+    Returns:
+        TaskType enum value
+
+    Raises:
+        ValueError: If task type is not valid
+    """
+    try:
+        return TaskType(task_type)
+    except ValueError:
+        available_tasks = list_available_tasks()
+        raise ValueError(f"Invalid task type: {task_type}. Available tasks: {available_tasks}")
