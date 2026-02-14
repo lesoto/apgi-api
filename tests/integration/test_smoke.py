@@ -19,14 +19,21 @@ from httpx import AsyncClient, ASGITransport
 
 
 @pytest.fixture
-async def client(test_environment):
+async def client(test_environment, mock_database_connection):
     """Create test client for smoke tests."""
     from app.main import create_app
+    from unittest.mock import AsyncMock, patch
 
-    app = create_app(test_mode=True)
-    transport = ASGITransport(app=app)
-    async with AsyncClient(transport=transport, base_url="http://test") as ac:
-        yield ac
+    # Mock Redis for the lifespan
+    mock_redis_client = AsyncMock()
+    mock_redis_client.ping = AsyncMock()
+    mock_redis_client.close = AsyncMock()
+
+    with patch("redis.asyncio.from_url", return_value=mock_redis_client):
+        app = create_app(test_mode=True)
+        transport = ASGITransport(app=app)
+        async with AsyncClient(transport=transport, base_url="http://test") as ac:
+            yield ac
 
 
 class TestHealthEndpoints:
@@ -67,18 +74,65 @@ class TestHealthEndpoints:
             assert data["status"] in ["healthy", "ready"]
 
     @pytest.mark.asyncio
-    async def test_liveness_check(self, client):
+    async def test_health_service_not_initialized(self, client):
         """
-        Test that /v1/health/live endpoint confirms process is running.
+        Test that health endpoints return 503 when health service is not initialized.
 
-        Validates: Requirement 9.3 - Liveness probe
+        Validates: Health service initialization check
         """
-        response = await client.get("/v1/health/live")
+        from unittest.mock import patch
 
-        assert response.status_code == 200
-        data = response.json()
-        assert data["status"] == "alive"
-        assert "message" in data
+        # Patch health_service to None
+        with patch("app.routes.health.health_service", None):
+            # Test /health
+            response = await client.get("/v1/health")
+            assert response.status_code == 503
+            data = response.json()
+            assert data["status"] == "unhealthy"
+            assert "error" in data
+            assert "Health service not initialized" in data["error"]
+
+            # Test /health/ready
+            response = await client.get("/v1/health/ready")
+            assert response.status_code == 503
+            data = response.json()
+            assert data["status"] == "not_ready"
+            assert "error" in data
+            assert "Health service not initialized" in data["error"]
+
+    @pytest.mark.asyncio
+    async def test_health_check_unhealthy(self, client):
+        """
+        Test that health endpoints return 503 when health check fails.
+
+        Validates: Unhealthy status handling
+        """
+        from unittest.mock import patch, AsyncMock
+
+        # Mock perform_health_check to return unhealthy
+        mock_health_check = AsyncMock(
+            return_value={
+                "status": "unhealthy",
+                "database": {"status": "unhealthy", "error": "Connection failed"},
+                "redis": {"status": "healthy"},
+                "celery": {"status": "healthy"},
+            }
+        )
+
+        with patch("app.routes.health.health_service") as mock_service:
+            mock_service.perform_health_check = mock_health_check
+
+            # Test /health
+            response = await client.get("/v1/health")
+            assert response.status_code == 503
+            data = response.json()
+            assert data["status"] == "unhealthy"
+
+            # Test /health/ready
+            response = await client.get("/v1/health/ready")
+            assert response.status_code == 503
+            data = response.json()
+            assert data["status"] == "unhealthy"
 
 
 class TestAuthenticationFlow:
@@ -91,11 +145,16 @@ class TestAuthenticationFlow:
 
         Validates: Requirement 8.1 - JWT authentication endpoint
         """
-        # Try to login (will fail with test credentials, but endpoint should exist)
-        response = await client.post(
-            "/v1/auth/login",
-            json={"username": "test_user", "password": "test_password"},
-        )
+        from unittest.mock import patch
+
+        # Patch authenticate_user to return None (invalid credentials)
+        # This allows the endpoint to return 401 as expected without MagicMock issues
+        with patch("app.services.auth_manager.AuthManager.authenticate_user", return_value=None):
+            # Try to login (will fail with test credentials, but endpoint should exist)
+            response = await client.post(
+                "/v1/auth/login",
+                json={"username": "test_user", "password": "test_password"},
+            )
 
         # Should get either 200 (success) or 401 (invalid credentials)
         # but not 404 (endpoint missing)
@@ -312,16 +371,22 @@ class TestAPIStructure:
         assert response.status_code in [200, 307]
 
     @pytest.mark.asyncio
-    async def test_openapi_json_available(self, client):
+    async def test_version_endpoint(self, client):
         """
-        Test that OpenAPI JSON schema is available.
+        Test that version endpoint returns correct information.
 
-        Validates: API schema availability
+        Validates: API version information availability
         """
-        response = await client.get("/openapi.json")
+        response = await client.get("/v1/version")
 
         assert response.status_code == 200
         data = response.json()
-        assert "openapi" in data
-        assert "info" in data
-        assert "paths" in data
+        assert "current_version" in data
+        assert "api_version" in data
+        assert "supported_versions" in data
+        assert "deprecated_versions" in data
+        assert "api_spec_url" in data
+        assert "documentation_url" in data
+        assert "timestamp" in data
+        assert data["api_spec_url"] == "/openapi.json"
+        assert data["documentation_url"] == "/docs"

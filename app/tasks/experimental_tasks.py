@@ -20,7 +20,6 @@ from apgi_system.system import APGISystem
 from app.celery_app import celery_app
 from app.database.connection import get_db
 from app.database.models import Task as TaskModel
-from app.services.webhook_manager import WebhookManager
 
 logger = logging.getLogger(__name__)
 

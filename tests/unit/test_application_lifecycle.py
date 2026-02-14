@@ -118,7 +118,7 @@ class TestLifespanStartup:
 
             # Verify database connection was used
             mock_engine, mock_session, mock_session_instance = mock_database_connection
-            mock_engine.assert_called_once()
+            mock_session.assert_called_once()
 
     @pytest.mark.asyncio
     @patch("redis.asyncio.from_url")
@@ -197,7 +197,7 @@ class TestGracefulShutdown:
 
             # Verify database connection was used
             mock_engine, mock_session, mock_session_instance = mock_database_connection
-            mock_engine.assert_called_once()
+            mock_engine.dispose.assert_called_once()
 
     @pytest.mark.asyncio
     @patch("redis.asyncio.from_url")
@@ -271,7 +271,7 @@ class TestStartupFailureHandling:
 
     @pytest.mark.asyncio
     @patch("redis.asyncio.from_url")
-    @patch("app.database.connection.init_db")
+    @patch("app.main.init_db")
     async def test_startup_fails_if_database_unavailable(
         self, mock_init_db, mock_redis, mock_database_connection
     ):

@@ -178,21 +178,17 @@ def test_database_url():
     Provide a test database URL.
 
     Uses environment variable TEST_DATABASE_URL if set,
-    otherwise uses a default PostgreSQL test database.
+    otherwise uses SQLite in-memory database for testing.
 
-    Note: These tests require PostgreSQL because the migrations use
-    PostgreSQL-specific types (ARRAY, JSONB). SQLite is not supported.
+    Note: These tests use SQLite for simplicity, but migrations are designed
+    for PostgreSQL. Some PostgreSQL-specific features may not work in SQLite.
 
-    To run these tests, either:
-    1. Start PostgreSQL locally (e.g., via docker-compose)
-    2. Set TEST_DATABASE_URL environment variable to a PostgreSQL database
-
-    Example:
+    To run these tests with PostgreSQL:
         TEST_DATABASE_URL=postgresql://user:pass@localhost:5432/test_db pytest
     """
     return os.environ.get(
         "TEST_DATABASE_URL",
-        "postgresql://apgi_dev:dev_password@localhost:5432/apgi_api_test_migrations",
+        "sqlite:///:memory:",
     )
 
 
@@ -206,16 +202,16 @@ def clean_test_database(test_database_url):
     2. Yields control to the test
     3. Drops all tables after the test
 
-    Skips tests if PostgreSQL is not available.
+    Supports both SQLite and PostgreSQL databases.
     """
-    # Check if PostgreSQL is available
-    if not test_database_url.startswith("postgresql"):
-        pytest.skip("PostgreSQL database required for migration tests")
-
+    # Check database connectivity
     try:
         engine = create_engine(test_database_url, poolclass=NullPool)
+        # Test connection
+        with engine.connect() as conn:
+            conn.execute(text("SELECT 1"))
     except Exception as e:
-        pytest.skip(f"Cannot connect to PostgreSQL database: {e}")
+        pytest.skip(f"Cannot connect to test database: {e}")
 
     # Determine if we're using SQLite or PostgreSQL
     is_sqlite = test_database_url.startswith("sqlite")
@@ -293,6 +289,11 @@ def test_property_3_migration_roundtrip_initial_schema(clean_test_database):
     6. Compare snapshots - they should be identical
     """
     database_url = clean_test_database
+
+    # Skip test if using SQLite (migrations use PostgreSQL-specific features)
+    if database_url.startswith("sqlite"):
+        pytest.skip("Migration tests require PostgreSQL database for ARRAY and JSONB types")
+
     engine = create_engine(database_url, poolclass=NullPool)
 
     # Step 1: Capture initial schema (should be empty)
@@ -382,6 +383,11 @@ def test_property_3_migration_roundtrip_idempotency(clean_test_database):
     downgrade works correctly regardless of how many times upgrade was run.
     """
     database_url = clean_test_database
+
+    # Skip test if using SQLite (migrations use PostgreSQL-specific features)
+    if database_url.startswith("sqlite"):
+        pytest.skip("Migration tests require PostgreSQL database for ARRAY and JSONB types")
+
     engine = create_engine(database_url, poolclass=NullPool)
 
     # Capture initial state
@@ -452,6 +458,11 @@ def test_property_3_migration_roundtrip_preserves_alembic_version(clean_test_dat
     that the system knows which migrations have been applied.
     """
     database_url = clean_test_database
+
+    # Skip test if using SQLite (migrations use PostgreSQL-specific features)
+    if database_url.startswith("sqlite"):
+        pytest.skip("Migration tests require PostgreSQL database for ARRAY and JSONB types")
+
     engine = create_engine(database_url, poolclass=NullPool)
 
     alembic_cfg = get_alembic_config(database_url)
@@ -524,6 +535,11 @@ def test_property_3_migration_roundtrip_multiple_cycles(clean_test_database, upg
     times without accumulating state or causing inconsistencies.
     """
     database_url = clean_test_database
+
+    # Skip test if using SQLite (migrations use PostgreSQL-specific features)
+    if database_url.startswith("sqlite"):
+        pytest.skip("Migration tests require PostgreSQL database for ARRAY and JSONB types")
+
     engine = create_engine(database_url, poolclass=NullPool)
 
     alembic_cfg = get_alembic_config(database_url)

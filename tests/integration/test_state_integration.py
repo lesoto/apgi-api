@@ -1,0 +1,234 @@
+"""
+Integration Tests for State Routes
+
+Tests state access endpoints through HTTP requests with authentication.
+"""
+
+import pytest
+import uuid
+from unittest.mock import AsyncMock, MagicMock, patch
+from httpx import AsyncClient, ASGITransport
+
+
+@pytest.fixture
+async def authenticated_client(test_environment, mock_database_connection):
+    """Create authenticated test client for state integration tests."""
+    from app.main import create_app
+    from app.services.auth_manager import AuthManager
+    from unittest.mock import AsyncMock, patch
+
+    # Mock Redis for the lifespan
+    mock_redis_client = AsyncMock()
+    mock_redis_client.ping = AsyncMock()
+    mock_redis_client.close = AsyncMock()
+
+    # Mock User for authentication
+    mock_user = MagicMock()
+    mock_user.user_id = str(uuid.uuid4())
+    mock_user.username = "test_user"
+    mock_user.roles = ["admin"]
+
+    # Create a real JWT token for the mock user
+    auth_manager = AuthManager(db=None)  # We don't need DB for token creation
+    access_token = auth_manager.create_access_token(
+        user_id=mock_user.user_id, username=mock_user.username, roles=mock_user.roles
+    )
+
+    with (
+        patch("redis.asyncio.from_url", return_value=mock_redis_client),
+        patch("app.services.auth_manager.AuthManager.authenticate_user", return_value=mock_user),
+        patch("app.middleware.authentication.is_authenticated", return_value=True),
+    ):
+        app = create_app(test_mode=True)
+        transport = ASGITransport(app=app)
+        async with AsyncClient(transport=transport, base_url="http://test") as ac:
+            # Add the JWT token to default headers
+            ac.headers.update({"Authorization": f"Bearer {access_token}"})
+            # Store the mock redis for use in tests
+            ac._mock_redis = mock_redis_client
+            yield ac
+
+
+@pytest.fixture
+def mock_session_manager():
+    """Create mock SessionManager for integration tests."""
+    manager = MagicMock()
+    mock_session = MagicMock()
+    mock_session.get_state = AsyncMock(
+        return_value={
+            "time": 1000.0,
+            "ignition": {
+                "ignition_occurred": True,
+                "total_signal": 3.5,
+                "threshold": 2.0,
+                "duration_ms": 250.0,
+            },
+            "workspace": {
+                "is_broadcasting": True,
+                "content": "Test content",
+                "broadcast_duration_ms": 150.0,
+            },
+            "body": {
+                "heart_rate": 75.0,
+                "cortisol": 0.15,
+                "temperature": 37.2,
+            },
+            "allostasis": {
+                "allostatic_load": 0.3,
+            },
+            "precision": {
+                "exteroceptive": 0.8,
+                "interoceptive": 0.9,
+            },
+            "metabolism": {
+                "reserves": 800.0,
+                "reserve_fraction": 0.8,
+            },
+            "self_model": {
+                "minimal": {"coherence": 0.6},
+                "narrative": {"active": True},
+            },
+            "history": {
+                "time": [500.0, 1000.0, 1500.0],
+                "ignitions": [False, True, False],
+            },
+            "prediction": {
+                "errors": {"level1": 0.1, "level2": 0.05},
+                "exteroceptive_stats": {"mean": 0.2},
+                "interoceptive_stats": {"mean": 0.1},
+            },
+            "interoception": {
+                "somatic_markers": {
+                    "num_markers": 10,
+                    "total_retrievals": 50,
+                    "successful_retrievals": 45,
+                    "retrieval_rate": 0.9,
+                    "markers": [{"context": "test", "action": "response", "outcome": "good"}],
+                },
+            },
+        }
+    )
+    manager.get_session = AsyncMock(return_value=mock_session)
+    return manager
+
+
+class TestStateRoutesIntegration:
+    """Integration tests for state access endpoints."""
+
+    @pytest.mark.asyncio
+    async def test_get_system_state_authenticated(self, authenticated_client, mock_session_manager):
+        """Test getting complete system state with authentication."""
+        from app.routes.sessions import init_session_routes
+
+        session_id = str(uuid.uuid4())
+
+        # Initialize session routes with mock redis
+        init_session_routes(authenticated_client._mock_redis)
+        import app.routes.sessions
+
+        app.routes.sessions._session_manager = mock_session_manager
+
+        response = await authenticated_client.get(f"/v1/sessions/{session_id}/state")
+
+        assert response.status_code == 200
+        data = response.json()
+        assert "time_ms" in data
+        assert "ignition" in data
+        assert "workspace" in data
+        assert "body" in data
+        assert "allostasis" in data
+        assert "precision" in data
+        assert "metabolism" in data
+        assert "self_model" in data
+
+    @pytest.mark.asyncio
+    async def test_get_ignition_history_authenticated(
+        self, authenticated_client, mock_session_manager
+    ):
+        """Test getting ignition event history with authentication."""
+        from app.routes.sessions import init_session_routes
+
+        session_id = str(uuid.uuid4())
+
+        # Initialize session routes with mock redis
+        init_session_routes(authenticated_client._mock_redis)
+        import app.routes.sessions
+
+        app.routes.sessions._session_manager = mock_session_manager
+
+        response = await authenticated_client.get(f"/v1/sessions/{session_id}/ignition-history")
+
+        assert response.status_code == 200
+        data = response.json()
+        assert "events" in data
+        assert "pagination" in data
+
+    @pytest.mark.asyncio
+    async def test_get_interoceptive_state_authenticated(
+        self, authenticated_client, mock_session_manager
+    ):
+        """Test getting interoceptive body state with authentication."""
+        from app.routes.sessions import init_session_routes
+
+        session_id = str(uuid.uuid4())
+
+        # Initialize session routes with mock redis
+        init_session_routes(authenticated_client._mock_redis)
+        import app.routes.sessions
+
+        app.routes.sessions._session_manager = mock_session_manager
+
+        response = await authenticated_client.get(f"/v1/sessions/{session_id}/interoception")
+
+        assert response.status_code == 200
+        data = response.json()
+        assert "heart_rate" in data
+        assert "cortisol" in data
+        assert "temperature" in data
+
+    @pytest.mark.asyncio
+    async def test_get_prediction_errors_authenticated(
+        self, authenticated_client, mock_session_manager
+    ):
+        """Test getting prediction errors with authentication."""
+        from app.routes.sessions import init_session_routes
+
+        session_id = str(uuid.uuid4())
+
+        # Initialize session routes with mock redis
+        init_session_routes(authenticated_client._mock_redis)
+        import app.routes.sessions
+
+        app.routes.sessions._session_manager = mock_session_manager
+
+        response = await authenticated_client.get(f"/v1/sessions/{session_id}/prediction-errors")
+
+        assert response.status_code == 200
+        data = response.json()
+        assert "session_id" in data
+        assert "time_ms" in data
+        assert "prediction_errors" in data
+
+    @pytest.mark.asyncio
+    async def test_get_somatic_markers_authenticated(
+        self, authenticated_client, mock_session_manager
+    ):
+        """Test getting somatic markers with authentication."""
+        from app.routes.sessions import init_session_routes
+
+        session_id = str(uuid.uuid4())
+
+        # Initialize session routes with mock redis
+        init_session_routes(authenticated_client._mock_redis)
+        import app.routes.sessions
+
+        app.routes.sessions._session_manager = mock_session_manager
+
+        response = await authenticated_client.get(f"/v1/sessions/{session_id}/somatic-markers")
+
+        assert response.status_code == 200
+        data = response.json()
+        assert "session_id" in data
+        assert "time_ms" in data
+        assert "num_markers" in data
+        assert "markers" in data

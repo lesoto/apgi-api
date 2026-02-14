@@ -157,7 +157,34 @@ def create_app(test_mode: bool = False) -> FastAPI:
     app = FastAPI(
         title="APGI System API",
         version="1.0.0",
-        description="REST API for Allostatic Precision-Gated Ignition consciousness modeling",
+        description="""REST API for Allostatic Precision-Gated Ignition consciousness modeling.
+
+## Rate Limiting
+
+This API implements rate limiting to ensure fair usage and protect against abuse:
+
+- **Default Rate Limit**: 60 requests per minute per client
+- **Rate limiting is based on IP address** and applies to all endpoints
+- **Rate limit headers** are included in all responses:
+  - `X-RateLimit-Limit`: Maximum requests allowed per time window
+  - `X-RateLimit-Remaining`: Remaining requests in current window
+  - `X-RateLimit-Reset`: Time when the rate limit resets (Unix timestamp)
+
+When the rate limit is exceeded, the API returns HTTP 429 (Too Many Requests) with details about when to retry.
+
+## Authentication
+
+All endpoints except `/health`, `/docs`, and `/openapi.json` require authentication using JWT tokens:
+- Include `Authorization: Bearer <token>` in request headers
+- Obtain tokens via the `/v1/auth/login` endpoint
+- Refresh tokens using `/v1/auth/refresh` before expiration
+
+## Data Formats
+
+- All timestamps use ISO 8601 format with UTC timezone
+- JSON is the primary data exchange format
+- Binary data (exports) uses appropriate MIME types
+""",
         docs_url="/docs",
         redoc_url="/redoc",
         openapi_url="/openapi.json",
