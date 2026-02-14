@@ -1,0 +1,4 @@
+[console_scripts]
+apgi-api = app.main:cli
+apgi-migrate = app.cli:migrate
+apgi-worker = app.cli:worker

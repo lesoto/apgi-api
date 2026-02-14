@@ -126,15 +126,29 @@ class DeprecationMiddleware(BaseHTTPMiddleware):
             deprecation_info: Deprecation information
 
         Returns:
-            Warning message string
+            Warning message string (ASCII-safe for HTTP headers)
         """
-        msg = f'299 - "Deprecated API endpoint: {path}"'
+        # Ensure path is ASCII-safe for HTTP headers (latin-1 encoding)
+        try:
+            safe_path = path.encode("latin-1").decode("latin-1")
+        except UnicodeEncodeError:
+            # If path contains non-latin-1 characters, use URL encoding
+            safe_path = path.encode("ascii", errors="backslashreplace").decode("ascii")
+
+        msg = f'299 - "Deprecated API endpoint: {safe_path}"'
 
         if "sunset" in deprecation_info:
             msg += f' "Sunset date: {deprecation_info["sunset"]}"'
 
         if "replacement" in deprecation_info:
-            msg += f' "Use {deprecation_info["replacement"]} instead"'
+            replacement = deprecation_info["replacement"]
+            try:
+                safe_replacement = replacement.encode("latin-1").decode("latin-1")
+            except UnicodeEncodeError:
+                safe_replacement = replacement.encode("ascii", errors="backslashreplace").decode(
+                    "ascii"
+                )
+            msg += f' "Use {safe_replacement} instead"'
 
         return msg
 

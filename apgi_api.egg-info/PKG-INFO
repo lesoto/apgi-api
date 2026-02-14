@@ -1,0 +1,53 @@
+Metadata-Version: 2.4
+Name: apgi-api
+Version: 1.0.0
+Summary: Standalone REST API for the APGI system
+Author-email: APGI Team <team@apgi.example.com>
+License: MIT
+Project-URL: Homepage, https://github.com/apgi/standalone-api
+Project-URL: Documentation, https://docs.apgi.example.com
+Project-URL: Repository, https://github.com/apgi/standalone-api
+Project-URL: Issues, https://github.com/apgi/standalone-api/issues
+Keywords: api,rest,fastapi,consciousness,cognitive-science
+Classifier: Development Status :: 4 - Beta
+Classifier: Intended Audience :: Science/Research
+Classifier: License :: OSI Approved :: MIT License
+Classifier: Programming Language :: Python :: 3
+Classifier: Programming Language :: Python :: 3.10
+Classifier: Programming Language :: Python :: 3.11
+Classifier: Programming Language :: Python :: 3.12
+Classifier: Framework :: FastAPI
+Classifier: Topic :: Scientific/Engineering :: Artificial Intelligence
+Requires-Python: >=3.10
+Description-Content-Type: text/markdown
+Requires-Dist: fastapi>=0.110.0
+Requires-Dist: uvicorn[standard]>=0.28.0
+Requires-Dist: starlette>=0.37.0
+Requires-Dist: pydantic>=2.8.0
+Requires-Dist: pydantic-settings>=2.3.0
+Requires-Dist: python-multipart>=0.0.9
+Requires-Dist: sqlalchemy>=2.0.30
+Requires-Dist: alembic>=1.13.0
+Requires-Dist: psycopg2-binary>=2.9.9
+Requires-Dist: asyncpg>=0.29.0
+Requires-Dist: redis>=5.0.1
+Requires-Dist: celery>=5.3.4
+Requires-Dist: kombu>=5.3.4
+Requires-Dist: pyjwt>=2.8.0
+Requires-Dist: bcrypt<5.0.0,>=4.0.0
+Requires-Dist: python-jose[cryptography]>=3.3.0
+Requires-Dist: httpx>=0.27.0
+Requires-Dist: prometheus-client>=0.19.0
+Requires-Dist: python-dotenv>=1.0.0
+Requires-Dist: pyyaml>=6.0.1
+Requires-Dist: psutil>=5.9.5
+Provides-Extra: dev
+Requires-Dist: pytest>=8.0.0; extra == "dev"
+Requires-Dist: pytest-asyncio>=0.23.0; extra == "dev"
+Requires-Dist: pytest-cov>=4.1.0; extra == "dev"
+Requires-Dist: hypothesis>=6.92.1; extra == "dev"
+Requires-Dist: locust>=2.20.0; extra == "dev"
+Requires-Dist: black>=24.0.0; extra == "dev"
+Requires-Dist: flake8>=7.0.0; extra == "dev"
+Requires-Dist: mypy>=1.9.0; extra == "dev"
+Requires-Dist: isort>=5.13.0; extra == "dev"

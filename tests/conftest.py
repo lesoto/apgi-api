@@ -8,6 +8,14 @@ and integration tests for the standalone API.
 import pytest
 from hypothesis import settings, HealthCheck
 
+# Import database test fixtures
+from tests.conftest_database import (
+    test_db_engine,
+    test_db_session,
+    mock_database_connection,
+    test_environment,
+)
+
 # Configure Hypothesis profiles for property-based testing
 settings.register_profile(
     "ci", max_examples=100, deadline=None, suppress_health_check=[HealthCheck.too_slow]

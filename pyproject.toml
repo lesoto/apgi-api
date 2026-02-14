@@ -55,6 +55,7 @@ dev = [
     "pytest-asyncio>=0.23.0",
     "pytest-cov>=4.1.0",
     "hypothesis>=6.92.1",
+    "locust>=2.20.0",
     "black>=24.0.0",
     "flake8>=7.0.0",
     "mypy>=1.9.0",
@@ -127,7 +128,7 @@ ignore_missing_imports = true
 
 [tool.pytest.ini_options]
 minversion = "8.0"
-addopts = "-ra -q --strict-markers --cov=app --cov-report=term-missing"
+addopts = "-ra -q --strict-markers --cov=app --cov-report=term-missing --ignore=tests/load"
 testpaths = ["tests"]
 asyncio_mode = "auto"
 asyncio_default_fixture_loop_scope = "function"
@@ -136,6 +137,7 @@ markers = [
     "integration: Integration tests",
     "property: Property-based tests",
     "slow: Slow running tests",
+    "load: Load and performance tests",
 ]
 
 [tool.coverage.run]
