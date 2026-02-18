@@ -6,8 +6,10 @@ Defines the data schemas for API requests and responses.
 
 from datetime import datetime
 from typing import Any, Dict, Optional
+import re
+import uuid
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 
 class SessionCreateRequest(BaseModel):
@@ -20,6 +22,79 @@ class SessionCreateRequest(BaseModel):
     description: Optional[str] = Field(
         None, description="Human-readable description of the session"
     )
+
+    @field_validator("config_path")
+    @classmethod
+    def validate_config_path(cls, v):
+        """Validate configuration file path."""
+        if v is None:
+            return v
+
+        if not isinstance(v, str) or not v.strip():
+            raise ValueError("Configuration path must be a non-empty string")
+
+        # Basic path validation - prevent directory traversal
+        if ".." in v or v.startswith("/"):
+            raise ValueError("Invalid configuration path: directory traversal not allowed")
+
+        # Check for valid file extension
+        if not v.endswith((".yaml", ".yml")):
+            raise ValueError("Configuration file must have .yaml or .yml extension")
+
+        # Reasonable path length limit
+        if len(v) > 255:
+            raise ValueError("Configuration path is too long (max 255 characters)")
+
+        return v.strip()
+
+    @field_validator("custom_config")
+    @classmethod
+    def validate_custom_config(cls, v):
+        """Validate custom configuration."""
+        if v is None:
+            return v
+
+        if not isinstance(v, dict):
+            raise ValueError("Custom configuration must be a dictionary")
+
+        # Validate configuration keys and values
+        for key, value in v.items():
+            if not isinstance(key, str) or not key.strip():
+                raise ValueError(f"Configuration key must be a non-empty string, got: {key}")
+
+            # Prevent certain dangerous configuration keys
+            dangerous_keys = {"database_url", "secret_key", "password", "token"}
+            if key.lower() in dangerous_keys:
+                raise ValueError(f'Configuration key "{key}" is not allowed in custom config')
+
+        return v
+
+    @field_validator("description")
+    @classmethod
+    def validate_description(cls, v):
+        """Validate session description."""
+        if v is None:
+            return v
+
+        if not isinstance(v, str):
+            raise ValueError("Description must be a string")
+
+        # Reasonable length limit
+        if len(v) > 500:
+            raise ValueError("Description is too long (max 500 characters)")
+
+        return v.strip()
+
+    @model_validator(mode="after")
+    def validate_config_consistency(self):
+        """Validate consistency between config_path and custom_config."""
+        if self.config_path and self.custom_config:
+            # Having both is allowed but warn about potential conflicts
+            pass
+        elif not self.config_path and not self.custom_config:
+            raise ValueError("Either config_path or custom_config must be provided")
+
+        return self
 
     model_config = ConfigDict(
         json_schema_extra={
@@ -37,6 +112,42 @@ class LoginRequest(BaseModel):
     username: str = Field(..., description="Username or email address")
     password: str = Field(..., description="User password", min_length=1)
     remember_me: Optional[bool] = Field(False, description="Extend session duration")
+
+    @field_validator("username")
+    @classmethod
+    def validate_username(cls, v):
+        """Validate username format."""
+        if not v or not v.strip():
+            raise ValueError("Username cannot be empty")
+
+        # Check for valid email format if it looks like an email
+        if "@" in v:
+            email_regex = r"^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$"
+            if not re.match(email_regex, v):
+                raise ValueError("Invalid email format")
+
+        # Check username format (alphanumeric, underscore, dash, min 3 chars)
+        elif not re.match(r"^[a-zA-Z0-9_-]{3,50}$", v):
+            raise ValueError(
+                "Username must be 3-50 characters, alphanumeric with underscores or dashes"
+            )
+
+        return v.strip()
+
+    @field_validator("password")
+    @classmethod
+    def validate_password(cls, v):
+        """Validate password strength."""
+        if not v or len(v) < 8:
+            raise ValueError("Password must be at least 8 characters long")
+
+        # Check for at least one uppercase, one lowercase, one digit
+        if not (re.search(r"[A-Z]", v) and re.search(r"[a-z]", v) and re.search(r"\d", v)):
+            raise ValueError(
+                "Password must contain at least one uppercase letter, one lowercase letter, and one digit"
+            )
+
+        return v
 
     model_config = ConfigDict(
         json_schema_extra={
@@ -151,6 +262,78 @@ class TaskSubmitRequest(BaseModel):
     webhook_url: Optional[str] = Field(
         None, description="Webhook URL for task completion notification"
     )
+
+    @field_validator("task_type")
+    @classmethod
+    def validate_task_type(cls, v):
+        """Validate task type."""
+        if not v or not v.strip():
+            raise ValueError("Task type cannot be empty")
+
+        # Define valid task types (this should ideally come from a registry)
+        valid_task_types = {
+            "attentional_blink",
+            "working_memory",
+            "decision_making",
+            "emotion_recognition",
+            "cognitive_load",
+            "learning_task",
+            "memory_consolidation",
+            "attention_task",
+            "executive_function",
+        }
+
+        if v not in valid_task_types:
+            raise ValueError(
+                f'Invalid task type: {v}. Valid types are: {", ".join(sorted(valid_task_types))}'
+            )
+
+        return v.strip()
+
+    @field_validator("parameters")
+    @classmethod
+    def validate_parameters(cls, v):
+        """Validate task parameters."""
+        if not isinstance(v, dict):
+            raise ValueError("Parameters must be a dictionary")
+
+        # Basic validation - ensure parameter names are reasonable
+        for key, value in v.items():
+            if not isinstance(key, str) or not key.strip():
+                raise ValueError(f"Parameter key must be a non-empty string, got: {key}")
+
+            # Basic type checking for common parameter types
+            if isinstance(value, (int, float)):
+                if value < 0:
+                    raise ValueError(f"Numeric parameter {key} cannot be negative")
+            elif isinstance(value, str):
+                if len(value) > 1000:  # Reasonable limit
+                    raise ValueError(f"String parameter {key} is too long (max 1000 characters)")
+
+        return v
+
+    @field_validator("webhook_url")
+    @classmethod
+    def validate_webhook_url(cls, v):
+        """Validate webhook URL format."""
+        if v is None:
+            return v
+
+        if not isinstance(v, str) or not v.strip():
+            raise ValueError("Webhook URL must be a non-empty string")
+
+        # Basic URL validation
+        url_regex = r"^https?://[^\s/$.?#].[^\s]*$"
+        if not re.match(url_regex, v):
+            raise ValueError("Invalid webhook URL format. Must be a valid HTTP/HTTPS URL")
+
+        # Additional security check - only allow HTTPS in production
+        if not v.startswith("https://"):
+            # In a real app, you'd check environment here
+            # For now, we'll allow HTTP but warn about it
+            pass
+
+        return v.strip()
 
     model_config = ConfigDict(
         json_schema_extra={
@@ -273,6 +456,63 @@ class UserCreateRequest(BaseModel):
     email: str = Field(..., description="Email address")
     password: str = Field(..., description="Password")
     roles: list[str] = Field(default_factory=list, description="User roles")
+
+    @field_validator("username")
+    @classmethod
+    def validate_username(cls, v):
+        """Validate username format."""
+        if not v or not v.strip():
+            raise ValueError("Username cannot be empty")
+
+        # Check username format (alphanumeric, underscore, dash, min 3 chars)
+        if not re.match(r"^[a-zA-Z0-9_-]{3,50}$", v):
+            raise ValueError(
+                "Username must be 3-50 characters, alphanumeric with underscores or dashes"
+            )
+
+        return v.strip()
+
+    @field_validator("email")
+    @classmethod
+    def validate_email(cls, v):
+        """Validate email format."""
+        if not v or not v.strip():
+            raise ValueError("Email cannot be empty")
+
+        email_regex = r"^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$"
+        if not re.match(email_regex, v):
+            raise ValueError("Invalid email format")
+
+        return v.strip().lower()
+
+    @field_validator("password")
+    @classmethod
+    def validate_password(cls, v):
+        """Validate password strength."""
+        if not v or len(v) < 8:
+            raise ValueError("Password must be at least 8 characters long")
+
+        # Check for at least one uppercase, one lowercase, one digit
+        if not (re.search(r"[A-Z]", v) and re.search(r"[a-z]", v) and re.search(r"\d", v)):
+            raise ValueError(
+                "Password must contain at least one uppercase letter, one lowercase letter, and one digit"
+            )
+
+        return v
+
+    @field_validator("roles")
+    @classmethod
+    def validate_roles(cls, v):
+        """Validate user roles."""
+        if not isinstance(v, list):
+            raise ValueError("Roles must be a list")
+
+        valid_roles = {"admin", "user", "researcher", "analyst"}
+        for role in v:
+            if role not in valid_roles:
+                raise ValueError(f'Invalid role: {role}. Valid roles are: {", ".join(valid_roles)}')
+
+        return v
 
 
 class UserCreateResponse(BaseModel):

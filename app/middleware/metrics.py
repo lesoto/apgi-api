@@ -56,6 +56,72 @@ response_size_bytes = Histogram(
     buckets=(100, 500, 1000, 5000, 10000, 50000, 100000, 500000, 1000000),
 )
 
+# Business-specific metrics
+
+# User activity metrics
+user_registrations = Counter(
+    "apgi_api_user_registrations_total", "Total number of user registrations"
+)
+user_logins = Counter("apgi_api_user_logins_total", "Total number of user logins", ["login_method"])
+user_logouts = Counter("apgi_api_user_logouts_total", "Total number of user logouts")
+active_users = Gauge("apgi_api_active_users", "Number of currently active users")
+
+# Session metrics
+sessions_created = Counter(
+    "apgi_api_sessions_created_total", "Total number of sessions created", ["session_type"]
+)
+sessions_completed = Counter(
+    "apgi_api_sessions_completed_total", "Total number of sessions completed", ["session_type"]
+)
+sessions_failed = Counter(
+    "apgi_api_sessions_failed_total",
+    "Total number of sessions failed",
+    ["session_type", "failure_reason"],
+)
+session_duration = Histogram(
+    "apgi_api_session_duration_seconds",
+    "Session duration in seconds",
+    ["session_type"],
+    buckets=(60, 300, 600, 1800, 3600, 7200, 14400, 28800),  # 1min to 8hrs
+)
+
+# Task metrics
+tasks_created = Counter(
+    "apgi_api_tasks_created_total", "Total number of tasks created", ["task_type"]
+)
+tasks_completed = Counter(
+    "apgi_api_tasks_completed_total", "Total number of tasks completed", ["task_type"]
+)
+tasks_failed = Counter(
+    "apgi_api_tasks_failed_total", "Total number of tasks failed", ["task_type", "failure_reason"]
+)
+task_duration = Histogram(
+    "apgi_api_task_duration_seconds",
+    "Task execution duration in seconds",
+    ["task_type"],
+    buckets=(0.1, 0.5, 1, 5, 10, 30, 60, 300, 600),  # 0.1s to 10min
+)
+task_queue_wait_time = Histogram(
+    "apgi_api_task_queue_wait_time_seconds",
+    "Time tasks spend waiting in queue",
+    ["task_type"],
+    buckets=(0.01, 0.05, 0.1, 0.5, 1, 5, 10, 30, 60),  # 10ms to 1min
+)
+
+# Data export metrics
+exports_requested = Counter(
+    "apgi_api_exports_requested_total", "Total number of data exports requested", ["export_format"]
+)
+exports_completed = Counter(
+    "apgi_api_exports_completed_total", "Total number of data exports completed", ["export_format"]
+)
+export_size_bytes = Histogram(
+    "apgi_api_export_size_bytes",
+    "Size of exported data in bytes",
+    ["export_format"],
+    buckets=(1000, 10000, 50000, 100000, 500000, 1000000, 5000000, 10000000),  # 1KB to 10MB
+)
+
 
 class PrometheusMetricsMiddleware(BaseHTTPMiddleware):
     """
@@ -238,6 +304,162 @@ class MetricsCollector:
             endpoint: Endpoint where error occurred
         """
         error_counter.labels(error_type=error_type, endpoint=endpoint).inc()
+
+    @staticmethod
+    def record_user_registration():
+        """Increment user registration counter."""
+        user_registrations.inc()
+
+    @staticmethod
+    def record_user_login(login_method: str = "password"):
+        """
+        Increment user login counter.
+
+        Args:
+            login_method: Method used for login (e.g., "password", "token")
+        """
+        user_logins.labels(login_method=login_method).inc()
+
+    @staticmethod
+    def record_user_logout():
+        """Increment user logout counter."""
+        user_logouts.inc()
+
+    @staticmethod
+    def set_active_users(count: int):
+        """
+        Update active users gauge.
+
+        Args:
+            count: Number of currently active users
+        """
+        active_users.set(count)
+
+    @staticmethod
+    def record_session_created(session_type: str = "default"):
+        """
+        Increment session creation counter.
+
+        Args:
+            session_type: Type of session created
+        """
+        sessions_created.labels(session_type=session_type).inc()
+
+    @staticmethod
+    def record_session_completed(session_type: str = "default"):
+        """
+        Increment session completion counter.
+
+        Args:
+            session_type: Type of session completed
+        """
+        sessions_completed.labels(session_type=session_type).inc()
+
+    @staticmethod
+    def record_session_failed(session_type: str = "default", failure_reason: str = "unknown"):
+        """
+        Increment session failure counter.
+
+        Args:
+            session_type: Type of session
+            failure_reason: Reason for failure
+        """
+        sessions_failed.labels(session_type=session_type, failure_reason=failure_reason).inc()
+
+    @staticmethod
+    def record_session_duration(session_type: str, duration_seconds: float):
+        """
+        Record session duration.
+
+        Args:
+            session_type: Type of session
+            duration_seconds: Session duration in seconds
+        """
+        session_duration.labels(session_type=session_type).observe(duration_seconds)
+
+    @staticmethod
+    def record_task_created(task_type: str):
+        """
+        Increment task creation counter.
+
+        Args:
+            task_type: Type of task created
+        """
+        tasks_created.labels(task_type=task_type).inc()
+
+    @staticmethod
+    def record_task_completed(task_type: str):
+        """
+        Increment task completion counter.
+
+        Args:
+            task_type: Type of task completed
+        """
+        tasks_completed.labels(task_type=task_type).inc()
+
+    @staticmethod
+    def record_task_failed(task_type: str, failure_reason: str = "unknown"):
+        """
+        Increment task failure counter.
+
+        Args:
+            task_type: Type of task
+            failure_reason: Reason for failure
+        """
+        tasks_failed.labels(task_type=task_type, failure_reason=failure_reason).inc()
+
+    @staticmethod
+    def record_task_duration(task_type: str, duration_seconds: float):
+        """
+        Record task execution duration.
+
+        Args:
+            task_type: Type of task
+            duration_seconds: Task duration in seconds
+        """
+        task_duration.labels(task_type=task_type).observe(duration_seconds)
+
+    @staticmethod
+    def record_task_queue_wait_time(task_type: str, wait_seconds: float):
+        """
+        Record time task spent waiting in queue.
+
+        Args:
+            task_type: Type of task
+            wait_seconds: Time spent waiting in seconds
+        """
+        task_queue_wait_time.labels(task_type=task_type).observe(wait_seconds)
+
+    @staticmethod
+    def record_export_requested(export_format: str):
+        """
+        Increment export request counter.
+
+        Args:
+            export_format: Format of the export (e.g., "json", "csv")
+        """
+        exports_requested.labels(export_format=export_format).inc()
+
+    @staticmethod
+    def record_export_completed(export_format: str):
+        """
+        Increment export completion counter.
+
+        Args:
+            export_format: Format of the export
+        """
+        exports_completed.labels(export_format=export_format).inc()
+
+    @staticmethod
+    def record_export_size(export_format: str, size_bytes: int):
+        """
+        Record export size.
+
+        Args:
+            export_format: Format of the export
+            size_bytes: Size of the exported data in bytes
+        """
+        export_size_bytes.labels(export_format=export_format).observe(size_bytes)
 
 
 # Global metrics collector instance

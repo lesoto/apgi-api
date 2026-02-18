@@ -270,10 +270,21 @@ def upgrade() -> None:
 
 
 def downgrade() -> None:
-    # Drop tables in reverse order
+    # Drop tables in reverse order with proper constraint handling
+    # Drop webhook_deliveries first (has foreign key to tasks)
     op.drop_table("webhook_deliveries")
+
+    # Drop refresh_tokens (has foreign key to users)
     op.drop_table("refresh_tokens")
+
+    # Drop session_data (has foreign key to sessions)
     op.drop_table("session_data")
+
+    # Drop tasks (has foreign key to sessions)
     op.drop_table("tasks")
+
+    # Drop sessions (has foreign key to users)
     op.drop_table("sessions")
+
+    # Drop users last (no dependencies)
     op.drop_table("users")

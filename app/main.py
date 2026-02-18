@@ -32,6 +32,7 @@ from app.config import settings
 from app.database.connection import close_db, init_db
 from app.exception_handlers import register_exception_handlers
 from app.middleware.alerting import configure_alerting
+from app.middleware.api_versioning import APIVersioningMiddleware
 from app.middleware.authentication import AuthenticationMiddleware
 from app.middleware.csrf import CSRFMiddleware
 from app.middleware.deprecation import DeprecationMiddleware
@@ -45,6 +46,8 @@ from app.middleware.metrics import PrometheusMetricsMiddleware
 from app.middleware.rate_limiting import RateLimitingMiddleware
 from app.middleware.schema_validation import ResponseSchemaValidationMiddleware
 from app.routes import auth, export, health, metrics, sessions, state, tasks, users, version
+from app.services.cache_service import init_cache_service
+from app.tracing import configure_distributed_tracing, instrument_application
 
 # Configure structured logging
 configure_structured_logging(settings.log_level)
@@ -87,6 +90,10 @@ async def lifespan(app: FastAPI):
     )
     logger.info("Alerting system configured", component="alerting")
 
+    # Configure distributed tracing
+    configure_distributed_tracing()
+    logger.info("Distributed tracing configured", component="tracing")
+
     # Initialize database
     try:
         init_db()
@@ -100,6 +107,10 @@ async def lifespan(app: FastAPI):
         redis_client = redis.from_url(settings.redis_url, encoding="utf-8", decode_responses=True)
         await redis_client.ping()
         logger.info("Redis client initialized", component="redis", url=settings.redis_url)
+
+        # Initialize cache service
+        init_cache_service(redis_client)
+        logger.info("Cache service initialized", component="cache")
 
         # Update rate limiting middleware with Redis client
         if rate_limiting_middleware:
@@ -207,6 +218,9 @@ All endpoints except `/health`, `/docs`, and `/openapi.json` require authenticat
     # Add request logging middleware
     app.add_middleware(RequestLoggingMiddleware)
 
+    # Add API versioning middleware (adds version headers to all responses)
+    app.add_middleware(APIVersioningMiddleware)
+
     # Add authentication middleware (extracts and verifies JWT tokens) - skip in test mode
     if not test_mode:
         app.add_middleware(AuthenticationMiddleware)
@@ -298,6 +312,10 @@ All endpoints except `/health`, `/docs`, and `/openapi.json` require authenticat
     version.configure_deprecated_endpoints({})
 
     logger.info("APGI API application created successfully", version="1.0.0")
+
+    # Instrument application with OpenTelemetry after all routes are added
+    instrument_application()
+
     return app
 
 

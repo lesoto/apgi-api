@@ -78,7 +78,7 @@ function Invoke-DockerMigration {
     
     # Check if docker-compose is available
     $DockerComposeCmd = $null
-    if (docker compose version 2>$null) {
+    if (docker compose version 2> $null) {
         $DockerComposeCmd = "docker compose"
     } elseif (Get-Command docker-compose -ErrorAction SilentlyContinue) {
         $DockerComposeCmd = "docker-compose"
@@ -146,7 +146,7 @@ if ($UseDocker -eq "auto") {
             Set-Location $DeploymentDir
             
             $DockerComposeCmd = $null
-            if (docker compose version 2>$null) {
+            if (docker compose version 2> $null) {
                 $DockerComposeCmd = "docker compose"
             } elseif (Get-Command docker-compose -ErrorAction SilentlyContinue) {
                 $DockerComposeCmd = "docker-compose"

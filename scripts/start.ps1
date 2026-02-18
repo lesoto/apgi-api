@@ -54,7 +54,7 @@ if (Test-CommandExists docker) {
 
 # Check for docker compose (both old and new syntax)
 $DockerComposeCmd = $null
-if (docker compose version 2>$null) {
+if (docker compose version 2> $null) {
     Write-Status "Docker Compose is installed"
     $DockerComposeCmd = "docker compose"
 } elseif (Test-CommandExists docker-compose) {
