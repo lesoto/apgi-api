@@ -54,6 +54,7 @@ The standalone API is a complete extraction of the APGI REST API from the main a
 ### Deployment Architecture
 
 **Changes:**
+
 - **Legacy:** API embedded in main application
 - **Standalone:** API deployed as separate service
 
@@ -67,6 +68,7 @@ The standalone API is a complete extraction of the APGI REST API from the main a
 ### Configuration
 
 **Changes:**
+
 - **Legacy:** Configuration in main application config files
 - **Standalone:** Configuration via environment variables
 
@@ -79,6 +81,7 @@ The standalone API is a complete extraction of the APGI REST API from the main a
 ### Database
 
 **Changes:**
+
 - **Legacy:** Shared database with main application
 - **Standalone:** Dedicated database (recommended) or shared database
 
@@ -91,6 +94,7 @@ The standalone API is a complete extraction of the APGI REST API from the main a
 ### Dependencies
 
 **Changes:**
+
 - **Legacy:** Shared dependencies with main application
 - **Standalone:** Independent dependency management
 
@@ -149,6 +153,7 @@ Switch all traffic at once (not recommended for production).
 - Maintenance window available
 
 **Steps:**
+
 1. Schedule maintenance window
 2. Stop legacy API
 3. Migrate data
@@ -167,7 +172,7 @@ Switch all traffic at once (not recommended for production).
 - [ ] Set up SSL/TLS certificates
 - [ ] Configure firewall rules
 
-### Configuration
+### Configuration Management
 
 - [ ] Generate secure JWT secret key
 - [ ] Configure CORS origins with new domain
@@ -263,7 +268,7 @@ psql -h standalone-db-host -U postgres -c "GRANT ALL PRIVILEGES ON DATABASE apgi
 
 **2.3 Migrate Data:**
 
-**Option A: Full Database Copy**
+### Option A: Full Database Copy
 
 ```bash
 # Restore backup to new database
@@ -273,7 +278,7 @@ psql -h standalone-db-host -U apgi_user apgi_api < legacy_backup_20240115.sql
 alembic upgrade head
 ```
 
-**Option B: Selective Data Migration**
+### Option B: Selective Data Migration
 
 ```bash
 # Export specific tables
@@ -317,6 +322,7 @@ curl https://api.example.com/health/ready
 ```
 
 **3.3 Run Smoke Tests:**
+
 ```bash
 # Test authentication
 curl -X POST https://api.example.com/v1/auth/login \
@@ -373,6 +379,7 @@ server {
 **4.2 Gradually Increase Traffic:**
 
 Week 3, Day 1: 10% standalone
+
 ```nginx
 split_clients "${remote_addr}${http_user_agent}" $backend {
     10%     standalone;
@@ -381,6 +388,7 @@ split_clients "${remote_addr}${http_user_agent}" $backend {
 ```
 
 Week 3, Day 3: 50% standalone (if no issues)
+
 ```nginx
 split_clients "${remote_addr}${http_user_agent}" $backend {
     50%     standalone;
@@ -389,6 +397,7 @@ split_clients "${remote_addr}${http_user_agent}" $backend {
 ```
 
 Week 3, Day 5: 100% standalone (if no issues)
+
 ```nginx
 upstream api {
     server standalone-api-1:8000;
@@ -409,6 +418,7 @@ server {
 ### Step 5: Monitor and Validate
 
 **5.1 Monitor Key Metrics:**
+
 - Request rate (requests/second)
 - Response time (p50, p95, p99)
 - Error rate (errors/second)
@@ -418,6 +428,7 @@ server {
 - Celery queue depth
 
 **5.2 Monitor Logs:**
+
 ```bash
 # View API logs
 docker-compose logs -f api
@@ -431,11 +442,13 @@ kubectl logs deployment/apgi-api | grep ERROR
 
 **5.3 Compare Metrics:**
 Compare standalone API metrics with legacy API baseline:
+
 - Response times should be similar or better
 - Error rates should be similar or lower
 - Success rates should be 99.9%+
 
 **5.4 Alert Thresholds:**
+
 - Error rate > 10 errors/minute → Investigate
 - Response time p95 > 1000ms → Investigate
 - Success rate < 99% → Rollback
@@ -445,16 +458,19 @@ Compare standalone API metrics with legacy API baseline:
 ### Shared Database Approach
 
 **Pros:**
+
 - No data migration needed
 - Instant cutover
 - Easy rollback
 
 **Cons:**
+
 - Shared resource contention
 - Coupled deployments
 - Harder to scale independently
 
 **Configuration:**
+
 ```bash
 # Both APIs use same database
 DATABASE_URL=postgresql://apgi_user:password@shared-db:5432/apgi_db
@@ -463,16 +479,19 @@ DATABASE_URL=postgresql://apgi_user:password@shared-db:5432/apgi_db
 ### Separate Database Approach
 
 **Pros:**
+
 - Independent scaling
 - Isolated failures
 - Better performance
 
 **Cons:**
+
 - Data migration required
 - More complex rollback
 - Potential data sync issues
 
 **Migration Steps:**
+
 1. Create new database
 2. Copy data from legacy database
 3. Run migrations on new database
@@ -484,6 +503,7 @@ DATABASE_URL=postgresql://apgi_user:password@shared-db:5432/apgi_db
 For zero-downtime migration with separate databases:
 
 **1. Set up replication:**
+
 ```bash
 # Configure PostgreSQL logical replication
 # On legacy database
@@ -494,11 +514,13 @@ CREATE SUBSCRIPTION apgi_sub CONNECTION 'host=legacy-db ...' PUBLICATION apgi_pu
 ```
 
 **2. Monitor replication lag:**
+
 ```sql
 SELECT * FROM pg_stat_subscription;
 ```
 
 **3. Cutover:**
+
 - Stop writes to legacy database
 - Wait for replication to catch up
 - Switch traffic to standalone API
@@ -515,11 +537,13 @@ The standalone API maintains 100% backward compatibility. Existing clients work 
 If deploying to a new domain:
 
 **Before:**
+
 ```javascript
 const API_BASE_URL = 'https://app.example.com/api';
 ```
 
 **After:**
+
 ```javascript
 const API_BASE_URL = 'https://api.example.com';
 ```
@@ -537,12 +561,14 @@ CORS_ORIGINS=https://new-frontend.example.com
 ### Pre-Migration Testing
 
 **1. Integration Tests:**
+
 ```bash
 cd standalone-api
 pytest tests/integration/
 ```
 
 **2. Smoke Tests:**
+
 ```bash
 # Test authentication
 ./tests/smoke/test_auth.sh
@@ -555,6 +581,7 @@ pytest tests/integration/
 ```
 
 **3. Load Tests:**
+
 ```bash
 # Using Apache Bench
 ab -n 10000 -c 100 https://api-staging.example.com/health
@@ -566,18 +593,21 @@ k6 run tests/load/api_load_test.js
 ### Post-Migration Testing
 
 **1. Verify All Endpoints:**
+
 ```bash
 # Run comprehensive API tests
 pytest tests/integration/ --base-url=https://api.example.com
 ```
 
 **2. Compare Responses:**
+
 ```bash
 # Compare legacy vs standalone responses
 ./tests/compare_responses.sh
 ```
 
 **3. Monitor for Errors:**
+
 ```bash
 # Check error logs
 kubectl logs deployment/apgi-api | grep ERROR | wc -l
@@ -607,11 +637,13 @@ server {
 ```
 
 **Reload nginx:**
+
 ```bash
 nginx -s reload
 ```
 
 **Verification:**
+
 ```bash
 curl https://api.example.com/health
 # Should hit legacy API
@@ -634,6 +666,7 @@ split_clients "${remote_addr}${http_user_agent}" $backend {
 **If using separate database and need to rollback:**
 
 **1. Stop standalone API:**
+
 ```bash
 docker-compose down
 # Or
@@ -641,11 +674,13 @@ kubectl delete deployment apgi-api
 ```
 
 **2. Restore legacy database (if modified):**
+
 ```bash
 psql -h legacy-db-host -U apgi_user apgi_db < legacy_backup_20240115.sql
 ```
 
 **3. Switch traffic to legacy API:**
+
 ```bash
 # Update load balancer configuration
 nginx -s reload
@@ -656,12 +691,14 @@ nginx -s reload
 **Full rollback to legacy API:**
 
 **1. Route all traffic to legacy:**
+
 ```bash
 # Update load balancer
 nginx -s reload
 ```
 
 **2. Stop standalone API:**
+
 ```bash
 docker-compose -f deployment/docker-compose.prod.yml down
 # Or
@@ -669,12 +706,14 @@ kubectl delete -f deployment/k8s/production/
 ```
 
 **3. Verify legacy API:**
+
 ```bash
 curl https://api.example.com/health
 # Should return 200 OK from legacy API
 ```
 
 **4. Restore data (if needed):**
+
 ```bash
 psql -h legacy-db-host -U apgi_user apgi_db < legacy_backup_20240115.sql
 ```
@@ -684,6 +723,7 @@ psql -h legacy-db-host -U apgi_user apgi_db < legacy_backup_20240115.sql
 ### Validation Checklist
 
 **Functionality:**
+
 - [ ] All endpoints return expected responses
 - [ ] Authentication works correctly
 - [ ] Session management works correctly
@@ -692,6 +732,7 @@ psql -h legacy-db-host -U apgi_user apgi_db < legacy_backup_20240115.sql
 - [ ] Health checks pass
 
 **Performance:**
+
 - [ ] Response times meet SLA (p95 < 500ms)
 - [ ] Error rate < 0.1%
 - [ ] Success rate > 99.9%
@@ -699,6 +740,7 @@ psql -h legacy-db-host -U apgi_user apgi_db < legacy_backup_20240115.sql
 - [ ] Cache hit rate > 80%
 
 **Monitoring:**
+
 - [ ] Logs are being collected
 - [ ] Metrics are being collected
 - [ ] Alerts are configured
@@ -706,6 +748,7 @@ psql -h legacy-db-host -U apgi_user apgi_db < legacy_backup_20240115.sql
 - [ ] On-call rotation is updated
 
 **Security:**
+
 - [ ] HTTPS is enforced
 - [ ] CORS is configured correctly
 - [ ] Rate limiting is enabled
@@ -713,6 +756,7 @@ psql -h legacy-db-host -U apgi_user apgi_db < legacy_backup_20240115.sql
 - [ ] Secrets are secured
 
 **Operations:**
+
 - [ ] Deployment process is documented
 - [ ] Rollback process is documented
 - [ ] Runbooks are updated
@@ -722,18 +766,21 @@ psql -h legacy-db-host -U apgi_user apgi_db < legacy_backup_20240115.sql
 ### Monitoring Period
 
 **Week 1-2 Post-Migration:**
+
 - Monitor closely (24/7 on-call)
 - Check metrics every hour
 - Review logs daily
 - Keep legacy API running
 
 **Week 3-4 Post-Migration:**
+
 - Monitor regularly (business hours)
 - Check metrics daily
 - Review logs weekly
 - Prepare to decommission legacy API
 
 **Week 5+ Post-Migration:**
+
 - Normal monitoring
 - Decommission legacy API
 - Archive legacy code
@@ -741,6 +788,7 @@ psql -h legacy-db-host -U apgi_user apgi_db < legacy_backup_20240115.sql
 ### Success Criteria
 
 Migration is successful when:
+
 - ✅ All traffic routed to standalone API
 - ✅ Error rate < 0.1% for 7 days
 - ✅ Response times meet SLA for 7 days
@@ -786,14 +834,14 @@ Migration is successful when:
 
 - Check [TROUBLESHOOTING.md](TROUBLESHOOTING.md)
 - Review migration logs
-- Contact DevOps team: devops@example.com
+- Contact DevOps team: [devops@example.com](mailto:devops@example.com)
 - Escalate to on-call engineer if critical
 
 ## Appendix
 
 ### Migration Timeline Template
 
-```
+```text
 Week 1: Preparation
 - Day 1-2: Deploy to staging, run tests
 - Day 3-4: Migrate data, verify integrity
@@ -822,16 +870,16 @@ Week 5+: Decommissioning
 
 ### Rollback Decision Matrix
 
-| Error Rate | Response Time | Action |
-|------------|---------------|--------|
-| < 0.1% | < 500ms | Continue |
-| 0.1-1% | 500-1000ms | Investigate, reduce traffic |
-| 1-5% | 1000-2000ms | Reduce traffic to 10% |
-| > 5% | > 2000ms | Immediate rollback |
+|Error Rate|Response Time|Action|
+|---|---|---|
+|< 0.1%|< 500ms|Continue|
+|0.1-1%|500-1000ms|Investigate, reduce traffic|
+|1-5%|1000-2000ms|Reduce traffic to 10%|
+|> 5%|> 2000ms|Immediate rollback|
 
 ### Contact Information
 
-- **DevOps Team:** devops@example.com
-- **On-Call Engineer:** oncall@example.com
+- **DevOps Team:** [devops@example.com](mailto:devops@example.com)
+- **On-Call Engineer:** [oncall@example.com](mailto:oncall@example.com)
 - **Slack Channel:** #api-migration
-- **Incident Response:** incidents@example.com
+- **Incident Response:** [incidents@example.com](mailto:incidents@example.com)

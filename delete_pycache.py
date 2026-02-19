@@ -4,8 +4,7 @@ import json
 import os
 import shutil
 import sys
-from pathlib import Path
-from typing import Iterable, List, Optional, Set, Dict, Any
+from typing import List, Dict, Any, Optional, Set, Iterable, cast
 
 """
 APGI API Cleaner - Enhanced temporary file and folder cleanup utility
@@ -32,7 +31,7 @@ CLEANED ITEMS:
 
 USAGE:
     python delete_pycache.py [--dry-run] [--backup DIR] [--unsafe]
-    
+
 For detailed options, run: python delete_pycache.py --help
 """
 
@@ -266,6 +265,7 @@ TEMP_DIR_NAMES = {
     # Testing and coverage
     ".pytest_cache",
     ".mypy_cache",
+    "mypy_cache",  # Added for deletion
     ".hypothesis",
     "htmlcov",
     ".coverage",
@@ -824,13 +824,13 @@ def delete_temporary_items(
     if config is None:
         config = DEFAULT_CONFIG
 
-    temp_dir_names = set(config.get("temp_dirs", TEMP_DIR_NAMES))
-    temp_file_patterns = config.get("temp_files", TEMP_FILE_PATTERNS)
-    essential_files = set(config.get("essential_files", ESSENTIAL_FILES))
-    essential_dirs = set(config.get("essential_dirs", ESSENTIAL_DIRS))
-    skip_traverse_dirs = set(config.get("skip_dirs", SKIP_TRAVERSE_DIRS))
-    safe_mode = config.get("safe_mode", True)
-    backup_before_delete = config.get("backup_before_delete", False)
+    temp_dir_names = set(cast(list, config.get("temp_dirs", list(TEMP_DIR_NAMES))))
+    temp_file_patterns = cast(list, config.get("temp_files", TEMP_FILE_PATTERNS))
+    essential_files = set(cast(list, config.get("essential_files", list(ESSENTIAL_FILES))))
+    essential_dirs = set(cast(list, config.get("essential_dirs", list(ESSENTIAL_DIRS))))
+    skip_traverse_dirs = set(cast(list, config.get("skip_dirs", list(SKIP_TRAVERSE_DIRS))))
+    safe_mode = cast(bool, config.get("safe_mode", True))
+    backup_before_delete = cast(bool, config.get("backup_before_delete", False))
 
     # Add user-specified patterns
     temp_dir_names.update(include_dir_patterns)
@@ -1107,7 +1107,7 @@ def clear_log_files(
                 print(f"Error clearing {file_path}: {str(e)}")
 
 
-def parse_args(argv: List[str] = None):
+def parse_args(argv: Optional[List[str]] = None):
     p = argparse.ArgumentParser(
         description="Enhanced APGI API temporary file and folder cleaner with safety checks",
         formatter_class=argparse.RawDescriptionHelpFormatter,
@@ -1124,7 +1124,7 @@ Examples:
   %(prog)s --unsafe                   # Disable safety mode (not recommended for production)
   %(prog)s --no-special-cleanup       # Disable special cleanup (enabled by default)
   %(prog)s --prune-empty-dirs        # Remove empty directories after cleanup
-  
+
 Safety Features:
   - Protects essential API files: main.py, config.py, models/, routes/, services/, etc.
   - Preserves database files and migrations
@@ -1236,7 +1236,7 @@ Safety Features:
     return p.parse_args(argv)
 
 
-def main(argv: List[str] = None):
+def main(argv: Optional[List[str]] = None):
     args = parse_args(argv)
     current_dir = os.path.dirname(os.path.abspath(__file__))
     root_directory = os.path.abspath(args.root) if args.root else current_dir

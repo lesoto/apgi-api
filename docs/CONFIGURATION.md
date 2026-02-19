@@ -690,6 +690,7 @@ MAX_REQUEST_SIZE=10485760
 ```
 
 **Production Validation Rules:**
+
 - `JWT_SECRET_KEY` must be 32+ characters
 - `CORS_ORIGINS` cannot be wildcard (`*`)
 - `DATABASE_URL` should use SSL (`sslmode=require`)
@@ -704,21 +705,24 @@ MAX_REQUEST_SIZE=10485760
 
 The API validates configuration on startup and fails fast if requirements are not met.
 
-#### Development Environment
+#### Development Validation Rules
 
 **Warnings (logged but don't prevent startup):**
+
 - Default JWT secret key is used
 - CORS wildcard is used
 - Database SSL is not enabled
 
 **Errors (prevent startup):**
+
 - Required variables are missing
 - Invalid URL formats
 - Invalid enum values
 
-#### Production Environment
+#### Production Validation Rules
 
 **Errors (prevent startup):**
+
 - `JWT_SECRET_KEY` is missing or < 32 characters
 - `JWT_SECRET_KEY` is the default development value
 - `CORS_ORIGINS` is wildcard (`*`)
@@ -730,22 +734,27 @@ The API validates configuration on startup and fails fast if requirements are no
 ### Validation Examples
 
 **Valid Production Configuration:**
+
 ```bash
 ENVIRONMENT=production
 JWT_SECRET_KEY=xK8vN2mP9qR4sT6uW7yZ0aB1cD3eF5gH8iJ9kL2mN4oP6qR8sT0uV2wX4yZ6aB8c
 CORS_ORIGINS=https://app.example.com
 DATABASE_URL=postgresql://user:pass@postgres:5432/db?sslmode=require
 ```
-✅ Passes validation
+
+ Passes validation
 
 **Invalid Production Configuration:**
+
 ```bash
 ENVIRONMENT=production
 JWT_SECRET_KEY=short
 CORS_ORIGINS=*
 DATABASE_URL=postgresql://user:pass@postgres:5432/db
 ```
-❌ Fails validation:
+
+ Fails validation:
+
 - JWT secret too short
 - CORS wildcard not allowed
 - Database SSL not configured
@@ -754,7 +763,7 @@ DATABASE_URL=postgresql://user:pass@postgres:5432/db
 
 When validation fails, the API logs specific errors:
 
-```
+```text
 Configuration validation failed:
 - JWT_SECRET_KEY must be at least 32 characters in production (current: 5)
 - CORS_ORIGINS cannot be wildcard (*) in production
@@ -770,61 +779,69 @@ The API then exits with code 1.
 ### Secrets Management
 
 **DO:**
-- ✅ Use secrets manager (AWS Secrets Manager, HashiCorp Vault, etc.)
-- ✅ Generate cryptographically random secrets
-- ✅ Rotate secrets periodically (every 90 days)
-- ✅ Use different secrets for each environment
-- ✅ Restrict access to secrets (principle of least privilege)
+
+- Use secrets manager (AWS Secrets Manager, HashiCorp Vault, etc.)
+- Generate cryptographically random secrets
+- Rotate secrets periodically (every 90 days)
+- Use different secrets for each environment
+- Restrict access to secrets (principle of least privilege)
 
 **DON'T:**
-- ❌ Commit secrets to version control
-- ❌ Share secrets via email or chat
-- ❌ Use the same secret across environments
-- ❌ Use weak or predictable secrets
-- ❌ Log secrets in application logs
 
-### Environment Variables
+- Commit secrets to version control
+- Share secrets via email or chat
+- Use the same secret across environments
+- Use weak or predictable secrets
+- Log secrets in application logs
+
+### Environment Variable Handling
 
 **DO:**
-- ✅ Use `.env` files for local development
-- ✅ Add `.env` to `.gitignore`
-- ✅ Provide `.env.example` as template
-- ✅ Document all variables
-- ✅ Validate on startup
+
+- Use `.env` files for local development
+- Add `.env` to `.gitignore`
+- Provide `.env.example` as template
+- Document all variables
+- Validate on startup
 
 **DON'T:**
-- ❌ Commit `.env` files
-- ❌ Use production secrets in development
-- ❌ Hardcode secrets in code
-- ❌ Expose secrets in error messages
+
+- Commit `.env` files
+- Use production secrets in development
+- Hardcode secrets in code
+- Expose secrets in error messages
 
 ### Database Security
 
 **DO:**
-- ✅ Use SSL/TLS for connections
-- ✅ Use strong passwords (16+ characters)
-- ✅ Restrict network access (firewall rules)
-- ✅ Use connection pooling
-- ✅ Enable query logging (for auditing)
+
+- Use SSL/TLS for connections
+- Use strong passwords (16+ characters)
+- Restrict network access (firewall rules)
+- Use connection pooling
+- Enable query logging (for auditing)
 
 **DON'T:**
-- ❌ Use default passwords
-- ❌ Allow public database access
-- ❌ Use root/admin accounts for application
-- ❌ Disable SSL in production
+
+- Use default passwords
+- Allow public database access
+- Use root/admin accounts for application
+- Disable SSL in production
 
 ### CORS Security
 
 **DO:**
-- ✅ Explicitly list allowed origins
-- ✅ Use HTTPS URLs
-- ✅ Include all subdomains explicitly
-- ✅ Review origins periodically
+
+- Explicitly list allowed origins
+- Use HTTPS URLs
+- Include all subdomains explicitly
+- Review origins periodically
 
 **DON'T:**
-- ❌ Use wildcard (`*`) with credentials
-- ❌ Allow HTTP origins in production
-- ❌ Use overly permissive origins
+
+- Use wildcard (`*`) with credentials
+- Allow HTTP origins in production
+- Use overly permissive origins
 
 ---
 
@@ -833,17 +850,20 @@ The API then exits with code 1.
 ### Connection Pooling
 
 **Database Connection Pool:**
+
 ```bash
 DATABASE_URL=postgresql://user:pass@postgres:5432/db?pool_size=10&max_overflow=20&pool_timeout=30&pool_recycle=3600
 ```
 
 **Parameters:**
+
 - `pool_size=10` - Maintain 10 connections
 - `max_overflow=20` - Allow 20 additional connections
 - `pool_timeout=30` - Wait 30s for connection
 - `pool_recycle=3600` - Recycle connections after 1 hour
 
 **Recommendations:**
+
 - Small deployment: `pool_size=5`, `max_overflow=10`
 - Medium deployment: `pool_size=10`, `max_overflow=20`
 - Large deployment: `pool_size=20`, `max_overflow=40`
@@ -851,6 +871,7 @@ DATABASE_URL=postgresql://user:pass@postgres:5432/db?pool_size=10&max_overflow=2
 ### Redis Persistence
 
 **Enable AOF (Append-Only File):**
+
 ```bash
 # In redis.conf
 appendonly yes
@@ -858,6 +879,7 @@ appendfsync everysec
 ```
 
 **Enable RDB (Snapshots):**
+
 ```bash
 # In redis.conf
 save 900 1      # Save after 900s if 1 key changed
@@ -868,6 +890,7 @@ save 60 10000   # Save after 60s if 10000 keys changed
 ### Celery Worker Configuration
 
 **Environment Variables:**
+
 ```bash
 # Worker concurrency (number of worker processes)
 CELERY_WORKER_CONCURRENCY=4
@@ -884,6 +907,7 @@ CELERY_RESULT_EXPIRES=86400  # 24 hours
 ```
 
 **Recommendations:**
+
 - CPU-bound tasks: `concurrency = CPU cores`
 - I/O-bound tasks: `concurrency = 2-4 × CPU cores`
 - Memory-intensive tasks: Lower concurrency
@@ -891,7 +915,8 @@ CELERY_RESULT_EXPIRES=86400  # 24 hours
 ### Load Balancer Configuration
 
 **Health Check Settings:**
-```
+
+```text
 Health Check Path: /health/ready
 Health Check Interval: 10 seconds
 Health Check Timeout: 5 seconds
@@ -900,12 +925,14 @@ Unhealthy Threshold: 3 consecutive failures
 ```
 
 **Session Affinity:**
+
 - Not required (API is stateless)
 - Use round-robin or least-connections
 
-### Logging Configuration
+### Advanced Logging Configuration
 
 **Structured JSON Logging:**
+
 ```python
 # Logs are automatically formatted as JSON
 {
@@ -921,6 +948,7 @@ Unhealthy Threshold: 3 consecutive failures
 ```
 
 **Log Aggregation:**
+
 - Forward logs to ELK, Splunk, or cloud logging
 - Use request_id for distributed tracing
 - Set retention policies (30-90 days)
@@ -930,13 +958,15 @@ Unhealthy Threshold: 3 consecutive failures
 ## Configuration Checklist
 
 ### Development Setup
-- [ ] Copy `.env.development` to `.env`
-- [ ] Update `DATABASE_URL` if needed
-- [ ] Update `REDIS_URL` if needed
-- [ ] Verify API starts successfully
-- [ ] Check health endpoint returns 200
+
+- Copy `.env.development` to `.env`
+- Update `DATABASE_URL` if needed
+- Update `REDIS_URL` if needed
+- Verify API starts successfully
+- Check health endpoint returns 200
 
 ### Staging Setup
+
 - [ ] Create `.env` from `.env.production` template
 - [ ] Generate secure `JWT_SECRET_KEY`
 - [ ] Configure `CORS_ORIGINS` with staging domain
@@ -946,6 +976,7 @@ Unhealthy Threshold: 3 consecutive failures
 - [ ] Test authentication flow
 
 ### Production Setup
+
 - [ ] Store secrets in secrets manager
 - [ ] Generate secure `JWT_SECRET_KEY` (32+ characters)
 - [ ] Configure `CORS_ORIGINS` with production domains
@@ -965,43 +996,52 @@ Unhealthy Threshold: 3 consecutive failures
 
 ### API Won't Start
 
-**Error: "JWT_SECRET_KEY must be at least 32 characters"**
+#### Error: "JWT_SECRET_KEY must be at least 32 characters"
+
 - Generate a secure key: `python -c "import secrets; print(secrets.token_urlsafe(32))"`
 - Set in environment: `JWT_SECRET_KEY=<generated-key>`
 
-**Error: "CORS_ORIGINS cannot be wildcard in production"**
+#### Error: "CORS_ORIGINS cannot be wildcard in production"
+
 - Set explicit origins: `CORS_ORIGINS=https://app.example.com`
 
-**Error: "DATABASE_URL is required"**
+#### Error: "DATABASE_URL is required"
+
 - Set database URL: `DATABASE_URL=postgresql://user:pass@host:5432/db`
 
 ### Database Connection Errors
 
-**Error: "could not connect to server"**
+#### Error: "could not connect to server"
+
 - Verify PostgreSQL is running
 - Check host and port in `DATABASE_URL`
 - Verify network connectivity
 
-**Error: "password authentication failed"**
+#### Error: "password authentication failed"
+
 - Verify username and password in `DATABASE_URL`
 - Check PostgreSQL user exists
 
-**Error: "SSL connection required"**
+#### Error: "SSL connection required"
+
 - Add `?sslmode=require` to `DATABASE_URL`
 
 ### Redis Connection Errors
 
-**Error: "Connection refused"**
+#### Error: "Connection refused"
+
 - Verify Redis is running
 - Check host and port in `REDIS_URL`
 - Verify network connectivity
 
-**Error: "NOAUTH Authentication required"**
+#### Error: "NOAUTH Authentication required"
+
 - Add password to `REDIS_URL`: `redis://:password@host:6379/0`
 
 ### CORS Errors
 
-**Error: "CORS policy: No 'Access-Control-Allow-Origin' header"**
+#### Error: "CORS policy: No 'Access-Control-Allow-Origin' header"
+
 - Add frontend domain to `CORS_ORIGINS`
 - Verify protocol (http/https) matches exactly
 - Check for trailing slashes
@@ -1011,7 +1051,8 @@ Unhealthy Threshold: 3 consecutive failures
 ## Support
 
 For configuration issues:
+
 - Check [TROUBLESHOOTING.md](TROUBLESHOOTING.md)
 - Review startup logs for validation errors
 - Verify all required variables are set
-- Contact DevOps team: devops@example.com
+- Contact DevOps team: <devops@example.com>

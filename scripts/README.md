@@ -7,6 +7,7 @@ This directory contains utility scripts for managing the APGI Standalone API.
 ### start.sh / start.ps1
 
 Development environment startup script that:
+
 - Checks for required dependencies (Docker, Docker Compose)
 - Creates `.env.development` from `.env.example` if needed
 - Starts all Docker services (PostgreSQL, Redis, API, Celery worker)
@@ -25,6 +26,7 @@ Development environment startup script that:
 ```
 
 **Requirements:**
+
 - Docker
 - Docker Compose
 

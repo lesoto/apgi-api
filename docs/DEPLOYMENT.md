@@ -566,6 +566,7 @@ kubectl exec -it <api-pod-name> -- alembic upgrade head
 ```
 
 **Manual:**
+
 ```bash
 cd standalone-api
 alembic upgrade head
@@ -581,14 +582,12 @@ alembic history
 
 **View current version:**
 
- 
 ```bash
 alembic current
 ```
 
 **Rollback one migration:**
 
- 
 ```bash
 alembic downgrade -1
 ```
@@ -644,7 +643,6 @@ kubectl apply -f celery-deployment.yaml
 
 **Manual:**
 
- 
 ```bash
 celery -A app.celery_app worker --loglevel=info
 ```
@@ -659,7 +657,6 @@ docker-compose -f deployment/docker-compose.yml up -d --scale celery_worker=5
 
 **Kubernetes:**
 
- 
 ```bash
 kubectl scale deployment apgi-celery-worker --replicas=5
 ```
@@ -674,6 +671,7 @@ celery -A app.celery_app inspect stats
 ```
 
 **View task queue:**
+
 ```bash
 celery -A app.celery_app inspect reserved
 ```
@@ -755,14 +753,12 @@ curl http://api-host:8000/health
 
 **Readiness (checks dependencies):**
 
- 
 ```bash
 curl http://api-host:8000/health/ready
 ```
 
 **Liveness:**
 
- 
 ```bash
 curl http://api-host:8000/health/live
 ```
@@ -831,6 +827,7 @@ Configure alerts for:
 ### Horizontal Scaling
 
 **API Instances:**
+
 ```bash
 # Docker Compose
 docker-compose up -d --scale api=5
@@ -840,6 +837,7 @@ kubectl scale deployment apgi-api --replicas=5
 ```
 
 **Celery Workers:**
+
 ```bash
 # Docker Compose
 docker-compose up -d --scale celery_worker=3
@@ -912,6 +910,7 @@ kubectl apply -f api-hpa.yaml
 ### Application Rollback
 
 **Docker:**
+
 ```bash
 # Tag current version
 docker tag apgi-api:latest apgi-api:backup
@@ -925,6 +924,7 @@ docker-compose up -d
 ```
 
 **Kubernetes:**
+
 ```bash
 # Rollback to previous deployment
 kubectl rollout undo deployment/apgi-api
@@ -939,6 +939,7 @@ kubectl rollout history deployment/apgi-api
 ### Database Rollback
 
 **Rollback one migration:**
+
 ```bash
 alembic downgrade -1
 ```
@@ -950,6 +951,7 @@ alembic downgrade <revision_id>
 ```
 
 **Restore from backup:**
+
 ```bash
 # Stop API
 docker-compose stop api
@@ -964,6 +966,7 @@ docker-compose start api
 ### Emergency Procedures
 
 **Complete system rollback:**
+
 1. Stop all API instances
 2. Stop all Celery workers
 3. Restore database from backup
@@ -972,6 +975,7 @@ docker-compose start api
 6. Gradually restore traffic
 
 **Partial rollback (canary):**
+
 1. Deploy previous version alongside current
 2. Route 10% traffic to previous version
 3. Monitor error rates and performance
@@ -985,6 +989,7 @@ See [TROUBLESHOOTING.md](TROUBLESHOOTING.md) for detailed troubleshooting guidan
 ### Quick Diagnostics
 
 **Check API logs:**
+
 ```bash
 # Docker
 docker-compose logs -f api
@@ -994,16 +999,19 @@ kubectl logs -f deployment/apgi-api
 ```
 
 **Check database connectivity:**
+
 ```bash
 psql -h postgres-host -U apgi_user apgi_api -c "SELECT 1"
 ```
 
 **Check Redis connectivity:**
+
 ```bash
 redis-cli -h redis-host ping
 ```
 
 **Check Celery workers:**
+
 ```bash
 celery -A app.celery_app inspect ping
 ```
@@ -1011,7 +1019,8 @@ celery -A app.celery_app inspect ping
 ## Support
 
 For issues or questions:
+
 - Check [TROUBLESHOOTING.md](TROUBLESHOOTING.md)
 - Review logs for error messages
 - Check health endpoints for dependency status
-- Contact DevOps team: devops@example.com
+- Contact DevOps team: [devops@example.com](mailto:devops@example.com)

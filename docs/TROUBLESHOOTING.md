@@ -76,11 +76,11 @@ kubectl describe pod <pod-name>
 
 **Common Causes:**
 
-#### 1. Configuration Validation Failure
+#### - Configuration Validation Failure
 
 **Error Message:**
 
-```
+```bash
 Configuration validation failed:
 - JWT_SECRET_KEY must be at least 32 characters in production
 ```
@@ -98,11 +98,11 @@ export JWT_SECRET_KEY=<generated-key>
 echo "JWT_SECRET_KEY=<generated-key>" >> .env
 ```
 
-#### 2. Missing Required Environment Variables
+#### - Missing Required Environment Variables
 
 **Error Message:**
 
-```
+```bash
 DATABASE_URL is required
 ```
 
@@ -123,11 +123,11 @@ REDIS_URL=redis://redis:6379/0
 EOF
 ```
 
-#### 3. Port Already in Use
+#### - Port Already in Use
 
 **Error Message:**
 
-```
+```bash
 Error: Address already in use
 ```
 
@@ -146,11 +146,11 @@ kill -9 <PID>
 export PORT=8001
 ```
 
-#### 4. Import Errors
+#### - Import Errors
 
 **Error Message:**
 
-```
+```bash
 ModuleNotFoundError: No module named 'fastapi'
 ```
 
@@ -169,7 +169,8 @@ docker-compose build --no-cache api
 **Symptom:** API fails to connect to database during startup
 
 **Error Message:**
-```
+
+```text
 could not connect to server: Connection refused
 ```
 
@@ -190,7 +191,7 @@ psql -h localhost -U apgi_user -d apgi_api
 
 **Solutions:**
 
-1. **PostgreSQL not running:**
+- **PostgreSQL not running:**
 
 ```bash
 # Start PostgreSQL
@@ -198,7 +199,7 @@ docker-compose up -d postgres
 kubectl apply -f postgres-deployment.yaml
 ```
 
-2. **Wrong connection string:**
+- **Wrong connection string:**
 
 ```bash
 # Verify DATABASE_URL format
@@ -209,7 +210,7 @@ echo $DATABASE_URL
 export DATABASE_URL=postgresql://apgi_user:password@postgres:5432/apgi_api
 ```
 
-3. **Network connectivity:**
+- **Network connectivity:**
 
 ```bash
 # Test network connectivity
@@ -221,7 +222,7 @@ docker network ls
 docker network inspect <network-name>
 ```
 
-4. **Authentication failure:**
+- **Authentication failure:**
 
 ```bash
 # Verify credentials
@@ -261,7 +262,7 @@ ORDER BY abs(correlation) ASC;
 
 **Solutions:**
 
-1. **Add missing indexes:**
+- **Add missing indexes:**
 
 ```sql
 -- Create index on frequently queried columns
@@ -269,14 +270,14 @@ CREATE INDEX idx_sessions_user_id ON sessions(user_id);
 CREATE INDEX idx_sessions_created_at ON sessions(created_at);
 ```
 
-2. **Increase connection pool:**
+- **Increase connection pool:**
 
 ```bash
 # Update DATABASE_URL
 DATABASE_URL=postgresql://user:pass@host:5432/db?pool_size=20&max_overflow=40
 ```
 
-3. **Optimize queries:**
+- **Optimize queries:**
 
 ```python
 # Use select_related for foreign keys
@@ -291,11 +292,12 @@ sessions = db.query(Session).limit(100).offset(0).all()
 **Symptom:** API returns 500 errors, logs show "connection pool exhausted"
 
 **Error Message:**
-```
+
+```text
 sqlalchemy.exc.TimeoutError: QueuePool limit of size 10 overflow 20 reached
 ```
 
-**Diagnosis:**
+**Diagnosis:****
 
 ```bash
 # Check active connections
@@ -307,13 +309,13 @@ curl http://localhost:8000/metrics | grep database_connections
 
 **Solutions:**
 
-1. **Increase pool size:**
+- **Increase pool size:**
 
 ```bash
 DATABASE_URL=postgresql://user:pass@host:5432/db?pool_size=20&max_overflow=40
 ```
 
-2. **Fix connection leaks:**
+- **Fix connection leaks:**
 
 ```python
 # Always use context managers
@@ -330,7 +332,8 @@ def endpoint(db: Session = Depends(get_db)):
 # Connection automatically closed
 ```
 
-3. **Reduce connection timeout:**
+- **Reduce connection timeout:**
+
 ```bash
 DATABASE_URL=postgresql://user:pass@host:5432/db?pool_timeout=10
 ```
@@ -340,11 +343,13 @@ DATABASE_URL=postgresql://user:pass@host:5432/db?pool_timeout=10
 **Symptom:** Alembic migrations fail to apply
 
 **Error Message:**
-```
+
+```bash
 alembic.util.exc.CommandError: Can't locate revision identified by 'abc123'
 ```
 
 **Diagnosis:**
+
 ```bash
 # Check current version
 alembic current
@@ -358,7 +363,8 @@ psql -h postgres-host -U apgi_user apgi_api -c "SELECT * FROM alembic_version;"
 
 **Solutions:**
 
-1. **Reset migration state:**
+- **Reset migration state:**
+
 ```bash
 # Stamp database with current version
 alembic stamp head
@@ -367,7 +373,8 @@ alembic stamp head
 alembic stamp <revision_id>
 ```
 
-2. **Fix broken migration:**
+- **Fix broken migration:**
+
 ```bash
 # Rollback to previous version
 alembic downgrade -1
@@ -379,7 +386,8 @@ alembic downgrade -1
 alembic upgrade head
 ```
 
-3. **Start fresh (development only):**
+- **Start fresh (development only):**
+
 ```bash
 # Drop all tables
 psql -h postgres-host -U apgi_user apgi_api -c "DROP SCHEMA public CASCADE; CREATE SCHEMA public;"
@@ -395,11 +403,13 @@ alembic upgrade head
 **Symptom:** API fails to connect to Redis
 
 **Error Message:**
-```
+
+```text
 redis.exceptions.ConnectionError: Error 111 connecting to redis:6379. Connection refused.
 ```
 
 **Diagnosis:**
+
 ```bash
 # Check if Redis is running
 docker-compose ps redis
@@ -416,13 +426,15 @@ kubectl logs -l app=redis
 
 **Solutions:**
 
-1. **Start Redis:**
+- **Start Redis:**
+
 ```bash
 docker-compose up -d redis
 kubectl apply -f redis-deployment.yaml
 ```
 
-2. **Fix connection string:**
+- **Fix connection string:**
+
 ```bash
 # Verify REDIS_URL
 echo $REDIS_URL
@@ -432,7 +444,8 @@ echo $REDIS_URL
 export REDIS_URL=redis://redis:6379/0
 ```
 
-3. **Check network connectivity:**
+- **Check network connectivity:**
+
 ```bash
 # Test connectivity
 telnet redis-host 6379
@@ -446,11 +459,13 @@ docker network inspect <network-name>
 **Symptom:** Redis connection fails with authentication error
 
 **Error Message:**
-```
+
+```text
 redis.exceptions.AuthenticationError: NOAUTH Authentication required
 ```
 
 **Solution:**
+
 ```bash
 # Add password to REDIS_URL
 export REDIS_URL=redis://:password@redis:6379/0
@@ -465,6 +480,7 @@ export REDIS_URL=redis://:password@redis:6379/0
 **Symptom:** Redis running out of memory, evicting keys
 
 **Diagnosis:**
+
 ```bash
 # Check Redis memory usage
 redis-cli -h redis-host INFO memory
@@ -475,7 +491,8 @@ redis-cli -h redis-host INFO stats | grep evicted
 
 **Solutions:**
 
-1. **Increase Redis memory:**
+- **Increase Redis memory:**
+
 ```yaml
 # docker-compose.yml
 redis:
@@ -483,14 +500,16 @@ redis:
   command: redis-server --maxmemory 2gb --maxmemory-policy allkeys-lru
 ```
 
-2. **Configure eviction policy:**
+- **Configure eviction policy:**
+
 ```bash
 # In redis.conf
 maxmemory 2gb
 maxmemory-policy allkeys-lru  # Evict least recently used keys
 ```
 
-3. **Reduce TTL on cached data:**
+- **Reduce TTL on cached data:**
+
 ```python
 # Set shorter TTL for session cache
 redis_client.setex(f"session:{session_id}", 3600, session_data)  # 1 hour instead of 24
@@ -503,6 +522,7 @@ redis_client.setex(f"session:{session_id}", 3600, session_data)  # 1 hour instea
 **Symptom:** API returns 401 Unauthorized for authenticated requests
 
 **Error Message:**
+
 ```json
 {
   "error": {
@@ -513,6 +533,7 @@ redis_client.setex(f"session:{session_id}", 3600, session_data)  # 1 hour instea
 ```
 
 **Diagnosis:**
+
 ```bash
 # Decode JWT token (without verification)
 python -c "import jwt; print(jwt.decode('YOUR_TOKEN', options={'verify_signature': False}))"
@@ -523,7 +544,8 @@ python -c "import jwt; print(jwt.decode('YOUR_TOKEN', options={'verify_signature
 
 **Solutions:**
 
-1. **Token expired:**
+- **Token expired:**
+
 ```bash
 # Get new token via refresh endpoint
 curl -X POST http://localhost:8000/v1/auth/refresh \
@@ -531,7 +553,8 @@ curl -X POST http://localhost:8000/v1/auth/refresh \
   -d '{"refresh_token":"YOUR_REFRESH_TOKEN"}'
 ```
 
-2. **Wrong JWT secret:**
+- **Wrong JWT secret:**
+
 ```bash
 # Verify JWT_SECRET_KEY is same across all API instances
 echo $JWT_SECRET_KEY
@@ -540,7 +563,8 @@ echo $JWT_SECRET_KEY
 export JWT_SECRET_KEY=<correct-secret>
 ```
 
-3. **Clock skew:**
+- **Clock skew:**
+
 ```bash
 # Synchronize system clocks
 ntpdate -s time.nist.gov
@@ -554,6 +578,7 @@ systemctl start ntpd
 **Symptom:** POST/PUT/DELETE requests fail with 403 Forbidden
 
 **Error Message:**
+
 ```json
 {
   "error": {
@@ -564,6 +589,7 @@ systemctl start ntpd
 ```
 
 **Solution:**
+
 ```bash
 # Include CSRF token in request header
 curl -X POST http://localhost:8000/v1/sessions \
@@ -581,6 +607,7 @@ export CSRF_ENABLED=false
 **Symptom:** API returns 429 Too Many Requests
 
 **Error Message:**
+
 ```json
 {
   "error": {
@@ -592,7 +619,8 @@ export CSRF_ENABLED=false
 
 **Solutions:**
 
-1. **Wait for rate limit window:**
+- **Wait for rate limit window:**
+
 ```bash
 # Check Retry-After header
 curl -I http://localhost:8000/v1/sessions
@@ -600,7 +628,8 @@ curl -I http://localhost:8000/v1/sessions
 # Wait specified seconds before retrying
 ```
 
-2. **Increase rate limit:**
+- **Increase rate limit:**
+
 ```bash
 # Update configuration
 export RATE_LIMIT_PER_MINUTE=120
@@ -609,7 +638,8 @@ export RATE_LIMIT_PER_MINUTE=120
 docker-compose restart api
 ```
 
-3. **Disable rate limiting (development only):**
+- **Disable rate limiting (development only):**
+
 ```bash
 export RATE_LIMIT_ENABLED=false
 ```
@@ -621,6 +651,7 @@ export RATE_LIMIT_ENABLED=false
 **Symptom:** API responses taking longer than expected
 
 **Diagnosis:**
+
 ```bash
 # Check response times
 curl -w "@curl-format.txt" -o /dev/null -s http://localhost:8000/v1/sessions
@@ -640,7 +671,8 @@ curl http://localhost:8000/metrics | grep http_request_duration
 
 **Solutions:**
 
-1. **Database optimization:**
+- **Database optimization:**
+
 ```sql
 -- Add indexes
 CREATE INDEX idx_sessions_user_id ON sessions(user_id);
@@ -650,7 +682,8 @@ ANALYZE sessions;
 ANALYZE users;
 ```
 
-2. **Enable caching:**
+- **Enable caching:**
+
 ```python
 # Cache frequently accessed data in Redis
 @cache(ttl=300)  # 5 minutes
@@ -658,7 +691,8 @@ def get_user(user_id: str):
     return db.query(User).filter(User.user_id == user_id).first()
 ```
 
-3. **Scale horizontally:**
+- **Scale horizontally:**
+
 ```bash
 # Add more API instances
 docker-compose up -d --scale api=5
@@ -667,7 +701,8 @@ docker-compose up -d --scale api=5
 kubectl scale deployment apgi-api --replicas=5
 ```
 
-4. **Optimize queries:**
+- **Optimize queries:**
+
 ```python
 # Use eager loading
 sessions = db.query(Session).options(selectinload(Session.user)).all()
@@ -681,6 +716,7 @@ sessions = db.query(Session).limit(100).offset(0).all()
 **Symptom:** API containers using excessive memory
 
 **Diagnosis:**
+
 ```bash
 # Check memory usage
 docker stats
@@ -701,7 +737,8 @@ for stat in top_stats[:10]:
 
 **Solutions:**
 
-1. **Increase memory limits:**
+- **Increase memory limits:**
+
 ```yaml
 # docker-compose.yml
 api:
@@ -711,7 +748,8 @@ api:
         memory: 1G
 ```
 
-2. **Fix memory leaks:**
+- **Fix memory leaks:**
+
 ```python
 # Close database sessions
 with get_db_context() as db:
@@ -724,7 +762,8 @@ import gc
 gc.collect()
 ```
 
-3. **Reduce worker concurrency:**
+- **Reduce worker concurrency:**
+
 ```bash
 # For Celery workers
 export CELERY_WORKER_CONCURRENCY=2
@@ -735,6 +774,7 @@ export CELERY_WORKER_CONCURRENCY=2
 **Symptom:** API containers using excessive CPU
 
 **Diagnosis:**
+
 ```bash
 # Check CPU usage
 docker stats
@@ -749,7 +789,8 @@ python -m pstats profile.stats
 
 **Solutions:**
 
-1. **Optimize hot paths:**
+- **Optimize hot paths:**
+
 ```python
 # Use list comprehensions instead of loops
 result = [process(item) for item in items]
@@ -760,13 +801,15 @@ def process_items():
         yield process(item)
 ```
 
-2. **Scale horizontally:**
+- **Scale horizontally:**
+
 ```bash
 docker-compose up -d --scale api=5
 kubectl scale deployment apgi-api --replicas=5
 ```
 
-3. **Increase CPU limits:**
+- **Increase CPU limits:**
+
 ```yaml
 # docker-compose.yml
 api:
@@ -783,6 +826,7 @@ api:
 **Symptom:** Celery worker fails to start or exits immediately
 
 **Diagnosis:**
+
 ```bash
 # Check worker logs
 docker-compose logs celery_worker
@@ -794,7 +838,8 @@ celery -A app.celery_app inspect ping
 
 **Solutions:**
 
-1. **Fix broker connection:**
+- **Fix broker connection:**
+
 ```bash
 # Verify CELERY_BROKER_URL
 echo $CELERY_BROKER_URL
@@ -804,7 +849,8 @@ echo $CELERY_BROKER_URL
 redis-cli -h redis-host -n 1 ping
 ```
 
-2. **Fix import errors:**
+- **Fix import errors:**
+
 ```bash
 # Reinstall dependencies
 pip install -r requirements.txt
@@ -818,6 +864,7 @@ docker-compose build --no-cache celery_worker
 **Symptom:** Tasks submitted but not executed by workers
 
 **Diagnosis:**
+
 ```bash
 # Check worker status
 celery -A app.celery_app inspect active
@@ -832,19 +879,22 @@ docker-compose logs -f celery_worker
 
 **Solutions:**
 
-1. **Start workers:**
+- **Start workers:**
+
 ```bash
 docker-compose up -d celery_worker
 kubectl apply -f celery-deployment.yaml
 ```
 
-2. **Increase worker concurrency:**
+- **Increase worker concurrency:**
+
 ```bash
 export CELERY_WORKER_CONCURRENCY=4
 docker-compose restart celery_worker
 ```
 
-3. **Check task routing:**
+- **Check task routing:**
+
 ```python
 # Verify task is registered
 from app.celery_app import celery_app
@@ -856,19 +906,22 @@ print(celery_app.tasks.keys())
 **Symptom:** Tasks fail with timeout errors
 
 **Error Message:**
-```
+
+```text
 celery.exceptions.SoftTimeLimitExceeded
 ```
 
 **Solutions:**
 
-1. **Increase task timeout:**
+- **Increase task timeout:**
+
 ```bash
 export CELERY_TASK_TIME_LIMIT=7200  # 2 hours
 export CELERY_TASK_SOFT_TIME_LIMIT=6900  # 1h 55m
 ```
 
-2. **Optimize task:**
+- **Optimize task:**
+
 ```python
 # Break into smaller subtasks
 @celery_app.task
@@ -882,7 +935,8 @@ def process_chunk(chunk):
     pass
 ```
 
-3. **Use task retries:**
+- **Use task retries:**
+
 ```python
 @celery_app.task(bind=True, max_retries=3)
 def my_task(self):
@@ -900,12 +954,14 @@ def my_task(self):
 **Symptom:** Browser shows CORS policy error
 
 **Error Message:**
-```
+
+```text
 Access to fetch at 'http://api.example.com' from origin 'http://frontend.example.com'
 has been blocked by CORS policy: No 'Access-Control-Allow-Origin' header is present
 ```
 
 **Diagnosis:**
+
 ```bash
 # Check CORS configuration
 echo $CORS_ORIGINS
@@ -920,19 +976,22 @@ curl -H "Origin: http://frontend.example.com" \
 
 **Solutions:**
 
-1. **Add origin to CORS_ORIGINS:**
+- **Add origin to CORS_ORIGINS:**
+
 ```bash
 export CORS_ORIGINS=http://frontend.example.com,http://another-domain.com
 docker-compose restart api
 ```
 
-2. **Check protocol (http vs https):**
+- **Check protocol (http vs https):**
+
 ```bash
 # Origin must match exactly including protocol
 CORS_ORIGINS=https://frontend.example.com  # Not http://
 ```
 
-3. **Allow credentials:**
+- **Allow credentials:**
+
 ```bash
 export CORS_ALLOW_CREDENTIALS=true
 ```
@@ -942,6 +1001,7 @@ export CORS_ALLOW_CREDENTIALS=true
 **Symptom:** OPTIONS requests fail
 
 **Diagnosis:**
+
 ```bash
 # Test preflight request
 curl -X OPTIONS http://localhost:8000/v1/sessions \
@@ -951,6 +1011,7 @@ curl -X OPTIONS http://localhost:8000/v1/sessions \
 ```
 
 **Solution:**
+
 ```bash
 # Ensure CORS middleware is configured
 # Should return 200 OK with CORS headers
@@ -963,6 +1024,7 @@ curl -X OPTIONS http://localhost:8000/v1/sessions \
 **Symptom:** No logs visible in log aggregation system
 
 **Diagnosis:**
+
 ```bash
 # Check if API is logging to stdout
 docker-compose logs api
@@ -973,13 +1035,15 @@ echo $LOG_LEVEL
 
 **Solutions:**
 
-1. **Set log level:**
+- **Set log level:**
+
 ```bash
 export LOG_LEVEL=INFO
 docker-compose restart api
 ```
 
-2. **Check log aggregation configuration:**
+- **Check log aggregation configuration:**
+
 ```bash
 # Verify logs are being forwarded
 # Check Filebeat/Fluentd/CloudWatch agent
@@ -990,6 +1054,7 @@ docker-compose restart api
 **Symptom:** Prometheus not scraping metrics
 
 **Diagnosis:**
+
 ```bash
 # Check metrics endpoint
 curl http://localhost:8000/metrics
@@ -1000,13 +1065,15 @@ curl http://localhost:8000/metrics
 
 **Solutions:**
 
-1. **Verify metrics endpoint:**
+- **Verify metrics endpoint:**
+
 ```bash
 # Should return Prometheus format metrics
 curl http://localhost:8000/metrics | head
 ```
 
-2. **Update Prometheus configuration:**
+- **Update Prometheus configuration:**
+
 ```yaml
 # prometheus.yml
 scrape_configs:
@@ -1022,6 +1089,7 @@ scrape_configs:
 **Symptom:** Docker container restarts repeatedly
 
 **Diagnosis:**
+
 ```bash
 # Check container status
 docker-compose ps
@@ -1035,7 +1103,8 @@ docker-compose logs --tail=100 api
 
 **Solutions:**
 
-1. **Fix application error:**
+- **Fix application error:**
+
 ```bash
 # Check logs for error
 docker-compose logs api | grep ERROR
@@ -1043,7 +1112,8 @@ docker-compose logs api | grep ERROR
 # Fix configuration or code issue
 ```
 
-2. **Increase health check timeout:**
+- **Increase health check timeout:**
+
 ```yaml
 # docker-compose.yml
 api:
@@ -1060,13 +1130,15 @@ api:
 **Symptom:** Container can't write to mounted volumes
 
 **Error Message:**
-```
+
+```text
 PermissionError: [Errno 13] Permission denied
 ```
 
 **Solutions:**
 
-1. **Fix volume permissions:**
+- **Fix volume permissions:**
+
 ```bash
 # Change ownership
 sudo chown -R 1000:1000 ./data
@@ -1075,7 +1147,8 @@ sudo chown -R 1000:1000 ./data
 docker-compose run --user root api bash
 ```
 
-2. **Use named volumes:**
+- **Use named volumes:**
+
 ```yaml
 # docker-compose.yml
 volumes:
@@ -1090,6 +1163,7 @@ volumes:
 **Symptom:** Pod keeps crashing and restarting
 
 **Diagnosis:**
+
 ```bash
 # Check pod status
 kubectl get pods
@@ -1104,13 +1178,15 @@ kubectl logs <pod-name> --previous  # Previous container logs
 
 **Solutions:**
 
-1. **Fix application error:**
+- **Fix application error:**
+
 ```bash
 # Check logs for error
 kubectl logs <pod-name> | grep ERROR
 ```
 
-2. **Increase resource limits:**
+- **Increase resource limits:**
+
 ```yaml
 # deployment.yaml
 resources:
@@ -1122,7 +1198,8 @@ resources:
     cpu: "500m"
 ```
 
-3. **Fix liveness probe:**
+- **Fix liveness probe:**
+
 ```yaml
 # deployment.yaml
 livenessProbe:
@@ -1138,6 +1215,7 @@ livenessProbe:
 **Symptom:** Kubernetes can't pull Docker image
 
 **Diagnosis:**
+
 ```bash
 # Check pod events
 kubectl describe pod <pod-name>
@@ -1148,13 +1226,15 @@ kubectl get pod <pod-name> -o jsonpath='{.spec.containers[0].image}'
 
 **Solutions:**
 
-1. **Fix image name:**
+- **Fix image name:**
+
 ```yaml
 # deployment.yaml
 image: your-registry.com/apgi-api:1.0.0  # Correct registry and tag
 ```
 
-2. **Add image pull secret:**
+- **Add image pull secret:**
+
 ```bash
 # Create secret
 kubectl create secret docker-registry regcred \
@@ -1175,6 +1255,7 @@ spec:
 **Symptom:** API not accessible from outside
 
 **Diagnosis:**
+
 ```bash
 # Check if API is listening
 netstat -tlnp | grep 8000
@@ -1188,7 +1269,8 @@ docker-compose exec api curl http://localhost:8000/health
 
 **Solutions:**
 
-1. **Check port binding:**
+- **Check port binding:**
+
 ```yaml
 # docker-compose.yml
 api:
@@ -1196,14 +1278,16 @@ api:
     - "8000:8000"  # host:container
 ```
 
-2. **Check firewall:**
+- **Check firewall:**
+
 ```bash
 # Allow port 8000
 sudo ufw allow 8000
 sudo firewall-cmd --add-port=8000/tcp --permanent
 ```
 
-3. **Check load balancer:**
+- **Check load balancer:**
+
 ```bash
 # Verify load balancer is routing to API
 curl -v http://load-balancer-url/health
@@ -1214,19 +1298,22 @@ curl -v http://load-balancer-url/health
 **Symptom:** Container can't resolve hostnames
 
 **Error Message:**
-```
+
+```text
 getaddrinfo: Name or service not known
 ```
 
 **Solutions:**
 
-1. **Use IP addresses:**
+- **Use IP addresses:**
+
 ```bash
 # Instead of hostname
 DATABASE_URL=postgresql://user:pass@10.0.1.5:5432/db
 ```
 
-2. **Fix DNS configuration:**
+- **Fix DNS configuration:**
+
 ```yaml
 # docker-compose.yml
 api:
@@ -1235,7 +1322,8 @@ api:
     - 8.8.4.4
 ```
 
-3. **Use Docker network:**
+- **Use Docker network:**
+
 ```bash
 # Ensure services are on same network
 docker network ls
@@ -1249,6 +1337,7 @@ docker network inspect <network-name>
 **Symptom:** Data in database doesn't match expected state
 
 **Diagnosis:**
+
 ```sql
 -- Check for orphaned records
 SELECT * FROM sessions WHERE user_id NOT IN (SELECT user_id FROM users);
@@ -1262,12 +1351,14 @@ SELECT * FROM sessions WHERE created_at > updated_at;
 
 **Solutions:**
 
-1. **Clean up orphaned records:**
+- **Clean up orphaned records:**
+
 ```sql
 DELETE FROM sessions WHERE user_id NOT IN (SELECT user_id FROM users);
 ```
 
-2. **Fix duplicate records:**
+- **Fix duplicate records:**
+
 ```sql
 -- Keep only the latest record
 DELETE FROM sessions
@@ -1276,7 +1367,8 @@ WHERE id NOT IN (
 );
 ```
 
-3. **Add constraints:**
+- **Add constraints:**
+
 ```sql
 -- Add foreign key constraint
 ALTER TABLE sessions ADD CONSTRAINT fk_user
@@ -1292,12 +1384,14 @@ ALTER TABLE sessions ADD CONSTRAINT unique_session_id UNIQUE (session_id);
 
 **Solutions:**
 
-1. **Restore from backup:**
+- **Restore from backup:**
+
 ```bash
 psql -h postgres-host -U apgi_user apgi_api < backup_20240115.sql
 ```
 
-2. **Verify data integrity:**
+- **Verify data integrity:**
+
 ```sql
 -- Check record counts
 SELECT COUNT(*) FROM users;
@@ -1308,7 +1402,8 @@ SELECT * FROM users LIMIT 10;
 SELECT * FROM sessions LIMIT 10;
 ```
 
-3. **Re-run migration:**
+- **Re-run migration:**
+
 ```bash
 # Rollback
 alembic downgrade -1
@@ -1321,11 +1416,11 @@ alembic upgrade head
 
 ### Before Asking for Help
 
-1. **Check this troubleshooting guide**
-2. **Check logs for error messages**
-3. **Check health endpoints**
-4. **Verify configuration**
-5. **Try restarting services**
+- **Check this troubleshooting guide**
+- **Check logs for error messages**
+- **Check health endpoints**
+- **Verify configuration**
+- **Try restarting services**
 
 ### Information to Provide
 
@@ -1343,8 +1438,8 @@ When asking for help, include:
 - **Documentation:** [README.md](../README.md)
 - **Configuration Guide:** [CONFIGURATION.md](CONFIGURATION.md)
 - **Deployment Guide:** [DEPLOYMENT.md](DEPLOYMENT.md)
-- **DevOps Team:** devops@example.com
-- **On-Call Engineer:** oncall@example.com
+- **DevOps Team:** [devops@example.com](mailto:devops@example.com)
+- **On-Call Engineer:** [oncall@example.com](mailto:oncall@example.com)
 - **Slack Channel:** #api-support
 
 ### Escalation

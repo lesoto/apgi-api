@@ -6,6 +6,7 @@ Provides distributed tracing capabilities for the APGI API.
 
 import os
 import warnings
+import typing
 
 # Handle OpenTelemetry compatibility issues with Python 3.14
 try:
@@ -79,7 +80,7 @@ def configure_distributed_tracing():
     span_processor_jaeger = BatchSpanProcessor(jaeger_exporter)
     span_processor_otlp = BatchSpanProcessor(otlp_exporter)
 
-    tracer_provider = trace.get_tracer_provider()
+    tracer_provider = typing.cast(TracerProvider, trace.get_tracer_provider())
     tracer_provider.add_span_processor(span_processor_jaeger)
     tracer_provider.add_span_processor(span_processor_otlp)
 
