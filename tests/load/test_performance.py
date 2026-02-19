@@ -31,7 +31,6 @@ import time
 from locust import HttpUser, task, between, events
 from locust.runners import MasterRunner
 
-
 # Performance thresholds
 MAX_RESPONSE_TIME_MS = 1000  # p95 should be under 1 second
 EXPECTED_RPS = 100  # Expected requests per second

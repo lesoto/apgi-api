@@ -6,8 +6,7 @@ Comprehensive caching implementation for session states, user data, and frequent
 
 import json
 import pickle
-from datetime import datetime, timedelta
-from typing import Any, Dict, Optional, Union
+from typing import Any, Dict, Optional
 
 import redis.asyncio as redis
 
@@ -265,7 +264,7 @@ class CacheService:
         pattern = f"{self.prefixes['session']}{session_id}:*"
         keys = await self.redis.keys(pattern)
         if keys:
-            return await self.redis.delete(*keys)
+            return await self.redis.delete(*keys)  # type: ignore[return-value]
         return 0
 
     async def invalidate_user_cache(self, user_id: str) -> int:
@@ -281,7 +280,7 @@ class CacheService:
         pattern = f"{self.prefixes['user']}{user_id}:*"
         keys = await self.redis.keys(pattern)
         if keys:
-            return await self.redis.delete(*keys)
+            return await self.redis.delete(*keys)  # type: ignore[return-value]
         return 0
 
     async def clear_expired_cache(self) -> int:

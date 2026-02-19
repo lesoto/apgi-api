@@ -22,7 +22,6 @@ sys.path.insert(0, str(Path(__file__).parent.parent.parent / "app"))
 from celery.result import AsyncResult
 from celery import states
 
-
 # ============================================================================
 # Helper Functions
 # ============================================================================

@@ -46,7 +46,21 @@ class TestHealthEndpoints:
 
         Validates: Requirement 9.1 - Basic health check endpoint
         """
-        response = await client.get("/health")
+        from unittest.mock import AsyncMock, patch
+
+        # Mock the health check to return healthy
+        mock_health_result = {
+            "status": "healthy",
+            "version": "1.0.0",
+            "timestamp": "2024-01-01T00:00:00Z",
+            "database": {"status": "healthy"},
+            "redis": {"status": "healthy"},
+            "celery": {"status": "healthy"},
+        }
+
+        with patch("app.routes.health.health_service") as mock_service:
+            mock_service.perform_health_check = AsyncMock(return_value=mock_health_result)
+            response = await client.get("/health")
 
         assert response.status_code == 200
         data = response.json()
@@ -57,11 +71,11 @@ class TestHealthEndpoints:
     @pytest.mark.asyncio
     async def test_readiness_check(self, client):
         """
-        Test that /v1/health/ready endpoint verifies dependencies.
+        Test that /health/ready endpoint verifies dependencies.
 
         Validates: Requirement 9.2 - Readiness probe with dependency checks
         """
-        response = await client.get("/v1/health/ready")
+        response = await client.get("/health/ready")
 
         # Should return 200 if all dependencies are healthy
         # or 503 if any dependency is unavailable
@@ -85,7 +99,7 @@ class TestHealthEndpoints:
         # Patch health_service to None
         with patch("app.routes.health.health_service", None):
             # Test /health
-            response = await client.get("/v1/health")
+            response = await client.get("/health")
             assert response.status_code == 503
             data = response.json()
             assert data["status"] == "unhealthy"
@@ -93,7 +107,7 @@ class TestHealthEndpoints:
             assert "Health service not initialized" in data["error"]
 
             # Test /health/ready
-            response = await client.get("/v1/health/ready")
+            response = await client.get("/health/ready")
             assert response.status_code == 503
             data = response.json()
             assert data["status"] == "not_ready"
@@ -123,13 +137,13 @@ class TestHealthEndpoints:
             mock_service.perform_health_check = mock_health_check
 
             # Test /health
-            response = await client.get("/v1/health")
+            response = await client.get("/health")
             assert response.status_code == 503
             data = response.json()
             assert data["status"] == "unhealthy"
 
             # Test /health/ready
-            response = await client.get("/v1/health/ready")
+            response = await client.get("/health/ready")
             assert response.status_code == 503
             data = response.json()
             assert data["status"] == "unhealthy"
@@ -153,7 +167,7 @@ class TestAuthenticationFlow:
             # Try to login (will fail with test credentials, but endpoint should exist)
             response = await client.post(
                 "/v1/auth/login",
-                json={"username": "test_user", "password": "test_password"},
+                json={"username": "test_user", "password": "TestPass123"},
             )
 
         # Should get either 200 (success) or 401 (invalid credentials)

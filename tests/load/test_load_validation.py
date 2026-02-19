@@ -19,7 +19,6 @@ import pytest
 from httpx import AsyncClient, ASGITransport
 from typing import List, Tuple
 
-
 # Performance thresholds
 MAX_RESPONSE_TIME_P95_MS = 1500  # p95 should be under 1.5 seconds (includes middleware overhead)
 MAX_RESPONSE_TIME_P99_MS = 2500  # p99 should be under 2.5 seconds

@@ -24,7 +24,6 @@ from app.services.auth_manager import AuthManager, TokenPayload
 from app.middleware.authentication import AuthenticationMiddleware
 from app.exceptions import ExpiredTokenError, InvalidTokenError
 
-
 # ============================================================================
 # Helper Functions
 # ============================================================================

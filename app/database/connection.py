@@ -28,13 +28,16 @@ if settings.database_url.startswith("sqlite"):
         connect_args={"check_same_thread": False},  # SQLite specific
     )
 else:
-    # PostgreSQL configuration with connection pooling
+    # PostgreSQL configuration with connection pooling optimized for horizontal scaling
     engine = create_engine(
         settings.database_url,
         echo=False,  # Set to True for SQL query logging
         pool_pre_ping=True,  # Verify connections before using
-        pool_size=10,
-        max_overflow=20,
+        pool_size=20,  # Increased pool size for multiple instances
+        max_overflow=30,  # Increased overflow for burst traffic
+        pool_timeout=30,  # Connection timeout
+        pool_recycle=3600,  # Recycle connections after 1 hour
+        echo_pool=False,  # Disable pool logging in production
     )
 
 

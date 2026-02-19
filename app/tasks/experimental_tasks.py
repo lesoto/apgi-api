@@ -8,18 +8,19 @@ import logging
 from datetime import datetime
 from typing import Any, Dict
 
-from celery import Task
-
-from apgi_system.experiments.tasks.attentional_blink import AttentionalBlinkTask
-from apgi_system.experiments.tasks.binocular_rivalry import BinocularRivalryTask
-from apgi_system.experiments.tasks.change_blindness import ChangeBlindnessTask
-from apgi_system.experiments.tasks.iowa_gambling import IowaGamblingTask
-from apgi_system.experiments.tasks.masking_paradigm import MaskingParadigmTask
-from apgi_system.platform_utils import get_resource_path
-from apgi_system.system import APGISystem
-from app.celery_app import celery_app
 from app.database.connection import get_db
 from app.database.models import Task as TaskModel
+from celery import Task
+
+from apgi_system.experiments.tasks.attentional_blink import AttentionalBlinkTask  # type: ignore[import]
+from apgi_system.experiments.tasks.binocular_rivalry import BinocularRivalryTask  # type: ignore[import]
+from apgi_system.experiments.tasks.change_blindness import ChangeBlindnessTask  # type: ignore[import]
+from apgi_system.experiments.tasks.iowa_gambling import IowaGamblingTask  # type: ignore[import]
+from apgi_system.experiments.tasks.masking_paradigm import MaskingParadigmTask  # type: ignore[import]
+from apgi_system.platform_utils import get_resource_path  # type: ignore[import]
+from apgi_system.system import APGISystem  # type: ignore[import]
+from app.celery_app import celery_app
+from app.services.webhook_manager import WebhookManager
 
 logger = logging.getLogger(__name__)
 
@@ -37,14 +38,14 @@ async def trigger_webhook_on_completion(task_id: str, result: Dict[str, Any]):
         db = next(get_db())
 
         # Find task record
-        task_record = db.query(TaskModel).filter(TaskModel.task_id == task_id).first()  # type: ignore[arg-type]
+        task_record = db.query(TaskModel).filter(TaskModel.task_id == task_id).first()
 
         if not task_record:
             logger.warning(f"Task record not found for task {task_id}")
             return
 
         # Update task status in database
-        task_record.status = result.get("status", "completed")  # type: ignore[assignment]
+        task_record.status = result.get("status", "completed")
         task_record.completed_at = datetime.utcnow()  # type: ignore[assignment]
         task_record.result_data = result  # type: ignore[assignment]
 

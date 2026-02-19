@@ -6,7 +6,6 @@ Logs validation failures for monitoring and debugging.
 """
 
 import json
-import logging
 from datetime import datetime
 from typing import Any, Callable, Dict, Optional
 

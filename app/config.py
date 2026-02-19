@@ -6,7 +6,7 @@ Configuration settings for the standalone APGI REST API.
 
 import os
 import warnings
-from typing import List
+from typing import List, Optional
 
 from dotenv import load_dotenv
 
@@ -52,7 +52,7 @@ class Settings:
         )
 
         # Authentication Settings
-        self.jwt_secret_key: str = os.getenv("JWT_SECRET_KEY")
+        self.jwt_secret_key: Optional[str] = os.getenv("JWT_SECRET_KEY")
         self.jwt_algorithm: str = "HS256"
         self.jwt_access_token_expire_minutes: int = int(
             os.getenv("JWT_ACCESS_TOKEN_EXPIRE_MINUTES", "30")
@@ -109,6 +109,38 @@ class Settings:
 
         # Request Size Limiting
         self.max_request_size_mb: int = int(os.getenv("MAX_REQUEST_SIZE_MB", "10"))
+        self.request_size_limit_enabled: bool = (
+            os.getenv("REQUEST_SIZE_LIMIT_ENABLED", "true").lower() == "true"
+        )
+
+        # CSRF Protection Settings
+        self.csrf_protection_enabled: bool = (
+            os.getenv("CSRF_PROTECTION_ENABLED", "true").lower() == "true"
+        )
+
+        # Performance Profiling Settings
+        self.profiling_enabled: bool = os.getenv("PROFILING_ENABLED", "false").lower() == "true"
+        self.profiling_memory_enabled: bool = (
+            os.getenv("PROFILING_MEMORY_ENABLED", "false").lower() == "true"
+        )
+        self.profiling_snapshot_interval_seconds: int = int(
+            os.getenv("PROFILING_SNAPSHOT_INTERVAL_SECONDS", "60")
+        )
+        self.profiling_max_snapshots: int = int(os.getenv("PROFILING_MAX_SNAPSHOTS", "1000"))
+
+        # Database Sharding Settings
+        self.database_shards_enabled: bool = (
+            os.getenv("DATABASE_SHARDS_ENABLED", "false").lower() == "true"
+        )
+        self.database_shards_count: int = int(os.getenv("DATABASE_SHARDS_COUNT", "1"))
+        self.database_shard_key: str = os.getenv("DATABASE_SHARD_KEY", "user_id")
+
+        # Individual shard URLs (for when sharding is enabled)
+        # These will be used by the sharding service
+        for i in range(10):  # Support up to 10 shards for now
+            shard_url = os.getenv(f"DATABASE_SHARD_{i}_URL")
+            if shard_url:
+                setattr(self, f"database_shard_{i}_url", shard_url)
 
         # Validate security settings after initialization
         self.__post_init__()

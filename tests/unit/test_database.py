@@ -5,21 +5,17 @@ Tests database initialization, connection pooling, and health checks.
 Validates Requirement 3.5: Database connectivity and schema verification on startup.
 """
 
-import os
 import pytest
 from unittest.mock import patch, MagicMock
 from sqlalchemy import create_engine, inspect, text
 from sqlalchemy.orm import Session
 
 from app.database.connection import (
-    init_db,
     close_db,
     get_db,
     get_db_context,
-    SessionLocal,
     engine,
 )
-from app.database.models import Base, User, Session as SessionModel, Task
 
 
 @pytest.fixture
@@ -38,7 +34,7 @@ def test_engine(test_db_url):
     # Create a test-specific Base with SQLite-compatible models
     TestBase = declarative_base()
 
-    class TestUser(TestBase):
+    class TestUser(TestBase):  # type: ignore
         """Test user model compatible with SQLite."""
 
         __tablename__ = "users"
@@ -50,7 +46,7 @@ def test_engine(test_db_url):
         created_at = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
         last_login = Column(DateTime(timezone=True), nullable=True)
 
-    class TestSession(TestBase):
+    class TestSession(TestBase):  # type: ignore
         """Test session model compatible with SQLite."""
 
         __tablename__ = "sessions"
@@ -63,7 +59,7 @@ def test_engine(test_db_url):
         description = Column(Text, nullable=True)
         tags = Column(Text, nullable=True, default="[]")  # JSON string instead of ARRAY
 
-    class TestTask(TestBase):
+    class TestTask(TestBase):  # type: ignore
         """Test task model compatible with SQLite."""
 
         __tablename__ = "tasks"
@@ -80,7 +76,7 @@ def test_engine(test_db_url):
         error_message = Column(Text, nullable=True)
         webhook_url = Column(String(500), nullable=True)
 
-    class TestSessionData(TestBase):
+    class TestSessionData(TestBase):  # type: ignore
         """Test session data model compatible with SQLite."""
 
         __tablename__ = "session_data"
@@ -90,7 +86,7 @@ def test_engine(test_db_url):
         data = Column(Text, nullable=False)  # JSON string
         created_at = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
 
-    class TestRefreshToken(TestBase):
+    class TestRefreshToken(TestBase):  # type: ignore
         """Test refresh token model compatible with SQLite."""
 
         __tablename__ = "refresh_tokens"
@@ -101,7 +97,7 @@ def test_engine(test_db_url):
         created_at = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
         revoked = Column(Boolean, nullable=False, default=False)
 
-    class TestWebhookDelivery(TestBase):
+    class TestWebhookDelivery(TestBase):  # type: ignore
         """Test webhook delivery model compatible with SQLite."""
 
         __tablename__ = "webhook_deliveries"
@@ -208,8 +204,8 @@ class TestConnectionPooling:
         """Test that connection pool has correct size settings."""
         pool = engine.pool
 
-        # Verify pool size (should be 10 as configured in connection.py)
-        assert pool.size() == 10, "Pool size should be 10"
+        # Verify pool size (should be 20 as configured in connection.py)
+        assert pool.size() == 20, "Pool size should be 20"  # type: ignore[attr-defined]
 
         # Verify max overflow (should be 20 as configured)
         # Note: overflow is the number of connections that can be created beyond pool_size

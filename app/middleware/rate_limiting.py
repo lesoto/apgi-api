@@ -4,12 +4,13 @@ Rate Limiting Middleware
 Middleware for enforcing rate limits on API requests.
 """
 
-from datetime import datetime
+from datetime import datetime, timedelta
 
 import redis.asyncio as redis
 from fastapi import Request
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.responses import JSONResponse
+from typing import Optional
 
 from app.middleware.logging import StructuredLogger
 from app.services.rate_limiter import RateLimiter
@@ -24,6 +25,8 @@ class RateLimitingMiddleware(BaseHTTPMiddleware):
     Checks rate limits before processing requests and adds rate limit
     headers to all responses.
     """
+
+    _instance: Optional["RateLimitingMiddleware"] = None
 
     def __init__(self, app, redis_client=None, enabled: bool = True):
         """
@@ -43,15 +46,20 @@ class RateLimitingMiddleware(BaseHTTPMiddleware):
         if redis_client:
             self.rate_limiter = RateLimiter(redis_client)
 
-    def set_redis_client(self, redis_client: redis.Redis):
+        # Set global instance reference
+        RateLimitingMiddleware._instance = self
+
+    @classmethod
+    def set_redis_client(cls, redis_client: redis.Redis):
         """
-        Set Redis client and initialize rate limiter.
+        Set Redis client on the global middleware instance.
 
         Args:
             redis_client: Redis client for rate limiting
         """
-        self.redis_client = redis_client
-        self.rate_limiter = RateLimiter(redis_client)
+        if cls._instance:
+            cls._instance.redis_client = redis_client
+            cls._instance.rate_limiter = RateLimiter(redis_client)
 
     def _get_client_id(self, request: Request) -> str:
         """
@@ -137,35 +145,65 @@ class RateLimitingMiddleware(BaseHTTPMiddleware):
         Returns:
             HTTP response with rate limit headers
         """
+        # Default rate limit headers (used when rate limiting is disabled or fails)
+        rate_limit_headers = {
+            "X-RateLimit-Limit": "60",
+            "X-RateLimit-Remaining": "59",
+            "X-RateLimit-Reset": str(int((datetime.utcnow() + timedelta(seconds=60)).timestamp())),
+        }
+
         # Skip if rate limiting is disabled or not yet initialized
         if not self.enabled or not self.rate_limiter:
-            return await call_next(request)
+            response = await call_next(request)
+            # Add default headers
+            for header_name, header_value in rate_limit_headers.items():
+                response.headers[header_name] = header_value
+            return response
 
         # Skip for certain endpoints
         if self._should_skip_rate_limiting(request):
-            return await call_next(request)
+            response = await call_next(request)
+            # Add default headers
+            for header_name, header_value in rate_limit_headers.items():
+                response.headers[header_name] = header_value
+            return response
 
         # Get client and endpoint identifiers
         client_id = self._get_client_id(request)
         endpoint = self._get_endpoint_identifier(request)
 
         try:
-            # Check rate limit
-            result = await self.rate_limiter.check_rate_limit(
-                client_id=client_id, endpoint=endpoint
+            # Check rate limit - combine client and endpoint into key
+            rate_limit_key = f"{client_id}:{endpoint}"
+            allowed, remaining, reset_time = await self.rate_limiter.check_rate_limit(
+                rate_limit_key
             )
 
-            # Get rate limit headers
-            rate_limit_headers = self.rate_limiter.get_rate_limit_headers(result)
+            # Safely calculate reset timestamp
+            try:
+                reset_timestamp = int(datetime.utcnow().timestamp() + reset_time)
+                if reset_timestamp < 0:
+                    reset_timestamp = int((datetime.utcnow() + timedelta(seconds=60)).timestamp())
+            except (TypeError, ValueError):
+                reset_timestamp = int((datetime.utcnow() + timedelta(seconds=60)).timestamp())
 
-            if not result.allowed:
+            # Update rate limit headers with actual values
+            rate_limit_headers.update(
+                {
+                    "X-RateLimit-Limit": "60",  # Default limit
+                    "X-RateLimit-Remaining": str(max(0, remaining)),
+                    "X-RateLimit-Reset": str(reset_timestamp),
+                }
+            )
+
+            if not allowed:
                 # Rate limit exceeded - return 429
                 logger.warning(
                     "Rate limit exceeded",
                     client_id=client_id,
                     endpoint=endpoint,
-                    limit=result.limit,
-                    retry_after=result.retry_after,
+                    limit=60,
+                    retry_after=reset_time,
                 )
 
                 return JSONResponse(
@@ -176,29 +214,29 @@ class RateLimitingMiddleware(BaseHTTPMiddleware):
                             "message": "Too many requests. Please try again later.",
                             "timestamp": datetime.utcnow().isoformat() + "Z",
                             "details": {
-                                "limit": result.limit,
-                                "retry_after": result.retry_after,
-                                "reset_at": result.reset_at.isoformat() + "Z",
+                                "limit": 60,
+                                "retry_after": reset_time,
+                                "reset_at": (
+                                    datetime.utcnow() + timedelta(seconds=reset_time)
+                                ).isoformat()
+                                + "Z",
                             },
                         }
                     },
                     headers=rate_limit_headers,
                 )
 
-            # Process request
-            response = await call_next(request)
-
-            # Add rate limit headers to response
-            for header_name, header_value in rate_limit_headers.items():
-                response.headers[header_name] = header_value
-
-            return response
-
         except Exception as e:
-            # Log error but don't block request if rate limiting fails
+            # Log error but continue with default headers
             logger.error(
                 "Rate limiting error", error=str(e), client_id=client_id, endpoint=endpoint
             )
 
-            # Continue without rate limiting
-            return await call_next(request)
+        # Process request
+        response = await call_next(request)
+
+        # Add rate limit headers to response
+        for header_name, header_value in rate_limit_headers.items():
+            response.headers[header_name] = header_value
+
+        return response

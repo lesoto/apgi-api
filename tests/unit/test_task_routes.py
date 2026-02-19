@@ -101,7 +101,7 @@ class TestTaskRoutes:
         from app.models.schemas import TaskSubmitRequest
 
         request = TaskSubmitRequest(
-            task_type="iowa_gambling",
+            task_type="attentional_blink",
             parameters={"num_trials": 100},
             webhook_url="https://example.com/webhook",
         )
@@ -117,7 +117,7 @@ class TestTaskRoutes:
 
         assert response.task_id == task_id
         assert response.session_id == session_id
-        assert response.task_type == "iowa_gambling"
+        assert response.task_type == "attentional_blink"
         assert response.status == "pending"
         assert response.status_url == f"/v1/tasks/{task_id}"
 
@@ -152,7 +152,7 @@ class TestTaskRoutes:
 
         from app.models.schemas import TaskSubmitRequest
 
-        request = TaskSubmitRequest(task_type="iowa_gambling", parameters={})
+        request = TaskSubmitRequest(task_type="attentional_blink", parameters={})
 
         mock_task_executor.submit_task.side_effect = Exception("Executor error")
 

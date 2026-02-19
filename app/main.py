@@ -7,20 +7,18 @@ FastAPI application providing RESTful access to the APGI System.
 import socket
 import sys
 from contextlib import asynccontextmanager
-from datetime import datetime
 from typing import Optional
 
 import redis.asyncio as redis
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.gzip import GZipMiddleware
-from fastapi.responses import JSONResponse
 
 # Check dependencies before starting
 try:
-    from app.utils.dependency_checker import check_dependencies_on_startup
+    from app.dependency_checker import check_dependencies
 
-    if not check_dependencies_on_startup():
+    if not check_dependencies():
         print("Dependency check failed. Exiting...")
         sys.exit(1)
 except ImportError:
@@ -36,29 +34,46 @@ from app.middleware.api_versioning import APIVersioningMiddleware
 from app.middleware.authentication import AuthenticationMiddleware
 from app.middleware.csrf import CSRFMiddleware
 from app.middleware.deprecation import DeprecationMiddleware
+from app.middleware.metrics import PrometheusMetricsMiddleware
 from app.middleware.request_size_limit import RequestSizeLimitMiddleware
+from app.middleware.schema_validation import ResponseSchemaValidationMiddleware
+from app.middleware.rate_limiting import RateLimitingMiddleware
 from app.middleware.logging import (
     RequestLoggingMiddleware,
     StructuredLogger,
     configure_structured_logging,
 )
-from app.middleware.metrics import PrometheusMetricsMiddleware
-from app.middleware.rate_limiting import RateLimitingMiddleware
-from app.middleware.schema_validation import ResponseSchemaValidationMiddleware
-from app.routes import auth, export, health, metrics, sessions, state, tasks, users, version
+
+# OpenTelemetry import is conditional - handle ImportError
+try:
+    from app.middleware.tracing import configure_distributed_tracing
+
+    OPENTELEMETRY_AVAILABLE = True
+except ImportError:
+    OPENTELEMETRY_AVAILABLE = False
+from app.routes import (
+    auth,
+    export,
+    health,
+    metrics,
+    sessions,
+    state,
+    tasks,
+    templates,
+    users,
+    version,
+)
 from app.services.cache_service import init_cache_service
-from app.tracing import configure_distributed_tracing, instrument_application
+
+from app.middleware.logging import StructuredLogger
 
 # Configure structured logging
 configure_structured_logging(settings.log_level)
-logger = StructuredLogger(__name__)
+logger: StructuredLogger = StructuredLogger(__name__)
 
 
 # Global Redis client
 redis_client: Optional[redis.Redis] = None
-
-# Global rate limiting middleware reference
-rate_limiting_middleware: Optional[RateLimitingMiddleware] = None
 
 
 def is_port_available(host: str, port: int) -> bool:
@@ -75,7 +90,7 @@ def is_port_available(host: str, port: int) -> bool:
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Lifespan context manager for startup and shutdown events."""
-    global redis_client  # type: ignore # noqa: F824
+    global redis_client
 
     # Startup
     logger.info("Application starting up", component="lifecycle")
@@ -91,8 +106,13 @@ async def lifespan(app: FastAPI):
     logger.info("Alerting system configured", component="alerting")
 
     # Configure distributed tracing
-    configure_distributed_tracing()
-    logger.info("Distributed tracing configured", component="tracing")
+    if OPENTELEMETRY_AVAILABLE:
+        configure_distributed_tracing()
+        logger.info("Distributed tracing configured", component="tracing")
+    else:
+        logger.info(
+            "Distributed tracing disabled (OpenTelemetry not available)", component="tracing"
+        )
 
     # Initialize database
     try:
@@ -105,19 +125,22 @@ async def lifespan(app: FastAPI):
     # Initialize Redis client
     try:
         redis_client = redis.from_url(settings.redis_url, encoding="utf-8", decode_responses=True)
-        await redis_client.ping()
-        logger.info("Redis client initialized", component="redis", url=settings.redis_url)
+        if redis_client:
+            await redis_client.ping()  # type: ignore
+            logger.info("Redis client initialized", component="redis", url=settings.redis_url)
 
-        # Initialize cache service
-        init_cache_service(redis_client)
-        logger.info("Cache service initialized", component="cache")
+            # Initialize cache service
+            init_cache_service(redis_client)
+            logger.info("Cache service initialized", component="cache")
 
-        # Update rate limiting middleware with Redis client
-        if rate_limiting_middleware:
-            rate_limiting_middleware.set_redis_client(redis_client)
+            # Update rate limiting middleware with Redis client
+            RateLimitingMiddleware.set_redis_client(redis_client)
             logger.info(
                 "Rate limiting middleware updated with Redis client", component="middleware"
             )
+        else:
+            logger.error("Failed to initialize Redis client", component="redis")
+            raise RuntimeError("Redis client initialization failed")
 
     except Exception as e:
         logger.error("Failed to initialize Redis", component="redis", error=str(e))
@@ -250,14 +273,8 @@ All endpoints except `/health`, `/docs`, and `/openapi.json` require authenticat
     app.add_middleware(DeprecationMiddleware, deprecated_endpoints={})
 
     # Add rate limiting middleware (will be enabled if Redis is available)
-    global rate_limiting_middleware
-    rate_limiting_middleware = RateLimitingMiddleware(
-        app,
-        redis_client=None,  # Will be set in startup
-        enabled=settings.rate_limit_enabled,
-    )
     app.add_middleware(
-        rate_limiting_middleware.__class__, redis_client=None, enabled=settings.rate_limit_enabled
+        RateLimitingMiddleware, redis_client=None, enabled=settings.rate_limit_enabled
     )
 
     # Configure CORS
@@ -271,19 +288,6 @@ All endpoints except `/health`, `/docs`, and `/openapi.json` require authenticat
 
     # Register exception handlers
     register_exception_handlers(app)
-
-    # Health check endpoint
-    @app.get("/health", tags=["Health"])
-    async def health_check():
-        """Basic health check endpoint."""
-        return JSONResponse(
-            status_code=200,
-            content={
-                "status": "healthy",
-                "timestamp": datetime.utcnow().isoformat() + "Z",
-                "version": "1.0.0",
-            },
-        )
 
     # Root endpoint
     @app.get("/", tags=["Root"])
@@ -301,6 +305,7 @@ All endpoints except `/health`, `/docs`, and `/openapi.json` require authenticat
     app.include_router(auth.router)
     app.include_router(users.router)
     app.include_router(sessions.router)
+    app.include_router(templates.router)
     app.include_router(state.router)
     app.include_router(tasks.router)
     app.include_router(export.router)
@@ -314,7 +319,14 @@ All endpoints except `/health`, `/docs`, and `/openapi.json` require authenticat
     logger.info("APGI API application created successfully", version="1.0.0")
 
     # Instrument application with OpenTelemetry after all routes are added
-    instrument_application()
+    def instrument_application():
+        """Placeholder - instrumentation now happens in lifespan."""
+        pass
+
+    try:
+        instrument_application()
+    except ImportError:
+        logger.warning("OpenTelemetry instrumentation skipped")
 
     return app
 
@@ -345,3 +357,10 @@ if __name__ == "__main__":
             sys.exit(1)
 
     uvicorn.run("app.main:app", host=default_host, port=default_port, reload=True, log_level="info")
+
+
+def cli():
+    """CLI entry point for the APGI API."""
+    from app.cli import cli as app_cli
+
+    app_cli()

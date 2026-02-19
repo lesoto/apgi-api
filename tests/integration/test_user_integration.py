@@ -6,6 +6,7 @@ Tests user management endpoints through HTTP requests with authentication.
 
 import pytest
 import uuid
+from datetime import datetime
 from unittest.mock import AsyncMock, MagicMock, patch
 from httpx import AsyncClient, ASGITransport
 
@@ -56,7 +57,7 @@ def mock_user_management_service():
     mock_user.username = "test_user"
     mock_user.email = "test@example.com"
     mock_user.roles = ["user"]
-    mock_user.created_at = "2023-01-01T00:00:00Z"
+    mock_user.created_at = datetime(2023, 1, 1)
 
     service.create_user = MagicMock(return_value=(mock_user, "generated_password"))
     service.get_user_by_id = AsyncMock(return_value=mock_user)
@@ -80,7 +81,7 @@ class TestUserRoutesIntegration:
             request_data = {
                 "username": "newuser",
                 "email": "newuser@example.com",
-                "password": "password123",
+                "password": "Password123",
                 "roles": ["user"],
             }
 
@@ -140,9 +141,7 @@ class TestUserRoutesIntegration:
 
             response = await authenticated_client.delete(f"/v1/users/{user_id}")
 
-            assert response.status_code == 200
-            data = response.json()
-            assert data["message"] == "User deleted successfully"
+            assert response.status_code == 204
 
     @pytest.mark.asyncio
     async def test_reset_password(self, authenticated_client, mock_user_management_service):

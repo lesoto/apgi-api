@@ -27,9 +27,12 @@ from app.models.schemas import (
     PredictionErrorsResponse,
     SomaticMarkersResponse,
 )
+from app.services.authorization import (
+    Permission,
+    require_permission,
+    get_current_user,
+)
 from app.routes.sessions import get_session_manager
-from app.services.session_manager import SessionManager
-from app.middleware.authentication import is_authenticated
 
 logger = logging.getLogger(__name__)
 
@@ -50,11 +53,12 @@ router = APIRouter(
     response_model=SystemStateResponse,
     summary="Get complete system state",
     description="Retrieve the complete current state of all APGI subsystems for the specified session",
+    dependencies=[Depends(require_permission(Permission.SESSION_READ))],
 )
 async def get_system_state(
     session_id: str,
-    request: Request,
-    manager: SessionManager = Depends(get_session_manager),
+    manager: "SessionManager" = Depends(get_session_manager),
+    current_user=Depends(get_current_user),
 ):
     """
     Get complete system state.
@@ -70,7 +74,6 @@ async def get_system_state(
 
     Args:
         session_id: Unique session identifier
-        request: HTTP request for authentication check
         manager: Session manager dependency
 
     Returns:
@@ -79,12 +82,6 @@ async def get_system_state(
     Raises:
         HTTPException: If session not found or state cannot be retrieved
     """
-    # Check authentication
-    if not is_authenticated(request):
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED, detail="Authentication required"
-        )
-
     try:
         # Get session
         sim_session = await manager.get_session(session_id)
@@ -160,10 +157,10 @@ async def get_system_state(
     response_model=IgnitionHistoryResponse,
     summary="Get ignition event history",
     description="Retrieve historical ignition events with optional filtering and pagination",
+    dependencies=[Depends(require_permission(Permission.SESSION_READ))],
 )
 async def get_ignition_history(  # noqa: C901
     session_id: str,
-    request: Request,
     start_time: Optional[float] = Query(None, description="Filter events after this time (ms)"),
     end_time: Optional[float] = Query(None, description="Filter events before this time (ms)"),
     limit: Optional[int] = Query(
@@ -173,7 +170,8 @@ async def get_ignition_history(  # noqa: C901
         description="Maximum number of events to return (warning: values > 500 may be slow)",
     ),
     cursor: Optional[str] = Query(None, description="Pagination cursor"),
-    manager: SessionManager = Depends(get_session_manager),
+    manager: "SessionManager" = Depends(get_session_manager),
+    current_user=Depends(get_current_user),
 ):
     """
     Get ignition event history.
@@ -183,7 +181,6 @@ async def get_ignition_history(  # noqa: C901
 
     Args:
         session_id: Unique session identifier
-        request: HTTP request for authentication check
         start_time: Optional start time filter (milliseconds)
         end_time: Optional end time filter (milliseconds)
         limit: Maximum number of events to return (1-1000)
@@ -196,12 +193,6 @@ async def get_ignition_history(  # noqa: C901
     Raises:
         HTTPException: If session not found or history cannot be retrieved
     """
-    # Check authentication
-    if not is_authenticated(request):
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED, detail="Authentication required"
-        )
-
     try:
         # Warn about potentially expensive queries
         if limit and limit > 500:
@@ -305,9 +296,12 @@ async def get_ignition_history(  # noqa: C901
     response_model=BodyState,
     summary="Get interoceptive body state",
     description="Retrieve current interoceptive state including physiological parameters",
+    dependencies=[Depends(require_permission(Permission.SESSION_READ))],
 )
 async def get_interoceptive_state(
-    session_id: str, request: Request, manager: SessionManager = Depends(get_session_manager)
+    session_id: str,
+    manager: "SessionManager" = Depends(get_session_manager),
+    current_user=Depends(get_current_user),
 ):
     """
     Get interoceptive body state.
@@ -319,7 +313,6 @@ async def get_interoceptive_state(
 
     Args:
         session_id: Unique session identifier
-        request: HTTP request for authentication check
         manager: Session manager dependency
 
     Returns:
@@ -328,12 +321,6 @@ async def get_interoceptive_state(
     Raises:
         HTTPException: If session not found or state cannot be retrieved
     """
-    # Check authentication
-    if not is_authenticated(request):
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED, detail="Authentication required"
-        )
-
     try:
         # Get session
         sim_session = await manager.get_session(session_id)
@@ -369,9 +356,12 @@ async def get_interoceptive_state(
     response_model=PredictionErrorsResponse,
     summary="Get prediction errors",
     description="Retrieve hierarchical prediction errors from all levels of the predictive processing hierarchy",
+    dependencies=[Depends(require_permission(Permission.SESSION_READ))],
 )
 async def get_prediction_errors(
-    session_id: str, request: Request, manager: SessionManager = Depends(get_session_manager)
+    session_id: str,
+    manager: "SessionManager" = Depends(get_session_manager),
+    current_user=Depends(get_current_user),
 ):
     """
     Get prediction errors.
@@ -381,7 +371,6 @@ async def get_prediction_errors(
 
     Args:
         session_id: Unique session identifier
-        request: HTTP request for authentication check
         manager: Session manager dependency
 
     Returns:
@@ -390,12 +379,6 @@ async def get_prediction_errors(
     Raises:
         HTTPException: If session not found or errors cannot be retrieved
     """
-    # Check authentication
-    if not is_authenticated(request):
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED, detail="Authentication required"
-        )
-
     try:
         # Get session
         sim_session = await manager.get_session(session_id)
@@ -434,9 +417,12 @@ async def get_prediction_errors(
     response_model=SomaticMarkersResponse,
     summary="Get somatic markers",
     description="Retrieve stored somatic markers (context-action-outcome associations)",
+    dependencies=[Depends(require_permission(Permission.SESSION_READ))],
 )
 async def get_somatic_markers(
-    session_id: str, request: Request, manager: SessionManager = Depends(get_session_manager)
+    session_id: str,
+    manager: "SessionManager" = Depends(get_session_manager),
+    current_user=Depends(get_current_user),
 ):
     """
     Get somatic markers.
@@ -446,7 +432,6 @@ async def get_somatic_markers(
 
     Args:
         session_id: Unique session identifier
-        request: HTTP request for authentication check
         manager: Session manager dependency
 
     Returns:
@@ -455,12 +440,6 @@ async def get_somatic_markers(
     Raises:
         HTTPException: If session not found or markers cannot be retrieved
     """
-    # Check authentication
-    if not is_authenticated(request):
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED, detail="Authentication required"
-        )
-
     try:
         # Get session
         sim_session = await manager.get_session(session_id)

@@ -5,11 +5,11 @@ This module provides common fixtures used across unit, property-based,
 and integration tests for the standalone API.
 """
 
-import pytest
+import pytest  # noqa: F401
 from hypothesis import settings, HealthCheck
 
 # Import database test fixtures
-from tests.conftest_database import (
+from tests.conftest_database import (  # noqa: F401
     test_db_engine,
     test_db_session,
     mock_database_connection,

@@ -105,7 +105,8 @@ async def validation_error_handler(
                 "code": "VALIDATION_ERROR",
                 "message": "Request validation failed",
                 "request_id": request_id,
-                "timestamp": None,  # Will be set by middleware if available
+                "timestamp": datetime.utcnow().isoformat()
+                + "Z",  # Will be set by middleware if available
                 "details": {"validation_errors": errors},
             }
         },
@@ -167,7 +168,8 @@ async def http_exception_handler(request: Request, exc: StarletteHTTPException) 
                 "code": error_code,
                 "message": str(exc.detail),
                 "request_id": request_id,
-                "timestamp": None,  # Will be set by middleware if available
+                "timestamp": datetime.utcnow().isoformat()
+                + "Z",  # Will be set by middleware if available
                 "details": {},
             }
         },
@@ -245,11 +247,13 @@ async def unhandled_exception_handler(request: Request, exc: Exception) -> JSONR
     except Exception as e:
         metadata["body_error"] = f"Failed to capture request body: {str(e)}"
 
-    await alert_manager.record_error(
-        error_type=type(exc).__name__,
-        error_message=str(exc),
-        metadata=metadata,
-    )
+    # Record error for alerting (only if alerting is configured)
+    if alert_manager.channels:
+        await alert_manager.record_error(
+            error_type=type(exc).__name__,
+            error_message=str(exc),
+            metadata=metadata,
+        )
 
     # Return generic error response (don't expose internal details)
     return JSONResponse(

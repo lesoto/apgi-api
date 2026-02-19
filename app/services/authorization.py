@@ -38,6 +38,12 @@ class Permission(str, Enum):
     SESSION_DELETE = "session:delete"
     SESSION_CONTROL = "session:control"  # start, pause, stop, reset
 
+    # Template permissions
+    TEMPLATE_CREATE = "template:create"
+    TEMPLATE_READ = "template:read"
+    TEMPLATE_UPDATE = "template:update"
+    TEMPLATE_DELETE = "template:delete"
+
     # Task permissions
     TASK_CREATE = "task:create"
     TASK_READ = "task:read"
@@ -68,6 +74,10 @@ ROLE_PERMISSIONS: Dict[Role, Set[Permission]] = {
         Permission.SESSION_UPDATE,
         Permission.SESSION_DELETE,
         Permission.SESSION_CONTROL,
+        Permission.TEMPLATE_CREATE,
+        Permission.TEMPLATE_READ,
+        Permission.TEMPLATE_UPDATE,
+        Permission.TEMPLATE_DELETE,
         Permission.TASK_CREATE,
         Permission.TASK_READ,
         Permission.TASK_DELETE,
@@ -88,6 +98,10 @@ ROLE_PERMISSIONS: Dict[Role, Set[Permission]] = {
         Permission.SESSION_UPDATE,
         Permission.SESSION_DELETE,
         Permission.SESSION_CONTROL,
+        Permission.TEMPLATE_CREATE,
+        Permission.TEMPLATE_READ,
+        Permission.TEMPLATE_UPDATE,
+        Permission.TEMPLATE_DELETE,
         Permission.TASK_CREATE,
         Permission.TASK_READ,
         Permission.TASK_DELETE,
@@ -99,6 +113,7 @@ ROLE_PERMISSIONS: Dict[Role, Set[Permission]] = {
     Role.VIEWER: {
         # Viewers can only read data
         Permission.SESSION_READ,
+        Permission.TEMPLATE_READ,
         Permission.TASK_READ,
         Permission.DATA_READ,
         # Can read basic user info

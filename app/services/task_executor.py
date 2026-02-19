@@ -7,16 +7,54 @@ Manages asynchronous task execution via Celery.
 import logging
 import uuid
 from datetime import datetime
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, Optional
+import time
 
 from celery.result import AsyncResult
-from sqlalchemy.orm import Session
 
 from app.celery_app import celery_app
 from app.database.connection import get_db_context
 from app.database.models import Task, TaskStatus
 
 logger = logging.getLogger(__name__)
+
+
+def retry_with_backoff(func, max_retries=3, base_delay=1.0, max_delay=30.0, backoff_factor=2.0):
+    """
+    Retry a function with exponential backoff for transient failures.
+
+    Args:
+        func: Function to retry
+        max_retries: Maximum number of retry attempts
+        base_delay: Initial delay in seconds
+        max_delay: Maximum delay between retries
+        backoff_factor: Factor to multiply delay by each retry
+
+    Returns:
+        Result of the function call
+
+    Raises:
+        Last exception if all retries fail
+    """
+    last_exception = None
+    delay = base_delay
+
+    for attempt in range(max_retries + 1):
+        try:
+            return func()
+        except Exception as e:
+            last_exception = e
+            if attempt < max_retries:
+                logger.warning(f"Attempt {attempt + 1} failed, retrying in {delay:.1f}s: {str(e)}")
+                time.sleep(delay)
+                delay = min(delay * backoff_factor, max_delay)
+            else:
+                logger.error(f"All {max_retries + 1} attempts failed: {str(e)}")
+
+    if last_exception is not None:
+        raise last_exception
+    else:
+        raise RuntimeError("All retries failed but no exception was captured")
 
 
 class TaskExecutor:
@@ -217,6 +255,7 @@ class TaskExecutor:
         task_type: str,
         parameters: Dict[str, Any],
         webhook_url: Optional[str] = None,
+        priority: int = 5,
     ) -> str:
         """
         Submit a task for asynchronous execution.
@@ -226,6 +265,7 @@ class TaskExecutor:
             task_type: Type of experimental task
             parameters: Task parameters
             webhook_url: Optional webhook URL for completion notification
+            priority: Task priority (1=highest, 10=lowest)
 
         Returns:
             Task ID
@@ -240,6 +280,10 @@ class TaskExecutor:
                 f"Available types: {', '.join(self.TASK_MAP.keys())}"
             )
 
+        # Validate priority
+        if not (1 <= priority <= 10):
+            raise ValueError("Priority must be between 1 (highest) and 10 (lowest)")
+
         # Generate task ID
         task_id = str(uuid.uuid4())
 
@@ -251,22 +295,136 @@ class TaskExecutor:
                 task_type=task_type,
                 parameters=parameters,
                 status=TaskStatus.PENDING.value,
+                priority=priority,
                 webhook_url=webhook_url,
             )
             db.add(task_record)
             db.commit()
 
-        # Submit task to Celery
-        celery_task_name = self.TASK_MAP[task_type]
-        celery_app.send_task(
-            celery_task_name,
-            args=[session_id, parameters],
-            task_id=task_id,
-        )
+        # Check if task can be started immediately (no unmet dependencies)
+        if self._can_start_task(task_id):
+            # Submit task to Celery with retry for transient failures
+            celery_task_name = self.TASK_MAP[task_type]
 
-        logger.info(f"Task {task_id} submitted: {task_type} for session {session_id}")
+            def submit_celery_task():
+                return celery_app.send_task(
+                    celery_task_name,
+                    args=[session_id, parameters],
+                    task_id=task_id,
+                )
+
+            try:
+                retry_with_backoff(submit_celery_task, max_retries=3, base_delay=0.5)
+                logger.info(
+                    f"Task {task_id} submitted immediately: {task_type} for session {session_id}"
+                )
+            except Exception as e:
+                logger.error(f"Failed to submit task {task_id} to Celery after retries: {str(e)}")
+                # Mark task as failed in database
+                with get_db_context() as db:
+                    task_record = db.query(Task).filter(Task.task_id == task_id).first()  # type: ignore
+                    if task_record:
+                        task_record.status = TaskStatus.FAILED.value  # type: ignore
+                        task_record.error_message = f"Celery submission failed: {str(e)}"  # type: ignore
+                        task_record.completed_at = datetime.utcnow()  # type: ignore
+                        db.commit()
+                raise
+        else:
+            logger.info(
+                f"Task {task_id} queued pending dependencies: {task_type} for session {session_id}"
+            )
 
         return task_id
+
+    def _can_start_task(self, task_id: str) -> bool:
+        """
+        Check if a task can be started based on its dependencies.
+
+        Args:
+            task_id: Task identifier
+
+        Returns:
+            True if all dependencies are satisfied, False otherwise
+        """
+        with get_db_context() as db:
+            from app.database.models import TaskDependency
+
+            # Get all dependencies for this task
+            dependencies = (
+                db.query(TaskDependency).filter(TaskDependency.dependent_task_id == task_id).all()
+            )
+
+            for dep in dependencies:
+                prerequisite_task = (
+                    db.query(Task).filter(Task.task_id == dep.prerequisite_task_id).first()
+                )
+
+                if not prerequisite_task:
+                    # Prerequisite task doesn't exist - this shouldn't happen
+                    logger.error(
+                        f"Prerequisite task {dep.prerequisite_task_id} not found for task {task_id}"
+                    )
+                    return False
+
+                # Check if prerequisite is completed (or failed for failure dependencies)
+                if dep.dependency_type == "completion":
+                    if prerequisite_task.status != TaskStatus.COMPLETED.value:
+                        return False
+                elif dep.dependency_type == "success":
+                    if prerequisite_task.status != TaskStatus.COMPLETED.value:
+                        return False
+                elif dep.dependency_type == "failure":
+                    if prerequisite_task.status != TaskStatus.FAILED.value:
+                        return False
+
+            return True
+
+    async def check_and_start_pending_tasks(self, session_id: str) -> None:
+        """
+        Check for pending tasks in a session that can now be started due to satisfied dependencies.
+
+        Args:
+            session_id: Session identifier
+        """
+        with get_db_context() as db:
+            # Get all pending tasks for this session, ordered by priority
+            pending_tasks = (
+                db.query(Task)
+                .filter(Task.session_id == session_id, Task.status == TaskStatus.PENDING.value)
+                .order_by(Task.priority)
+                .all()
+            )
+
+            for task in pending_tasks:
+                if self._can_start_task(task.task_id):  # type: ignore[arg-type]
+                    # Start the task with retry for transient failures
+                    celery_task_name = self.TASK_MAP[task.task_type]  # type: ignore
+
+                    def start_celery_task():
+                        return celery_app.send_task(
+                            celery_task_name,
+                            args=[task.session_id, task.parameters],
+                            task_id=task.task_id,
+                        )
+
+                    try:
+                        retry_with_backoff(start_celery_task, max_retries=3, base_delay=0.5)
+
+                        # Update task status to running
+                        task.status = TaskStatus.RUNNING.value  # type: ignore
+                        task.started_at = datetime.utcnow()  # type: ignore
+                        db.commit()
+
+                        logger.info(
+                            f"Started previously blocked task {task.task_id} due to satisfied dependencies"
+                        )
+                    except Exception as e:
+                        logger.error(f"Failed to start task {task.task_id} after retries: {str(e)}")
+                        # Mark as failed
+                        task.status = TaskStatus.FAILED.value  # type: ignore
+                        task.error_message = f"Task start failed: {str(e)}"  # type: ignore
+                        task.completed_at = datetime.utcnow()  # type: ignore
+                        db.commit()
 
     async def get_task_status(self, task_id: str) -> Dict[str, Any]:
         """
@@ -304,6 +462,37 @@ class TaskExecutor:
             if async_result.state == "STARTED" and async_result.info:
                 status_info["info"] = async_result.info
 
+            # Handle Celery FAILURE state to ensure error propagation
+            if async_result.state == "FAILURE":
+                # Update database status if not already failed
+                if task_record.status != TaskStatus.FAILED.value:
+                    task_record.status = TaskStatus.FAILED.value  # type: ignore
+                    error_msg = (
+                        str(async_result.result)
+                        if async_result.result
+                        else "Worker crashed or task failed unexpectedly"
+                    )
+                    task_record.error_message = str(error_msg)  # type: ignore[assignment]
+                    task_record.completed_at = datetime.utcnow()  # type: ignore
+                    db.commit()
+                # Ensure error is in status_info
+                if not status_info["error"]:
+                    status_info["error"] = task_record.error_message
+
+            # Check for stuck running tasks (worker may have crashed)
+            elif task_record.status == TaskStatus.RUNNING.value and task_record.started_at:
+                time_running = (datetime.utcnow() - task_record.started_at).total_seconds()
+                max_runtime_seconds = 3600  # 1 hour timeout
+                if time_running > max_runtime_seconds:
+                    task_record.status = TaskStatus.FAILED.value  # type: ignore
+                    error_msg = f"Task timed out after {max_runtime_seconds} seconds"
+                    task_record.error_message = error_msg  # type: ignore
+                    task_record.completed_at = datetime.utcnow()  # type: ignore
+                    db.commit()
+                    status_info["status"] = TaskStatus.FAILED.value
+                    status_info["error"] = task_record.error_message
+                    logger.warning(f"Task {task_id} timed out and marked as failed")
+
             return status_info
 
     async def cancel_task(self, task_id: str) -> Dict[str, Any]:
@@ -330,9 +519,9 @@ class TaskExecutor:
             celery_app.control.revoke(task_id, terminate=True)
 
             # Update task status in database
-            task_record.status = TaskStatus.FAILED.value
-            task_record.error_message = "Task cancelled by user"
-            task_record.completed_at = datetime.utcnow()
+            task_record.status = TaskStatus.FAILED.value  # type: ignore
+            task_record.error_message = "Task cancelled by user"  # type: ignore
+            task_record.completed_at = datetime.utcnow()  # type: ignore
             db.commit()
 
             logger.info(f"Task {task_id} cancelled")

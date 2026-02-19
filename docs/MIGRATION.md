@@ -752,27 +752,31 @@ Migration is successful when:
 
 ### Common Issues
 
-**Issue: High error rate after migration**
+#### Issue: High error rate after migration
+
 - Check logs for specific errors
 - Verify configuration is correct
 - Check database connectivity
 - Check Redis connectivity
 - Rollback if error rate > 1%
 
-**Issue: Slow response times**
+#### Issue: Slow response times
+
 - Check database connection pool
 - Check Redis connection count
 - Check Celery queue depth
 - Scale up API instances
 - Optimize slow queries
 
-**Issue: Authentication failures**
+#### Issue: Authentication failures
+
 - Verify JWT_SECRET_KEY matches
 - Check token expiration times
 - Verify CORS configuration
 - Check clock synchronization
 
-**Issue: Database connection errors**
+#### Issue: Database connection errors
+
 - Verify DATABASE_URL is correct
 - Check database is accessible
 - Check connection pool settings

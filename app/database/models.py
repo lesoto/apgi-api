@@ -74,19 +74,84 @@ class User(Base):  # type: ignore[misc, valid-type]
     )
     password_hash = Column(String(255), nullable=False, comment="Hashed password")
     roles = Column(ARRAY(Text), nullable=False, default=list, comment="User roles for RBAC")  # type: ignore[var-annotated]
+    is_active = Column(
+        Boolean, nullable=False, default=True, comment="Whether the user account is active"
+    )
     created_at = Column(
         DateTime(timezone=True),
         nullable=False,
         server_default=func.now(),
         comment="Account creation timestamp",
     )
+    updated_at = Column(
+        DateTime(timezone=True),
+        nullable=False,
+        server_default=func.now(),
+        comment="Last update timestamp",
+    )
     last_login = Column(DateTime(timezone=True), nullable=True, comment="Last login timestamp")
 
     # Relationships
     sessions = relationship("Session", back_populates="user", cascade="all, delete-orphan")
+    session_templates = relationship(
+        "SessionTemplate", back_populates="user", cascade="all, delete-orphan"
+    )
 
     def __repr__(self):
         return f"<User(user_id={self.user_id}, username={self.username})>"
+
+
+class SessionTemplate(Base):  # type: ignore[misc, valid-type]
+    """Session template model for reusable session configurations."""
+
+    __tablename__ = "session_templates"
+
+    template_id = Column(
+        String(36),
+        primary_key=True,
+        default=lambda: str(uuid.uuid4()),
+        comment="Unique template identifier",
+    )
+    user_id = Column(
+        String(36),
+        ForeignKey("users.user_id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+        comment="Owner user ID",
+    )
+    name = Column(String(100), nullable=False, index=True, comment="Template name")
+    description = Column(Text, nullable=True, comment="Template description")
+    config_path = Column(String(255), nullable=True, comment="Path to YAML configuration file")
+    custom_config = Column(JSONB, nullable=True, comment="Default custom configuration overrides")
+    default_description = Column(Text, nullable=True, comment="Default session description")
+    tags = Column(ARRAY(Text), nullable=True, default=list, comment="Template tags for organization")  # type: ignore[var-annotated]
+    is_public = Column(Boolean, nullable=False, default=False, comment="Whether template is public")
+    created_at = Column(
+        DateTime(timezone=True),
+        nullable=False,
+        server_default=func.now(),
+        comment="Template creation timestamp",
+    )
+    updated_at = Column(
+        DateTime(timezone=True),
+        nullable=False,
+        server_default=func.now(),
+        comment="Last update timestamp",
+    )
+
+    # Relationships
+    user = relationship("User", back_populates="session_templates")
+    sessions = relationship("Session", back_populates="template")
+
+    # Indexes
+    __table_args__ = (
+        Index("idx_session_templates_user_name", "user_id", "name"),
+        Index("idx_session_templates_public", "is_public"),
+        Index("idx_session_templates_created_at", "created_at"),
+    )
+
+    def __repr__(self):
+        return f"<SessionTemplate(template_id={self.template_id}, name={self.name})>"
 
 
 class Session(Base):  # type: ignore[misc, valid-type]
@@ -107,6 +172,13 @@ class Session(Base):  # type: ignore[misc, valid-type]
         index=True,
         comment="Owner user ID",
     )
+    template_id = Column(
+        String(36),
+        ForeignKey("session_templates.template_id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+        comment="Template used to create this session",
+    )
     config = Column(JSONB, nullable=False, comment="Session configuration as JSON")
     state = Column(
         String(20),
@@ -125,7 +197,6 @@ class Session(Base):  # type: ignore[misc, valid-type]
         DateTime(timezone=True),
         nullable=False,
         server_default=func.now(),
-        onupdate=func.now(),
         comment="Last update timestamp",
     )
     description = Column(Text, nullable=True, comment="Human-readable session description")
@@ -133,6 +204,7 @@ class Session(Base):  # type: ignore[misc, valid-type]
 
     # Relationships
     user = relationship("User", back_populates="sessions")
+    template = relationship("SessionTemplate", back_populates="sessions")
     tasks = relationship("Task", back_populates="session", cascade="all, delete-orphan")
     session_data = relationship(
         "SessionData", back_populates="session", cascade="all, delete-orphan"
@@ -142,6 +214,9 @@ class Session(Base):  # type: ignore[misc, valid-type]
     __table_args__ = (
         Index("idx_sessions_user_created", "user_id", "created_at"),
         Index("idx_sessions_state", "state"),
+        Index("idx_sessions_created_at", "created_at"),
+        Index("idx_sessions_user_state", "user_id", "state"),
+        Index("idx_sessions_template", "template_id"),
     )
 
     def __repr__(self):
@@ -175,6 +250,9 @@ class Task(Base):  # type: ignore[misc, valid-type]
         index=True,
         comment="Current task status",
     )
+    priority = Column(
+        Integer, nullable=False, default=5, comment="Task priority (1=highest, 10=lowest)"
+    )
     progress = Column(Integer, nullable=True, comment="Progress percentage (0-100)")
     result_data = Column(JSONB, nullable=True, comment="Task results as JSON")
     created_at = Column(
@@ -194,16 +272,83 @@ class Task(Base):  # type: ignore[misc, valid-type]
 
     # Relationships
     session = relationship("Session", back_populates="tasks")
+    dependencies = relationship(
+        "TaskDependency",
+        foreign_keys="TaskDependency.dependent_task_id",
+        back_populates="dependent_task",
+        cascade="all, delete-orphan",
+    )
+    prerequisite_for = relationship(
+        "TaskDependency",
+        foreign_keys="TaskDependency.prerequisite_task_id",
+        back_populates="prerequisite_task",
+        cascade="all, delete-orphan",
+    )
 
     # Indexes
     __table_args__ = (
         Index("idx_tasks_session_created", "session_id", "created_at"),
         Index("idx_tasks_status", "status"),
         Index("idx_tasks_type", "task_type"),
+        Index("idx_tasks_priority", "priority"),
     )
 
     def __repr__(self):
         return f"<Task(task_id={self.task_id}, type={self.task_type}, status={self.status})>"
+
+
+class TaskDependency(Base):  # type: ignore[misc, valid-type]
+    """Task dependency model for managing task execution order."""
+
+    __tablename__ = "task_dependencies"
+
+    id = Column(
+        Integer, primary_key=True, autoincrement=True, comment="Auto-incrementing primary key"
+    )
+    dependent_task_id = Column(
+        String(36),
+        ForeignKey("tasks.task_id", ondelete="CASCADE"),
+        nullable=False,
+        comment="Task that depends on the prerequisite",
+    )
+    prerequisite_task_id = Column(
+        String(36),
+        ForeignKey("tasks.task_id", ondelete="CASCADE"),
+        nullable=False,
+        comment="Task that must complete before the dependent task",
+    )
+    dependency_type = Column(
+        String(20),
+        nullable=False,
+        default="completion",
+        comment="Type of dependency (completion, success, failure)",
+    )
+    created_at = Column(
+        DateTime(timezone=True),
+        nullable=False,
+        server_default=func.now(),
+        comment="Dependency creation timestamp",
+    )
+
+    # Relationships
+    dependent_task = relationship(
+        "Task", foreign_keys=[dependent_task_id], back_populates="dependencies"
+    )
+    prerequisite_task = relationship(
+        "Task", foreign_keys=[prerequisite_task_id], back_populates="prerequisite_for"
+    )
+
+    # Indexes
+    __table_args__ = (
+        Index("idx_task_dependencies_dependent", "dependent_task_id"),
+        Index("idx_task_dependencies_prerequisite", "prerequisite_task_id"),
+        Index(
+            "idx_task_dependencies_unique", "dependent_task_id", "prerequisite_task_id", unique=True
+        ),
+    )
+
+    def __repr__(self):
+        return f"<TaskDependency(dependent={self.dependent_task_id}, prerequisite={self.prerequisite_task_id})>"
 
 
 class SessionData(Base):  # type: ignore[misc, valid-type]

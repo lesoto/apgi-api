@@ -7,7 +7,6 @@ Handles exporting simulation session data in various formats (JSON, CSV).
 import json
 import logging
 from typing import Optional, List, Tuple, Dict, Any
-from datetime import datetime
 
 from app.services.session_manager import SessionManager
 
@@ -177,11 +176,11 @@ class DataExportService:
 
         if time_series:
             # Get all variable names
-            var_names = set()
+            var_names = []
             for point in time_series:
-                var_names.update(point.keys())
-            var_names.discard("time")
-            var_names = sorted(var_names)
+                var_names.extend(point.keys())
+            var_names = sorted(set(var_names))
+            var_names.remove("time") if "time" in var_names else None
 
             # Write header
             header = "time," + ",".join(var_names)

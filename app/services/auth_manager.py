@@ -6,7 +6,6 @@ Handles JWT token creation/verification and password hashing for user authentica
 
 import hmac
 import logging
-import secrets
 from datetime import datetime, timedelta
 from typing import Any, Dict, List, Optional
 
@@ -272,12 +271,13 @@ class AuthManager:
 
         return user
 
-    def create_tokens_for_user(self, user: User) -> Dict[str, Any]:
+    def create_tokens_for_user(self, user: User, remember_me: bool = False) -> Dict[str, Any]:
         """
         Create access and refresh tokens for a user.
 
         Args:
             user: User object
+            remember_me: Whether to extend refresh token expiry
 
         Returns:
             Dictionary with access_token, refresh_token, token_type, and expires_in
@@ -290,11 +290,17 @@ class AuthManager:
             user_id=user.user_id, username=user.username, roles=user.roles  # type: ignore[arg-type]
         )
 
+        # Determine refresh token expiry based on remember_me
+        if remember_me:
+            refresh_expire_days = 30  # Extended expiry for remember_me
+        else:
+            refresh_expire_days = self.refresh_token_expire_days
+
         # Store refresh token in database
         from datetime import timezone
 
         token_hash = self.hash_password(refresh_token)
-        expires_at = datetime.now(timezone.utc) + timedelta(days=self.refresh_token_expire_days)
+        expires_at = datetime.now(timezone.utc) + timedelta(days=refresh_expire_days)
 
         try:
             db_refresh_token = RefreshToken(
@@ -312,6 +318,7 @@ class AuthManager:
             "refresh_token": refresh_token,
             "token_type": "bearer",
             "expires_in": self.access_token_expire_minutes * 60,
+            "refresh_expires_in": refresh_expire_days * 24 * 60 * 60,
         }
 
     # ========================================================================
@@ -350,28 +357,27 @@ class AuthManager:
         # Verify refresh token
         payload = self.verify_token(refresh_token, expected_type="refresh")
 
-        # Hash the provided token to lookup the exact token in database
-        token_hash = self.hash_password(refresh_token)
-
-        # Look up the specific token by hash and user_id (not just first non-revoked)
-        db_token = (
+        # Look up all non-revoked tokens for this user (to prevent timing attacks)
+        db_tokens = (
             self.db.query(RefreshToken)
             .filter(
                 and_(
                     RefreshToken.user_id == payload.user_id,
-                    RefreshToken.token_hash == token_hash,
-                    not RefreshToken.revoked,  # type: ignore[arg-type, assignment]
+                    RefreshToken.revoked.is_(False),  # type: ignore[arg-type]
                 )
             )
-            .first()
+            .all()
         )
+
+        # Find the specific token by bcrypt check
+        db_token = None
+        for candidate_token in db_tokens:
+            if self.verify_password(refresh_token, candidate_token.token_hash):  # type: ignore[arg-type]
+                db_token = candidate_token
+                break
 
         if not db_token:
             raise AuthenticationError("Invalid or revoked refresh token")
-
-        # Use constant-time comparison for token verification
-        if not self.constant_time_compare(refresh_token, db_token.token_hash):  # type: ignore[arg-type]
-            raise AuthenticationError("Invalid refresh token")
 
         # Check expiration in database
         from datetime import timezone
@@ -408,21 +414,24 @@ class AuthManager:
             # Verify token to get user_id
             payload = self.verify_token(refresh_token, expected_type="refresh")
 
-            # Hash the provided token to lookup the exact token in database
-            token_hash = self.hash_password(refresh_token)
-
-            # Find and revoke the specific token by hash and user_id
-            db_token = (
+            # Look up all non-revoked tokens for this user (to prevent timing attacks)
+            db_tokens = (
                 self.db.query(RefreshToken)
                 .filter(
                     and_(
                         RefreshToken.user_id == payload.user_id,
-                        RefreshToken.token_hash == token_hash,
-                        not RefreshToken.revoked,  # type: ignore[arg-type, assignment]
+                        RefreshToken.revoked.is_(False),  # type: ignore[arg-type]
                     )
                 )
-                .first()
+                .all()
             )
+
+            # Find the specific token by bcrypt check
+            db_token = None
+            for candidate_token in db_tokens:
+                if self.verify_password(refresh_token, candidate_token.token_hash):  # type: ignore[arg-type]
+                    db_token = candidate_token
+                    break
 
             try:
                 if db_token:
@@ -432,7 +441,7 @@ class AuthManager:
                 return False
             except Exception as e:
                 self.db.rollback()
-                logger.error(f"Failed to revoke refresh token {token_hash}: {e}")
+                logger.error(f"Failed to revoke refresh token for user {payload.user_id}: {e}")
                 return False
 
         except (InvalidTokenError, ExpiredTokenError):
@@ -452,7 +461,7 @@ class AuthManager:
         try:
             tokens = (
                 self.db.query(RefreshToken)
-                .filter(and_(RefreshToken.user_id == user_id, not RefreshToken.revoked))  # type: ignore[arg-type, assignment]
+                .filter(and_(RefreshToken.user_id == user_id, RefreshToken.revoked.is_(False)))  # type: ignore[arg-type]
                 .all()
             )
         except Exception as e:

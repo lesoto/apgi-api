@@ -8,9 +8,10 @@ import time
 import psutil
 from typing import Callable
 
-from fastapi import Request, Response
+from fastapi import Request
 from prometheus_client import CONTENT_TYPE_LATEST, Counter, Gauge, Histogram, generate_latest
 from starlette.middleware.base import BaseHTTPMiddleware
+from starlette.responses import Response as StarletteResponse
 from starlette.types import ASGIApp
 
 # Define Prometheus metrics
@@ -47,6 +48,52 @@ memory_usage_bytes = Gauge("apgi_api_memory_usage_bytes", "Current memory usage 
 
 # CPU usage gauge
 cpu_usage_percent = Gauge("apgi_api_cpu_usage_percent", "Current CPU usage percentage")
+
+# Database connection pool metrics
+database_connections_active = Gauge(
+    "apgi_api_database_connections_active", "Number of active database connections"
+)
+database_connections_idle = Gauge(
+    "apgi_api_database_connections_idle", "Number of idle database connections"
+)
+database_connections_used = Gauge(
+    "apgi_api_database_connections_used", "Number of used database connections"
+)
+database_connections_overflow = Gauge(
+    "apgi_api_database_connections_overflow", "Number of overflow database connections"
+)
+
+# Redis metrics
+redis_connections_active = Gauge(
+    "apgi_api_redis_connections_active", "Number of active Redis connections"
+)
+redis_memory_used_bytes = Gauge("apgi_api_redis_memory_used_bytes", "Redis memory usage in bytes")
+redis_keys_total = Gauge("apgi_api_redis_keys_total", "Total number of keys in Redis")
+redis_hit_rate = Gauge("apgi_api_redis_hit_rate", "Redis cache hit rate (0.0-1.0)")
+
+# Celery metrics
+celery_active_workers = Gauge("apgi_api_celery_active_workers", "Number of active Celery workers")
+celery_active_tasks = Gauge("apgi_api_celery_active_tasks", "Number of currently executing tasks")
+celery_scheduled_tasks = Gauge("apgi_api_celery_scheduled_tasks", "Number of scheduled tasks")
+celery_queued_tasks = Gauge("apgi_api_celery_queued_tasks", "Number of tasks in queue")
+
+# Cache metrics
+cache_hits = Counter("apgi_api_cache_hits_total", "Total number of cache hits")
+cache_misses = Counter("apgi_api_cache_misses_total", "Total number of cache misses")
+cache_sets = Counter("apgi_api_cache_sets_total", "Total number of cache sets")
+
+# Authentication metrics
+auth_attempts = Counter("apgi_api_auth_attempts_total", "Total authentication attempts", ["result"])
+auth_tokens_issued = Counter("apgi_api_auth_tokens_issued_total", "Total JWT tokens issued")
+auth_tokens_revoked = Counter("apgi_api_auth_tokens_revoked_total", "Total JWT tokens revoked")
+
+# Rate limiting metrics
+rate_limit_exceeded = Counter(
+    "apgi_api_rate_limit_exceeded_total", "Total rate limit violations", ["endpoint"]
+)
+rate_limit_allowed = Counter(
+    "apgi_api_rate_limit_allowed_total", "Total allowed requests under rate limit", ["endpoint"]
+)
 
 # Response size histogram
 response_size_bytes = Histogram(
@@ -139,7 +186,7 @@ class PrometheusMetricsMiddleware(BaseHTTPMiddleware):
     def __init__(self, app: ASGIApp):
         super().__init__(app)
 
-    async def dispatch(self, request: Request, call_next: Callable) -> Response:
+    async def dispatch(self, request: Request, call_next: Callable) -> StarletteResponse:
         """
         Process request and collect metrics.
 
@@ -152,7 +199,8 @@ class PrometheusMetricsMiddleware(BaseHTTPMiddleware):
         """
         # Skip metrics collection for the metrics endpoint itself
         if request.url.path == "/metrics":
-            return await call_next(request)
+            response = await call_next(request)
+            return response  # type: ignore
 
         # Normalize endpoint path (remove IDs for better aggregation)
         endpoint = self._normalize_endpoint(request.url.path)
@@ -189,7 +237,7 @@ class PrometheusMetricsMiddleware(BaseHTTPMiddleware):
             # Update system metrics
             self._update_system_metrics()
 
-            return response
+            return response  # type: ignore
 
         except Exception as e:
             # Record error metrics
@@ -451,29 +499,119 @@ class MetricsCollector:
         exports_completed.labels(export_format=export_format).inc()
 
     @staticmethod
-    def record_export_size(export_format: str, size_bytes: int):
+    def update_database_metrics(active: int, idle: int, used: int, overflow: int):
         """
-        Record export size.
+        Update database connection pool metrics.
 
         Args:
-            export_format: Format of the export
-            size_bytes: Size of the exported data in bytes
+            active: Number of active connections
+            idle: Number of idle connections
+            used: Number of used connections
+            overflow: Number of overflow connections
         """
-        export_size_bytes.labels(export_format=export_format).observe(size_bytes)
+        database_connections_active.set(active)
+        database_connections_idle.set(idle)
+        database_connections_used.set(used)
+        database_connections_overflow.set(overflow)
+
+    @staticmethod
+    def update_redis_metrics(connections: int, memory_bytes: int, keys: int, hit_rate: float):
+        """
+        Update Redis metrics.
+
+        Args:
+            connections: Number of active connections
+            memory_bytes: Memory usage in bytes
+            keys: Total number of keys
+            hit_rate: Cache hit rate (0.0-1.0)
+        """
+        redis_connections_active.set(connections)
+        redis_memory_used_bytes.set(memory_bytes)
+        redis_keys_total.set(keys)
+        redis_hit_rate.set(hit_rate)
+
+    @staticmethod
+    def update_celery_metrics(active_workers: int, active_tasks: int, scheduled: int, queued: int):
+        """
+        Update Celery metrics.
+
+        Args:
+            active_workers: Number of active workers
+            active_tasks: Number of currently executing tasks
+            scheduled: Number of scheduled tasks
+            queued: Number of tasks in queue
+        """
+        celery_active_workers.set(active_workers)
+        celery_active_tasks.set(active_tasks)
+        celery_scheduled_tasks.set(scheduled)
+        celery_queued_tasks.set(queued)
+
+    @staticmethod
+    def record_cache_hit():
+        """Increment cache hit counter."""
+        cache_hits.inc()
+
+    @staticmethod
+    def record_cache_miss():
+        """Increment cache miss counter."""
+        cache_misses.inc()
+
+    @staticmethod
+    def record_cache_set():
+        """Increment cache set counter."""
+        cache_sets.inc()
+
+    @staticmethod
+    def record_auth_attempt(result: str):
+        """
+        Record authentication attempt.
+
+        Args:
+            result: Result of authentication ("success", "failure", "invalid_credentials", etc.)
+        """
+        auth_attempts.labels(result=result).inc()
+
+    @staticmethod
+    def record_token_issued():
+        """Increment token issued counter."""
+        auth_tokens_issued.inc()
+
+    @staticmethod
+    def record_token_revoked():
+        """Increment token revoked counter."""
+        auth_tokens_revoked.inc()
+
+    @staticmethod
+    def record_rate_limit_exceeded(endpoint: str):
+        """
+        Record rate limit violation.
+
+        Args:
+            endpoint: Endpoint where rate limit was exceeded
+        """
+        rate_limit_exceeded.labels(endpoint=endpoint).inc()
+
+    @staticmethod
+    def record_rate_limit_allowed(endpoint: str):
+        """
+        Record allowed request under rate limit.
+
+        Args:
+            endpoint: Endpoint that was allowed
+        """
+        rate_limit_allowed.labels(endpoint=endpoint).inc()
 
 
 # Global metrics collector instance
 metrics_collector = MetricsCollector()
 
 
-def get_metrics_response() -> Response:
+def get_metrics_response() -> StarletteResponse:
     """
     Generate Prometheus metrics response.
 
     Returns:
         Response with Prometheus metrics in text format
     """
-    from starlette.responses import Response
-
     metrics_data = generate_latest()
-    return Response(content=metrics_data, media_type=CONTENT_TYPE_LATEST)
+    return StarletteResponse(content=metrics_data, media_type=CONTENT_TYPE_LATEST)

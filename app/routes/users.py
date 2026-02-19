@@ -5,7 +5,7 @@ API endpoints for user management including registration,
 password reset, and user administration.
 """
 
-from typing import List, Optional
+from typing import List
 
 from fastapi import APIRouter, Depends, status, HTTPException
 from sqlalchemy.orm import Session
@@ -28,7 +28,7 @@ from app.services.authorization import (
     get_current_user,
     TokenPayload,
 )
-from app.services.user_management import get_user_management_service, UserManagementService
+from app.services.user_management import get_user_management_service
 
 router = APIRouter(
     prefix="/v1/users",
@@ -48,6 +48,7 @@ router = APIRouter(
     status_code=status.HTTP_201_CREATED,
     summary="Register new user",
     description="Create a new user account with auto-generated password if not provided",
+    dependencies=[Depends(require_permission(Permission.USER_CREATE))],
 )
 async def register_user(
     request: UserCreateRequest,
@@ -69,20 +70,20 @@ async def register_user(
     user_service = get_user_management_service(db)
 
     try:
-        user, password = user_service.create_user(
+        user = user_service.create_user(
             username=request.username,
             email=request.email,
             password=request.password,
-            roles=request.roles or ["user"],
+            roles=["user"],
         )
 
         return UserCreateResponse(
-            user_id=user.user_id,
-            username=user.username,
-            email=user.email,
-            roles=user.roles,
-            password=password,  # Only returned once during creation
-            created_at=user.created_at,
+            user_id=str(user.user_id),
+            username=str(user.username),
+            email=str(user.email),
+            roles=list(user.roles) if user.roles else [],
+            password=request.password,  # Only returned once during creation
+            created_at=user.created_at,  # type: ignore[arg-type]
             message="User created successfully",
         )
 
@@ -119,15 +120,18 @@ async def create_default_user(
     user_service = get_user_management_service(db)
 
     try:
-        user, password = user_service.create_default_user()
+        user = user_service.create_default_user(
+            username="admin", email="admin@example.com", password="secure_password"
+        )
+        password = "secure_password"
 
         return UserCreateResponse(
-            user_id=user.user_id,
-            username=user.username,
-            email=user.email,
-            roles=user.roles,
+            user_id=user.user_id,  # type: ignore[arg-type]
+            username=user.username,  # type: ignore[arg-type]
+            email=user.email,  # type: ignore[arg-type]
+            roles=user.roles,  # type: ignore[arg-type]
             password=password,
-            created_at=user.created_at,
+            created_at=user.created_at,  # type: ignore[arg-type]
             message="Default user created successfully",
         )
 
@@ -165,14 +169,14 @@ async def list_users(
 
     return [
         UserResponse(
-            user_id=user.user_id,
-            username=user.username,
-            email=user.email,
-            roles=user.roles,
-            is_active=user.is_active,
-            created_at=user.created_at,
-            updated_at=user.updated_at,
-            last_login=user.last_login,
+            user_id=user.user_id,  # type: ignore[arg-type]
+            username=user.username,  # type: ignore[arg-type]
+            email=user.email,  # type: ignore[arg-type]
+            roles=user.roles,  # type: ignore[arg-type]
+            is_active=user.is_active,  # type: ignore[arg-type]
+            created_at=user.created_at,  # type: ignore[arg-type]
+            updated_at=user.updated_at,  # type: ignore[arg-type]
+            last_login=user.last_login,  # type: ignore[arg-type]
         )
         for user in users
     ]
@@ -205,14 +209,47 @@ async def get_current_user_profile(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
 
     return UserResponse(
-        user_id=user.user_id,
-        username=user.username,
-        email=user.email,
-        roles=user.roles,
-        is_active=user.is_active,
-        created_at=user.created_at,
-        updated_at=user.updated_at,
-        last_login=user.last_login,
+        user_id=user.user_id,  # type: ignore[arg-type]
+        username=user.username,  # type: ignore[arg-type]
+        email=user.email,  # type: ignore[arg-type]
+        roles=user.roles,  # type: ignore[arg-type]
+        is_active=user.is_active,  # type: ignore[arg-type]
+        created_at=user.created_at,  # type: ignore[arg-type]
+        updated_at=user.updated_at,  # type: ignore[arg-type]
+        last_login=user.last_login,  # type: ignore[arg-type]
+    )
+
+
+@router.get(
+    "/stats",
+    response_model=UserStatsResponse,
+    summary="Get user statistics",
+    description="Retrieve user statistics (requires admin privileges)",
+    dependencies=[Depends(require_permission(Permission.USER_READ))],
+)
+async def get_user_stats(
+    db: Session = Depends(get_db),
+):
+    """
+    Get user statistics.
+
+    Args:
+        db: Database session
+        user_service: User management service
+
+    Returns:
+        UserStatsResponse object
+    """
+    user_service = get_user_management_service(db)
+    stats = user_service.get_user_stats()
+
+    return UserStatsResponse(
+        total_users=stats["total_users"],
+        active_users=stats["active_users"],
+        inactive_users=stats["inactive_users"],
+        role_counts=stats["role_counts"],
+        total_sessions=stats["total_sessions"],
+        active_sessions=stats["active_sessions"],
     )
 
 
@@ -247,14 +284,14 @@ async def get_user(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
 
     return UserResponse(
-        user_id=user.user_id,
-        username=user.username,
-        email=user.email,
-        roles=user.roles,
-        is_active=user.is_active,
-        created_at=user.created_at,
-        updated_at=user.updated_at,
-        last_login=user.last_login,
+        user_id=user.user_id,  # type: ignore[arg-type]
+        username=user.username,  # type: ignore[arg-type]
+        email=user.email,  # type: ignore[arg-type]
+        roles=user.roles,  # type: ignore[arg-type]
+        is_active=user.is_active,  # type: ignore[arg-type]
+        created_at=user.created_at,  # type: ignore[arg-type]
+        updated_at=user.updated_at,  # type: ignore[arg-type]
+        last_login=user.last_login,  # type: ignore[arg-type]
     )
 
 
@@ -307,14 +344,14 @@ async def update_user(
         )
 
         return UserResponse(
-            user_id=user.user_id,
-            username=user.username,
-            email=user.email,
-            roles=user.roles,
-            is_active=user.is_active,
-            created_at=user.created_at,
-            updated_at=user.updated_at,
-            last_login=user.last_login,
+            user_id=user.user_id,  # type: ignore[arg-type]
+            username=user.username,  # type: ignore[arg-type]
+            email=user.email,  # type: ignore[arg-type]
+            roles=user.roles,  # type: ignore[arg-type]
+            is_active=user.is_active,  # type: ignore[arg-type]
+            created_at=user.created_at,  # type: ignore[arg-type]
+            updated_at=user.updated_at,  # type: ignore[arg-type]
+            last_login=user.last_login,  # type: ignore[arg-type]
         )
 
     except UserNotFoundError:
@@ -415,34 +452,3 @@ async def delete_user(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Failed to delete user: {str(e)}",
         )
-
-
-@router.get(
-    "/stats",
-    response_model=UserStatsResponse,
-    summary="Get user statistics",
-    description="Retrieve user statistics (requires admin privileges)",
-    dependencies=[Depends(require_permission(Permission.USER_READ))],
-)
-async def get_user_stats(
-    db: Session = Depends(get_db),
-):
-    """
-    Get user statistics.
-
-    Args:
-        db: Database session
-        user_service: User management service
-
-    Returns:
-        UserStatsResponse object
-    """
-    user_service = get_user_management_service(db)
-    stats = user_service.get_user_stats()
-
-    return UserStatsResponse(
-        total_users=stats["total_users"],
-        active_users=stats["active_users"],
-        inactive_users=stats["inactive_users"],
-        role_counts=stats["role_counts"],
-    )

@@ -6,13 +6,13 @@ Tests task submission, status checking, result retrieval, and timeout handling.
 
 import pytest
 import uuid
-from datetime import datetime, timedelta
-from unittest.mock import AsyncMock, MagicMock, patch
+from datetime import datetime
+from typing import Any
+from unittest.mock import MagicMock, patch
 from celery import states
 
 from app.services.task_executor import TaskExecutor
 from app.database.models import Task, TaskStatus
-
 
 # ============================================================================
 # Fixtures
@@ -119,7 +119,7 @@ async def test_submit_task_invalid_type(task_executor):
     """Test task submission with invalid task type."""
     session_id = str(uuid.uuid4())
     task_type = "invalid_task_type"
-    parameters = {}
+    parameters: dict[str, Any] = {}
 
     with pytest.raises(ValueError) as exc_info:
         await task_executor.submit_task(

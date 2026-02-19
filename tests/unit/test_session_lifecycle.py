@@ -8,8 +8,7 @@ Validates Requirements 18.3, 18.4, 18.5, 18.6, 18.7.
 
 import pytest
 import asyncio
-from datetime import datetime, timedelta
-from unittest.mock import Mock, MagicMock, AsyncMock, patch
+from unittest.mock import MagicMock, AsyncMock, patch
 import uuid
 
 from app.services.session_manager import (
@@ -18,7 +17,7 @@ from app.services.session_manager import (
     SessionLifecycleState,
 )
 from app.models.schemas import SessionCreateRequest
-from app.database.models import Session as SessionModel, SessionState
+from app.database.models import SessionState
 
 
 @pytest.fixture
@@ -92,6 +91,7 @@ class TestSessionCreation:
             config_path=sample_config["config_path"],
             custom_config=sample_config["custom_config"],
             description=sample_config["description"],
+            template_id=None,
         )
 
         session_id = await session_manager.create_session(request)
@@ -110,6 +110,7 @@ class TestSessionCreation:
             config_path=sample_config["config_path"],
             custom_config=sample_config["custom_config"],
             description=sample_config["description"],
+            template_id=None,
         )
 
         session_id = await session_manager.create_session(request)
@@ -126,6 +127,7 @@ class TestSessionCreation:
             config_path=sample_config["config_path"],
             custom_config=sample_config["custom_config"],
             description=sample_config["description"],
+            template_id=None,
         )
 
         await session_manager.create_session(request)
@@ -143,6 +145,7 @@ class TestSessionCreation:
             config_path=sample_config["config_path"],
             custom_config=sample_config["custom_config"],
             description=sample_config["description"],
+            template_id=None,
         )
 
         session_id = await session_manager.create_session(request)
@@ -161,6 +164,7 @@ class TestSessionCreation:
             config_path=sample_config["config_path"],
             custom_config=sample_config["custom_config"],
             description=sample_config["description"],
+            template_id=None,
         )
 
         session_id = await session_manager.create_session(request)
@@ -184,7 +188,7 @@ class TestSessionStateTransitions:
 
         result = await session.start()
 
-        assert session.state == SessionLifecycleState.RUNNING
+        assert session.state == SessionLifecycleState.RUNNING  # type: ignore
         assert result["status"] == SessionLifecycleState.RUNNING.value
         assert result["session_id"] == session_id
 
@@ -201,7 +205,7 @@ class TestSessionStateTransitions:
         # Pause session
         result = await session.pause()
 
-        assert session.state == SessionLifecycleState.PAUSED
+        assert session.state == SessionLifecycleState.PAUSED  # type: ignore
         assert result["status"] == SessionLifecycleState.PAUSED.value
         assert result["session_id"] == session_id
 
@@ -219,7 +223,7 @@ class TestSessionStateTransitions:
         # Resume (start again)
         result = await session.start()
 
-        assert session.state == SessionLifecycleState.RUNNING
+        assert session.state == SessionLifecycleState.RUNNING  # type: ignore
         assert result["status"] == SessionLifecycleState.RUNNING.value
 
     @pytest.mark.asyncio
@@ -235,7 +239,7 @@ class TestSessionStateTransitions:
         # Stop session
         result = await session.stop()
 
-        assert session.state == SessionLifecycleState.STOPPED
+        assert session.state == SessionLifecycleState.STOPPED  # type: ignore
         assert result["status"] == SessionLifecycleState.STOPPED.value
         assert result["session_id"] == session_id
 
@@ -253,7 +257,7 @@ class TestSessionStateTransitions:
         # Stop session
         result = await session.stop()
 
-        assert session.state == SessionLifecycleState.STOPPED
+        assert session.state == SessionLifecycleState.STOPPED  # type: ignore
         assert result["status"] == SessionLifecycleState.STOPPED.value
 
     @pytest.mark.asyncio
@@ -270,7 +274,7 @@ class TestSessionStateTransitions:
         # Reset session
         result = await session.reset()
 
-        assert session.state == SessionLifecycleState.CREATED
+        assert session.state == SessionLifecycleState.CREATED  # type: ignore
         assert result["status"] == SessionLifecycleState.CREATED.value
         assert result["session_id"] == session_id
 
@@ -285,7 +289,7 @@ class TestSessionStateTransitions:
         # Stop session without starting
         result = await session.stop()
 
-        assert session.state == SessionLifecycleState.STOPPED
+        assert session.state == SessionLifecycleState.STOPPED  # type: ignore
         assert result["status"] == SessionLifecycleState.STOPPED.value
 
 
@@ -383,6 +387,7 @@ class TestSessionDeletion:
             config_path=sample_config["config_path"],
             custom_config=sample_config["custom_config"],
             description=sample_config["description"],
+            template_id=None,
         )
 
         session_id = await session_manager.create_session(request)
@@ -405,6 +410,7 @@ class TestSessionDeletion:
             config_path=sample_config["config_path"],
             custom_config=sample_config["custom_config"],
             description=sample_config["description"],
+            template_id=None,
         )
 
         session_id = await session_manager.create_session(request)
@@ -432,6 +438,7 @@ class TestSessionDeletion:
             config_path=sample_config["config_path"],
             custom_config=sample_config["custom_config"],
             description=sample_config["description"],
+            template_id=None,
         )
 
         session_id = await session_manager.create_session(request)
@@ -495,6 +502,7 @@ class TestSessionExpiration:
             config_path=sample_config["config_path"],
             custom_config=sample_config["custom_config"],
             description=sample_config["description"],
+            template_id=None,
         )
 
         session_id = await session_manager.create_session(request)
@@ -522,6 +530,7 @@ class TestSessionExpiration:
             config_path=sample_config["config_path"],
             custom_config=sample_config["custom_config"],
             description=sample_config["description"],
+            template_id=None,
         )
 
         session_id = await session_manager.create_session(request)
@@ -547,6 +556,7 @@ class TestSessionExpiration:
             request = SessionCreateRequest(
                 config_path=sample_config["config_path"],
                 custom_config=sample_config["custom_config"],
+                template_id=None,
                 description=f"Test session {i}",
             )
             session_id = await session_manager.create_session(request)
@@ -571,6 +581,7 @@ class TestSessionExpiration:
             config_path=sample_config["config_path"],
             custom_config=sample_config["custom_config"],
             description=sample_config["description"],
+            template_id=None,
         )
 
         session_id = await session_manager.create_session(request)
@@ -610,6 +621,7 @@ class TestSessionStateConsistency:
             config_path=sample_config["config_path"],
             custom_config=sample_config["custom_config"],
             description=sample_config["description"],
+            template_id=None,
         )
 
         session_id = await session_manager.create_session(request)

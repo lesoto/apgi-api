@@ -5,7 +5,6 @@ Service for tracking and enforcing rate limits using Redis.
 """
 
 import logging
-from typing import Optional
 
 import redis.asyncio as redis
 

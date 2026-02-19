@@ -1,13 +1,12 @@
 """
-Request Size Limiting Middleware
+Request Size Limit Middleware
 
-Limits request body size to prevent DoS attacks via large payloads.
+Middleware for limiting the size of incoming requests.
 """
 
 from datetime import datetime
-from typing import Optional
 
-from fastapi import Request, HTTPException
+from fastapi import Request
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.responses import JSONResponse
 

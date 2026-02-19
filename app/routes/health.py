@@ -10,7 +10,7 @@ from typing import Optional
 
 from app.services.health_check import HealthCheckService
 
-router = APIRouter(prefix="/v1", tags=["Health"])
+router = APIRouter(tags=["Health"])
 
 # Global health check service instance
 health_service: Optional[HealthCheckService] = None
@@ -28,9 +28,9 @@ def init_health_routes(redis_client):
 
 
 @router.get("/health")
-async def health_check():
+async def root_health_check():
     """
-    Comprehensive health check endpoint.
+    Comprehensive health check endpoint at root path.
 
     Checks the health of all API dependencies:
     - Database connectivity

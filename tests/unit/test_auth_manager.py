@@ -8,12 +8,13 @@ Validates Requirements 8.2, 8.3, 8.4.
 
 import pytest
 from datetime import datetime, timedelta, timezone
-from unittest.mock import Mock, MagicMock, patch
+from unittest.mock import MagicMock
+from typing import cast
 import jwt
 
-from app.services.auth_manager import AuthManager, TokenPayload
+from app.services.auth_manager import AuthManager
 from app.config import settings
-from app.exceptions import AuthenticationError, ExpiredTokenError, InvalidTokenError
+from app.exceptions import ExpiredTokenError, InvalidTokenError
 
 
 @pytest.fixture
@@ -96,7 +97,7 @@ class TestAccessTokenCreation:
         # Verify token signature
         try:
             payload = jwt.decode(
-                token, settings.jwt_secret_key, algorithms=[settings.jwt_algorithm]
+                token, cast(str, settings.jwt_secret_key), algorithms=[settings.jwt_algorithm]
             )
             signature_valid = True
         except jwt.InvalidTokenError:
@@ -108,7 +109,7 @@ class TestAccessTokenCreation:
         """Test that access token can be created with empty roles list."""
         user_id = "user123"
         username = "testuser"
-        roles = []
+        roles: list[str] = []
 
         token = auth_manager.create_access_token(user_id, username, roles)
 
@@ -186,7 +187,7 @@ class TestRefreshTokenCreation:
         # Verify token signature
         try:
             payload = jwt.decode(
-                token, settings.jwt_secret_key, algorithms=[settings.jwt_algorithm]
+                token, cast(str, settings.jwt_secret_key), algorithms=[settings.jwt_algorithm]
             )
             signature_valid = True
         except jwt.InvalidTokenError:
@@ -228,7 +229,7 @@ class TestAccessTokenVerification:
             "token_type": "access",
         }
         expired_token = jwt.encode(
-            payload_dict, settings.jwt_secret_key, algorithm=settings.jwt_algorithm
+            payload_dict, cast(str, settings.jwt_secret_key), algorithm=settings.jwt_algorithm
         )
 
         # Verify token raises ExpiredTokenError
@@ -321,7 +322,7 @@ class TestRefreshTokenVerification:
             "token_type": "refresh",
         }
         expired_token = jwt.encode(
-            payload_dict, settings.jwt_secret_key, algorithm=settings.jwt_algorithm
+            payload_dict, cast(str, settings.jwt_secret_key), algorithm=settings.jwt_algorithm
         )
 
         # Verify token raises ExpiredTokenError
@@ -407,7 +408,7 @@ class TestTokenExpiration:
             "token_type": "access",
         }
         short_lived_token = jwt.encode(
-            payload_dict, settings.jwt_secret_key, algorithm=settings.jwt_algorithm
+            payload_dict, cast(str, settings.jwt_secret_key), algorithm=settings.jwt_algorithm
         )
 
         # Token should be valid immediately
@@ -438,7 +439,7 @@ class TestInvalidTokenRejection:
             "token_type": "access",
         }
         invalid_token = jwt.encode(
-            payload_dict, settings.jwt_secret_key, algorithm=settings.jwt_algorithm
+            payload_dict, cast(str, settings.jwt_secret_key), algorithm=settings.jwt_algorithm
         )
 
         with pytest.raises(InvalidTokenError):
@@ -460,7 +461,9 @@ class TestInvalidTokenRejection:
             "token_type": "access",
         }
         # Use HS512 instead of HS256
-        wrong_algo_token = jwt.encode(payload_dict, settings.jwt_secret_key, algorithm="HS512")
+        wrong_algo_token = jwt.encode(
+            payload_dict, cast(str, settings.jwt_secret_key), algorithm="HS512"
+        )
 
         with pytest.raises(InvalidTokenError):
             auth_manager.verify_token(wrong_algo_token, expected_type="access")

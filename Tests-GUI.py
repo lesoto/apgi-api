@@ -16,16 +16,15 @@ import os
 from collections import deque
 from pathlib import Path
 from tkinter import scrolledtext, ttk
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional, Tuple, cast
 
-# Import theme manager
-try:
-    from apgi_gui.theme_manager import ThemeManager
+import re
 
-    THEME_MANAGER_AVAILABLE = True
-except ImportError:
-    THEME_MANAGER_AVAILABLE = False
-    print("Warning: Theme manager not available. Theme support disabled.")
+
+def strip_ansi_codes(text: str) -> str:
+    """Strip ANSI escape codes from text."""
+    ansi_escape = re.compile(r"\x1B(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~])")
+    return ansi_escape.sub("", text)
 
 
 class ToolTip:
@@ -118,27 +117,42 @@ class TestsRunnerGUI:
         self.root.title("APGI Tests Scripts Runner")
         self.root.geometry("800x600")
 
-        # Initialize theme manager
-        self.theme_manager = None
-        if THEME_MANAGER_AVAILABLE:
-            self.theme_manager = ThemeManager(initial_theme="normal")
-
         # Get tests directory
         self.tests_dir = Path(__file__).parent / "tests"
-        self.scripts = self.get_script_list()
+        self.scripts: List[Path] = self.get_script_list()
+
+        # Initialize theme manager
+        self.theme_manager: Optional[Any] = None
+        self.theme_manager_available = False
+        try:
+            from apgi_gui.theme_manager import ThemeManager  # type: ignore[import-untyped]
+
+            # Detect system dark mode preference
+            initial_theme = self._detect_system_theme()
+            self.theme_manager = ThemeManager(initial_theme=initial_theme)
+            self.theme_manager_available = True
+        except ImportError:
+            print("Warning: Theme manager not available. Theme support disabled.")
+        except Exception as e:
+            print(f"Error initializing theme manager: {e}")
 
         # Store running processes
         self.running_processes: Dict[str, subprocess.Popen[str]] = {}
 
-        # Output tag constants
-        self.TAG_INFO = "info"
-        self.TAG_ERROR = "error"
-        self.TAG_SUCCESS = "success"
-        self.TAG_WARNING = "warning"
-
+        # Progress bar state management
+        self.progress_active = False
         # Bounded output buffer to prevent memory leaks
         self.output_buffer_size = 10000  # Maximum number of output lines to keep
         self.output_buffer: deque[Tuple[str, str]] = deque(maxlen=self.output_buffer_size)
+
+        # Maximum lines to keep in output text widget to prevent memory issues
+        self.max_output_lines = 2000
+
+        # Output tags
+        self.TAG_INFO = "INFO"
+        self.TAG_ERROR = "ERROR"
+        self.TAG_SUCCESS = "SUCCESS"
+        self.TAG_WARNING = "WARNING"
 
         self.setup_ui()
 
@@ -148,6 +162,37 @@ class TestsRunnerGUI:
 
         # Handle window close button
         self.root.protocol("WM_DELETE_WINDOW", self.quit_application)
+
+    def _detect_system_theme(self) -> str:
+        """Detect system theme preference (dark/light)."""
+        result: Optional[subprocess.CompletedProcess[str]] = None
+        try:
+            # Check macOS system preference
+            result = subprocess.run(
+                ["defaults", "read", "-g", "AppleInterfaceStyle"],
+                capture_output=True,
+                text=True,
+                timeout=5,
+            )
+            if result and result.returncode == 0 and result.stdout.strip() == "Dark":
+                return "dark"
+        except (subprocess.TimeoutExpired, FileNotFoundError, subprocess.SubprocessError):
+            pass
+
+        # Fallback to light theme
+        return "normal"
+
+    def start_progress(self) -> None:
+        """Start progress bar if not already active."""
+        if not self.progress_active:
+            self.progress.start()
+            self.progress_active = True
+
+    def stop_progress(self) -> None:
+        """Stop progress bar if active."""
+        if self.progress_active:
+            self.progress.stop()
+            self.progress_active = False
 
     def get_script_list(self) -> List[Path]:
         """Get all Python scripts in tests directory recursively.
@@ -173,18 +218,19 @@ class TestsRunnerGUI:
         file_menu.add_command(label="Quit", command=self.quit_application)
 
         # Theme menu (only if theme manager is available)
-        if self.theme_manager:
+        if self.theme_manager_available:
             theme_menu = tk.Menu(menubar, tearoff=0)
             menubar.add_cascade(label="Theme", menu=theme_menu)
 
             # Add theme options
-            for theme_name in self.theme_manager.get_available_themes():
-                theme_menu.add_radiobutton(
-                    label=theme_name.capitalize(),
-                    command=lambda t=theme_name: self._set_theme(t),  # type: ignore
-                    variable=tk.StringVar(value=self.theme_manager.current_theme),
-                    value=theme_name,
-                )
+            if self.theme_manager:
+                for theme_name in self.theme_manager.get_available_themes():
+                    theme_menu.add_radiobutton(
+                        label=theme_name.capitalize(),
+                        command=lambda t=theme_name: self._set_theme(t),  # type: ignore
+                        variable=tk.StringVar(value=self.theme_manager.current_theme),
+                        value=theme_name,
+                    )
 
     def _set_theme(self, theme_name: str) -> None:
         """Set the current theme.
@@ -195,8 +241,11 @@ class TestsRunnerGUI:
         if not self.theme_manager:
             return
 
-        if self.theme_manager.set_theme(theme_name):
-            self._apply_theme_to_widgets()
+        try:
+            if self.theme_manager.set_theme(theme_name):
+                self._apply_theme_to_widgets()
+        except Exception as e:
+            print(f"Warning: Failed to set theme {theme_name}: {e}")
 
     def _apply_theme_to_widgets(self) -> None:
         """Apply current theme to all widgets."""
@@ -358,6 +407,13 @@ class TestsRunnerGUI:
                 self.output_text.insert(tk.END, msg + "\n", t)
         else:
             self.output_text.insert(tk.END, message + "\n", tag)
+
+        # Limit output lines to prevent memory issues
+        line_count = int(self.output_text.index("end-1c").split(".")[0])
+        if line_count > self.max_output_lines:
+            # Keep only the last max_output_lines lines
+            self.output_text.delete(1.0, f"{line_count - self.max_output_lines + 1}.0")
+
         self.output_text.see(tk.END)
 
     def update_status(self, message: str) -> None:
@@ -378,10 +434,9 @@ class TestsRunnerGUI:
         Returns:
             Path to selected script or None if no selection.
         """
-        selection = tuple(self.scripts_listbox.curselection())  # type: ignore
-        if selection:
-            index = selection[0]
-            return self.scripts[index]
+        selection = tuple(self.scripts_listbox.curselection())
+        if selection and 0 <= selection[0] < len(self.scripts):
+            return cast(Optional[Path], self.scripts[selection[0]])
         return None
 
     def run_selected_script(self) -> None:
@@ -420,7 +475,7 @@ class TestsRunnerGUI:
 
             self.log_output("All tests execution completed", self.TAG_SUCCESS)
             self.update_status("Ready")
-            self.progress.stop()
+            self.root.after_idle(self.stop_progress)
 
         # Run in separate thread to avoid blocking GUI
         thread = threading.Thread(target=run_all, daemon=True)
@@ -431,7 +486,7 @@ class TestsRunnerGUI:
         try:
             self.log_output("Starting complete test suite with pytest...", self.TAG_INFO)
             self.update_status("Running all tests with pytest")
-            self.progress.start()
+            self.start_progress()
 
             # Check if pytest is available
             try:
@@ -487,8 +542,8 @@ class TestsRunnerGUI:
                     if output == "" and process.poll() is not None:
                         break
                     if output:
-                        # Color-code pytest output
-                        line = output.strip()
+                        # Strip ANSI codes and color-code pytest output
+                        line = strip_ansi_codes(output.strip())
                         if line.startswith("FAILED") or "ERROR" in line:
                             self.log_output(line, self.TAG_ERROR)
                         elif line.startswith("PASSED") or "passed" in line.lower():
@@ -514,7 +569,7 @@ class TestsRunnerGUI:
                 if "pytest_all" in self.running_processes:
                     del self.running_processes["pytest_all"]
 
-                self.progress.stop()
+                self.stop_progress()
                 self.update_status("Ready")
 
             # Start output reading thread
@@ -523,7 +578,7 @@ class TestsRunnerGUI:
 
         except Exception as e:
             self.log_output(f"Error running pytest: {str(e)}", self.TAG_ERROR)
-            self.progress.stop()
+            self.stop_progress()
             self.update_status("Error")
 
     def run_script(self, script: Path, wait: bool = False) -> bool:
@@ -542,7 +597,7 @@ class TestsRunnerGUI:
             relative_path = script.relative_to(self.tests_dir)
             self.log_output(f"Starting: {relative_path}", self.TAG_INFO)
             self.update_status(f"Running: {relative_path}")
-            self.progress.start()
+            self.start_progress()
 
             # Enable stop button when script starts
             self.root.after_idle(lambda: self.stop_button.config(state=tk.NORMAL))
@@ -595,7 +650,7 @@ class TestsRunnerGUI:
                 # Disable stop button when script completes
                 self.root.after_idle(self._update_stop_button_state)
 
-                self.progress.stop()
+                self.root.after_idle(self.stop_progress)
                 self.update_status("Ready")
 
             # Start output reading thread
@@ -611,7 +666,7 @@ class TestsRunnerGUI:
         except Exception as e:
             relative_path = script.relative_to(self.tests_dir)
             self.log_output(f"Error running {relative_path}: {str(e)}", self.TAG_ERROR)
-            self.progress.stop()
+            self.stop_progress()
             self.update_status("Error")
             # Disable stop button on error
             self.root.after_idle(self._update_stop_button_state)
@@ -636,7 +691,7 @@ class TestsRunnerGUI:
                     self.log_output("Stopped pytest test suite", self.TAG_WARNING)
                     del self.running_processes["pytest_all"]
                     self._update_stop_button_state()
-                    self.progress.stop()
+                    self.root.after_idle(self.stop_progress)
                     self.update_status("Ready")
                 except Exception as e:
                     self.log_output(f"Error stopping pytest: {str(e)}", self.TAG_ERROR)
@@ -653,7 +708,7 @@ class TestsRunnerGUI:
                 del self.running_processes[script.name]
                 # Disable stop button if no processes are running
                 self._update_stop_button_state()
-                self.progress.stop()
+                self.root.after_idle(self.stop_progress)
                 self.update_status("Ready")
             except Exception as e:
                 relative_path = script.relative_to(self.tests_dir)
@@ -665,6 +720,7 @@ class TestsRunnerGUI:
     def clear_output(self) -> None:
         """Clear the output text area."""
         self.output_text.delete(1.0, tk.END)
+        self.output_buffer.clear()
         self.log_output("Output cleared", self.TAG_INFO)
 
     def quit_application(self) -> None:
@@ -690,6 +746,8 @@ class TestsRunnerGUI:
         # Wait a moment for messages to be processed
         self.root.update_idletasks()
 
+        self.root.after_idle(self.stop_progress)
+
         # Quit the application
         self.root.quit()
         self.root.destroy()
@@ -704,10 +762,12 @@ def main() -> None:
 
         # Center window on screen
         root.update_idletasks()
+        screen_width = root.winfo_screenwidth()
+        screen_height = root.winfo_screenheight()
         width = root.winfo_width()
         height = root.winfo_height()
-        x = (root.winfo_screenwidth() // 2) - (width // 2)
-        y = (root.winfo_screenheight() // 2) - (height // 2)
+        x = (screen_width - width) // 2
+        y = (screen_height - height) // 2
         root.geometry(f"{width}x{height}+{x}+{y}")
 
         root.mainloop()

@@ -7,10 +7,10 @@ Cross-Site Request Forgery attacks.
 
 import hashlib
 import secrets
-from datetime import datetime, timedelta
+from datetime import datetime
 from typing import Optional
 
-from fastapi import Request, Response
+from fastapi import Request
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.responses import JSONResponse
 
@@ -119,9 +119,9 @@ class CSRFMiddleware(BaseHTTPMiddleware):
         # Try form data
         try:
             if hasattr(request, "_form") and request._form:
-                token = request._form.get("csrf_token")
-                if token:
-                    return token
+                form_token = request._form.get("csrf_token")
+                if form_token and isinstance(form_token, str):
+                    return form_token
         except Exception:
             pass
 
@@ -164,10 +164,10 @@ class CSRFMiddleware(BaseHTTPMiddleware):
         else:
             # For unsafe methods, validate CSRF token
             if self._should_protect(request):
-                token = self._get_csrf_token_from_request(request)
+                request_token: Optional[str] = self._get_csrf_token_from_request(request)
                 cookie_token = request.cookies.get(self.cookie_name)
 
-                if not token or not cookie_token:
+                if not request_token or not cookie_token:
                     logger.warning(
                         "CSRF token missing",
                         method=request.method,
@@ -188,7 +188,7 @@ class CSRFMiddleware(BaseHTTPMiddleware):
                     )
 
                 # Validate token (constant-time comparison would be ideal here)
-                if not secrets.compare_digest(token, cookie_token):
+                if not secrets.compare_digest(request_token, cookie_token):
                     logger.warning(
                         "CSRF token mismatch", method=request.method, path=request.url.path
                     )

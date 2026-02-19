@@ -5,15 +5,30 @@ Provides distributed tracing capabilities for the APGI API.
 """
 
 import os
-from opentelemetry import trace
-from opentelemetry.sdk.trace import TracerProvider
-from opentelemetry.sdk.trace.export import BatchSpanProcessor
-from opentelemetry.exporter.jaeger.thrift import JaegerExporter
-from opentelemetry.exporter.otlp.proto.grpc.trace_exporter import OTLPSpanExporter
-from opentelemetry.instrumentation.fastapi import FastAPIInstrumentor
-from opentelemetry.instrumentation.sqlalchemy import SQLAlchemyInstrumentor
-from opentelemetry.instrumentation.redis import RedisInstrumentor
-from opentelemetry.trace import set_tracer_provider
+import warnings
+
+# Handle OpenTelemetry compatibility issues with Python 3.14
+try:
+    from opentelemetry import trace
+    from opentelemetry.sdk.trace import TracerProvider
+    from opentelemetry.sdk.trace.export import BatchSpanProcessor
+    from opentelemetry.exporter.jaeger.thrift import JaegerExporter
+    from opentelemetry.exporter.otlp.proto.grpc.trace_exporter import OTLPSpanExporter
+    from opentelemetry.instrumentation.fastapi import FastAPIInstrumentor
+    from opentelemetry.instrumentation.sqlalchemy import SQLAlchemyInstrumentor
+    from opentelemetry.instrumentation.redis import RedisInstrumentor
+    from opentelemetry.sdk.resources import Resource
+
+    OPENTELEMETRY_AVAILABLE = True
+except (ImportError, TypeError) as e:
+    # Handle Python 3.14 compatibility issues
+    OPENTELEMETRY_AVAILABLE = False
+    warnings.warn(
+        f"OpenTelemetry not available: {str(e)}. "
+        "Distributed tracing will be disabled. "
+        "This may be due to Python 3.14 compatibility issues.",
+        ImportWarning,
+    )
 
 
 def configure_distributed_tracing():
@@ -22,6 +37,10 @@ def configure_distributed_tracing():
 
     Sets up tracing with Jaeger and OTLP exporters based on environment configuration.
     """
+    if not OPENTELEMETRY_AVAILABLE:
+        print("OpenTelemetry not available, skipping tracing configuration")
+        return
+
     # Get tracing configuration from environment
     tracing_enabled = os.getenv("TRACING_ENABLED", "false").lower() == "true"
     jaeger_endpoint = os.getenv("JAEGER_ENDPOINT", "http://localhost:14268/api/traces")
@@ -35,7 +54,7 @@ def configure_distributed_tracing():
     # Set up tracer provider
     trace.set_tracer_provider(
         TracerProvider(
-            resource=trace.Resource.create(
+            resource=Resource.create(
                 {
                     "service.name": service_name,
                     "service.version": service_version,
@@ -60,8 +79,9 @@ def configure_distributed_tracing():
     span_processor_jaeger = BatchSpanProcessor(jaeger_exporter)
     span_processor_otlp = BatchSpanProcessor(otlp_exporter)
 
-    trace.get_tracer_provider().add_span_processor(span_processor_jaeger)
-    trace.get_tracer_provider().add_span_processor(span_processor_otlp)
+    tracer_provider = trace.get_tracer_provider()
+    tracer_provider.add_span_processor(span_processor_jaeger)
+    tracer_provider.add_span_processor(span_processor_otlp)
 
 
 def instrument_application():
@@ -70,6 +90,10 @@ def instrument_application():
 
     This should be called after the FastAPI app is created but before it starts serving requests.
     """
+    if not OPENTELEMETRY_AVAILABLE:
+        print("OpenTelemetry not available, skipping application instrumentation")
+        return
+
     tracing_enabled = os.getenv("TRACING_ENABLED", "false").lower() == "true"
 
     if not tracing_enabled:
@@ -93,6 +117,9 @@ def get_tracer(name: str):
         name: Name of the tracer component
 
     Returns:
-        OpenTelemetry tracer instance
+        OpenTelemetry tracer instance or None if not available
     """
+    if not OPENTELEMETRY_AVAILABLE:
+        return None
+
     return trace.get_tracer(name)

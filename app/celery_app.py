@@ -4,7 +4,12 @@ Celery Application Configuration
 Configures Celery for asynchronous task execution with Redis broker.
 """
 
+import sys
+from pathlib import Path
 from celery import Celery
+
+# Add parent directory to path to allow imports
+sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from app.config import settings
 
@@ -35,6 +40,3 @@ celery_app.conf.update(
 celery_app.conf.task_routes = {
     "app.tasks.experimental_tasks.*": {"queue": "experimental"},
 }
-
-if __name__ == "__main__":
-    celery_app.start()

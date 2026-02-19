@@ -284,6 +284,7 @@ spec:
 ```
 
 **Redis Deployment:**
+
 ```yaml
 # redis-deployment.yaml
 apiVersion: apps/v1
@@ -532,6 +533,7 @@ kubectl apply -f ingress.yaml
 ### Initial Database Creation
 
 **Using PostgreSQL client:**
+
 ```bash
 # Connect to PostgreSQL
 psql -h postgres-host -U postgres
@@ -552,11 +554,13 @@ GRANT ALL PRIVILEGES ON DATABASE apgi_api TO apgi_user;
 ### Running Migrations
 
 **Docker:**
+
 ```bash
 docker-compose exec api alembic upgrade head
 ```
 
 **Kubernetes:**
+
 ```bash
 kubectl exec -it <api-pod-name> -- alembic upgrade head
 ```
@@ -570,26 +574,33 @@ alembic upgrade head
 ### Migration Management
 
 **View migration history:**
+
 ```bash
 alembic history
 ```
 
 **View current version:**
+
+ 
 ```bash
 alembic current
 ```
 
 **Rollback one migration:**
+
+ 
 ```bash
 alembic downgrade -1
 ```
 
 **Rollback to specific version:**
+
 ```bash
 alembic downgrade <revision_id>
 ```
 
 **Create new migration:**
+
 ```bash
 alembic revision --autogenerate -m "Description of changes"
 ```
@@ -597,16 +608,19 @@ alembic revision --autogenerate -m "Description of changes"
 ### Database Backup
 
 **Backup:**
+
 ```bash
 pg_dump -h postgres-host -U apgi_user apgi_api > backup_$(date +%Y%m%d_%H%M%S).sql
 ```
 
 **Restore:**
+
 ```bash
 psql -h postgres-host -U apgi_user apgi_api < backup_20240115_120000.sql
 ```
 
 **Automated backups (cron):**
+
 ```bash
 # Add to crontab
 0 2 * * * pg_dump -h postgres-host -U apgi_user apgi_api > /backups/apgi_api_$(date +\%Y\%m\%d).sql
@@ -617,16 +631,20 @@ psql -h postgres-host -U apgi_user apgi_api < backup_20240115_120000.sql
 ### Starting Celery Workers
 
 **Docker:**
+
 ```bash
 docker-compose -f deployment/docker-compose.yml up -d celery_worker
 ```
 
 **Kubernetes:**
+
 ```bash
 kubectl apply -f celery-deployment.yaml
 ```
 
 **Manual:**
+
+ 
 ```bash
 celery -A app.celery_app worker --loglevel=info
 ```
@@ -634,11 +652,14 @@ celery -A app.celery_app worker --loglevel=info
 ### Scaling Workers
 
 **Docker Compose:**
+
 ```bash
 docker-compose -f deployment/docker-compose.yml up -d --scale celery_worker=5
 ```
 
 **Kubernetes:**
+
+ 
 ```bash
 kubectl scale deployment apgi-celery-worker --replicas=5
 ```
@@ -646,6 +667,7 @@ kubectl scale deployment apgi-celery-worker --replicas=5
 ### Monitoring Workers
 
 **View worker status:**
+
 ```bash
 celery -A app.celery_app inspect active
 celery -A app.celery_app inspect stats
@@ -677,6 +699,7 @@ CELERY_WORKER_PREFETCH_MULTIPLIER=4
 Before deploying to production, verify:
 
 ### Security
+
 - [ ] `JWT_SECRET_KEY` is cryptographically random (32+ characters)
 - [ ] `CORS_ORIGINS` is explicitly configured (no wildcards)
 - [ ] Database uses SSL/TLS connections
@@ -687,6 +710,7 @@ Before deploying to production, verify:
 - [ ] CSRF protection is enabled
 
 ### Configuration
+
 - [ ] `ENVIRONMENT=production`
 - [ ] `LOG_LEVEL=INFO` or `WARNING`
 - [ ] Database connection pooling is configured
@@ -695,6 +719,7 @@ Before deploying to production, verify:
 - [ ] All required environment variables are set
 
 ### Infrastructure
+
 - [ ] PostgreSQL has automated backups
 - [ ] Redis has persistence enabled
 - [ ] Load balancer is configured with health checks
@@ -703,6 +728,7 @@ Before deploying to production, verify:
 - [ ] Resource limits are set (CPU, memory)
 
 ### Testing
+
 - [ ] Health checks return 200 OK
 - [ ] Readiness checks verify all dependencies
 - [ ] Authentication flow works end-to-end
@@ -711,6 +737,7 @@ Before deploying to production, verify:
 - [ ] Database migrations are up to date
 
 ### Documentation
+
 - [ ] Deployment runbook is complete
 - [ ] Rollback procedures are documented
 - [ ] On-call contacts are documented
@@ -721,16 +748,21 @@ Before deploying to production, verify:
 ### Health Checks
 
 **Basic health:**
+
 ```bash
 curl http://api-host:8000/health
 ```
 
 **Readiness (checks dependencies):**
+
+ 
 ```bash
 curl http://api-host:8000/health/ready
 ```
 
 **Liveness:**
+
+ 
 ```bash
 curl http://api-host:8000/health/live
 ```
@@ -738,11 +770,13 @@ curl http://api-host:8000/health/live
 ### Metrics
 
 **Prometheus metrics:**
+
 ```bash
 curl http://api-host:8000/metrics
 ```
 
 Key metrics to monitor:
+
 - `http_requests_total` - Total request count
 - `http_request_duration_seconds` - Request latency
 - `http_requests_in_progress` - Active requests
@@ -755,14 +789,17 @@ Key metrics to monitor:
 Logs are written to stdout in JSON format. Configure log aggregation:
 
 **ELK Stack:**
+
 - Filebeat → Logstash → Elasticsearch → Kibana
 
 **Cloud Providers:**
+
 - AWS: CloudWatch Logs
 - GCP: Cloud Logging
 - Azure: Azure Monitor
 
 **Example log query (Elasticsearch):**
+
 ```json
 {
   "query": {
@@ -779,6 +816,7 @@ Logs are written to stdout in JSON format. Configure log aggregation:
 ### Alerting
 
 Configure alerts for:
+
 - Error rate > 10 errors/minute for 5 minutes
 - Response time p95 > 1000ms for 5 minutes
 - Health check failures
@@ -847,21 +885,25 @@ kubectl apply -f api-hpa.yaml
 ### Database Scaling
 
 **Read Replicas:**
+
 - Configure PostgreSQL streaming replication
 - Route read queries to replicas
 - Keep writes on primary
 
 **Connection Pooling:**
+
 - Use PgBouncer for connection pooling
 - Configure pool size based on load
 
 ### Redis Scaling
 
 **Redis Cluster:**
+
 - Deploy Redis Cluster for horizontal scaling
 - Configure sharding for large datasets
 
 **Redis Sentinel:**
+
 - Deploy Redis Sentinel for high availability
 - Automatic failover on primary failure
 
@@ -902,6 +944,7 @@ alembic downgrade -1
 ```
 
 **Rollback to specific version:**
+
 ```bash
 alembic downgrade <revision_id>
 ```

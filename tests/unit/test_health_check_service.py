@@ -34,8 +34,10 @@ class TestHealthCheckService:
         # Mock database connection
         mock_engine = MagicMock()
         mock_conn = MagicMock()
+        mock_result = MagicMock()
+        mock_result.fetchone.return_value = (0,)
+        mock_conn.execute.return_value = mock_result
         mock_engine.connect.return_value.__enter__.return_value = mock_conn
-        mock_conn.execute.return_value = None
 
         with patch("app.database.connection.engine", mock_engine):
             result = await health_check_service.perform_health_check()
@@ -56,7 +58,7 @@ class TestHealthCheckService:
 
         # Verify Redis
         assert deps["redis"]["status"] == "healthy"
-        assert deps["redis"]["message"] == "Connected"
+        assert "Connected and responsive" in deps["redis"]["message"]
 
         # Verify Database
         assert deps["database"]["status"] == "healthy"
@@ -77,8 +79,10 @@ class TestHealthCheckService:
         # Mock database connection
         mock_engine = MagicMock()
         mock_conn = MagicMock()
+        mock_result = MagicMock()
+        mock_result.fetchone.return_value = (0,)
+        mock_conn.execute.return_value = mock_result
         mock_engine.connect.return_value.__enter__.return_value = mock_conn
-        mock_conn.execute.return_value = None
 
         with patch("app.database.connection.engine", mock_engine):
             result = await health_check_service.perform_health_check()

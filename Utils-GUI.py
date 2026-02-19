@@ -8,15 +8,17 @@ with output display and error handling.
 """
 
 import json
-import queue
+import os
 import select
 import subprocess
 import sys
 import threading
-import tkinter as tk
+from collections import deque
 from pathlib import Path
-from tkinter import scrolledtext, ttk, simpledialog
-from typing import Dict, List, Optional
+from typing import Any, Dict, List, Optional, Tuple, cast
+
+import tkinter as tk
+from tkinter import scrolledtext, simpledialog, ttk
 
 
 class UtilsRunnerGUI:
@@ -31,16 +33,20 @@ class UtilsRunnerGUI:
         self.root.title("APGI Utils Scripts Runner")
         self.root.geometry("800x600")
 
-        # Get utils directory
-        self.utils_dir = Path(__file__).parent / "app" / "utils"
+        # Get utils directories
+        self.script_dirs = [
+            Path(__file__).parent / "app",
+            Path(__file__).parent / "app" / "services",
+        ]
 
-        # Validate utils directory exists
-        if not self.utils_dir.exists():
-            print(f"Warning: Utils directory not found at {self.utils_dir}")
-            self.utils_dir = None
+        # Validate directories exist
+        self.valid_dirs = [d for d in self.script_dirs if d.exists() and d.is_dir()]
+        if not self.valid_dirs:
+            print(f"Warning: No script directories found: {[str(d) for d in self.script_dirs]}")
+            self.valid_dirs = []
 
         # Output queue for thread-safe updates
-        self.output_queue = queue.Queue()
+        self.output_buffer: deque[Tuple[str, str]] = deque(maxlen=10000)
 
         # Maximum lines to keep in output to prevent performance issues
         self.max_output_lines = 2000
@@ -52,12 +58,15 @@ class UtilsRunnerGUI:
         self.TAG_WARNING = "warning"
 
         # Load configuration
-        self.config = self.load_config()
+        self.config: Dict[str, Any] = self.load_config()
 
         self.scripts = self.get_script_list()
 
         # Store running processes
         self.running_processes: Dict[str, subprocess.Popen] = {}
+
+        # Progress bar state management
+        self.progress_active = False
 
         self.setup_ui()
 
@@ -68,20 +77,54 @@ class UtilsRunnerGUI:
         # Handle window close button
         self.root.protocol("WM_DELETE_WINDOW", self.quit_application)
 
-    def load_config(self) -> Dict:
-        """Load configuration from JSON file.
+    def _detect_system_theme(self):
+        """Detect system theme preference (dark/light)."""
+        try:
+            # Check macOS system preference
+            result = subprocess.run(
+                ["defaults", "read", "-g", "AppleInterfaceStyle"],
+                capture_output=True,
+                text=True,
+                timeout=5,
+            )
+            if result.returncode == 0 and result.stdout.strip() == "Dark":
+                return "dark"
+        except (subprocess.TimeoutExpired, FileNotFoundError, subprocess.SubprocessError):
+            pass
+
+        # Fallback to light theme
+        return "normal"
+
+    def start_progress(self):
+        """Start progress bar if not already active."""
+        if not self.progress_active:
+            self.progress.start()
+            self.progress_active = True
+
+    def stop_progress(self):
+        """Stop progress bar if active."""
+        if self.progress_active:
+            self.progress.stop()
+            self.progress_active = False
+
+    def load_config(self) -> Dict[str, Any]:
+        """Load configuration from JSON files in script directories.
 
         Returns:
-            Configuration dictionary with default values if file not found.
+            Configuration dictionary with default values if files not found.
         """
-        config_path = self.utils_dir / "utils_script_config.json" if self.utils_dir else None
         default_config = {
             "script_categories": {
-                "utilities": {
-                    "description": "General utility scripts",
+                "app": {
+                    "description": "Main application scripts",
                     "scripts": [],
                     "timeout": 3600,
-                }
+                },
+                "services": {
+                    "description": "Service scripts",
+                    "scripts": [],
+                    "timeout": 3600,
+                },
             },
             "default_settings": {
                 "timeout": 3600,
@@ -92,18 +135,54 @@ class UtilsRunnerGUI:
             },
         }
 
-        try:
-            if config_path.exists():
-                with open(config_path, "r") as f:
-                    return json.load(f)
-            else:
-                # Create default config file
-                with open(config_path, "w") as f:
-                    json.dump(default_config, f, indent=2)
-                return default_config
-        except Exception as e:
-            self.log_output(f"Warning: Could not load config: {e}", self.TAG_WARNING)
-            return default_config
+        # Try to load config from each directory
+        for script_dir in self.valid_dirs:
+            config_path = script_dir / "utils_script_config.json"
+            try:
+                if config_path.exists():
+                    with open(config_path, "r") as f:
+                        dir_config = cast(Dict[str, Any], json.load(f))
+                        # Merge configs
+                        for category, category_config in cast(
+                            Dict[str, Any], dir_config.get("script_categories", {})
+                        ).items():
+                            if category not in cast(
+                                Dict[str, Any], default_config["script_categories"]
+                            ):
+                                cast(Dict[str, Any], default_config["script_categories"])[
+                                    category
+                                ] = category_config
+                            else:
+                                # Merge scripts
+                                existing_scripts = cast(
+                                    List[str],
+                                    cast(Dict[str, Any], default_config["script_categories"])[
+                                        category
+                                    ]["scripts"],
+                                )
+                                new_scripts = cast(List[str], category_config.get("scripts", []))
+                                cast(Dict[str, Any], default_config["script_categories"])[category][
+                                    "scripts"
+                                ] = list(set(existing_scripts + new_scripts))
+            except Exception as e:
+                self.log_output(
+                    f"Warning: Could not load config from {config_path}: {e}", self.TAG_WARNING
+                )
+
+        # Create default config files if they don't exist
+        for script_dir in self.valid_dirs:
+            config_path = script_dir / "utils_script_config.json"
+            if not config_path.exists():
+                try:
+                    with open(config_path, "w") as f:
+                        json.dump(default_config, f, indent=2)
+                except Exception as e:
+                    self.log_output(
+                        f"Warning: Could not create config file at {config_path}: {e}",
+                        self.TAG_WARNING,
+                    )
+
+        return default_config
 
     def get_script_timeout(self, script_name: str) -> int:
         """Get timeout for a specific script from configuration.
@@ -116,8 +195,8 @@ class UtilsRunnerGUI:
         """
         for category in self.config.get("script_categories", {}).values():
             if script_name in category.get("scripts", []):
-                return category.get("timeout", self.config["default_settings"]["timeout"])
-        return self.config["default_settings"]["timeout"]
+                return int(category.get("timeout", self.config["default_settings"]["timeout"]))
+        return int(self.config["default_settings"]["timeout"])
 
     def prompt_for_arguments(self, script_name: str) -> List[str]:
         """Prompt user for script arguments.
@@ -145,18 +224,20 @@ class UtilsRunnerGUI:
                 return dialog.split()
         return []
 
-    def get_script_list(self) -> List[Path]:
-        """Get all Python scripts in utils directory.
+    def get_script_list(self) -> List[Tuple[Path, str]]:
+        """Get all Python scripts from all script directories.
 
         Returns:
-            List of Path objects for executable Python scripts.
+            List of tuples (Path, str) for executable Python scripts with their directory name.
         """
         scripts = []
-        if self.utils_dir and self.utils_dir.exists() and self.utils_dir.is_dir():
-            for file_path in self.utils_dir.glob("*.py"):
-                if file_path.name != "__init__.py" and self._is_executable_script(file_path):
-                    scripts.append(file_path)
-        return sorted(scripts)
+        for script_dir in self.valid_dirs:
+            if script_dir.exists() and script_dir.is_dir():
+                dir_name = script_dir.name  # "app" or "services"
+                for file_path in script_dir.glob("*.py"):
+                    if file_path.name != "__init__.py" and self._is_executable_script(file_path):
+                        scripts.append((file_path, dir_name))
+        return sorted(scripts, key=lambda x: (x[1], x[0].name))  # Sort by directory, then name
 
     def _is_executable_script(self, script_path: Path) -> bool:
         """Check if a script is executable.
@@ -184,7 +265,7 @@ class UtilsRunnerGUI:
         """
         # Main container
         main_frame = ttk.Frame(self.root, padding="10")
-        main_frame.grid(row=0, column=0, sticky=(tk.W, tk.E, tk.N, tk.S))
+        main_frame.grid(row=0, column=0, sticky=(tk.W, tk.E, tk.N, tk.S))  # type: ignore[arg-type]
 
         # Configure grid weights
         self.root.columnconfigure(0, weight=1)
@@ -200,7 +281,7 @@ class UtilsRunnerGUI:
 
         # Scripts list frame
         list_frame = ttk.LabelFrame(main_frame, text="Available Scripts", padding="5")
-        list_frame.grid(row=1, column=0, sticky=(tk.W, tk.E, tk.N, tk.S), padx=(0, 10))
+        list_frame.grid(row=1, column=0, sticky=(tk.W, tk.E, tk.N, tk.S), padx=(0, 10))  # type: ignore[arg-type]
 
         # Scripts listbox with scrollbar
         list_scrollbar = ttk.Scrollbar(list_frame)
@@ -212,13 +293,14 @@ class UtilsRunnerGUI:
         self.scripts_listbox.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
         list_scrollbar.config(command=self.scripts_listbox.yview)
 
-        # Populate scripts list
-        for script in self.scripts:
-            self.scripts_listbox.insert(tk.END, script.name)
+        # Populate scripts list with directory information
+        for script_path, dir_name in self.scripts:
+            display_name = f"[{dir_name}] {script_path.name}"
+            self.scripts_listbox.insert(tk.END, display_name)
 
         # Control buttons frame
         control_frame = ttk.Frame(main_frame)
-        control_frame.grid(row=1, column=1, sticky=(tk.W, tk.E, tk.N), padx=(0, 10))
+        control_frame.grid(row=1, column=1, sticky=(tk.W, tk.E, tk.N), padx=(0, 10))  # type: ignore[arg-type]
 
         # Buttons
         self.run_button = ttk.Button(
@@ -268,7 +350,7 @@ class UtilsRunnerGUI:
         # Output frame
         output_frame = ttk.LabelFrame(main_frame, text="Output", padding="5")
         output_frame.grid(
-            row=2, column=0, columnspan=3, sticky=(tk.W, tk.E, tk.N, tk.S), pady=(10, 0)
+            row=2, column=0, columnspan=3, sticky=(tk.W, tk.E, tk.N, tk.S), pady=(10, 0)  # type: ignore[arg-type]
         )
 
         # Output text area
@@ -286,7 +368,7 @@ class UtilsRunnerGUI:
         # Start processing output queue
         self.process_output_queue()
 
-    def log_output(self, message: str, tag: str = None):
+    def log_output(self, message: str, tag: Optional[str] = None):
         """Add message to output queue for thread-safe logging.
 
         Args:
@@ -295,7 +377,7 @@ class UtilsRunnerGUI:
         """
         if tag is None:
             tag = self.TAG_INFO
-        self.output_queue.put((message, tag))
+        self.output_buffer.append((message, tag))
 
     def _log_output(self, message: str, tag: str):
         """Thread-safe output logging."""
@@ -311,10 +393,10 @@ class UtilsRunnerGUI:
     def process_output_queue(self):
         """Process queued output messages in the main thread."""
         try:
-            while True:
-                message, tag = self.output_queue.get_nowait()
+            while self.output_buffer:
+                message, tag = self.output_buffer.popleft()
                 self._log_output(message, tag)
-        except queue.Empty:
+        except Exception:
             pass
         self.root.after(100, self.process_output_queue)
 
@@ -327,44 +409,48 @@ class UtilsRunnerGUI:
         self.root.after_idle(lambda: self._safe_update_status(message))
 
     def _safe_update_status(self, message: str):
-        """Thread-safe status update."""
-        self.status_label.config(text=message)
+        """Safely update the status label from any thread."""
+        try:
+            if hasattr(self, "status_label") and self.status_label:
+                self.status_label.config(text=message)
+        except Exception:
+            # Ignore errors when updating UI from threads
+            pass
 
-    def get_selected_script(self) -> Optional[Path]:
-        """Get the currently selected script.
+    def get_selected_script_path(self) -> Optional[Path]:
+        """Get the path of the currently selected script.
 
         Returns:
-            Path to selected script or None if no selection.
+            Path to the selected script or None if no selection.
         """
         selection = self.scripts_listbox.curselection()
         if selection:
             index = selection[0]
-            return self.scripts[index]
+            if 0 <= index < len(self.scripts):
+                script_path, _ = self.scripts[index]
+                return cast(Optional[Path], script_path)
         return None
 
-    def run_script(
-        self,
-        script_path: Path,
-        args: List[str] = None,
-        wait: bool = False,
-        timeout: int = None,
-    ):
-        """Run a script with optional waiting and timeout.
-
-        Args:
-            script_path: Path to the script to run.
-            args: List of arguments to pass to the script.
-            wait: If True, wait for completion and return success status.
-            timeout: Timeout in seconds, uses config default if None.
+    def get_selected_script_info(self) -> Optional[Tuple[Path, str]]:
+        """Get the path and directory of the currently selected script.
 
         Returns:
-            True if script started (wait=False) or completed successfully (wait=True).
+            Tuple (Path, str) for the selected script or None if no selection.
         """
-        if args is None:
-            args = []
-        script_name = script_path.name
-        self.log_output(f"Running script: {script_name}", self.TAG_INFO)
-        return self._run_script_thread(script_path, args, timeout=timeout, wait=wait)
+        selection = self.scripts_listbox.curselection()
+        if selection:
+            index = selection[0]
+            if 0 <= index < len(self.scripts):
+                return cast(Tuple[Path, str], self.scripts[index])
+        return None
+
+    def get_selected_script(self) -> Optional[Path]:
+        """Get the path of the currently selected script.
+
+        Returns:
+            Path to the selected script or None if no selection.
+        """
+        return self.get_selected_script_path()
 
     def run_selected_script(self):
         """Run the selected script in a separate thread."""
@@ -392,9 +478,10 @@ class UtilsRunnerGUI:
             return
 
         def run_all():
-            for i, script in enumerate(self.scripts):
+            for i, script_info in enumerate(self.scripts):
+                script_path, dir_name = script_info
                 self.log_output(
-                    f"Running script {i + 1}/{len(self.scripts)}: {script.name}",
+                    f"Running script {i + 1}/{len(self.scripts)}: [{dir_name}] {script_path.name}",
                     self.TAG_INFO,
                 )
                 self.scripts_listbox.selection_clear(0, tk.END)
@@ -402,18 +489,18 @@ class UtilsRunnerGUI:
                 self.scripts_listbox.see(i)
 
                 success = self.run_script(
-                    script, wait=True, timeout=self.get_script_timeout(script.name)
+                    script_path, wait=True, timeout=self.get_script_timeout(script_path.name)
                 )
                 if not success:
                     self.log_output(
-                        f"Script {script.name} failed, stopping execution",
+                        f"Script [{dir_name}] {script_path.name} failed, stopping execution",
                         self.TAG_ERROR,
                     )
                     break
 
             self.log_output("All scripts execution completed", self.TAG_SUCCESS)
             self.update_status("Ready")
-            self.progress.stop()
+            self.root.after_idle(lambda: self.progress.stop())
 
         # Run in separate thread to avoid blocking GUI
         thread = threading.Thread(target=run_all, daemon=True)
@@ -424,8 +511,8 @@ class UtilsRunnerGUI:
         script: Path,
         wait: bool = False,
         retry_count: int = 0,
-        timeout: int = None,
-        args: List[str] = None,
+        timeout: Optional[int] = None,
+        args: Optional[List[str]] = None,
     ) -> bool:
         """Run a single script.
 
@@ -446,6 +533,9 @@ class UtilsRunnerGUI:
         start_time = time.time()
         script_name = script.name
 
+        # Start progress bar
+        self.start_progress()
+
         # Prepare command
         cmd = [sys.executable, str(script)]
 
@@ -464,6 +554,10 @@ class UtilsRunnerGUI:
 
         # Start process
         try:
+            # Set up environment with PYTHONPATH
+            env = os.environ.copy()
+            env["PYTHONPATH"] = str(Path(__file__).parent)
+
             process = subprocess.Popen(
                 cmd,
                 stdout=subprocess.PIPE,
@@ -471,7 +565,8 @@ class UtilsRunnerGUI:
                 text=True,
                 bufsize=1,
                 universal_newlines=True,
-                cwd=self.utils_dir.parent,
+                cwd=Path(__file__).parent,
+                env=env,
             )
 
             self.running_processes[script_name] = process
@@ -484,7 +579,7 @@ class UtilsRunnerGUI:
                 while True:
                     # Wait for output with a short timeout to allow timeout checking
                     ready, _, _ = select.select([process.stdout], [], [], 1.0)
-                    if ready:
+                    if ready and process.stdout:
                         output = process.stdout.readline()
                         if not output and process.poll() is not None:
                             break
@@ -523,6 +618,8 @@ class UtilsRunnerGUI:
                 if not self.running_processes:
                     self.root.after(0, self._update_button_states)
 
+                self.root.after_idle(self.stop_progress)
+
             # Start output reading thread
             output_thread = threading.Thread(target=read_output, daemon=True)
             output_thread.start()
@@ -538,6 +635,7 @@ class UtilsRunnerGUI:
 
         except Exception as e:
             self.log_output(f"Error running {script.name}: {str(e)}", self.TAG_ERROR)
+            self.root.after_idle(lambda: self.progress.stop())
             self.progress.stop()
             self.update_status("Error")
             # Disable stop button on error
@@ -605,8 +703,8 @@ class UtilsRunnerGUI:
                 self.log_output(f"Stopped: {script.name}", self.TAG_WARNING)
                 del self.running_processes[script.name]
                 # Disable stop button if no processes are running
-                self._update_stop_button_state()
-                self.progress.stop()
+                self._update_button_states()
+                self.root.after_idle(self.stop_progress)
                 self.update_status("Ready")
             except Exception as e:
                 self.log_output(f"Error stopping {script.name}: {str(e)}", self.TAG_ERROR)
@@ -616,6 +714,7 @@ class UtilsRunnerGUI:
     def clear_output(self):
         """Clear the output text area."""
         self.output_text.delete(1.0, tk.END)
+        self.output_buffer.clear()
         self.log_output("Output cleared", self.TAG_INFO)
 
     def quit_application(self):
@@ -636,14 +735,6 @@ class UtilsRunnerGUI:
         self.running_processes.clear()
 
         # Log quit message
-        self.log_output("Quitting application...", self.TAG_INFO)
-
-        # Wait a moment for messages to be processed
-        self.root.update_idletasks()
-
-        # Quit the application
-        self.root.quit()
-        self.root.destroy()
 
 
 def main():
@@ -655,10 +746,12 @@ def main():
 
         # Center window on screen
         root.update_idletasks()
+        screen_width = root.winfo_screenwidth()
+        screen_height = root.winfo_screenheight()
         width = root.winfo_width()
         height = root.winfo_height()
-        x = (root.winfo_screenwidth() // 2) - (width // 2)
-        y = (root.winfo_screenheight() // 2) - (height // 2)
+        x = (screen_width - width) // 2
+        y = (screen_height - height) // 2
         root.geometry(f"{width}x{height}+{x}+{y}")
 
         root.mainloop()

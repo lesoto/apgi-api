@@ -10,20 +10,19 @@ import logging
 import re
 import uuid
 import time
-from datetime import datetime, timedelta
+from datetime import datetime
 from enum import Enum
-from typing import Any, Dict, Optional, Tuple
+from typing import Any, Dict, Optional, Tuple, cast
 from collections import OrderedDict
-from sqlalchemy.orm import sessionmaker
 
 import redis.asyncio as redis
 from sqlalchemy import select
 
 from app.database.models import Session as SessionModel
 from app.database.models import SessionState
-from app.database.connection import get_db_context
+from app.database.models import SessionTemplate
 from app.models.schemas import SessionCreateRequest
-from apgi_system.system import APGISystem
+from apgi_system.system import APGISystem  # type: ignore[import-untyped]
 
 logger = logging.getLogger(__name__)
 
@@ -82,7 +81,7 @@ class SimulationSession:
         """
         self.session_id = session_id
         self.config = config
-        self.state = SessionLifecycleState.CREATED
+        self.state: SessionLifecycleState = SessionLifecycleState.CREATED
         self.created_at = datetime.utcnow()
         self.updated_at = datetime.utcnow()
 
@@ -246,7 +245,7 @@ class SimulationSession:
             state = self.apgi_system.step(extero_input)
             self.updated_at = datetime.utcnow()
 
-            return state
+            return state  # type: ignore
 
     async def get_state(self) -> Dict[str, Any]:
         """
@@ -268,11 +267,11 @@ class SimulationSession:
                 "updated_at": self.updated_at.isoformat() + "Z",
             }
 
-            return state
+            return state  # type: ignore
 
     def _capture_state(self) -> Dict[str, Any]:
         """Capture complete system state for pause/resume."""
-        return self.apgi_system.get_state()
+        return cast(Dict[str, Any], self.apgi_system.get_state())
 
     def _restore_state(self, state: Dict[str, Any]):
         """Restore system state from snapshot."""
@@ -350,11 +349,54 @@ class SessionManager:
         session_id = str(uuid.uuid4())
 
         # Prepare configuration
-        config = {
-            "config_path": request.config_path,
-            "custom_config": request.custom_config,
-            "description": request.description,
-        }
+        config = {}
+
+        # Handle template-based session creation
+        template_id = None
+        if request.template_id:
+            # Load template from database
+            db_session = self.db_session_factory()
+            try:
+                stmt = select(SessionTemplate).where(
+                    SessionTemplate.template_id == request.template_id
+                )
+                result = db_session.execute(stmt)
+                template = result.scalar_one_or_none()
+
+                if not template:
+                    raise ValueError(f"Template {request.template_id} not found")
+
+                # Check if user has access to template (public or owned by user)
+                if not template.is_public and template.user_id != user_id:
+                    raise ValueError(
+                        f"Template {request.template_id} is not accessible to user {user_id}"
+                    )
+
+                # Use template configuration as base
+                config = {
+                    "config_path": template.config_path,
+                    "custom_config": template.custom_config or {},
+                    "description": request.description or template.default_description,
+                }
+                template_id = template.template_id
+
+            finally:
+                db_session.close()
+
+        # Apply request overrides
+        if request.config_path:
+            config["config_path"] = request.config_path
+        if request.custom_config:
+            # Merge custom config with existing (request overrides template)
+            existing_custom = config.get("custom_config", {})
+            existing_custom.update(request.custom_config)
+            config["custom_config"] = existing_custom
+        if request.description and not template_id:
+            config["description"] = request.description
+
+        # Ensure we have valid configuration
+        if not config.get("config_path") and not config.get("custom_config"):
+            raise ValueError("Either config_path or custom_config must be provided")
 
         # Create simulation session
         sim_session = SimulationSession(session_id, config)
@@ -370,9 +412,10 @@ class SessionManager:
                 db_model = SessionModel(
                     session_id=session_id,
                     user_id=user_id,
+                    template_id=template_id,
                     config=config,
                     state=SessionState.CREATED.value,
-                    description=request.description,
+                    description=config.get("description"),
                     tags=[],
                 )
                 db_session.add(db_model)
@@ -381,6 +424,10 @@ class SessionManager:
                 # Only add to cache after successful DB write
                 self.sessions[session_id] = (sim_session, time.time())  # Store with timestamp
                 logger.info(f"Session {session_id} created and persisted")
+
+                if template_id:
+                    logger.info(f"Session {session_id} created from template {template_id}")
+
             except Exception as e:
                 db_session.rollback()
                 logger.error(f"Failed to persist session {session_id}: {e}")
@@ -561,35 +608,52 @@ class SessionManager:
         # Cache for 1 hour
         await self.redis.setex(f"session:{session_id}", 3600, json.dumps(metadata))
 
-    async def list_sessions(self, user_id: Optional[str] = None) -> list:
+    async def list_sessions(
+        self,
+        user_id: Optional[str] = None,
+        page: int = 1,
+        per_page: int = 10,
+        state: Optional[str] = None,
+    ) -> Dict[str, Any]:
         """
-        List all sessions, optionally filtered by user.
+        List sessions with pagination and filtering.
 
         Args:
             user_id: Optional user ID filter
+            page: Page number (1-based)
+            per_page: Items per page
+            state: Optional state filter
 
         Returns:
-            List of session metadata
+            Dict with sessions list and total count
         """
+        from sqlalchemy import func
+
         db_session = self.db_session_factory()
         try:
+            # Build query
             stmt = select(SessionModel)
             if user_id:
                 stmt = stmt.where(SessionModel.user_id == user_id)
+            if state:
+                stmt = stmt.where(SessionModel.state == state)
 
+            # Get total count
+            count_stmt = select(func.count()).select_from(stmt.subquery())
+            total_result = db_session.execute(count_stmt)
+            total = total_result.scalar()
+
+            # Apply pagination
+            offset = (page - 1) * per_page
+            stmt = stmt.offset(offset).limit(per_page)
+
+            # Execute query
             result = db_session.execute(stmt)
             sessions = result.scalars().all()
 
-            return [
-                {
-                    "session_id": s.session_id,
-                    "user_id": s.user_id,
-                    "state": s.state,
-                    "created_at": s.created_at.isoformat() + "Z",
-                    "updated_at": s.updated_at.isoformat() + "Z",
-                    "description": s.description,
-                }
-                for s in sessions
-            ]
+            return {
+                "sessions": sessions,
+                "total": total,
+            }
         finally:
             db_session.close()

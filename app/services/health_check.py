@@ -10,6 +10,8 @@ import time
 import redis.asyncio as redis
 from sqlalchemy import text
 
+from app.celery_app import celery_app
+
 
 class HealthCheckService:
     """Service for performing health checks on API dependencies."""
@@ -36,7 +38,7 @@ class HealthCheckService:
         # Check Redis connectivity and performance
         try:
             start_time = time.time()
-            await self.redis_client.ping()
+            redis_result = await self.redis_client.ping()  # type: ignore[misc]
             redis_time = time.time() - start_time
 
             # Performance threshold (in seconds)
@@ -68,21 +70,16 @@ class HealthCheckService:
                 conn.execute(text("SELECT 1"))
             connectivity_time = time.time() - start_time
 
-            # Test query performance with a more complex query
+            # Test query performance with a simpler query
             start_time = time.time()
             with engine.connect() as conn:
-                # Test a query that exercises indexes and joins
-                result = conn.execute(
-                    text(
-                        """
-                    SELECT COUNT(*) as user_count
-                    FROM users u
-                    LEFT JOIN sessions s ON u.user_id = s.user_id
-                    WHERE u.created_at > CURRENT_TIMESTAMP - INTERVAL '30 days'
-                """
-                    )
-                )
-                user_count = result.fetchone()[0]
+                # Test a simple query that works across databases
+                result = conn.execute(text("SELECT COUNT(*) FROM users"))
+                row = result.fetchone()
+                if row is not None:
+                    user_count = row[0]
+                else:
+                    user_count = 0
             query_time = time.time() - start_time
 
             # Performance thresholds (in seconds)
@@ -112,17 +109,47 @@ class HealthCheckService:
             else:
                 dependencies["database"] = {
                     "status": "healthy",
-                    "message": "Connected and performant",
-                    "connectivity_time": f"{connectivity_time:.3f}s",
-                    "query_time": f"{query_time:.3f}s",
-                    "active_users_30d": user_count,
+                    "message": "Connected",
                 }
         except Exception as e:
             dependencies["database"] = {"status": "unhealthy", "message": str(e)}
             all_healthy = False
 
-        # Check Celery (simplified - would need actual Celery inspection)
-        dependencies["celery"] = {"status": "unknown", "message": "Not checked"}
+        # Check Celery worker status
+        try:
+            # First, try to ping the workers
+            ping_result = celery_app.control.ping(timeout=5.0)
+
+            if ping_result:
+                # Workers are responding to ping
+                worker_count = len(ping_result)
+
+                # Get additional stats
+                inspect = celery_app.control.inspect()
+                active_tasks = inspect.active()
+                stats = inspect.stats()
+
+                task_count = 0
+                if active_tasks:
+                    task_count = sum(len(tasks) for tasks in active_tasks.values())
+
+                dependencies["celery"] = {
+                    "status": "healthy",
+                    "message": f"Workers responding: {worker_count}, tasks running: {task_count}",
+                    "active_workers": str(worker_count),
+                    "running_tasks": str(task_count),
+                }
+            else:
+                dependencies["celery"] = {
+                    "status": "unhealthy",
+                    "message": "No Celery workers responded to ping",
+                }
+                all_healthy = False
+        except Exception as e:
+            dependencies["celery"] = {
+                "status": "unknown",
+                "message": "Not checked",
+            }
 
         return {
             "status": "healthy" if all_healthy else "unhealthy",

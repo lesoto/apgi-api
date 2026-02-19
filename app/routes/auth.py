@@ -9,7 +9,12 @@ from sqlalchemy.orm import Session
 
 from app.database.connection import get_db
 from app.exceptions import AuthenticationError, ExpiredTokenError, InvalidTokenError
-from app.models.schemas import LoginRequest, TokenRefreshRequest, TokenResponse
+from app.models.schemas import (
+    LoginRequest,
+    TokenRefreshRequest,
+    TokenResponse,
+    TokenRefreshResponse,
+)
 from app.services.auth_manager import AuthManager
 from app.services.authorization import TokenPayload, get_current_user
 
@@ -69,14 +74,14 @@ async def login(request: LoginRequest, db: Session = Depends(get_db)) -> TokenRe
         raise AuthenticationError("Invalid username or password")
 
     # Create tokens
-    tokens = auth_manager.create_tokens_for_user(user)
+    tokens = auth_manager.create_tokens_for_user(user, request.remember_me or False)
 
     return TokenResponse(**tokens)
 
 
 @router.post(
     "/refresh",
-    response_model=TokenResponse,
+    response_model=TokenRefreshResponse,
     status_code=status.HTTP_200_OK,
     summary="Refresh access token",
     description="""
@@ -103,7 +108,7 @@ async def login(request: LoginRequest, db: Session = Depends(get_db)) -> TokenRe
 )
 async def refresh_token(
     request: TokenRefreshRequest, db: Session = Depends(get_db)
-) -> TokenResponse:
+) -> TokenRefreshResponse:
     """
     Refresh access token using refresh token.
 
@@ -124,7 +129,7 @@ async def refresh_token(
     try:
         # Get new access token
         tokens = auth_manager.refresh_access_token(request.refresh_token)
-        return TokenResponse(**tokens)
+        return TokenRefreshResponse(**tokens)
     except (InvalidTokenError, ExpiredTokenError, AuthenticationError) as e:
         raise e
     except Exception as e:
