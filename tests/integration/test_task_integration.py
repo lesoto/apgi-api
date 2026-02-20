@@ -249,3 +249,54 @@ class TestTaskRoutesIntegration:
         data = response.json()
         assert "error" in data
         assert data["error"]["message"] == f"Task {task_id} not found"
+
+    @pytest.mark.asyncio
+    async def test_task_submission_celery_integration(self, authenticated_client):
+        """Test that task submission properly integrates with Celery."""
+        from unittest.mock import patch, MagicMock
+        from app.routes.tasks import init_task_routes
+        from app.database.connection import init_db, close_db
+
+        # Initialize database for this test
+        init_db()
+
+        try:
+            # Initialize task routes with real executor
+            init_task_routes()
+
+            session_id = str(uuid.uuid4())
+
+            # Create a mock Celery task result
+            mock_celery_result = MagicMock()
+            mock_celery_result.id = str(uuid.uuid4())
+
+            # Patch celery_app.send_task to verify it's called correctly
+            with patch("app.services.task_executor.celery_app.send_task") as mock_send_task:
+                mock_send_task.return_value = mock_celery_result
+
+                request_data = {
+                    "task_type": "iowa_gambling",
+                    "parameters": {"num_trials": 50},
+                    "priority": 5,
+                }
+
+                response = await authenticated_client.post(
+                    f"/v1/sessions/{session_id}/tasks", json=request_data
+                )
+
+                # Should return 202 Accepted
+                assert response.status_code == 202
+                data = response.json()
+                assert "task_id" in data
+                assert data["session_id"] == session_id
+                assert data["task_type"] == "iowa_gambling"
+
+                # Verify Celery send_task was called with correct arguments
+                mock_send_task.assert_called_once()
+                call_args = mock_send_task.call_args
+                assert call_args[0][0] == "app.tasks.experimental_tasks.execute_iowa_gambling_task"
+                assert call_args[1]["args"] == [session_id, {"num_trials": 50}]
+                assert "task_id" in call_args[1]
+
+        finally:
+            close_db()

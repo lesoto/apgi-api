@@ -45,6 +45,11 @@ class Settings:
         # Redis Settings
         self.redis_url: str = os.getenv("REDIS_URL", "redis://localhost:6379/0")
 
+        # Health Check Settings
+        self.health_critical_services: List[str] = [
+            s.strip() for s in os.getenv("HEALTH_CRITICAL_SERVICES", "redis,database").split(",")
+        ]
+
         # Celery Settings
         self.celery_broker_url: str = os.getenv("CELERY_BROKER_URL", "redis://localhost:6379/1")
         self.celery_result_backend: str = os.getenv(

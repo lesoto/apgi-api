@@ -290,8 +290,8 @@ def test_property_3_migration_roundtrip_initial_schema(clean_test_database):
     database_url = clean_test_database
 
     # Skip test if using SQLite (migrations use PostgreSQL-specific features)
-    # if database_url.startswith("sqlite"):
-    #     pytest.skip("Migration tests require PostgreSQL database for ARRAY and JSONB types")
+    if database_url.startswith("sqlite"):
+        pytest.skip("Migration tests require PostgreSQL database for ARRAY and JSONB types")
 
     engine = create_engine(database_url, poolclass=NullPool)
 
@@ -384,8 +384,8 @@ def test_property_3_migration_roundtrip_idempotency(clean_test_database):
     database_url = clean_test_database
 
     # Skip test if using SQLite (migrations use PostgreSQL-specific features)
-    # if database_url.startswith("sqlite"):
-    #     pytest.skip("Migration tests require PostgreSQL database for ARRAY and JSONB types")
+    if database_url.startswith("sqlite"):
+        pytest.skip("Migration tests require PostgreSQL database for ARRAY and JSONB types")
 
     engine = create_engine(database_url, poolclass=NullPool)
 
@@ -459,8 +459,8 @@ def test_property_3_migration_roundtrip_preserves_alembic_version(clean_test_dat
     database_url = clean_test_database
 
     # Skip test if using SQLite (migrations use PostgreSQL-specific features)
-    # if database_url.startswith("sqlite"):
-    #     pytest.skip("Migration tests require PostgreSQL database for ARRAY and JSONB types")
+    if database_url.startswith("sqlite"):
+        pytest.skip("Migration tests require PostgreSQL database for ARRAY and JSONB types")
 
     engine = create_engine(database_url, poolclass=NullPool)
 
@@ -538,8 +538,8 @@ def test_property_3_migration_roundtrip_multiple_cycles(clean_test_database, upg
     database_url = clean_test_database
 
     # Skip test if using SQLite (migrations use PostgreSQL-specific features)
-    # if database_url.startswith("sqlite"):
-    #     pytest.skip("Migration tests require PostgreSQL database for ARRAY and JSONB types")
+    if database_url.startswith("sqlite"):
+        pytest.skip("Migration tests require PostgreSQL database for ARRAY and JSONB types")
 
     engine = create_engine(database_url, poolclass=NullPool)
 

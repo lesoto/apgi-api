@@ -141,7 +141,7 @@ run_seeder() {
     if [[ "$docker_mode" == "true" ]]; then
         # Run in Docker container
         cd "$PROJECT_ROOT"
-        docker-compose -f "$DOCKER_COMPOSE_FILE" exec -T api python -m scripts.seeders."$script_name" \
+        docker-compose -f "$DOCKER_COMPOSE_FILE" exec -T api python3 -m scripts.seeders."$script_name" \
             --env "$ENVIRONMENT" $([[ "$FORCE" == "true" ]] && echo "--force")
     else
         # Run locally

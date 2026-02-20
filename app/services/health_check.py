@@ -10,6 +10,7 @@ import time
 import redis.asyncio as redis
 from sqlalchemy import text
 
+from app.config import settings
 from app.celery_app import celery_app
 
 
@@ -107,6 +108,7 @@ class HealthCheckService:
         """
         dependencies = {}
         all_healthy = True
+        critical_services = settings.health_critical_services
 
         # Check Redis connectivity and performance
         try:
@@ -130,8 +132,9 @@ class HealthCheckService:
                     "response_time": f"{redis_time:.3f}s",
                 }
         except Exception as e:
-            dependencies["redis"] = {"status": "unhealthy", "message": str(e)}
-            all_healthy = False
+            dependencies["redis"] = {"status": "unhealthy", "message": f"CRITICAL: {str(e)}"}
+            if "redis" in critical_services:
+                all_healthy = False
 
         # Check database connectivity and performance
         try:
@@ -185,13 +188,14 @@ class HealthCheckService:
                     "message": "Connected",
                 }
         except Exception as e:
-            dependencies["database"] = {"status": "unhealthy", "message": str(e)}
-            all_healthy = False
+            dependencies["database"] = {"status": "unhealthy", "message": f"CRITICAL: {str(e)}"}
+            if "database" in critical_services:
+                all_healthy = False
 
         # Check Celery worker status
         try:
             # First, try to ping the workers
-            ping_result = celery_app.control.ping(timeout=5.0)
+            ping_result = celery_app.control.ping(timeout=1.0)
 
             if ping_result:
                 # Workers are responding to ping
@@ -215,13 +219,13 @@ class HealthCheckService:
             else:
                 dependencies["celery"] = {
                     "status": "unhealthy",
-                    "message": "No Celery workers responded to ping",
+                    "message": "OPTIONAL: No Celery workers responded to ping",
                 }
-                all_healthy = False
+                # Celery is optional, do not fail overall health
         except Exception as e:
             dependencies["celery"] = {
                 "status": "unknown",
-                "message": "Not checked",
+                "message": "OPTIONAL: Not checked",
             }
 
         return {

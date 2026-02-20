@@ -105,7 +105,7 @@ def update_user_mock(**kwargs):
     from datetime import datetime
 
     return MockUser(
-        user_id=str(uuid.uuid4()),
+        user_id=kwargs.get("user_id", str(uuid.uuid4())),
         username="test_user",
         email=kwargs.get("email", "test@example.com"),
         roles=kwargs.get("roles", ["user"]),

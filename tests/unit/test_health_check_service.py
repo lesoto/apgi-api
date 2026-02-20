@@ -103,7 +103,7 @@ class TestHealthCheckService:
         # Verify Redis
         deps = result["dependencies"]
         assert deps["redis"]["status"] == "unhealthy"
-        assert deps["redis"]["message"] == "Connection failed"
+        assert deps["redis"]["message"] == "CRITICAL: Connection failed"
 
         # Verify Database still healthy
         assert deps["database"]["status"] == "healthy"
@@ -124,7 +124,7 @@ class TestHealthCheckService:
         # Verify Database
         deps = result["dependencies"]
         assert deps["database"]["status"] == "unhealthy"
-        assert deps["database"]["message"] == "DB connection failed"
+        assert deps["database"]["message"] == "CRITICAL: DB connection failed"
 
         # Verify Redis still healthy
         assert deps["redis"]["status"] == "healthy"

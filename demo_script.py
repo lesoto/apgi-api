@@ -107,8 +107,8 @@ class APIDemo:
         self.make_request("GET", "/health")
         self.make_request("GET", "/health/ready")
         self.make_request("GET", "/health/live")
-        self.make_request("GET", "/version")
-        self.make_request("GET", "/metrics", auth=False)
+        self.make_request("GET", "/v1/version")
+        self.make_request("GET", "/v1/metrics", auth=False)
 
         # 2. Authentication
         print("\n2. AUTHENTICATION")

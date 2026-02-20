@@ -43,6 +43,7 @@ from app.middleware.logging import (
     StructuredLogger,
     configure_structured_logging,
 )
+from app.middleware.profiling import ProfilingMiddleware
 
 # OpenTelemetry import is conditional - handle ImportError
 try:
@@ -237,6 +238,15 @@ All endpoints except `/health`, `/docs`, and `/openapi.json` require authenticat
 
     # Add metrics middleware (first, to track all requests)
     app.add_middleware(PrometheusMetricsMiddleware)
+
+    # Add profiling middleware (if enabled)
+    if getattr(settings, "profiling_enabled", False):
+        app.add_middleware(
+            ProfilingMiddleware,
+            enabled=True,
+            memory_tracing=getattr(settings, "profiling_memory_enabled", False),
+            profile_functions=True,  # Enable detailed function profiling
+        )
 
     # Add request logging middleware
     app.add_middleware(RequestLoggingMiddleware)

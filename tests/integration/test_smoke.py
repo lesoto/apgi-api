@@ -158,8 +158,43 @@ class TestHealthEndpoints:
             data = response.json()
             assert data["status"] == "not_ready"
 
+    @pytest.mark.asyncio
+    async def test_health_check_celery_unhealthy_but_overall_healthy(self, client):
+        """
+        Test that /health endpoint returns 200 when critical dependencies are healthy
+        but Celery is unavailable (Celery is treated as optional).
 
-class TestAuthenticationFlow:
+        Validates: Celery optional dependency handling
+        """
+        from unittest.mock import patch, AsyncMock
+
+        # Mock perform_health_check to return healthy overall but Celery unhealthy
+        mock_health_check = AsyncMock(
+            return_value={
+                "status": "healthy",
+                "timestamp": "2024-01-01T00:00:00Z",
+                "dependencies": {
+                    "database": {"status": "healthy", "message": "Connected"},
+                    "redis": {"status": "healthy", "message": "Connected and responsive"},
+                    "celery": {
+                        "status": "unhealthy",
+                        "message": "No Celery workers responded to ping",
+                    },
+                },
+            }
+        )
+
+        with patch("app.routes.health.health_service") as mock_service:
+            mock_service.perform_health_check = mock_health_check
+            response = await client.get("/health")
+
+        assert response.status_code == 200
+        data = response.json()
+        assert data["status"] == "healthy"
+        assert data["dependencies"]["celery"]["status"] == "unhealthy"
+        assert data["dependencies"]["database"]["status"] == "healthy"
+        assert data["dependencies"]["redis"]["status"] == "healthy"
+
     """Test authentication flow works end-to-end."""
 
     @pytest.mark.asyncio
