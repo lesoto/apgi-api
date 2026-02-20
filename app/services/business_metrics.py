@@ -6,7 +6,7 @@ Service for collecting and aggregating business metrics for operational insights
 
 import hashlib
 import logging
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Dict, Any, Optional, cast, Callable
 from dataclasses import dataclass
 
@@ -87,7 +87,7 @@ class BusinessMetricsService:
                 total_users = db.query(func.count(User.user_id)).scalar()
 
                 # Active users (users who logged in within last 30 days)
-                thirty_days_ago = datetime.utcnow() - timedelta(days=30)
+                thirty_days_ago = datetime.now(timezone.utc) - timedelta(days=30)
                 active_users = (
                     db.query(func.count(User.user_id))
                     .filter(User.last_login >= thirty_days_ago)
@@ -98,7 +98,7 @@ class BusinessMetricsService:
                 total_sessions = db.query(func.count(SessionModel.session_id)).scalar()
 
                 # Active sessions (created or updated in last 24 hours)
-                twenty_four_hours_ago = datetime.utcnow() - timedelta(hours=24)
+                twenty_four_hours_ago = datetime.now(timezone.utc) - timedelta(hours=24)
                 active_sessions = (
                     db.query(func.count(SessionModel.session_id))
                     .filter(
@@ -195,7 +195,7 @@ class BusinessMetricsService:
             Dictionary with session metrics
         """
         with get_db_context() as db:
-            start_date = datetime.utcnow() - timedelta(days=days)
+            start_date = datetime.now(timezone.utc) - timedelta(days=days)
 
             # Sessions by status
             status_counts = (
@@ -266,7 +266,7 @@ class BusinessMetricsService:
             Dictionary with task metrics
         """
         with get_db_context() as db:
-            start_date = datetime.utcnow() - timedelta(days=days)
+            start_date = datetime.now(timezone.utc) - timedelta(days=days)
 
             # Tasks by status
             status_counts = (
@@ -338,7 +338,7 @@ class BusinessMetricsService:
             Dictionary with user metrics
         """
         with get_db_context() as db:
-            start_date = datetime.utcnow() - timedelta(days=days)
+            start_date = datetime.now(timezone.utc) - timedelta(days=days)
 
             # User registrations over time
             daily_registrations = (
@@ -400,7 +400,7 @@ class BusinessMetricsService:
             Dictionary with template metrics
         """
         with get_db_context() as db:
-            start_date = datetime.utcnow() - timedelta(days=days)
+            start_date = datetime.now(timezone.utc) - timedelta(days=days)
 
             # Template usage (sessions created from templates)
             template_usage = (
@@ -449,6 +449,6 @@ class BusinessMetricsService:
             "tasks": self.get_task_metrics(days),
             "users": self.get_user_metrics(days),
             "templates": self.get_template_metrics(days),
-            "generated_at": datetime.utcnow(),
+            "generated_at": datetime.now(timezone.utc),
             "time_range_days": days,
         }

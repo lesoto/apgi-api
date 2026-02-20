@@ -6,7 +6,7 @@ Manages asynchronous task execution via Celery.
 
 import logging
 import uuid
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Any, Dict, Optional
 import time
 
@@ -326,7 +326,7 @@ class TaskExecutor:
                     if task_record:
                         task_record.status = TaskStatus.FAILED.value  # type: ignore
                         task_record.error_message = f"Celery submission failed: {str(e)}"  # type: ignore
-                        task_record.completed_at = datetime.utcnow()  # type: ignore
+                        task_record.completed_at = datetime.now(timezone.utc)  # type: ignore
                         db.commit()
                 raise
         else:
@@ -412,7 +412,7 @@ class TaskExecutor:
 
                         # Update task status to running
                         task.status = TaskStatus.RUNNING.value  # type: ignore
-                        task.started_at = datetime.utcnow()  # type: ignore
+                        task.started_at = datetime.now(timezone.utc)  # type: ignore
                         db.commit()
 
                         logger.info(
@@ -423,7 +423,7 @@ class TaskExecutor:
                         # Mark as failed
                         task.status = TaskStatus.FAILED.value  # type: ignore
                         task.error_message = f"Task start failed: {str(e)}"  # type: ignore
-                        task.completed_at = datetime.utcnow()  # type: ignore
+                        task.completed_at = datetime.now(timezone.utc)  # type: ignore
                         db.commit()
 
     async def get_task_status(self, task_id: str) -> Dict[str, Any]:
@@ -473,7 +473,7 @@ class TaskExecutor:
                         else "Worker crashed or task failed unexpectedly"
                     )
                     task_record.error_message = str(error_msg)  # type: ignore[assignment]
-                    task_record.completed_at = datetime.utcnow()  # type: ignore
+                    task_record.completed_at = datetime.now(timezone.utc)  # type: ignore
                     db.commit()
                 # Ensure error is in status_info
                 if not status_info["error"]:
@@ -481,13 +481,13 @@ class TaskExecutor:
 
             # Check for stuck running tasks (worker may have crashed)
             elif task_record.status == TaskStatus.RUNNING.value and task_record.started_at:
-                time_running = (datetime.utcnow() - task_record.started_at).total_seconds()
+                time_running = (datetime.now(timezone.utc) - task_record.started_at).total_seconds()
                 max_runtime_seconds = 3600  # 1 hour timeout
                 if time_running > max_runtime_seconds:
                     task_record.status = TaskStatus.FAILED.value  # type: ignore
                     error_msg = f"Task timed out after {max_runtime_seconds} seconds"
                     task_record.error_message = error_msg  # type: ignore
-                    task_record.completed_at = datetime.utcnow()  # type: ignore
+                    task_record.completed_at = datetime.now(timezone.utc)  # type: ignore
                     db.commit()
                     status_info["status"] = TaskStatus.FAILED.value
                     status_info["error"] = task_record.error_message
@@ -519,9 +519,9 @@ class TaskExecutor:
             celery_app.control.revoke(task_id, terminate=True)
 
             # Update task status in database
-            task_record.status = TaskStatus.FAILED.value  # type: ignore
+            task_record.status = TaskStatus.CANCELLED.value  # type: ignore
             task_record.error_message = "Task cancelled by user"  # type: ignore
-            task_record.completed_at = datetime.utcnow()  # type: ignore
+            task_record.completed_at = datetime.now(timezone.utc)  # type: ignore
             db.commit()
 
             logger.info(f"Task {task_id} cancelled")

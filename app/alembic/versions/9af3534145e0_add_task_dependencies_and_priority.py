@@ -9,8 +9,8 @@ import sqlalchemy as sa
 from alembic import op
 
 # revision identifiers, used by Alembic.
-revision = '9af3534145e0'
-down_revision = '50e7513df3b0'
+revision = "9af3534145e0"
+down_revision = "50e7513df3b0"
 branch_labels = None
 depends_on = None
 
@@ -19,7 +19,7 @@ def upgrade() -> None:
     # Add priority column to tasks table
     op.add_column(
         "tasks",
-        sa.Column("priority", sa.Integer(), nullable=False, default=5, comment="Task priority (1=highest, 10=lowest)")
+        sa.Column("priority", sa.Integer(), nullable=False, default=5, comment="Task priority (1=highest, 10=lowest)"),
     )
 
     # Create task_dependencies table
@@ -30,26 +30,26 @@ def upgrade() -> None:
             sa.Integer(),
             autoincrement=True,
             nullable=False,
-            comment="Auto-incrementing primary key"
+            comment="Auto-incrementing primary key",
         ),
         sa.Column(
             "dependent_task_id",
             sa.String(length=36),
             nullable=False,
-            comment="Task that depends on the prerequisite"
+            comment="Task that depends on the prerequisite",
         ),
         sa.Column(
             "prerequisite_task_id",
             sa.String(length=36),
             nullable=False,
-            comment="Task that must complete before the dependent task"
+            comment="Task that must complete before the dependent task",
         ),
         sa.Column(
             "dependency_type",
             sa.String(length=20),
             nullable=False,
             default="completion",
-            comment="Type of dependency (completion, success, failure)"
+            comment="Type of dependency (completion, success, failure)",
         ),
         sa.Column(
             "created_at",
@@ -63,8 +63,15 @@ def upgrade() -> None:
         sa.PrimaryKeyConstraint("id"),
     )
     op.create_index("idx_task_dependencies_dependent", "task_dependencies", ["dependent_task_id"])
-    op.create_index("idx_task_dependencies_prerequisite", "task_dependencies", ["prerequisite_task_id"])
-    op.create_index("idx_task_dependencies_unique", "task_dependencies", ["dependent_task_id", "prerequisite_task_id"], unique=True)
+    op.create_index(
+        "idx_task_dependencies_prerequisite", "task_dependencies", ["prerequisite_task_id"]
+    )
+    op.create_index(
+        "idx_task_dependencies_unique",
+        "task_dependencies",
+        ["dependent_task_id", "prerequisite_task_id"],
+        unique=True,
+    )
     op.create_index("idx_tasks_priority", "tasks", ["priority"])
 
 

@@ -166,7 +166,6 @@ def instrument_application():
         return
 
     try:
-
         # Configure tracing based on settings
         configure_distributed_tracing(
             service_name=getattr(settings, "tracing_service_name", "apgi-api"),

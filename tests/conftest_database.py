@@ -42,7 +42,6 @@ def mock_database_connection():
         patch("app.database.connection.engine") as mock_engine,
         patch("app.database.connection.SessionLocal") as mock_session,
     ):
-
         # Mock engine
         mock_engine.return_value = MagicMock()
 

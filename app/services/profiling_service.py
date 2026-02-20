@@ -13,7 +13,7 @@ import tracemalloc
 from contextlib import contextmanager
 from dataclasses import dataclass
 from typing import Dict, List, Any, Generator
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 
 logger = logging.getLogger(__name__)
 
@@ -104,7 +104,7 @@ class ProfilingService:
     ):
         """Record a performance snapshot."""
         snapshot = PerformanceSnapshot(
-            timestamp=datetime.utcnow(),
+            timestamp=datetime.now(timezone.utc),
             cpu_percent=cpu_percent,
             memory_mb=memory_mb,
             active_threads=active_threads,
@@ -121,7 +121,7 @@ class ProfilingService:
 
     def get_performance_history(self, hours: int = 1) -> List[Dict[str, Any]]:
         """Get performance history for the specified time period."""
-        cutoff = datetime.utcnow() - timedelta(hours=hours)
+        cutoff = datetime.now(timezone.utc) - timedelta(hours=hours)
 
         recent_snapshots = [s for s in self.snapshots if s.timestamp >= cutoff]
 
@@ -257,7 +257,7 @@ class ProfilingService:
                 "memory_mb": memory_mb,
                 "active_threads": active_threads,
                 "active_coroutines": active_coroutines,
-                "timestamp": datetime.utcnow().isoformat() + "Z",
+                "timestamp": datetime.now(timezone.utc).isoformat() + "Z",
             }
         except ImportError:
             return {"error": "psutil not available"}
@@ -272,7 +272,9 @@ class ProfilingService:
 
         # Analyze recent snapshots (last hour)
         recent_snapshots = [
-            s for s in self.snapshots if s.timestamp >= datetime.utcnow() - timedelta(hours=1)
+            s
+            for s in self.snapshots
+            if s.timestamp >= datetime.now(timezone.utc) - timedelta(hours=1)
         ]
 
         if not recent_snapshots:

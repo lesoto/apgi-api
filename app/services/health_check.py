@@ -4,7 +4,7 @@ Health Check Service
 Provides health check functionality for monitoring API dependencies.
 """
 
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Dict, Any
 import time
 import redis.asyncio as redis
@@ -24,6 +24,79 @@ class HealthCheckService:
             redis_client: Redis client instance
         """
         self.redis_client = redis_client
+
+    async def perform_readiness_check(self) -> Dict[str, Any]:
+        """
+        Perform readiness check on critical dependencies only.
+
+        Readiness checks should be lightweight and only verify that the service
+        can accept traffic. This excludes optional components like Celery workers.
+
+        Returns:
+            Dict containing readiness status and critical dependency information
+        """
+        dependencies = {}
+        all_ready = True
+
+        # Check Redis connectivity (critical for session management)
+        try:
+            start_time = time.time()
+            redis_result = await self.redis_client.ping()  # type: ignore[misc]
+            redis_time = time.time() - start_time
+
+            # Performance threshold (in seconds)
+            redis_threshold = 0.05  # 50ms
+
+            if redis_time > redis_threshold:
+                dependencies["redis"] = {
+                    "status": "degraded",
+                    "message": f"Connected but slow: {redis_time:.3f}s (threshold: {redis_threshold}s)",
+                }
+                all_ready = False
+            else:
+                dependencies["redis"] = {
+                    "status": "ready",
+                    "message": "Connected and responsive",
+                    "response_time": f"{redis_time:.3f}s",
+                }
+        except Exception as e:
+            dependencies["redis"] = {"status": "not_ready", "message": str(e)}
+            all_ready = False
+
+        # Check database connectivity (critical for user data)
+        try:
+            from app.database.connection import engine
+
+            # Test basic connectivity only (no performance checks)
+            start_time = time.time()
+            with engine.connect() as conn:
+                conn.execute(text("SELECT 1"))
+            connectivity_time = time.time() - start_time
+
+            # Performance threshold (in seconds)
+            connectivity_threshold = 0.1  # 100ms
+
+            if connectivity_time > connectivity_threshold:
+                dependencies["database"] = {
+                    "status": "degraded",
+                    "message": f"Connected but slow: {connectivity_time:.3f}s (threshold: {connectivity_threshold}s)",
+                }
+                all_ready = False
+            else:
+                dependencies["database"] = {
+                    "status": "ready",
+                    "message": "Connected",
+                    "connectivity_time": f"{connectivity_time:.3f}s",
+                }
+        except Exception as e:
+            dependencies["database"] = {"status": "not_ready", "message": str(e)}
+            all_ready = False
+
+        return {
+            "status": "ready" if all_ready else "not_ready",
+            "timestamp": datetime.now(timezone.utc).isoformat() + "Z",
+            "dependencies": dependencies,
+        }
 
     async def perform_health_check(self) -> Dict[str, Any]:
         """
@@ -153,6 +226,6 @@ class HealthCheckService:
 
         return {
             "status": "healthy" if all_healthy else "unhealthy",
-            "timestamp": datetime.utcnow().isoformat() + "Z",
+            "timestamp": datetime.now(timezone.utc).isoformat() + "Z",
             "dependencies": dependencies,
         }

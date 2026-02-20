@@ -6,12 +6,11 @@ supported versions, and deprecation notices.
 """
 
 import os
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Dict, List, Optional
 
 from fastapi import APIRouter
 from fastapi.responses import JSONResponse
-from typing import Dict, List, Optional
 
 router = APIRouter(prefix="/v1", tags=["Version"])
 
@@ -43,7 +42,7 @@ async def get_version_info():
             "deprecated_versions": DEPRECATED_VERSIONS,
             "api_spec_url": "/openapi.json",
             "documentation_url": "/docs",
-            "timestamp": datetime.utcnow().isoformat() + "Z",
+            "timestamp": datetime.now(timezone.utc).isoformat() + "Z",
         },
     )
 
@@ -239,36 +238,28 @@ func main() {{
         return JSONResponse(
             status_code=400,
             content={
-                {
-                    "error": f"Unsupported language: {language}",
-                    "supported_languages": supported_languages,
-                }
+                "error": f"Unsupported language: {language}",
+                "supported_languages": supported_languages,
             },
         )
 
     return {
-        {
-            "language": language,
-            "base_url": base_url,
-            "api_version": API_VERSION,
-            "documentation": {
-                {
-                    "openapi_spec": "/openapi.json",
-                    "interactive_docs": "/docs",
-                    "client_examples": examples[language].strip(),
-                }
-            },
-            "endpoints": {
-                {
-                    "health": "/health",
-                    "auth_login": "/v1/auth/login",
-                    "auth_refresh": "/v1/auth/refresh",
-                    "tasks": "/v1/tasks",
-                    "sessions": "/v1/sessions",
-                    "dashboard": "/v1/dashboard",
-                }
-            },
-        }
+        "language": language,
+        "base_url": base_url,
+        "api_version": API_VERSION,
+        "documentation": {
+            "openapi_spec": "/openapi.json",
+            "interactive_docs": "/docs",
+            "client_examples": examples[language].strip(),
+        },
+        "endpoints": {
+            "health": "/health",
+            "auth_login": "/v1/auth/login",
+            "auth_refresh": "/v1/auth/refresh",
+            "tasks": "/v1/tasks",
+            "sessions": "/v1/sessions",
+            "dashboard": "/v1/dashboard",
+        },
     }
 
 

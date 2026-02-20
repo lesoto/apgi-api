@@ -13,6 +13,7 @@ from fastapi import Request
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.responses import JSONResponse
 
+from app.database.models import APIKey
 from app.database.connection import SessionLocal
 from app.exceptions import ExpiredTokenError, InvalidTokenError
 from app.services.auth_manager import AuthManager, TokenPayload
@@ -132,7 +133,7 @@ class AuthenticationMiddleware(BaseHTTPMiddleware):
         # Only use prefix matching for specific safe patterns
         path_prefixes = [
             "/static/",
-            "/docs/",
+            "/docs",
             "/redoc/",
         ]
 
@@ -177,7 +178,8 @@ class AuthenticationMiddleware(BaseHTTPMiddleware):
                     username="",  # API keys don't have usernames
                     roles=api_key_info.permissions,
                     token_type="api_key",
-                    exp=None,  # API keys may not expire
+                    exp=api_key_info.expires_at
+                    or datetime(9999, 12, 31).replace(tzinfo=timezone.utc),
                 )
                 return ("api_key", user_payload)
             except Exception:
@@ -245,39 +247,52 @@ class AuthenticationMiddleware(BaseHTTPMiddleware):
         Raises:
             ValueError: If API key is invalid or expired
         """
-        # For now, implement a simple API key verification
-        # In a real implementation, this would check against a database table
-        # For demonstration, we'll use a simple hash-based verification
+        # Create database session for API key verification
+        db = SessionLocal()
+        try:
+            auth_manager = AuthManager(db)
 
-        import hashlib
-        from datetime import datetime, timezone
+            # Look up all active API keys (to prevent timing attacks)
+            active_keys = db.query(APIKey).filter(APIKey.is_active.is_(True)).all()
 
-        # Simple verification - hash the key and check against known hashes
-        # In production, this should be replaced with proper database lookup
-        key_hash = hashlib.sha256(api_key.encode()).hexdigest()
+            # Find the specific key by bcrypt check
+            db_api_key = None
+            for candidate_key in active_keys:
+                if auth_manager.verify_password(api_key, candidate_key.key_hash):  # type: ignore[arg-type]
+                    db_api_key = candidate_key
+                    break
 
-        # Mock API key database - replace with actual database query
-        mock_api_keys = {
-            "test_key_123": {
-                "key_id": "key_123",
-                "user_id": "user_test",
-                "name": "Test API Key",
-                "permissions": ["read", "write"],
-                "created_at": datetime.now(timezone.utc),
-                "expires_at": None,
-            }
-        }
+            if not db_api_key:
+                raise ValueError("Invalid API key")
 
-        if key_hash not in mock_api_keys:
-            raise ValueError("Invalid API key")
+            # Check expiration
+            from datetime import timezone
 
-        key_info_dict = mock_api_keys[key_hash]
+            if db_api_key.expires_at and db_api_key.expires_at < datetime.now(timezone.utc):
+                raise ValueError("API key has expired")
 
-        # Check expiration
-        if key_info_dict["expires_at"] and key_info_dict["expires_at"] < datetime.now(timezone.utc):
-            raise ValueError("API key has expired")
+            # Update last used timestamp
+            try:
+                db_api_key.last_used_at = datetime.now(timezone.utc)  # type: ignore[assignment]
+                db.commit()
+            except Exception as e:
+                # Log but don't fail authentication for this
+                logger.warning(
+                    f"Failed to update last_used_at for API key {db_api_key.key_id}: {e}"
+                )
+                db.rollback()
 
-        return APIKeyInfo(**key_info_dict)
+            return APIKeyInfo(
+                key_id=db_api_key.key_id,  # type: ignore[arg-type]
+                user_id=db_api_key.user_id,  # type: ignore[arg-type]
+                name=db_api_key.name,  # type: ignore[arg-type]
+                permissions=db_api_key.permissions,  # type: ignore[arg-type]
+                created_at=db_api_key.created_at,  # type: ignore[arg-type]
+                expires_at=db_api_key.expires_at,  # type: ignore[arg-type]
+            )
+
+        finally:
+            db.close()
 
     def _create_error_response(self, status_code: int, code: str, message: str) -> JSONResponse:
         """

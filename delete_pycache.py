@@ -88,9 +88,11 @@ ESSENTIAL_FILES = {
     ".pre-commit-config.yaml",
     # Environment files
     ".env.example",
-    ".env.template",
-    ".env.sample",
-    # API specific essential files
+    ".env.development",
+    ".env.production",
+    ".env.production.template",
+    "REPORT.md",
+    "delete_pycache.py",  # This cleanup script itself
     "main.py",
     "app.py",
     "run.py",

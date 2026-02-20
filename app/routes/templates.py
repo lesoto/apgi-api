@@ -8,9 +8,7 @@ import logging
 from uuid import uuid4
 
 from fastapi import APIRouter, Depends, HTTPException, status
-from sqlalchemy import select
-from sqlalchemy.orm import Session
-
+from sqlalchemy import select, func
 from app.database.connection import get_db_context
 from app.database.models import SessionTemplate
 from app.models.schemas import (
@@ -24,7 +22,7 @@ from app.services.authorization import get_current_user, require_permission, Per
 
 logger = logging.getLogger(__name__)
 
-router = APIRouter(prefix="/templates", tags=["Templates"])
+router = APIRouter(prefix="/v1/templates", tags=["Templates"])
 
 # Global dependencies
 _redis_client = None
@@ -77,9 +75,7 @@ async def list_templates(
         )
 
     try:
-        with get_db_context() as db_session:
-            # Type hint for mypy
-            db_session: Session
+        with get_db_context() as db:
             # Build query
             query = select(SessionTemplate)
 
@@ -93,31 +89,31 @@ async def list_templates(
                 )
 
             # Get total count
-            total_result = db_session.execute(select(SessionTemplate).where(query.whereclause))
-            total = len(total_result.fetchall())
+            count_stmt = select(func.count()).select_from(SessionTemplate).where(query.whereclause)  # type: ignore
+            total = db.execute(count_stmt).scalar() or 0
 
             # Apply pagination
             offset = (page - 1) * per_page
             query = query.offset(offset).limit(per_page)
 
             # Execute query
-            result = db_session.execute(query)
-            templates_db = result.fetchall()
+            result = db.execute(query)
+            templates_db = result.scalars().all()
 
             # Convert to response format
             templates = [
                 SessionTemplateResponse(
-                    template_id=template.template_id,
-                    user_id=template.user_id,
-                    name=template.name,
-                    description=template.description,
-                    config_path=template.config_path,
-                    custom_config=template.custom_config,
-                    default_description=template.default_description,
-                    tags=template.tags or [],
-                    is_public=template.is_public,
-                    created_at=template.created_at,
-                    updated_at=template.updated_at,
+                    template_id=str(template.template_id),
+                    user_id=str(template.user_id),
+                    name=str(template.name),
+                    description=template.description,  # type: ignore[arg-type]
+                    config_path=template.config_path,  # type: ignore[arg-type]
+                    custom_config=template.custom_config,  # type: ignore[arg-type]
+                    default_description=template.default_description,  # type: ignore[arg-type]
+                    tags=list(template.tags) if template.tags else [],
+                    is_public=bool(template.is_public),
+                    created_at=template.created_at,  # type: ignore[arg-type]
+                    updated_at=template.updated_at,  # type: ignore[arg-type]
                 )
                 for template in templates_db
             ]
@@ -166,15 +162,13 @@ async def create_template(
         HTTPException: If template creation fails
     """
     try:
-        with get_db_context() as db_session:
-            # Type hint for mypy
-            db_session: Session
+        with get_db_context() as db:
             # Check for duplicate name for this user
             existing_stmt = select(SessionTemplate).where(
                 SessionTemplate.user_id == current_user.user_id,
                 SessionTemplate.name == request.name,
             )
-            existing_result = db_session.execute(existing_stmt)
+            existing_result = db.execute(existing_stmt)
             existing_template = existing_result.scalar_one_or_none()
 
             if existing_template:
@@ -197,9 +191,9 @@ async def create_template(
                 is_public=request.is_public,
             )
 
-            db_session.add(template)
-            db_session.commit()
-            db_session.refresh(template)
+            db.add(template)
+            db.commit()
+            db.refresh(template)
 
             logger.info(
                 f"Template {template_id} created successfully by user {current_user.user_id}"
@@ -209,14 +203,14 @@ async def create_template(
                 template_id=str(template.template_id),
                 user_id=str(template.user_id),
                 name=str(template.name),
-                description=template.description,
-                config_path=template.config_path,
-                custom_config=template.custom_config,
-                default_description=template.default_description,
+                description=template.description,  # type: ignore[arg-type]
+                config_path=template.config_path,  # type: ignore[arg-type]
+                custom_config=template.custom_config,  # type: ignore[arg-type]
+                default_description=template.default_description,  # type: ignore[arg-type]
                 tags=list(template.tags) if template.tags else [],
                 is_public=bool(template.is_public),
-                created_at=template.created_at,
-                updated_at=template.updated_at,
+                created_at=template.created_at,  # type: ignore[arg-type]
+                updated_at=template.updated_at,  # type: ignore[arg-type]
             )
 
     except HTTPException:
@@ -248,11 +242,9 @@ async def get_template(
         HTTPException: If template not found or access denied
     """
     try:
-        with get_db_context() as db_session:
-            # Type hint for mypy
-            db_session: Session
+        with get_db_context() as db:
             stmt = select(SessionTemplate).where(SessionTemplate.template_id == template_id)
-            result = db_session.execute(stmt)
+            result = db.execute(stmt)
             template = result.scalar_one_or_none()
 
             if not template:
@@ -271,14 +263,14 @@ async def get_template(
                 template_id=str(template.template_id),
                 user_id=str(template.user_id),
                 name=str(template.name),
-                description=template.description,
-                config_path=template.config_path,
-                custom_config=template.custom_config,
-                default_description=template.default_description,
+                description=template.description,  # type: ignore[arg-type]
+                config_path=template.config_path,  # type: ignore[arg-type]
+                custom_config=template.custom_config,  # type: ignore[arg-type]
+                default_description=template.default_description,  # type: ignore[arg-type]
                 tags=list(template.tags) if template.tags else [],
                 is_public=bool(template.is_public),
-                created_at=template.created_at,
-                updated_at=template.updated_at,
+                created_at=template.created_at,  # type: ignore[arg-type]
+                updated_at=template.updated_at,  # type: ignore[arg-type]
             )
 
     except HTTPException:
@@ -318,11 +310,9 @@ async def update_template(
         HTTPException: If template not found or access denied
     """
     try:
-        with get_db_context() as db_session:
-            # Type hint for mypy
-            db_session: Session
+        with get_db_context() as db:
             stmt = select(SessionTemplate).where(SessionTemplate.template_id == template_id)
-            result = db_session.execute(stmt)
+            result = db.execute(stmt)
             template = result.scalar_one_or_none()
 
             if not template:
@@ -345,7 +335,7 @@ async def update_template(
                     SessionTemplate.name == request.name,
                     SessionTemplate.template_id != template_id,
                 )
-                existing_result = db_session.execute(existing_stmt)
+                existing_result = db.execute(existing_stmt)
                 existing_template = existing_result.scalar_one_or_none()
 
                 if existing_template:
@@ -367,14 +357,14 @@ async def update_template(
                 template_id=str(template.template_id),
                 user_id=str(template.user_id),
                 name=str(template.name),
-                description=template.description,
-                config_path=template.config_path,
-                custom_config=template.custom_config,
-                default_description=template.default_description,
+                description=template.description,  # type: ignore[arg-type]
+                config_path=template.config_path,  # type: ignore[arg-type]
+                custom_config=template.custom_config,  # type: ignore[arg-type]
+                default_description=template.default_description,  # type: ignore[arg-type]
                 tags=list(template.tags) if template.tags else [],
                 is_public=bool(template.is_public),
-                created_at=template.created_at,
-                updated_at=template.updated_at,
+                created_at=template.created_at,  # type: ignore[arg-type]
+                updated_at=template.updated_at,  # type: ignore[arg-type]
             )
 
     except HTTPException:
@@ -403,11 +393,9 @@ async def delete_template(
         HTTPException: If template not found or access denied
     """
     try:
-        with get_db_context() as db_session:
-            # Type hint for mypy
-            db_session: Session
+        with get_db_context() as db:
             stmt = select(SessionTemplate).where(SessionTemplate.template_id == template_id)
-            result = db_session.execute(stmt)
+            result = db.execute(stmt)
             template = result.scalar_one_or_none()
 
             if not template:
@@ -423,7 +411,7 @@ async def delete_template(
                     detail="Only template owner can delete it",
                 )
 
-            db_session.delete(template)
+            db.delete(template)
             # Context manager will commit automatically
 
             logger.info(f"Template {template_id} deleted by user {current_user.user_id}")

@@ -4,7 +4,7 @@ Request Size Limit Middleware
 Middleware for limiting the size of incoming requests.
 """
 
-from datetime import datetime
+from datetime import datetime, timezone
 
 from fastapi import Request
 from starlette.middleware.base import BaseHTTPMiddleware
@@ -103,7 +103,7 @@ class RequestSizeLimitMiddleware(BaseHTTPMiddleware):
                             "error": {
                                 "code": "REQUEST_TOO_LARGE",
                                 "message": f"Request body too large. Maximum size is {self.max_size_mb}MB",
-                                "timestamp": datetime.utcnow().isoformat() + "Z",
+                                "timestamp": datetime.now(timezone.utc).isoformat() + "Z",
                                 "details": {
                                     "max_size_mb": self.max_size_mb,
                                     "actual_size_bytes": size,
@@ -135,7 +135,7 @@ class RequestSizeLimitMiddleware(BaseHTTPMiddleware):
                         "error": {
                             "code": "REQUEST_TOO_LARGE",
                             "message": f"Request body too large. Maximum size is {self.max_size_mb}MB",
-                            "timestamp": datetime.utcnow().isoformat() + "Z",
+                            "timestamp": datetime.now(timezone.utc).isoformat() + "Z",
                             "details": {
                                 "max_size_mb": self.max_size_mb,
                                 "actual_size_bytes": len(body),

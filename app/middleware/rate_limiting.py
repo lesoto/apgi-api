@@ -4,7 +4,7 @@ Rate Limiting Middleware
 Middleware for enforcing rate limits on API requests.
 """
 
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 
 import redis.asyncio as redis
 from fastapi import Request
@@ -149,7 +149,9 @@ class RateLimitingMiddleware(BaseHTTPMiddleware):
         rate_limit_headers = {
             "X-RateLimit-Limit": "60",
             "X-RateLimit-Remaining": "59",
-            "X-RateLimit-Reset": str(int((datetime.utcnow() + timedelta(seconds=60)).timestamp())),
+            "X-RateLimit-Reset": str(
+                int((datetime.now(timezone.utc) + timedelta(seconds=60)).timestamp())
+            ),
         }
 
         # Skip if rate limiting is disabled or not yet initialized
@@ -181,11 +183,15 @@ class RateLimitingMiddleware(BaseHTTPMiddleware):
 
             # Safely calculate reset timestamp
             try:
-                reset_timestamp = int(datetime.utcnow().timestamp() + reset_time)
+                reset_timestamp = int(datetime.now(timezone.utc).timestamp() + reset_time)
                 if reset_timestamp < 0:
-                    reset_timestamp = int((datetime.utcnow() + timedelta(seconds=60)).timestamp())
+                    reset_timestamp = int(
+                        (datetime.now(timezone.utc) + timedelta(seconds=60)).timestamp()
+                    )
             except (TypeError, ValueError):
-                reset_timestamp = int((datetime.utcnow() + timedelta(seconds=60)).timestamp())
+                reset_timestamp = int(
+                    (datetime.now(timezone.utc) + timedelta(seconds=60)).timestamp()
+                )
 
             # Update rate limit headers with actual values
             rate_limit_headers.update(
@@ -212,12 +218,12 @@ class RateLimitingMiddleware(BaseHTTPMiddleware):
                         "error": {
                             "code": "RATE_LIMIT_EXCEEDED",
                             "message": "Too many requests. Please try again later.",
-                            "timestamp": datetime.utcnow().isoformat() + "Z",
+                            "timestamp": datetime.now(timezone.utc).isoformat() + "Z",
                             "details": {
                                 "limit": 60,
                                 "retry_after": reset_time,
                                 "reset_at": (
-                                    datetime.utcnow() + timedelta(seconds=reset_time)
+                                    datetime.now(timezone.utc) + timedelta(seconds=reset_time)
                                 ).isoformat()
                                 + "Z",
                             },

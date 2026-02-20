@@ -64,8 +64,8 @@ async def readiness_check():
     """
     Readiness probe endpoint.
 
-    Verifies that all dependencies (database, Redis, Celery) are available
-    and the API is ready to serve requests.
+    Verifies that critical dependencies (database, Redis) are available
+    and API is ready to serve requests.
 
     Returns:
         JSON response with readiness status
@@ -80,13 +80,13 @@ async def readiness_check():
             content={"status": "not_ready", "error": "Health service not initialized"},
         )
 
-    # Perform readiness check (same as health check)
-    health_status = await health_service.perform_health_check()
+    # Perform readiness check (critical dependencies only)
+    readiness_status = await health_service.perform_readiness_check()
 
-    # Return 503 if any component is unhealthy
-    status_code = 200 if health_status["status"] == "healthy" else 503
+    # Return 503 if any critical component is not ready
+    status_code = 200 if readiness_status["status"] in ["ready", "degraded"] else 503
 
-    return JSONResponse(status_code=status_code, content=health_status)
+    return JSONResponse(status_code=status_code, content=readiness_status)
 
 
 @router.get("/health/live")

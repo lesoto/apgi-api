@@ -110,7 +110,6 @@ class TestLifespanStartup:
             patch("app.main.sessions.get_session_manager"),
             patch("app.main.configure_alerting"),
         ):
-
             mock_app = MagicMock()
 
             async with lifespan(mock_app):
@@ -140,7 +139,6 @@ class TestLifespanStartup:
             patch("app.main.sessions.get_session_manager"),
             patch("app.main.configure_alerting"),
         ):
-
             mock_app = MagicMock()
 
             async with lifespan(mock_app):
@@ -189,7 +187,6 @@ class TestGracefulShutdown:
             patch("app.main.sessions.get_session_manager"),
             patch("app.main.configure_alerting"),
         ):
-
             mock_app = MagicMock()
 
             async with lifespan(mock_app):
@@ -219,7 +216,6 @@ class TestGracefulShutdown:
             patch("app.main.sessions.get_session_manager"),
             patch("app.main.configure_alerting"),
         ):
-
             mock_app = MagicMock()
 
             async with lifespan(mock_app):
@@ -256,7 +252,6 @@ class TestGracefulShutdown:
             patch("app.main.sessions.get_session_manager"),
             patch("app.main.configure_alerting"),
         ):
-
             mock_app = MagicMock()
 
             async with lifespan(mock_app):

@@ -128,6 +128,7 @@ async def execute_task(
             session_id=session_id,
             task_type=request.task_type,
             parameters=request.parameters,
+            priority=request.priority,
             webhook_url=request.webhook_url,
         )
 

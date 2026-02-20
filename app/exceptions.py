@@ -4,7 +4,7 @@ Custom Exception Classes for APGI API
 Defines custom exception hierarchy for consistent error handling across the API.
 """
 
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Any, Dict, Optional
 
 
@@ -55,7 +55,7 @@ class APIError(Exception):
                 "code": self.code,
                 "message": self.message,
                 "request_id": request_id,
-                "timestamp": datetime.utcnow().isoformat() + "Z",
+                "timestamp": datetime.now(timezone.utc).isoformat() + "Z",
                 "details": self.details,
             }
         }

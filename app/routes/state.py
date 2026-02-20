@@ -7,7 +7,7 @@ API endpoints for accessing APGI system state, ignition history, and subsystem d
 import logging
 from typing import Optional
 
-from fastapi import APIRouter, Depends, HTTPException, Query, status, Request
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 
 from app.models.schemas import (
     AllostaticState,
@@ -33,6 +33,7 @@ from app.services.authorization import (
     get_current_user,
 )
 from app.routes.sessions import get_session_manager
+from app.services.session_manager import SessionManager
 
 logger = logging.getLogger(__name__)
 
@@ -131,7 +132,7 @@ async def get_system_state(
                     coherence=self_model_data.get("minimal", {}).get("coherence", 0.5)
                 ),
                 narrative=NarrativeSelfState(
-                    active=self_model_data.get("narrative", {}).get("active", False)
+                    narrative=self_model_data.get("narrative", {}).get("narrative", "")
                 ),
             ),
         )
@@ -221,15 +222,22 @@ async def get_ignition_history(  # noqa: C901
                 if end_time is not None and time_val > end_time:
                     continue
 
-                # Calculate ignition event details from state data
-                ignition_data = state.get("ignition", {})
-                total_signal = ignition_data.get("total_signal", 0.0)
-                threshold = ignition_data.get("threshold", 2.0)
+                # Get ignition data - use historical if available, otherwise current
+                ignition_signals = history.get("ignition_signals", [])
+                ignition_thresholds = history.get("ignition_thresholds", [])
+                if i < len(ignition_signals) and i < len(ignition_thresholds):
+                    total_signal = ignition_signals[i]
+                    threshold = ignition_thresholds[i]
+                else:
+                    # Fallback to current values if historical not available
+                    ignition_data = state.get("ignition", {})
+                    total_signal = ignition_data.get("total_signal", 0.0)
+                    threshold = ignition_data.get("threshold", 2.0)
 
                 # Estimate duration based on signal decay (simplified calculation)
                 duration_ms = min(500.0, max(100.0, total_signal * 100))
 
-                # Use actual signal and threshold values
+                # Use historical or current signal and threshold values
                 events.append(
                     IgnitionEvent(
                         time_ms=time_val,

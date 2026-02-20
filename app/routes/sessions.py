@@ -5,10 +5,11 @@ API endpoints for creating, controlling, and managing APGI simulation sessions.
 """
 
 import logging
-from typing import Optional
+from typing import Optional, Dict, Any
 
 import redis.asyncio as redis
 from fastapi import APIRouter, Depends, HTTPException, status
+from sqlalchemy.orm import Session
 
 from app.database.connection import SessionLocal, get_db
 from app.database.models import Session as SessionModel, Task
@@ -33,6 +34,42 @@ from app.services.authorization import (
 from app.services.session_manager import SessionLifecycleState, SessionManager
 
 logger = logging.getLogger(__name__)
+
+
+async def validate_session_ownership(
+    session_id: str, user_id: str, manager: SessionManager, db_session: Session
+) -> SessionModel:
+    """
+    Validate that the current user owns the specified session.
+
+    Args:
+        session_id: Session identifier to validate
+        user_id: Current user's ID
+        manager: Session manager dependency
+        db_session: Database session
+
+    Returns:
+        Session model if ownership is valid
+
+    Raises:
+        HTTPException: If session not found or user doesn't own it
+    """
+    # Get session from database to check ownership
+    session = db_session.query(SessionModel).filter(SessionModel.session_id == session_id).first()
+    if not session:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail=f"Session {session_id} not found"
+        )
+
+    # Check ownership
+    if session.user_id != user_id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Access denied: you do not own this session",
+        )
+
+    return session
+
 
 # Create router
 router = APIRouter(
@@ -180,7 +217,7 @@ async def create_session(
         HTTPException: If session creation fails
     """
     # Create session
-    session_id = await manager.create_session(request)
+    session_id = await manager.create_session(request, user_id=current_user.user_id)
 
     # Get session details
     sim_session = await manager.get_session(session_id)
@@ -206,6 +243,7 @@ async def get_session(
     session_id: str,
     manager: SessionManager = Depends(get_session_manager),
     current_user=Depends(get_current_user),
+    db=Depends(get_db),
 ):
     """
     Get session details.
@@ -220,6 +258,9 @@ async def get_session(
     Raises:
         HTTPException: If session not found
     """
+    # Validate session ownership
+    await validate_session_ownership(session_id, current_user.user_id, manager, db)
+
     try:
         sim_session = await manager.get_session(session_id)
     except ValueError:
@@ -246,6 +287,7 @@ async def get_session_metrics(
     session_id: str,
     manager: SessionManager = Depends(get_session_manager),
     current_user=Depends(get_current_user),
+    db=Depends(get_db),
 ):
     """
     Get session metrics.
@@ -260,6 +302,9 @@ async def get_session_metrics(
     Raises:
         HTTPException: If session not found
     """
+    # Validate session ownership
+    await validate_session_ownership(session_id, current_user.user_id, manager, db)
+
     try:
         sim_session = await manager.get_session(session_id)
     except ValueError:
@@ -276,9 +321,9 @@ async def get_session_metrics(
 
     metrics = {
         "session_id": session_id,
-        "ignition_frequency": ignition.get("intensity", 0.0),  # Placeholder
-        "free_energy": allostatic.get("load", 0.0),  # Placeholder
-        "metabolic_load": body.get("energy", 0.0),  # Placeholder
+        "ignition_frequency": ignition.get("intensity", 0.0),
+        "free_energy": allostatic.get("load", 0.0),
+        "metabolic_load": body.get("energy", 0.0),
         "additional_metrics": {
             "allostatic_threshold": allostatic.get("threshold", 0.0),
             "arousal": body.get("arousal", 0.0),
@@ -365,6 +410,7 @@ async def start_session(
     session_id: str,
     manager: SessionManager = Depends(get_session_manager),
     current_user=Depends(get_current_user),
+    db=Depends(get_db),
 ):
     """
     Start simulation.
@@ -379,6 +425,9 @@ async def start_session(
     Raises:
         HTTPException: If session not found or cannot be started
     """
+    # Validate session ownership
+    await validate_session_ownership(session_id, current_user.user_id, manager, db)
+
     try:
         sim_session = await manager.get_session(session_id)
     except ValueError:
@@ -411,6 +460,7 @@ async def pause_session(
     session_id: str,
     manager: SessionManager = Depends(get_session_manager),
     current_user=Depends(get_current_user),
+    db=Depends(get_db),
 ):
     """
     Pause simulation.
@@ -425,6 +475,9 @@ async def pause_session(
     Raises:
         HTTPException: If session not found or cannot be paused
     """
+    # Validate session ownership
+    await validate_session_ownership(session_id, current_user.user_id, manager, db)
+
     try:
         sim_session = await manager.get_session(session_id)
     except ValueError:
@@ -457,6 +510,7 @@ async def stop_session(
     session_id: str,
     manager: SessionManager = Depends(get_session_manager),
     current_user=Depends(get_current_user),
+    db=Depends(get_db),
 ):
     """
     Stop simulation.
@@ -471,6 +525,9 @@ async def stop_session(
     Raises:
         HTTPException: If session not found
     """
+    # Validate session ownership
+    await validate_session_ownership(session_id, current_user.user_id, manager, db)
+
     try:
         sim_session = await manager.get_session(session_id)
     except ValueError:
@@ -499,6 +556,7 @@ async def reset_session(
     session_id: str,
     manager: SessionManager = Depends(get_session_manager),
     current_user=Depends(get_current_user),
+    db=Depends(get_db),
 ):
     """
     Reset simulation to initial state.
@@ -513,6 +571,9 @@ async def reset_session(
     Raises:
         HTTPException: If session not found
     """
+    # Validate session ownership
+    await validate_session_ownership(session_id, current_user.user_id, manager, db)
+
     try:
         sim_session = await manager.get_session(session_id)
     except ValueError:
@@ -541,6 +602,7 @@ async def delete_session(
     session_id: str,
     manager: SessionManager = Depends(get_session_manager),
     current_user=Depends(get_current_user),
+    db=Depends(get_db),
 ):
     """
     Delete session and clean up resources.
@@ -555,6 +617,9 @@ async def delete_session(
     Raises:
         HTTPException: If session not found or deletion fails
     """
+    # Validate session ownership
+    await validate_session_ownership(session_id, current_user.user_id, manager, db)
+
     try:
         # Verify session exists before deletion
         await manager.get_session(session_id)
@@ -567,3 +632,55 @@ async def delete_session(
     logger.info(f"Session {session_id} deleted")
 
     return None
+
+
+@router.post(
+    "/{session_id}/step",
+    response_model=SessionActionResponse,
+    summary="Step simulation",
+    description="Execute single simulation step for specified session",
+    dependencies=[Depends(require_permission(Permission.SESSION_CONTROL))],
+)
+async def step_session(
+    session_id: str,
+    extero_input: Optional[Dict[str, Any]] = None,
+    manager: SessionManager = Depends(get_session_manager),
+    current_user=Depends(get_current_user),
+    db=Depends(get_db),
+):
+    """
+    Execute single simulation step.
+
+    Args:
+        session_id: Unique session identifier
+        extero_input: Optional exteroceptive input for this step
+        manager: Session manager dependency
+
+    Returns:
+        SessionActionResponse with updated status and state
+
+    Raises:
+        HTTPException: If session not found or cannot be stepped
+    """
+    # Validate session ownership
+    await validate_session_ownership(session_id, current_user.user_id, manager, db)
+
+    try:
+        sim_session = await manager.get_session(session_id)
+    except ValueError:
+        raise SessionNotFoundError(session_id)
+
+    try:
+        # Execute step with provided input (default to empty dict if not provided)
+        state = await sim_session.step(extero_input or {})
+
+        logger.info(f"Session {session_id} stepped successfully")
+
+        return SessionActionResponse(
+            session_id=session_id, status="stepped", timestamp=sim_session.updated_at
+        )
+    except ValueError as e:
+        # Session not in running state or other error
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, detail=f"Cannot step session: {str(e)}"
+        )

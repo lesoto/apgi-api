@@ -4,6 +4,7 @@ Authentication Manager Service
 Handles JWT token creation/verification and password hashing for user authentication.
 """
 
+import hashlib
 import hmac
 import logging
 from datetime import datetime, timedelta
@@ -94,20 +95,27 @@ class AuthManager:
     @staticmethod
     def hash_password(password: str) -> str:
         """
-        Hash a password using bcrypt.
+        Hash a password using bcrypt with SHA-256 pre-hashing.
 
         Args:
             password: Plain text password
 
         Returns:
             Hashed password string
+
+        Raises:
+            ValueError: If password is too long (> 1024 characters)
         """
-        # Truncate password to 72 bytes (bcrypt limit)
+        # Validate password length to prevent extremely long inputs
+        if len(password) > 1024:
+            raise ValueError("Password too long (maximum 1024 characters)")
+
+        # Pre-hash with SHA-256 to handle bcrypt's 72-byte limit uniformly
         password_bytes = password.encode("utf-8")
-        if len(password_bytes) > 72:
-            password_bytes = password_bytes[:72]
+        sha256_hash = hashlib.sha256(password_bytes).digest()
+
         salt = bcrypt.gensalt(rounds=12)
-        hashed = bcrypt.hashpw(password_bytes, salt)
+        hashed = bcrypt.hashpw(sha256_hash, salt)
         return hashed.decode("utf-8")
 
     @staticmethod
@@ -122,12 +130,12 @@ class AuthManager:
         Returns:
             True if password matches, False otherwise
         """
-        # Truncate password to 72 bytes (bcrypt limit) - must match hash_password behavior
+        # Pre-hash with SHA-256 to match hash_password behavior
         password_bytes = plain_password.encode("utf-8")
-        if len(password_bytes) > 72:
-            password_bytes = password_bytes[:72]
+        sha256_hash = hashlib.sha256(password_bytes).digest()
+
         hashed_bytes = hashed_password.encode("utf-8")
-        return bcrypt.checkpw(password_bytes, hashed_bytes)
+        return bcrypt.checkpw(sha256_hash, hashed_bytes)
 
     # ========================================================================
     # Token Creation

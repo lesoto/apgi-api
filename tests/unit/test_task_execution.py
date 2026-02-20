@@ -6,7 +6,7 @@ Tests task submission, status checking, result retrieval, and timeout handling.
 
 import pytest
 import uuid
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Any
 from unittest.mock import MagicMock, patch
 from celery import states
@@ -44,7 +44,7 @@ def sample_task_record():
         task_type="iowa_gambling",
         parameters={"num_trials": 100},
         status=TaskStatus.PENDING.value,
-        created_at=datetime.utcnow(),
+        created_at=datetime.now(timezone.utc),
     )
 
 

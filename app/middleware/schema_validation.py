@@ -6,8 +6,8 @@ Logs validation failures for monitoring and debugging.
 """
 
 import json
-from datetime import datetime
-from typing import Any, Callable, Dict, Optional
+from datetime import datetime, timezone
+from typing import Any, Awaitable, Callable, Dict, Optional, cast
 
 from fastapi import Request, Response
 from starlette.middleware.base import BaseHTTPMiddleware
@@ -63,7 +63,9 @@ class ResponseSchemaValidationMiddleware(BaseHTTPMiddleware):
                 fail_on_error=fail_on_error,
             )
 
-    async def dispatch(self, request: Request, call_next: Callable) -> Response:
+    async def dispatch(
+        self, request: Request, call_next: Callable[[Request], Awaitable[Response]]
+    ) -> Response:
         """
         Process request and validate response against schema.
 
@@ -231,7 +233,7 @@ class ResponseSchemaValidationMiddleware(BaseHTTPMiddleware):
         # Cache the result
         self._schema_cache[cache_key] = response_schema
 
-        return response_schema
+        return cast(Optional[Dict[str, Any]], response_schema)
 
     def _find_matching_path(self, path: str) -> Optional[Dict[str, Any]]:
         """
@@ -267,7 +269,7 @@ class ResponseSchemaValidationMiddleware(BaseHTTPMiddleware):
                     break
 
             if match:
-                return path_item
+                return cast(Optional[Dict[str, Any]], path_item)
 
         return None
 
@@ -420,5 +422,5 @@ class ResponseSchemaValidationMiddleware(BaseHTTPMiddleware):
             status_code=response.status_code,
             error=error,
             validation_errors=validation_errors or [],
-            timestamp=datetime.utcnow().isoformat() + "Z",
+            timestamp=datetime.now(timezone.utc).isoformat() + "Z",
         )

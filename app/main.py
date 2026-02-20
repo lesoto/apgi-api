@@ -244,10 +244,6 @@ All endpoints except `/health`, `/docs`, and `/openapi.json` require authenticat
     # Add API versioning middleware (adds version headers to all responses)
     app.add_middleware(APIVersioningMiddleware)
 
-    # Add authentication middleware (extracts and verifies JWT tokens) - skip in test mode
-    if not test_mode:
-        app.add_middleware(AuthenticationMiddleware)
-
     # Add response schema validation middleware
     app.add_middleware(
         ResponseSchemaValidationMiddleware,
@@ -268,6 +264,10 @@ All endpoints except `/health`, `/docs`, and `/openapi.json` require authenticat
             header_name="X-CSRF-Token",
             token_expiry_minutes=60,
         )
+
+    # Add authentication middleware (extracts and verifies JWT tokens) - skip in test mode
+    if not test_mode:
+        app.add_middleware(AuthenticationMiddleware)
 
     # Add deprecation middleware
     app.add_middleware(DeprecationMiddleware, deprecated_endpoints={})

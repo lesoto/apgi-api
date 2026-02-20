@@ -10,8 +10,8 @@ from alembic import op
 from sqlalchemy.dialects import postgresql
 
 # revision identifiers, used by Alembic.
-revision = '50e7513df3b0'
-down_revision = '002'
+revision = "50e7513df3b0"
+down_revision = "002"
 branch_labels = None
 depends_on = None
 
@@ -20,20 +20,21 @@ def upgrade() -> None:
     # Create session_templates table
     op.create_table(
         "session_templates",
-        sa.Column(
-            "template_id", sa.String(length=36), nullable=False, comment="Unique template identifier"
-        ),
+        sa.Column("template_id", sa.String(length=36), nullable=False, comment="Unique template identifier"),
         sa.Column("user_id", sa.String(length=36), nullable=False, comment="Owner user ID"),
         sa.Column("name", sa.String(length=100), nullable=False, comment="Template name"),
         sa.Column("description", sa.Text(), nullable=True, comment="Template description"),
         sa.Column(
-            "config_path", sa.String(length=255), nullable=True, comment="Path to YAML configuration file"
+            "config_path",
+            sa.String(length=255),
+            nullable=True,
+            comment="Path to YAML configuration file",
         ),
         sa.Column(
             "custom_config",
             postgresql.JSONB(astext_type=sa.Text()),
             nullable=True,
-            comment="Default custom configuration overrides"
+            comment="Default custom configuration overrides",
         ),
         sa.Column(
             "default_description", sa.Text(), nullable=True, comment="Default session description"
@@ -44,9 +45,7 @@ def upgrade() -> None:
             nullable=True,
             comment="Template tags for organization",
         ),
-        sa.Column(
-            "is_public", sa.Boolean(), nullable=False, comment="Whether template is public"
-        ),
+        sa.Column("is_public", sa.Boolean(), nullable=False, comment="Whether template is public"),
         sa.Column(
             "created_at",
             sa.DateTime(timezone=True),
@@ -71,7 +70,12 @@ def upgrade() -> None:
     # Add template_id column to sessions table
     op.add_column(
         "sessions",
-        sa.Column("template_id", sa.String(length=36), nullable=True, comment="Template used to create this session")
+        sa.Column(
+            "template_id",
+            sa.String(length=36),
+            nullable=True,
+            comment="Template used to create this session",
+        ),
     )
     op.create_foreign_key(
         "fk_sessions_template_id",
@@ -79,7 +83,7 @@ def upgrade() -> None:
         "session_templates",
         ["template_id"],
         ["template_id"],
-        ondelete="SET NULL"
+        ondelete="SET NULL",
     )
     op.create_index("idx_sessions_template", "sessions", ["template_id"])
 

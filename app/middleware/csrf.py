@@ -7,7 +7,7 @@ Cross-Site Request Forgery attacks.
 
 import hashlib
 import secrets
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Optional
 
 from fastapi import Request
@@ -182,7 +182,7 @@ class CSRFMiddleware(BaseHTTPMiddleware):
                             "error": {
                                 "code": "CSRF_TOKEN_MISSING",
                                 "message": "CSRF token is required for this request",
-                                "timestamp": datetime.utcnow().isoformat() + "Z",
+                                "timestamp": datetime.now(timezone.utc).isoformat() + "Z",
                             }
                         },
                     )
@@ -199,7 +199,7 @@ class CSRFMiddleware(BaseHTTPMiddleware):
                             "error": {
                                 "code": "CSRF_TOKEN_INVALID",
                                 "message": "Invalid CSRF token",
-                                "timestamp": datetime.utcnow().isoformat() + "Z",
+                                "timestamp": datetime.now(timezone.utc).isoformat() + "Z",
                             }
                         },
                     )

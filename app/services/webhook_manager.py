@@ -6,7 +6,7 @@ Handles webhook delivery and management for task completions.
 
 import asyncio
 import logging
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Dict, Any
 import uuid
 
@@ -58,7 +58,7 @@ class WebhookManager:
         delivery_id = str(uuid.uuid4())
 
         # Calculate retry schedule (exponential backoff)
-        now = datetime.utcnow()
+        now = datetime.now(timezone.utc)
         retry_delays = [5, 30, 300, 1800, 3600]  # 5min, 30min, 5h, 30min, 1h
 
         delivery = WebhookDelivery(
@@ -122,7 +122,7 @@ class WebhookManager:
                     timeout=aiohttp.ClientTimeout(total=30),
                 ) as response:
                     delivery.attempts += 1  # type: ignore[assignment]
-                    delivery.last_attempt_at = datetime.utcnow()  # type: ignore[assignment]
+                    delivery.last_attempt_at = datetime.now(timezone.utc)  # type: ignore[assignment]
 
                     if response.status >= 200 and response.status < 300:
                         delivery.status = "delivered"  # type: ignore[assignment]
@@ -135,7 +135,7 @@ class WebhookManager:
                         # Schedule next retry
                         retry_delays = [5, 30, 300, 1800, 3600]
                         if delivery.attempts < len(retry_delays):
-                            delivery.next_retry_at = datetime.utcnow() + timedelta(  # type: ignore[assignment]
+                            delivery.next_retry_at = datetime.now(timezone.utc) + timedelta(  # type: ignore[assignment]
                                 seconds=retry_delays[delivery.attempts]
                             )
                         else:
@@ -149,12 +149,12 @@ class WebhookManager:
 
         except asyncio.TimeoutError:
             delivery.attempts += 1  # type: ignore[assignment]
-            delivery.last_attempt_at = datetime.utcnow()  # type: ignore[assignment]
+            delivery.last_attempt_at = datetime.now(timezone.utc)  # type: ignore[assignment]
             delivery.error_message = "Timeout"  # type: ignore[assignment]
             # Schedule next retry
             retry_delays = [5, 30, 300, 1800, 3600]
             if delivery.attempts < len(retry_delays):
-                delivery.next_retry_at = datetime.utcnow() + timedelta(  # type: ignore[assignment]
+                delivery.next_retry_at = datetime.now(timezone.utc) + timedelta(  # type: ignore[assignment]
                     seconds=retry_delays[delivery.attempts]
                 )
             else:
@@ -164,12 +164,12 @@ class WebhookManager:
 
         except Exception as e:
             delivery.attempts += 1  # type: ignore[assignment]
-            delivery.last_attempt_at = datetime.utcnow()  # type: ignore[assignment]
+            delivery.last_attempt_at = datetime.now(timezone.utc)  # type: ignore[assignment]
             delivery.error_message = str(e)  # type: ignore[assignment]
             # Schedule next retry
             retry_delays = [5, 30, 300, 1800, 3600]
             if delivery.attempts < len(retry_delays):
-                delivery.next_retry_at = datetime.utcnow() + timedelta(  # type: ignore[assignment]
+                delivery.next_retry_at = datetime.now(timezone.utc) + timedelta(  # type: ignore[assignment]
                     seconds=retry_delays[delivery.attempts]
                 )
             else:
@@ -187,7 +187,7 @@ class WebhookManager:
         Returns:
             Number of deliveries processed
         """
-        now = datetime.utcnow()
+        now = datetime.now(timezone.utc)
         pending_deliveries = (
             db.query(WebhookDelivery)
             .filter(

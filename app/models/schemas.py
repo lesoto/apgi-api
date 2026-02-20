@@ -1103,7 +1103,6 @@ class UserCreateResponse(BaseModel):
     username: str = Field(..., description="Username")
     email: str = Field(..., description="Email address")
     roles: list[str] = Field(..., description="User roles")
-    password: str = Field(..., description="Generated password")
     created_at: datetime = Field(..., description="Creation timestamp")
     message: str = Field(..., description="Response message")
 
@@ -1140,7 +1139,6 @@ class PasswordResetResponse(BaseModel):
     """Response for password reset."""
 
     user_id: str = Field(..., description="User identifier")
-    new_password: str = Field(..., description="New password")
     message: str = Field(..., description="Reset message")
 
 
@@ -1159,41 +1157,47 @@ class UserStatsResponse(BaseModel):
 class AllostaticState(BaseModel):
     """Allostatic state representation."""
 
-    load: float = Field(..., description="Allostatic load")
-    threshold: float = Field(..., description="Allostatic threshold")
+    allostatic_load: float = Field(..., description="Allostatic load")
 
 
 class BodyState(BaseModel):
     """Body state representation."""
 
-    energy: float = Field(..., description="Energy level")
-    arousal: float = Field(..., description="Arousal level")
+    heart_rate: float = Field(..., description="Heart rate")
+    cortisol: float = Field(..., description="Cortisol level")
+    temperature: float = Field(..., description="Body temperature")
 
 
 class IgnitionEvent(BaseModel):
     """Ignition event representation."""
 
-    timestamp: datetime = Field(..., description="Event timestamp")
-    type: str = Field(..., description="Event type")
+    time_ms: float = Field(..., description="Event time in milliseconds")
+    duration_ms: Optional[float] = Field(None, description="Event duration in milliseconds")
+    trigger_signal: float = Field(..., description="Trigger signal")
+    threshold: float = Field(..., description="Signal threshold")
 
 
 class IgnitionHistoryResponse(BaseModel):
     """Response for ignition history."""
 
     events: list[IgnitionEvent] = Field(..., description="Ignition events")
+    pagination: Optional[PaginationInfo] = Field(None, description="Pagination information")
 
 
 class IgnitionState(BaseModel):
     """Ignition state representation."""
 
-    active: bool = Field(..., description="Ignition active")
-    intensity: float = Field(..., description="Ignition intensity")
+    ignition_occurred: bool = Field(..., description="Whether ignition has occurred")
+    total_signal: float = Field(..., description="Total ignition signal")
+    threshold: float = Field(..., description="Ignition threshold")
+    duration_ms: Optional[float] = Field(None, description="Ignition duration in milliseconds")
 
 
 class MetabolicState(BaseModel):
     """Metabolic state representation."""
 
-    rate: float = Field(..., description="Metabolic rate")
+    reserves: float = Field(..., description="Metabolic reserves")
+    reserve_fraction: float = Field(..., description="Reserve fraction")
 
 
 class MinimalSelfState(BaseModel):
@@ -1211,9 +1215,9 @@ class NarrativeSelfState(BaseModel):
 class PaginationInfo(BaseModel):
     """Pagination information."""
 
-    page: int = Field(..., description="Current page")
+    page: int = Field(..., description="Current page number")
     per_page: int = Field(..., description="Items per page")
-    total: int = Field(..., description="Total items")
+    total: int = Field(..., description="Total number of items")
 
     model_config = ConfigDict(
         json_schema_extra={
@@ -1229,21 +1233,28 @@ class PaginationInfo(BaseModel):
 class PrecisionState(BaseModel):
     """Precision state representation."""
 
-    value: float = Field(..., description="Precision value")
+    exteroceptive: float = Field(..., description="Exteroceptive precision")
+    interoceptive: float = Field(..., description="Interoceptive precision")
 
 
 class SelfModelState(BaseModel):
     """Self model state representation."""
 
-    confidence: float = Field(..., description="Model confidence")
+    minimal: MinimalSelfState = Field(..., description="Minimal self state")
+    narrative: NarrativeSelfState = Field(..., description="Narrative self state")
 
 
 class SystemStateResponse(BaseModel):
     """Response for system state."""
 
-    allostatic: AllostaticState = Field(..., description="Allostatic state")
-    body: BodyState = Field(..., description="Body state")
+    time_ms: float = Field(..., description="Current simulation time in milliseconds")
     ignition: IgnitionState = Field(..., description="Ignition state")
+    workspace: WorkspaceState = Field(..., description="Workspace state")
+    body: BodyState = Field(..., description="Body state")
+    allostasis: AllostaticState = Field(..., description="Allostatic state")
+    precision: PrecisionState = Field(..., description="Precision state")
+    metabolism: MetabolicState = Field(..., description="Metabolic state")
+    self_model: SelfModelState = Field(..., description="Self model state")
 
 
 # Export Schemas
@@ -1259,17 +1270,307 @@ class SummaryStatistics(BaseModel):
 class WorkspaceState(BaseModel):
     """Workspace state representation."""
 
-    active: bool = Field(..., description="Workspace active")
-    content: str = Field(..., description="Workspace content")
+    is_broadcasting: bool = Field(..., description="Whether workspace is broadcasting")
+    content: Optional[str] = Field(None, description="Workspace content")
+    broadcast_duration_ms: Optional[float] = Field(
+        None, description="Broadcast duration in milliseconds"
+    )
 
 
 class PredictionErrorsResponse(BaseModel):
     """Response for prediction errors."""
 
-    errors: list[float] = Field(..., description="Prediction errors")
+    session_id: str = Field(..., description="Session identifier")
+    time_ms: float = Field(..., description="Current time in milliseconds")
+    prediction_errors: Dict[str, Any] = Field(..., description="Prediction errors")
+    exteroceptive_stats: Dict[str, Any] = Field(..., description="Exteroceptive statistics")
+    interoceptive_stats: Dict[str, Any] = Field(..., description="Interoceptive statistics")
 
 
 class SomaticMarkersResponse(BaseModel):
     """Response for somatic markers."""
 
-    markers: list[float] = Field(..., description="Somatic markers")
+    session_id: str = Field(..., description="Session identifier")
+    time_ms: float = Field(..., description="Current time in milliseconds")
+    num_markers: int = Field(..., description="Number of markers")
+    total_retrievals: int = Field(..., description="Total retrievals")
+    successful_retrievals: int = Field(..., description="Successful retrievals")
+    retrieval_rate: float = Field(..., description="Retrieval rate")
+    markers: list[Dict[str, Any]] = Field(..., description="Somatic markers")
+
+
+# API Key Management Schemas
+class APIKeyCreateRequest(BaseModel):
+    """Request to create a new API key."""
+
+    name: str = Field(..., description="API key name/description")
+    permissions: List[str] = Field(default_factory=list, description="Permissions for this key")
+    expires_at: Optional[datetime] = Field(None, description="Optional expiration timestamp")
+
+    @field_validator("name")
+    @classmethod
+    def validate_name(cls, v):
+        """Validate API key name."""
+        if not v or not v.strip():
+            raise ValueError("API key name cannot be empty")
+
+        if len(v) > 100:
+            raise ValueError("API key name is too long (max 100 characters)")
+
+        return v.strip()
+
+    @field_validator("permissions")
+    @classmethod
+    def validate_permissions(cls, v):
+        """Validate permissions list."""
+        if v is None:
+            return []
+
+        if not isinstance(v, list):
+            raise ValueError("Permissions must be a list")
+
+        valid_permissions = {"read", "write", "admin", "delete"}
+        for perm in v:
+            if not isinstance(perm, str) or not perm.strip():
+                raise ValueError("Each permission must be a non-empty string")
+            if perm not in valid_permissions:
+                raise ValueError(
+                    f"Invalid permission: {perm}. Must be one of: {', '.join(valid_permissions)}"
+                )
+
+        return [perm.strip() for perm in v]
+
+    model_config = ConfigDict(
+        json_schema_extra={
+            "example": {
+                "name": "My API Key",
+                "permissions": ["read", "write"],
+                "expires_at": "2025-01-15T10:30:00Z",
+            }
+        }
+    )
+
+
+class APIKeyCreateResponse(BaseModel):
+    """Response for API key creation."""
+
+    key_id: str = Field(..., description="Unique API key identifier")
+    key: str = Field(..., description="The actual API key (only shown once)")
+    name: str = Field(..., description="API key name")
+    permissions: List[str] = Field(..., description="Permissions for this key")
+    expires_at: Optional[datetime] = Field(None, description="Expiration timestamp")
+    created_at: datetime = Field(..., description="Creation timestamp")
+
+    model_config = ConfigDict(
+        json_schema_extra={
+            "example": {
+                "key_id": "key_abc123",
+                "key": "apgi_abc123def456...",
+                "name": "My API Key",
+                "permissions": ["read", "write"],
+                "expires_at": "2025-01-15T10:30:00Z",
+                "created_at": "2024-01-15T10:30:00Z",
+            }
+        }
+    )
+
+
+class APIKeyResponse(BaseModel):
+    """Response for API key details (without the actual key)."""
+
+    key_id: str = Field(..., description="Unique API key identifier")
+    name: str = Field(..., description="API key name")
+    permissions: List[str] = Field(..., description="Permissions for this key")
+    expires_at: Optional[datetime] = Field(None, description="Expiration timestamp")
+    is_active: bool = Field(..., description="Whether the key is active")
+    created_at: datetime = Field(..., description="Creation timestamp")
+    last_used_at: Optional[datetime] = Field(None, description="Last usage timestamp")
+
+    model_config = ConfigDict(
+        json_schema_extra={
+            "example": {
+                "key_id": "key_abc123",
+                "name": "My API Key",
+                "permissions": ["read", "write"],
+                "expires_at": "2025-01-15T10:30:00Z",
+                "is_active": True,
+                "created_at": "2024-01-15T10:30:00Z",
+                "last_used_at": "2024-01-16T08:45:00Z",
+            }
+        }
+    )
+
+
+class APIKeyListResponse(BaseModel):
+    """Response for API keys list."""
+
+    api_keys: List[APIKeyResponse] = Field(..., description="List of API keys")
+    pagination: PaginationInfo = Field(..., description="Pagination information")
+
+    model_config = ConfigDict(
+        json_schema_extra={
+            "example": {
+                "api_keys": [
+                    {
+                        "key_id": "key_abc123",
+                        "name": "My API Key",
+                        "permissions": ["read", "write"],
+                        "expires_at": "2025-01-15T10:30:00Z",
+                        "is_active": True,
+                        "created_at": "2024-01-15T10:30:00Z",
+                        "last_used_at": "2024-01-16T08:45:00Z",
+                    }
+                ],
+                "pagination": {
+                    "page": 1,
+                    "per_page": 10,
+                    "total": 1,
+                },
+            }
+        }
+    )
+
+
+class APIKeyUpdateRequest(BaseModel):
+    """Request to update an API key."""
+
+    name: Optional[str] = Field(None, description="API key name")
+    permissions: Optional[List[str]] = Field(None, description="Permissions for this key")
+    is_active: Optional[bool] = Field(None, description="Whether the key is active")
+
+    @field_validator("name")
+    @classmethod
+    def validate_name(cls, v):
+        """Validate API key name."""
+        if v is None:
+            return v
+
+        if not v.strip():
+            raise ValueError("API key name cannot be empty")
+
+        if len(v) > 100:
+            raise ValueError("API key name is too long (max 100 characters)")
+
+        return v.strip()
+
+    @field_validator("permissions")
+    @classmethod
+    def validate_permissions(cls, v):
+        """Validate permissions list."""
+        if v is None:
+            return v
+
+        if not isinstance(v, list):
+            raise ValueError("Permissions must be a list")
+
+        valid_permissions = {"read", "write", "admin", "delete"}
+        for perm in v:
+            if not isinstance(perm, str) or not perm.strip():
+                raise ValueError("Each permission must be a non-empty string")
+            if perm not in valid_permissions:
+                raise ValueError(
+                    f"Invalid permission: {perm}. Must be one of: {', '.join(valid_permissions)}"
+                )
+
+        return [perm.strip() for perm in v]
+
+    model_config = ConfigDict(
+        json_schema_extra={
+            "example": {
+                "name": "Updated API Key Name",
+                "permissions": ["read", "write", "admin"],
+                "is_active": False,
+            }
+        }
+    )
+
+
+# Webhook Delivery Management Schemas
+class WebhookDeliveryResponse(BaseModel):
+    """Response for webhook delivery details."""
+
+    delivery_id: str = Field(..., description="Unique delivery identifier")
+    task_id: str = Field(..., description="Associated task ID")
+    webhook_url: str = Field(..., description="Target webhook URL")
+    status: str = Field(..., description="Delivery status")
+    attempts: int = Field(..., description="Number of delivery attempts")
+    last_attempt_at: Optional[datetime] = Field(None, description="Last delivery attempt timestamp")
+    next_retry_at: Optional[datetime] = Field(None, description="Next retry timestamp")
+    response_status: Optional[int] = Field(None, description="HTTP response status code")
+    response_body: Optional[str] = Field(None, description="HTTP response body")
+    error_message: Optional[str] = Field(None, description="Error message if delivery failed")
+    created_at: datetime = Field(..., description="Delivery record creation timestamp")
+
+    model_config = ConfigDict(
+        json_schema_extra={
+            "example": {
+                "delivery_id": "delivery_abc123",
+                "task_id": "task_xyz789",
+                "webhook_url": "https://example.com/webhook",
+                "status": "delivered",
+                "attempts": 1,
+                "last_attempt_at": "2024-01-15T10:35:00Z",
+                "next_retry_at": None,
+                "response_status": 200,
+                "response_body": '{"status": "success"}',
+                "error_message": None,
+                "created_at": "2024-01-15T10:30:00Z",
+            }
+        }
+    )
+
+
+class WebhookDeliveryListResponse(BaseModel):
+    """Response for webhook deliveries list."""
+
+    deliveries: List[WebhookDeliveryResponse] = Field(..., description="List of webhook deliveries")
+    pagination: PaginationInfo = Field(..., description="Pagination information")
+
+    model_config = ConfigDict(
+        json_schema_extra={
+            "example": {
+                "deliveries": [
+                    {
+                        "delivery_id": "delivery_abc123",
+                        "task_id": "task_xyz789",
+                        "webhook_url": "https://example.com/webhook",
+                        "status": "delivered",
+                        "attempts": 1,
+                        "last_attempt_at": "2024-01-15T10:35:00Z",
+                        "next_retry_at": None,
+                        "response_status": 200,
+                        "response_body": '{"status": "success"}',
+                        "error_message": None,
+                        "created_at": "2024-01-15T10:30:00Z",
+                    }
+                ],
+                "pagination": {
+                    "page": 1,
+                    "per_page": 10,
+                    "total": 1,
+                },
+            }
+        }
+    )
+
+
+class WebhookRetryResponse(BaseModel):
+    """Response for webhook retry operation."""
+
+    delivery_id: str = Field(..., description="Delivery identifier")
+    success: bool = Field(..., description="Whether the retry was successful")
+    status: str = Field(..., description="Updated delivery status")
+    attempts: int = Field(..., description="Updated number of attempts")
+    last_attempt_at: datetime = Field(..., description="Last attempt timestamp")
+
+    model_config = ConfigDict(
+        json_schema_extra={
+            "example": {
+                "delivery_id": "delivery_abc123",
+                "success": True,
+                "status": "delivered",
+                "attempts": 2,
+                "last_attempt_at": "2024-01-15T10:40:00Z",
+            }
+        }
+    )

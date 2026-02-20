@@ -6,7 +6,7 @@ Tests state access endpoints through HTTP requests with authentication.
 
 import pytest
 import uuid
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from unittest.mock import AsyncMock, MagicMock, patch
 from httpx import AsyncClient, ASGITransport
 from sqlalchemy.orm import Session
@@ -48,7 +48,7 @@ async def authenticated_client(test_environment, mock_database_connection):
                 username=mock_user.username,
                 roles=mock_user.roles,
                 token_type="access",
-                exp=datetime.utcnow() + timedelta(hours=1),  # Future expiration
+                exp=datetime.now(timezone.utc) + timedelta(hours=1),  # Future expiration
             ),
         ),
         patch("app.routes.sessions.get_session_manager", return_value=mock_session_manager),

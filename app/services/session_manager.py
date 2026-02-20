@@ -10,7 +10,7 @@ import logging
 import re
 import uuid
 import time
-from datetime import datetime
+from datetime import datetime, timezone
 from enum import Enum
 from typing import Any, Dict, Optional, Tuple, cast
 from collections import OrderedDict
@@ -82,8 +82,8 @@ class SimulationSession:
         self.session_id = session_id
         self.config = config
         self.state: SessionLifecycleState = SessionLifecycleState.CREATED
-        self.created_at = datetime.utcnow()
-        self.updated_at = datetime.utcnow()
+        self.created_at = datetime.now(timezone.utc)
+        self.updated_at = datetime.now(timezone.utc)
 
         # Thread-safe lock for concurrent access
         self.lock = asyncio.Lock()
@@ -141,7 +141,7 @@ class SimulationSession:
             self.is_running = True
             self.is_paused = False
             self.state = SessionLifecycleState.RUNNING
-            self.updated_at = datetime.utcnow()
+            self.updated_at = datetime.now(timezone.utc)
 
             logger.info(f"Session {self.session_id} started")
 
@@ -168,7 +168,7 @@ class SimulationSession:
             self.is_running = False
             self.is_paused = True
             self.state = SessionLifecycleState.PAUSED
-            self.updated_at = datetime.utcnow()
+            self.updated_at = datetime.now(timezone.utc)
 
             logger.info(f"Session {self.session_id} paused")
 
@@ -189,7 +189,7 @@ class SimulationSession:
             self.is_running = False
             self.is_paused = False
             self.state = SessionLifecycleState.STOPPED
-            self.updated_at = datetime.utcnow()
+            self.updated_at = datetime.now(timezone.utc)
 
             logger.info(f"Session {self.session_id} stopped")
 
@@ -217,7 +217,7 @@ class SimulationSession:
             self.is_running = False
             self.is_paused = False
             self.state = SessionLifecycleState.CREATED
-            self.updated_at = datetime.utcnow()
+            self.updated_at = datetime.now(timezone.utc)
 
             logger.info(f"Session {self.session_id} reset")
 
@@ -243,7 +243,15 @@ class SimulationSession:
 
             # Execute step in APGI system
             state = self.apgi_system.step(extero_input)
-            self.updated_at = datetime.utcnow()
+            self.updated_at = datetime.now(timezone.utc)
+
+            # Store historical ignition data for accurate event annotation
+            history = state.setdefault("history", {})
+            ignition_data = state.get("ignition", {})
+            ignition_signals = history.setdefault("ignition_signals", [])
+            ignition_signals.append(ignition_data.get("total_signal", 0.0))
+            ignition_thresholds = history.setdefault("ignition_thresholds", [])
+            ignition_thresholds.append(ignition_data.get("threshold", 2.0))
 
             return state  # type: ignore
 
@@ -271,16 +279,63 @@ class SimulationSession:
 
     def _capture_state(self) -> Dict[str, Any]:
         """Capture complete system state for pause/resume."""
-        return cast(Dict[str, Any], self.apgi_system.get_state())
+        state = cast(Dict[str, Any], self.apgi_system.get_state())
+
+        # Explicitly capture subsystem states for full restoration
+        state["allostasis"] = self.apgi_system.allostasis.save_state()
+        state["body"] = self.apgi_system.body.save_state()
+        state["precision"] = self.apgi_system.precision.save_state()
+        state["workspace"] = self.apgi_system.workspace.save_state()
+        state["self_model"] = self.apgi_system.self_model.save_state()
+        state["ignition"] = self.apgi_system.ignition.save_state()
+
+        return state
 
     def _restore_state(self, state: Dict[str, Any]):
         """Restore system state from snapshot."""
-        # This is a simplified restoration - in production, you'd need
-        # to carefully restore each subsystem's internal state
+        # Restore complete system state from snapshot
+        if not state:
+            logger.warning(f"Session {self.session_id} attempting to restore empty state")
+            return
+
+        # Restore basic simulation properties
         self.apgi_system.time = state.get("time", 0.0)
         self.apgi_system.history = state.get("history", {})
 
-        logger.info(f"Session {self.session_id} state restored")
+        # Restore subsystem states if available
+        if "allostasis" in state:
+            self.apgi_system.allostasis.load_state(state["allostasis"])
+
+        if "body" in state:
+            self.apgi_system.body.load_state(state["body"])
+
+        if "precision" in state:
+            self.apgi_system.precision.load_state(state["precision"])
+
+        if "workspace" in state:
+            self.apgi_system.workspace.load_state(state["workspace"])
+
+        if "self_model" in state:
+            self.apgi_system.self_model.load_state(state["self_model"])
+
+        if "ignition" in state:
+            self.apgi_system.ignition.load_state(state["ignition"])
+
+        # Restore any other dynamic attributes from state
+        for key, value in state.items():
+            if hasattr(self.apgi_system, key) and key not in [
+                "time",
+                "history",
+                "allostasis",
+                "body",
+                "precision",
+                "workspace",
+                "self_model",
+                "ignition",
+            ]:
+                setattr(self.apgi_system, key, value)
+
+        logger.info(f"Session {self.session_id} full state restored")
 
 
 class SessionManager:
@@ -304,9 +359,9 @@ class SessionManager:
         # In-memory session cache with TTL and size limits
         self.session_cache_max_size = 1000  # Maximum number of sessions to cache
         self.session_ttl_seconds = 3600  # 1 hour TTL for cached sessions
-        self.sessions: OrderedDict[str, Tuple[SimulationSession, float]] = (
-            OrderedDict()
-        )  # (session, last_access_time)
+        self.sessions: OrderedDict[
+            str, Tuple[SimulationSession, float]
+        ] = OrderedDict()  # (session, last_access_time)
 
         # Lock for session cache access
         self.cache_lock = asyncio.Lock()
@@ -582,7 +637,7 @@ class SessionManager:
 
             if db_model:
                 db_model.state = new_state.value
-                db_model.updated_at = datetime.utcnow()
+                db_model.updated_at = datetime.now(timezone.utc)
                 db_session.commit()
         except Exception as e:
             db_session.rollback()

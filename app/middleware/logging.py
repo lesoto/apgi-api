@@ -9,10 +9,10 @@ import logging
 import time
 import traceback
 import uuid
-from datetime import datetime
-from typing import Callable, Optional
+from datetime import datetime, timezone
+from typing import Any, Callable, Optional
 
-from fastapi import Request, Response
+from fastapi import Request
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.types import ASGIApp
 
@@ -38,7 +38,7 @@ class StructuredLogger:
             JSON-formatted log string
         """
         log_entry = {
-            "timestamp": datetime.utcnow().isoformat() + "Z",
+            "timestamp": datetime.now(timezone.utc).isoformat() + "Z",
             "level": level,
             "logger": self.logger.name,
             "message": message,
@@ -78,7 +78,7 @@ class RequestLoggingMiddleware(BaseHTTPMiddleware):
         super().__init__(app)
         self.logger = StructuredLogger("app.requests")
 
-    async def dispatch(self, request: Request, call_next: Callable) -> Response:
+    async def dispatch(self, request: Request, call_next: Callable) -> Any:
         """
         Process request and log details.
 

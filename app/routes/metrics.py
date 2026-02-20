@@ -293,6 +293,7 @@ async def get_dashboard_html(
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>APGI API Analytics Dashboard</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
         body {{ font-family: Arial, sans-serif; margin: 20px; background-color: #f5f5f5; }}
         .dashboard {{ max-width: 1200px; margin: 0 auto; }}
@@ -300,7 +301,7 @@ async def get_dashboard_html(
         .metric-card {{ background: white; padding: 20px; margin: 10px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); display: inline-block; width: 300px; vertical-align: top; }}
         .metric-value {{ font-size: 2em; font-weight: bold; color: #3498db; }}
         .metric-label {{ color: #7f8c8d; margin-top: 5px; }}
-        .chart-placeholder {{ background: #ecf0f1; height: 200px; display: flex; align-items: center; justify-content: center; border-radius: 4px; margin-top: 10px; }}
+        .chart-container {{ background: white; height: 300px; margin-top: 10px; }}
         .grid {{ display: flex; flex-wrap: wrap; }}
         .section {{ background: white; padding: 20px; margin: 10px 0; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }}
         .section h2 {{ color: #2c3e50; border-bottom: 2px solid #3498db; padding-bottom: 10px; }}
@@ -338,16 +339,16 @@ async def get_dashboard_html(
 
         <div class="section">
             <h2>Performance Trends</h2>
-            <div class="chart-placeholder">
-                <span>Performance Chart - Last {days} days</span>
+            <div class="chart-container">
+                <canvas id="performanceChart"></canvas>
             </div>
-            <p>Response time trends and throughput metrics would be visualized here.</p>
+            <p>Response time trends and throughput metrics over the last {days} days.</p>
         </div>
 
         <div class="section">
             <h2>API Usage by Endpoint</h2>
-            <div class="chart-placeholder">
-                <span>Endpoint Usage Chart</span>
+            <div class="chart-container">
+                <canvas id="endpointChart"></canvas>
             </div>
             <p>Most frequently used API endpoints and their usage patterns.</p>
         </div>
@@ -370,6 +371,60 @@ async def get_dashboard_html(
             </div>
         </div>
     </div>
+
+    <script>
+        // Dashboard data
+        const dashboardData = {dashboard_data};
+
+        // Performance Trends Chart
+        const performanceCtx = document.getElementById('performanceChart').getContext('2d');
+        const performanceChart = new Chart(performanceCtx, {{
+            type: 'line',
+            data: {{
+                labels: dashboardData.trends ? dashboardData.trends.dates : [],
+                datasets: [{{
+                    label: 'Response Time (ms)',
+                    data: dashboardData.trends ? dashboardData.trends.response_times : [],
+                    borderColor: 'rgb(75, 192, 192)',
+                    tension: 0.1
+                }}, {{
+                    label: 'Requests per Hour',
+                    data: dashboardData.trends ? dashboardData.trends.requests : [],
+                    borderColor: 'rgb(255, 99, 132)',
+                    tension: 0.1
+                }}]
+            }},
+            options: {{
+                responsive: true,
+                maintainAspectRatio: false
+            }}
+        }});
+
+        // Endpoint Usage Chart
+        const endpointCtx = document.getElementById('endpointChart').getContext('2d');
+        const endpointChart = new Chart(endpointCtx, {{
+            type: 'bar',
+            data: {{
+                labels: dashboardData.endpoints ? dashboardData.endpoints.labels : [],
+                datasets: [{{
+                    label: 'Request Count',
+                    data: dashboardData.endpoints ? dashboardData.endpoints.counts : [],
+                    backgroundColor: 'rgba(54, 162, 235, 0.5)',
+                    borderColor: 'rgb(54, 162, 235)',
+                    borderWidth: 1
+                }}]
+            }},
+            options: {{
+                responsive: true,
+                maintainAspectRatio: false,
+                scales: {{
+                    y: {{
+                        beginAtZero: true
+                    }}
+                }}
+            }}
+        }});
+    </script>
 </body>
 </html>
 """

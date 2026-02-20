@@ -5,20 +5,20 @@ Celery tasks for executing experimental paradigms (Iowa Gambling, Masking, Atten
 """
 
 import logging
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Any, Dict
 
 from app.database.connection import get_db
 from app.database.models import Task as TaskModel
 from celery import Task
 
-from apgi_system.experiments.tasks.attentional_blink import AttentionalBlinkTask  # type: ignore[import]
-from apgi_system.experiments.tasks.binocular_rivalry import BinocularRivalryTask  # type: ignore[import]
-from apgi_system.experiments.tasks.change_blindness import ChangeBlindnessTask  # type: ignore[import]
-from apgi_system.experiments.tasks.iowa_gambling import IowaGamblingTask  # type: ignore[import]
-from apgi_system.experiments.tasks.masking_paradigm import MaskingParadigmTask  # type: ignore[import]
-from apgi_system.platform_utils import get_resource_path  # type: ignore[import]
-from apgi_system.system import APGISystem  # type: ignore[import]
+from apgi_system.experiments.tasks.attentional_blink import AttentionalBlinkTask  # type: ignore[import-untyped]
+from apgi_system.experiments.tasks.binocular_rivalry import BinocularRivalryTask  # type: ignore[import-untyped]
+from apgi_system.experiments.tasks.change_blindness import ChangeBlindnessTask  # type: ignore[import-untyped]
+from apgi_system.experiments.tasks.iowa_gambling import IowaGamblingTask  # type: ignore[import-untyped]
+from apgi_system.experiments.tasks.masking_paradigm import MaskingParadigmTask  # type: ignore[import-untyped]
+from apgi_system.platform_utils import get_resource_path  # type: ignore[import-untyped]
+from apgi_system.system import APGISystem  # type: ignore[import-untyped]
 from app.celery_app import celery_app
 from app.services.webhook_manager import WebhookManager
 
@@ -27,7 +27,7 @@ logger = logging.getLogger(__name__)
 
 async def trigger_webhook_on_completion(task_id: str, result: Dict[str, Any]):
     """
-    Trigger webhook delivery when task completes.
+    Trigger webhook delivery when task completes and start dependent tasks.
 
     Args:
         task_id: Celery task ID
@@ -46,13 +46,23 @@ async def trigger_webhook_on_completion(task_id: str, result: Dict[str, Any]):
 
         # Update task status in database
         task_record.status = result.get("status", "completed")
-        task_record.completed_at = datetime.utcnow()  # type: ignore[assignment]
+        task_record.completed_at = datetime.now(timezone.utc)  # type: ignore[assignment]
         task_record.result_data = result  # type: ignore[assignment]
 
         if result.get("status") == "failed":
             task_record.error_message = result.get("error")  # type: ignore[assignment]
 
         db.commit()
+
+        # Start dependent tasks that were waiting for this task to complete
+        try:
+            from app.services.task_executor import TaskExecutor
+
+            task_executor = TaskExecutor()
+            await task_executor.check_and_start_pending_tasks(task_record.session_id)  # type: ignore[arg-type]
+            logger.info(f"Checked for dependent tasks after completion of {task_id}")
+        except Exception as e:
+            logger.error(f"Failed to check dependent tasks for {task_id}: {e}")
 
         # Check if webhook URL is configured
         if task_record.webhook_url:
@@ -64,7 +74,7 @@ async def trigger_webhook_on_completion(task_id: str, result: Dict[str, Any]):
                 "session_id": task_record.session_id,
                 "task_type": task_record.task_type,
                 "status": result.get("status", "completed"),
-                "completed_at": datetime.utcnow().isoformat() + "Z",
+                "completed_at": datetime.now(timezone.utc).isoformat() + "Z",
                 "result": result,
             }
 

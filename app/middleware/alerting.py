@@ -7,7 +7,7 @@ Monitors critical errors and triggers alerts through configured notification cha
 import asyncio
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from enum import Enum
 from typing import Dict, List, Optional, Any, Callable
 
@@ -36,7 +36,7 @@ class Alert:
     title: str
     message: str
     severity: AlertSeverity
-    timestamp: datetime = field(default_factory=datetime.utcnow)
+    timestamp: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
     metadata: Dict = field(default_factory=dict)
 
     def to_dict(self) -> Dict:
@@ -675,7 +675,7 @@ class AlertRule:
         """
         # Check cooldown
         if self.last_triggered:
-            time_since_last = (datetime.utcnow() - self.last_triggered).total_seconds()
+            time_since_last = (datetime.now(timezone.utc) - self.last_triggered).total_seconds()
             if time_since_last < self.cooldown_seconds:
                 return None
 
@@ -683,7 +683,7 @@ class AlertRule:
         try:
             condition_result = await self.condition()
             if condition_result:
-                self.last_triggered = datetime.utcnow()
+                self.last_triggered = datetime.now(timezone.utc)
 
                 # Create alert
                 alert_data = condition_result if isinstance(condition_result, dict) else {}
@@ -767,7 +767,7 @@ class AlertManager:
         """
         Check active alerts and escalate them according to their policies.
         """
-        now = datetime.utcnow()
+        now = datetime.now(timezone.utc)
 
         for alert_key, alert in list(self.active_alerts.items()):
             alert_age = (now - alert.timestamp).total_seconds()
@@ -813,7 +813,7 @@ class AlertManager:
             metadata: Additional error metadata
         """
         async with self._lock:
-            now = datetime.utcnow()
+            now = datetime.now(timezone.utc)
 
             # Initialize error tracking for this type
             if error_type not in self.error_counts:
@@ -850,7 +850,7 @@ class AlertManager:
         """
         # Check cooldown to avoid alert spam
         alert_key = f"high_error_rate_{error_type}"
-        now = datetime.utcnow()
+        now = datetime.now(timezone.utc)
 
         if alert_key in self.alert_cooldowns:
             if now < self.alert_cooldowns[alert_key]:

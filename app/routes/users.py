@@ -7,6 +7,8 @@ password reset, and user administration.
 
 from typing import List
 
+import secrets
+
 from fastapi import APIRouter, Depends, status, HTTPException
 from sqlalchemy.orm import Session
 
@@ -48,7 +50,6 @@ router = APIRouter(
     status_code=status.HTTP_201_CREATED,
     summary="Register new user",
     description="Create a new user account with auto-generated password if not provided",
-    dependencies=[Depends(require_permission(Permission.USER_CREATE))],
 )
 async def register_user(
     request: UserCreateRequest,
@@ -82,7 +83,6 @@ async def register_user(
             username=str(user.username),
             email=str(user.email),
             roles=list(user.roles) if user.roles else [],
-            password=request.password,  # Only returned once during creation
             created_at=user.created_at,  # type: ignore[arg-type]
             message="User created successfully",
         )
@@ -120,17 +120,16 @@ async def create_default_user(
     user_service = get_user_management_service(db)
 
     try:
+        password = secrets.token_urlsafe(16)
         user = user_service.create_default_user(
-            username="admin", email="admin@example.com", password="secure_password"
+            username="admin", email="admin@example.com", password=password
         )
-        password = "secure_password"
 
         return UserCreateResponse(
             user_id=user.user_id,  # type: ignore[arg-type]
             username=user.username,  # type: ignore[arg-type]
             email=user.email,  # type: ignore[arg-type]
             roles=user.roles,  # type: ignore[arg-type]
-            password=password,
             created_at=user.created_at,  # type: ignore[arg-type]
             message="Default user created successfully",
         )
@@ -150,6 +149,8 @@ async def create_default_user(
     dependencies=[Depends(require_permission(Permission.USER_READ))],
 )
 async def list_users(
+    page: int = 1,
+    per_page: int = 10,
     active_only: bool = True,
     db: Session = Depends(get_db),
 ):
@@ -157,6 +158,8 @@ async def list_users(
     List all users.
 
     Args:
+        page: Page number (1-based)
+        per_page: Items per page (max 100)
         active_only: Only return active users
         db: Database session
         user_service: User management service
@@ -164,8 +167,19 @@ async def list_users(
     Returns:
         List of UserResponse objects
     """
+    if page < 1:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Page must be >= 1")
+    if per_page < 1 or per_page > 100:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, detail="Per page must be between 1 and 100"
+        )
+
     user_service = get_user_management_service(db)
     users = user_service.list_users(active_only=active_only)
+
+    # Apply pagination
+    offset = (page - 1) * per_page
+    paginated_users = users[offset : offset + per_page]
 
     return [
         UserResponse(
@@ -178,7 +192,7 @@ async def list_users(
             updated_at=user.updated_at,  # type: ignore[arg-type]
             last_login=user.last_login,  # type: ignore[arg-type]
         )
-        for user in users
+        for user in paginated_users
     ]
 
 
@@ -407,9 +421,7 @@ async def reset_user_password(
             user_id=user_id, new_password=request.new_password
         )
 
-        return PasswordResetResponse(
-            user_id=user_id, new_password=new_password, message="Password reset successfully"
-        )
+        return PasswordResetResponse(user_id=user_id, message="Password reset successfully")
 
     except UserNotFoundError:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")

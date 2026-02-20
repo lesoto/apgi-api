@@ -1,7 +1,5 @@
 # Utility Scripts
 
-This directory contains utility scripts for managing the APGI Standalone API.
-
 ## Available Scripts
 
 ### start.sh / start.ps1
@@ -33,6 +31,7 @@ Development environment startup script that:
 ### migrate.sh / migrate.ps1
 
 Database migration script that:
+
 - Runs Alembic migrations with error handling
 - Auto-detects whether to run locally or in Docker
 - Supports custom migration targets
@@ -56,6 +55,7 @@ Database migration script that:
 ```
 
 **Parameters:**
+
 - `target` (optional): Migration target (default: `head`)
   - `head` - Latest migration
   - `+1` / `-1` - Relative migration
@@ -69,6 +69,7 @@ Database migration script that:
 ### health_check.sh / health_check.ps1
 
 Health check script for monitoring that:
+
 - Checks the API health endpoint
 - Returns appropriate exit codes for monitoring systems
 - Supports custom URLs and timeouts
@@ -92,6 +93,7 @@ Health check script for monitoring that:
 ```
 
 **Options:**
+
 - `-u, --url URL` / `-Url URL`: API base URL (default: `http://localhost:8000`)
 - `-e, --endpoint PATH` / `-Endpoint PATH`: Health endpoint path (default: `/health/ready`)
 - `-t, --timeout SECONDS` / `-Timeout SECONDS`: Request timeout (default: `10`)
@@ -100,11 +102,13 @@ Health check script for monitoring that:
 - `-h, --help` / `-Help`: Show help message
 
 **Exit Codes:**
+
 - `0` - Service is healthy
 - `1` - Service is unhealthy
 - `2` - Connection error or timeout
 
 **Environment Variables:**
+
 - `API_URL` - API base URL
 - `HEALTH_ENDPOINT` - Health endpoint path
 - `TIMEOUT` - Request timeout in seconds
@@ -186,6 +190,7 @@ WantedBy=multi-user.target
 ### start.sh fails with "Docker daemon is not running"
 
 **Solution:** Start Docker Desktop or the Docker daemon:
+
 - Windows: Start Docker Desktop
 - Linux: `sudo systemctl start docker`
 - macOS: Start Docker Desktop
@@ -193,11 +198,13 @@ WantedBy=multi-user.target
 ### migrate.sh fails with "Alembic is not installed"
 
 **Solution:** Install Alembic:
+
 ```bash
 pip install alembic
 ```
 
 Or use Docker mode:
+
 ```bash
 ./scripts/migrate.sh head docker
 ```
@@ -205,6 +212,7 @@ Or use Docker mode:
 ### health_check.sh fails with "curl is not installed"
 
 **Solution:** Install curl:
+
 - Ubuntu/Debian: `sudo apt-get install curl`
 - CentOS/RHEL: `sudo yum install curl`
 - macOS: `brew install curl`
@@ -213,12 +221,14 @@ Or use Docker mode:
 ### Services don't become healthy
 
 **Solution:** Check service logs:
+
 ```bash
 cd deployment
 docker-compose logs -f
 ```
 
 Common issues:
+
 - PostgreSQL: Check database credentials in `.env.development`
 - Redis: Check if port 6379 is already in use
 - API: Check if port 8000 is already in use

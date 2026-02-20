@@ -6,7 +6,7 @@ Global exception handlers for consistent error responses across the API.
 
 import logging
 import uuid
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Union
 
 from fastapi import Request, status
@@ -105,7 +105,7 @@ async def validation_error_handler(
                 "code": "VALIDATION_ERROR",
                 "message": "Request validation failed",
                 "request_id": request_id,
-                "timestamp": datetime.utcnow().isoformat()
+                "timestamp": datetime.now(timezone.utc).isoformat()
                 + "Z",  # Will be set by middleware if available
                 "details": {"validation_errors": errors},
             }
@@ -168,7 +168,7 @@ async def http_exception_handler(request: Request, exc: StarletteHTTPException) 
                 "code": error_code,
                 "message": str(exc.detail),
                 "request_id": request_id,
-                "timestamp": datetime.utcnow().isoformat()
+                "timestamp": datetime.now(timezone.utc).isoformat()
                 + "Z",  # Will be set by middleware if available
                 "details": {},
             }
@@ -263,7 +263,7 @@ async def unhandled_exception_handler(request: Request, exc: Exception) -> JSONR
                 "code": "INTERNAL_SERVER_ERROR",
                 "message": "An unexpected error occurred. Please try again later.",
                 "request_id": request_id,
-                "timestamp": datetime.utcnow().isoformat() + "Z",
+                "timestamp": datetime.now(timezone.utc).isoformat() + "Z",
                 "details": {"error_id": error_id},
             }
         },

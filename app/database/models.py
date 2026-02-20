@@ -48,6 +48,7 @@ class TaskStatus(str, Enum):
     RUNNING = "running"
     COMPLETED = "completed"
     FAILED = "failed"
+    CANCELLED = "cancelled"
 
 
 # ============================================================================
@@ -96,6 +97,7 @@ class User(Base):  # type: ignore[misc, valid-type]
     session_templates = relationship(
         "SessionTemplate", back_populates="user", cascade="all, delete-orphan"
     )
+    api_keys = relationship("APIKey", back_populates="user", cascade="all, delete-orphan")
 
     def __repr__(self):
         return f"<User(user_id={self.user_id}, username={self.username})>"
@@ -428,6 +430,51 @@ class RefreshToken(Base):  # type: ignore[misc, valid-type]
 
     def __repr__(self):
         return f"<RefreshToken(token_id={self.token_id}, user_id={self.user_id})>"
+
+
+class APIKey(Base):  # type: ignore[misc, valid-type]
+    """API key for authentication."""
+
+    __tablename__ = "api_keys"
+
+    key_id = Column(
+        String(36),
+        primary_key=True,
+        default=lambda: str(uuid.uuid4()),
+        comment="Unique API key identifier",
+    )
+    user_id = Column(
+        String(36),
+        ForeignKey("users.user_id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+        comment="Owner user ID",
+    )
+    name = Column(String(100), nullable=False, comment="API key name/description")
+    key_hash = Column(String(255), nullable=False, unique=True, comment="Hashed API key")
+    permissions = Column(ARRAY(Text), nullable=False, default=list, comment="Permissions for this key")  # type: ignore[var-annotated]
+    expires_at = Column(DateTime(timezone=True), nullable=True, comment="Expiration timestamp")
+    is_active = Column(Boolean, nullable=False, default=True, comment="Whether the key is active")
+    created_at = Column(
+        DateTime(timezone=True),
+        nullable=False,
+        server_default=func.now(),
+        comment="Creation timestamp",
+    )
+    last_used_at = Column(DateTime(timezone=True), nullable=True, comment="Last usage timestamp")
+
+    # Relationships
+    user = relationship("User", back_populates="api_keys")
+
+    # Indexes
+    __table_args__ = (
+        Index("idx_api_keys_user", "user_id"),
+        Index("idx_api_keys_expires", "expires_at"),
+        Index("idx_api_keys_active", "is_active"),
+    )
+
+    def __repr__(self):
+        return f"<APIKey(key_id={self.key_id}, name={self.name})>"
 
 
 class WebhookDelivery(Base):  # type: ignore[misc, valid-type]
