@@ -7,9 +7,7 @@ and deprecated endpoint logging.
 """
 
 import json
-import pytest
-from hypothesis import given, strategies as st, assume, settings
-from unittest.mock import Mock, patch
+from hypothesis import given, strategies as st, settings
 from contextlib import contextmanager
 import sys
 from pathlib import Path
@@ -19,9 +17,9 @@ import logging
 # Add app directory to path for imports
 sys.path.insert(0, str(Path(__file__).parent.parent.parent / "app"))
 
-from fastapi import FastAPI, Request
+from fastapi import FastAPI
 from fastapi.testclient import TestClient
-from middleware.deprecation import DeprecationMiddleware
+from app.middleware.deprecation import DeprecationMiddleware
 
 # ============================================================================
 # Helper Functions
@@ -147,7 +145,7 @@ def test_property_17_deprecation_headers_on_deprecated_endpoints(
     # Property 3: Response should include Sunset header with sunset date
     assert (
         "sunset" in response.headers
-    ), f"Response from deprecated endpoint should include 'Sunset' header"
+    ), "Response from deprecated endpoint should include 'Sunset' header"
     sunset_header = response.headers["sunset"]
     assert (
         sunset_header == sunset_date
@@ -156,7 +154,7 @@ def test_property_17_deprecation_headers_on_deprecated_endpoints(
     # Property 4: Response should include Link header pointing to replacement
     assert (
         "link" in response.headers
-    ), f"Response from deprecated endpoint should include 'Link' header"
+    ), "Response from deprecated endpoint should include 'Link' header"
     link_header = response.headers["link"]
     assert (
         replacement_path in link_header
@@ -168,7 +166,7 @@ def test_property_17_deprecation_headers_on_deprecated_endpoints(
     # Property 5: Response should include Warning header with deprecation message
     assert (
         "warning" in response.headers
-    ), f"Response from deprecated endpoint should include 'Warning' header"
+    ), "Response from deprecated endpoint should include 'Warning' header"
     warning_header = response.headers["warning"]
     assert (
         endpoint_path in warning_header
@@ -212,14 +210,14 @@ def test_property_17_no_deprecation_headers_on_active_endpoints(endpoint_path):
     # Property 2: Response should NOT include Sunset header
     assert (
         "sunset" not in response.headers
-    ), f"Response from active endpoint should NOT include 'Sunset' header"
+    ), "Response from active endpoint should NOT include 'Sunset' header"
 
     # Property 3: Response should NOT include deprecation-related Link header
     if "link" in response.headers:
         link_header = response.headers["link"]
         assert (
             'rel="successor-version"' not in link_header
-        ), f"Response from active endpoint should NOT include successor-version Link header"
+        ), "Response from active endpoint should NOT include successor-version Link header"
 
 
 @settings(max_examples=1)
@@ -356,7 +354,7 @@ def test_property_18_deprecated_endpoint_logging(endpoint_path, sunset_date):
     # Property 2: Response should include Warning header with endpoint path
     assert (
         "warning" in response.headers
-    ), f"Deprecated endpoint should include Warning header for logging"
+    ), "Deprecated endpoint should include Warning header for logging"
     warning_header = response.headers["warning"]
     assert (
         endpoint_path in warning_header
@@ -366,7 +364,7 @@ def test_property_18_deprecated_endpoint_logging(endpoint_path, sunset_date):
     # Verify that all necessary information for logging is present in headers
     assert (
         "sunset" in response.headers
-    ), f"Sunset header should be present for logging deprecation info"
+    ), "Sunset header should be present for logging deprecation info"
     assert (
         response.headers["sunset"] == sunset_date
     ), f"Sunset date should be '{sunset_date}' for logging"
@@ -456,12 +454,12 @@ def test_property_18_deprecated_endpoint_logging_parameterized(session_id):
     # Property 2: Warning header should mention the actual path for logging
     assert (
         "warning" in response.headers
-    ), f"Warning header should be present for logging parameterized endpoint access"
+    ), "Warning header should be present for logging parameterized endpoint access"
     warning_header = response.headers["warning"]
     # The warning should contain the pattern or actual path
     assert (
         "/v1/sessions/" in warning_header
-    ), f"Warning header should reference the sessions endpoint for logging"
+    ), "Warning header should reference the sessions endpoint for logging"
 
 
 @settings(max_examples=1)

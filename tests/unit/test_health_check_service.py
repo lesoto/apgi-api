@@ -39,7 +39,17 @@ class TestHealthCheckService:
         mock_conn.execute.return_value = mock_result
         mock_engine.connect.return_value.__enter__.return_value = mock_conn
 
-        with patch("app.database.connection.engine", mock_engine):
+        # Mock Celery to return healthy status
+        mock_inspect = MagicMock()
+        mock_inspect.active.return_value = {}
+        mock_inspect.stats.return_value = {"worker1": {}}
+        mock_control = MagicMock()
+        mock_control.inspect.return_value = mock_inspect
+        mock_control.ping.return_value = [{"worker1": "pong"}]
+
+        with patch("app.database.connection.engine", mock_engine), patch(
+            "app.services.health_check.celery_app.control", mock_control
+        ):
             result = await health_check_service.perform_health_check()
 
         # Verify structure
@@ -65,8 +75,8 @@ class TestHealthCheckService:
         assert deps["database"]["message"] == "Connected"
 
         # Verify Celery
-        assert deps["celery"]["status"] == "unknown"
-        assert deps["celery"]["message"] == "Not checked"
+        assert deps["celery"]["status"] == "healthy"
+        assert "Workers responding" in deps["celery"]["message"]
 
         # Verify timestamp format
         datetime.fromisoformat(result["timestamp"].rstrip("Z"))

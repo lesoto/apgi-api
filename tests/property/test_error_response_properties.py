@@ -8,9 +8,8 @@ server errors, and sensitive information exclusion.
 """
 
 import pytest
-from hypothesis import given, strategies as st, assume, settings
-from unittest.mock import Mock, patch, AsyncMock
-from datetime import datetime, timedelta
+from hypothesis import given, strategies as st, settings
+from unittest.mock import Mock
 import sys
 from pathlib import Path
 import json
@@ -19,27 +18,19 @@ import re
 # Add app directory to path for imports
 sys.path.insert(0, str(Path(__file__).parent.parent.parent / "app"))
 
-from fastapi import FastAPI, Request, HTTPException, Depends
+from fastapi import FastAPI, Request
 from fastapi.testclient import TestClient
-from pydantic import BaseModel, ValidationError as PydanticValidationError
-from starlette.exceptions import HTTPException as StarletteHTTPException
+from pydantic import BaseModel
 
 from app.exceptions import (
-    APIError,
-    ValidationError,
     AuthenticationError,
-    InvalidTokenError,
-    ExpiredTokenError,
     AuthorizationError,
     SessionNotFoundError,
     TaskNotFoundError,
     UserNotFoundError,
-    InternalServerError,
 )
+from typing import Union
 from app.exception_handlers import (
-    api_error_handler,
-    validation_error_handler,
-    http_exception_handler,
     unhandled_exception_handler,
 )
 
@@ -161,7 +152,7 @@ def test_property_23_validation_error_response(invalid_field, invalid_value):
 
     # Property 4: Error should have code field
     assert "code" in error, "Error should contain 'code' field"
-    assert error["code"] == "VALIDATION_ERROR", f"Error code should be 'VALIDATION_ERROR'"
+    assert error["code"] == "VALIDATION_ERROR", "Error code should be 'VALIDATION_ERROR'"
 
     # Property 5: Error should have message field
     assert "message" in error, "Error should contain 'message' field"
@@ -249,9 +240,9 @@ def test_property_24_authentication_failure_response(path):
     response = client.get(path)
 
     # Property 1: Status code should be 401
-    assert (
-        response.status_code == 401
-    ), f"Authentication failure should return 401, got {response.status_code}"
+    assert response.status_code == 401, "Authentication failure should return 401, got " + str(
+        response.status_code
+    )
 
     # Property 2: Response should be valid JSON
     error_data = response.json()
@@ -265,7 +256,7 @@ def test_property_24_authentication_failure_response(path):
         "INVALID_TOKEN",
         "TOKEN_EXPIRED",
         "UNAUTHORIZED",
-    ], f"Error code should indicate authentication failure"
+    ], "Error code should indicate authentication failure"
 
     # Property 4: Error should have message field
     assert "message" in error, "Error should contain 'message' field"
@@ -381,7 +372,7 @@ def test_property_25_authorization_error_via_endpoint():
     response = client.get("/forbidden")
 
     # Property 1: Status code should be 403
-    assert response.status_code == 403, f"Authorization failure should return 403"
+    assert response.status_code == 403, "Authorization failure should return 403"
 
     # Property 2: Response should be valid JSON
     error_data = response.json()
@@ -437,7 +428,7 @@ def test_property_26_not_found_response(resource_id):
 
     # Property 4: Error code should indicate not found
     assert "code" in error, "Error should contain 'code' field"
-    assert "NOT_FOUND" in error["code"], f"Error code should indicate not found"
+    assert "NOT_FOUND" in error["code"], "Error code should indicate not found"
 
     # Property 5: Error message should mention the resource
     assert "message" in error, "Error should contain 'message' field"
@@ -464,6 +455,7 @@ def test_property_26_not_found_error_types(resource_type, resource_id):
     This property ensures consistency across different resource types.
     """
     # Create appropriate not found error based on resource type
+    error: Union[SessionNotFoundError, TaskNotFoundError, UserNotFoundError]
     if resource_type == "session":
         error = SessionNotFoundError(resource_id)
     elif resource_type == "task":
@@ -475,7 +467,7 @@ def test_property_26_not_found_error_types(resource_type, resource_id):
     assert error.status_code == 404, f"{resource_type} not found should have status code 404"
 
     # Property 2: Error code should indicate not found
-    assert "NOT_FOUND" in error.code, f"Error code should indicate not found"
+    assert "NOT_FOUND" in error.code, "Error code should indicate not found"
 
     # Property 3: Error message should include the resource ID
     assert resource_id in error.message, "Error message should include resource ID"
@@ -520,7 +512,18 @@ def test_property_27_server_error_response(error_message):
         assert response.status_code == 500, "Unhandled exception should return 500"
 
         # Property 2: Response should be valid JSON
-        response_data = json.loads(response.body.decode())
+        # Handle response body decoding (can be bytes or memoryview)
+        if hasattr(response.body, "decode"):
+            response_text = response.body.decode()
+        else:
+            response_text = (
+                response.body.decode("utf-8", errors="ignore")  # type: ignore[attr-defined]
+                if isinstance(response.body, bytes)
+                else response.body.tobytes().decode("utf-8", errors="ignore")
+                if isinstance(response.body, memoryview)
+                else str(response.body)
+            )
+        response_data = json.loads(response_text)
 
         # Property 3: Error should have proper structure
         assert "error" in response_data
@@ -665,7 +668,11 @@ def test_property_28_database_credentials_not_exposed(database_url):
         response = asyncio.run(unhandled_exception_handler(mock_request, exc))
 
         # Property: Response should not contain the database URL
-        response_text = response.body.decode()
+        response_text = (
+            response.body.decode()
+            if isinstance(response.body, bytes)
+            else response.body.tobytes().decode("utf-8")
+        )
         assert (
             database_url not in response_text
         ), "Response should not contain database connection string"
@@ -713,7 +720,17 @@ def test_property_28_file_paths_not_exposed(file_path):
         response = asyncio.run(unhandled_exception_handler(mock_request, exc))
 
         # Property: Response should not contain the file path
-        response_text = response.body.decode()
+        # Handle response body decoding (can be bytes or memoryview)
+        if hasattr(response.body, "decode"):
+            response_text = response.body.decode()
+        else:
+            response_text = (
+                response.body.decode("utf-8", errors="ignore")  # type: ignore[attr-defined]
+                if isinstance(response.body, bytes)
+                else response.body.tobytes().decode("utf-8", errors="ignore")
+                if isinstance(response.body, memoryview)
+                else str(response.body)
+            )
         assert file_path not in response_text, "Response should not contain internal file paths"
 
         # Verify generic error message is returned

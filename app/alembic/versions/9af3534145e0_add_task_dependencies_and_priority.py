@@ -19,7 +19,13 @@ def upgrade() -> None:
     # Add priority column to tasks table
     op.add_column(
         "tasks",
-        sa.Column("priority", sa.Integer(), nullable=False, default=5, comment="Task priority (1=highest, 10=lowest)"),
+        sa.Column(
+            "priority",
+            sa.Integer(),
+            nullable=False,
+            default=5,
+            comment="Task priority (1=highest, 10=lowest)",
+        ),
     )
 
     # Create task_dependencies table

@@ -480,6 +480,16 @@ class UtilsRunnerGUI:
         def run_all():
             for i, script_info in enumerate(self.scripts):
                 script_path, dir_name = script_info
+                script_name = script_path.name
+
+                # Skip scripts that start servers indefinitely
+                if script_name == "main.py":
+                    self.log_output(
+                        f"Skipping script {i + 1}/{len(self.scripts)}: [{dir_name}] {script_name} (starts server)",
+                        self.TAG_WARNING,
+                    )
+                    continue
+
                 self.log_output(
                     f"Running script {i + 1}/{len(self.scripts)}: [{dir_name}] {script_path.name}",
                     self.TAG_INFO,

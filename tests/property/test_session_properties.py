@@ -5,11 +5,10 @@ Feature: api-migration
 Tests universal properties of session lifecycle and concurrent access.
 """
 
-import pytest
+from typing import Optional, Any, Tuple, TypedDict, List
 from hypothesis import given, strategies as st, assume, settings
 import asyncio
-from unittest.mock import Mock, MagicMock, patch
-from datetime import datetime
+from unittest.mock import MagicMock, patch
 import uuid
 
 # Import after setting up environment
@@ -20,10 +19,17 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent.parent.parent / "app"))
 
 from app.services.session_manager import (
-    SessionManager,
     SimulationSession,
     SessionLifecycleState,
 )
+
+
+# Type definitions
+class OperationResult(TypedDict, total=False):
+    op1: Optional[Tuple[str, Any]]
+    op2: Optional[Tuple[str, Any]]
+    errors: List[str]
+
 
 # ============================================================================
 # Helper Functions
@@ -56,7 +62,7 @@ def create_mock_db_session_factory():
     return factory
 
 
-def create_test_session(session_id: str = None, config: dict = None):
+def create_test_session(session_id: Optional[str] = None, config: Optional[dict] = None):
     """Create a test simulation session."""
     if session_id is None:
         session_id = str(uuid.uuid4())
@@ -141,30 +147,30 @@ def test_property_22_concurrent_modification_prevention(initial_state, operation
         session.is_paused = False
 
     # Track results from concurrent operations
-    results = {"op1": None, "op2": None, "errors": []}
+    results: OperationResult = {"op1": None, "op2": None, "errors": []}
 
     async def execute_operation(op_name: str, operation: str):
         """Execute an operation and capture result or error."""
         try:
             if operation == "start":
                 result = await session.start()
-                results[op_name] = ("success", result)
+                results[op_name] = ("success", result)  # type: ignore
             elif operation == "pause":
                 result = await session.pause()
-                results[op_name] = ("success", result)
+                results[op_name] = ("success", result)  # type: ignore
             elif operation == "stop":
                 result = await session.stop()
-                results[op_name] = ("success", result)
+                results[op_name] = ("success", result)  # type: ignore
             elif operation == "reset":
                 result = await session.reset()
-                results[op_name] = ("success", result)
+                results[op_name] = ("success", result)  # type: ignore
         except ValueError as e:
             # Expected error for invalid state transitions or concurrent conflicts
-            results[op_name] = ("error", str(e))
+            results[op_name] = ("error", str(e))  # type: ignore
             results["errors"].append(str(e))
         except Exception as e:
             # Unexpected error
-            results[op_name] = ("unexpected_error", str(e))
+            results[op_name] = ("unexpected_error", str(e))  # type: ignore
 
     async def run_concurrent_operations():
         """Run two operations concurrently."""

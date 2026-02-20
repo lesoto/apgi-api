@@ -10,18 +10,6 @@ import uuid
 from unittest.mock import AsyncMock, MagicMock, patch
 from fastapi import HTTPException
 
-"""
-Unit tests for task routes.
-
-Tests task submission, status checking, listing, and cancellation endpoints
-by calling route functions directly with mocked dependencies.
-"""
-
-import pytest
-import uuid
-from unittest.mock import AsyncMock, MagicMock, patch
-from fastapi import HTTPException
-
 
 @pytest.fixture
 def mock_task_executor():
@@ -103,6 +91,7 @@ class TestTaskRoutes:
         request = TaskSubmitRequest(
             task_type="attentional_blink",
             parameters={"num_trials": 100},
+            priority=5,
             webhook_url="https://example.com/webhook",
         )
 
@@ -128,7 +117,9 @@ class TestTaskRoutes:
 
         from app.models.schemas import TaskSubmitRequest
 
-        request = TaskSubmitRequest(task_type="invalid_task", parameters={})
+        request = TaskSubmitRequest(
+            task_type="invalid_task", parameters={}, priority=5, webhook_url=None
+        )
 
         mock_task_executor.submit_task.side_effect = ValueError("Invalid task type")
 
@@ -152,7 +143,9 @@ class TestTaskRoutes:
 
         from app.models.schemas import TaskSubmitRequest
 
-        request = TaskSubmitRequest(task_type="attentional_blink", parameters={})
+        request = TaskSubmitRequest(
+            task_type="attentional_blink", parameters={}, priority=5, webhook_url=None
+        )
 
         mock_task_executor.submit_task.side_effect = Exception("Executor error")
 

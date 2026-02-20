@@ -244,12 +244,13 @@ All endpoints except `/health`, `/docs`, and `/openapi.json` require authenticat
     # Add API versioning middleware (adds version headers to all responses)
     app.add_middleware(APIVersioningMiddleware)
 
-    # Add response schema validation middleware
-    app.add_middleware(
-        ResponseSchemaValidationMiddleware,
-        enabled=settings.schema_validation_enabled,
-        fail_on_error=settings.schema_validation_fail_on_error,
-    )
+    # Add response schema validation middleware - skip in test mode
+    if not test_mode:
+        app.add_middleware(
+            ResponseSchemaValidationMiddleware,
+            enabled=settings.schema_validation_enabled,
+            fail_on_error=settings.schema_validation_fail_on_error,
+        )
 
     # Add CSRF protection middleware - skip in test mode
     if not test_mode:

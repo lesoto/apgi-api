@@ -12,7 +12,7 @@ from sqlalchemy import text
 from sqlalchemy.orm import Session
 
 from app.database.connection import get_db_context
-from app.database.models import User, Session, Task, SessionTemplate, TaskDependency
+from app.database.models import User, Session as SessionModel, Task, SessionTemplate, TaskDependency
 
 logger = logging.getLogger(__name__)
 
@@ -25,7 +25,7 @@ class DatabaseStateTester:
         """Get the number of rows in a table."""
         with get_db_context() as db:
             result = db.execute(text(f"SELECT COUNT(*) FROM {table_name}"))
-            return result.scalar()
+            return result.scalar()  # type: ignore[return-value]
 
     @staticmethod
     def get_user_count() -> int:
@@ -37,9 +37,9 @@ class DatabaseStateTester:
     def get_session_count(user_id: Optional[str] = None) -> int:
         """Get number of sessions, optionally filtered by user."""
         with get_db_context() as db:
-            query = db.query(Session)
+            query = db.query(SessionModel)
             if user_id:
-                query = query.filter(Session.user_id == user_id)
+                query = query.filter(SessionModel.user_id == user_id)
             return query.count()
 
     @staticmethod
@@ -70,7 +70,10 @@ class DatabaseStateTester:
     def verify_session_exists(session_id: str) -> bool:
         """Verify that a session exists."""
         with get_db_context() as db:
-            return db.query(Session).filter(Session.session_id == session_id).first() is not None
+            return (
+                db.query(SessionModel).filter(SessionModel.session_id == session_id).first()
+                is not None
+            )
 
     @staticmethod
     def verify_task_exists(task_id: str) -> bool:
@@ -82,21 +85,21 @@ class DatabaseStateTester:
     def get_session_state(session_id: str) -> Optional[str]:
         """Get the current state of a session."""
         with get_db_context() as db:
-            session = db.query(Session).filter(Session.session_id == session_id).first()
-            return session.state if session else None
+            session = db.query(SessionModel).filter(SessionModel.session_id == session_id).first()
+            return session.state if session else None  # type: ignore[return-value]
 
     @staticmethod
     def get_task_state(task_id: str) -> Optional[str]:
         """Get the current state of a task."""
         with get_db_context() as db:
             task = db.query(Task).filter(Task.task_id == task_id).first()
-            return task.status if task else None
+            return task.status if task else None  # type: ignore[return-value]
 
     @staticmethod
     def get_user_sessions(user_id: str) -> List[Dict[str, Any]]:
         """Get all sessions for a user."""
         with get_db_context() as db:
-            sessions = db.query(Session).filter(Session.user_id == user_id).all()
+            sessions = db.query(SessionModel).filter(SessionModel.user_id == user_id).all()
             return [
                 {
                     "session_id": s.session_id,
@@ -131,14 +134,18 @@ class DatabaseStateTester:
         with get_db_context() as db:
             # Check for sessions without valid users
             orphaned_sessions = (
-                db.query(Session).filter(~Session.user_id.in_(db.query(User.user_id))).count()
+                db.query(SessionModel)
+                .filter(~SessionModel.user_id.in_(db.query(User.user_id)))
+                .count()
             )
             if orphaned_sessions > 0:
                 issues.append(f"Found {orphaned_sessions} sessions with invalid user_id")
 
             # Check for tasks without valid sessions
             orphaned_tasks = (
-                db.query(Task).filter(~Task.session_id.in_(db.query(Session.session_id))).count()
+                db.query(Task)
+                .filter(~Task.session_id.in_(db.query(SessionModel.session_id)))
+                .count()
             )
             if orphaned_tasks > 0:
                 issues.append(f"Found {orphaned_tasks} tasks with invalid session_id")
@@ -159,10 +166,10 @@ class DatabaseStateTester:
 
             # Check for sessions without valid templates (if template_id is set)
             invalid_template_refs = (
-                db.query(Session)
+                db.query(SessionModel)
                 .filter(
-                    Session.template_id.isnot(None),
-                    ~Session.template_id.in_(db.query(SessionTemplate.template_id)),
+                    SessionModel.template_id.isnot(None),
+                    ~SessionModel.template_id.in_(db.query(SessionTemplate.template_id)),
                 )
                 .count()
             )
@@ -212,7 +219,9 @@ class TestDataManager:
                     logger.info(f"Deleted {len(self.created_tasks)} test tasks")
 
                 if self.created_sessions:
-                    db.query(Session).filter(Session.session_id.in_(self.created_sessions)).delete()
+                    db.query(SessionModel).filter(
+                        SessionModel.session_id.in_(self.created_sessions)
+                    ).delete()
                     logger.info(f"Deleted {len(self.created_sessions)} test sessions")
 
                 if self.created_templates:
@@ -266,8 +275,8 @@ class TestDataManager:
         db.add(user)
         db.commit()
 
-        self.track_user(user.user_id)
-        return user.user_id
+        self.track_user(user.user_id)  # type: ignore[arg-type]
+        return user.user_id  # type: ignore[return-value]
 
     def create_test_session(
         self, db: Session, user_id: str, session_data: Optional[Dict[str, Any]] = None
@@ -284,12 +293,12 @@ class TestDataManager:
                 "description": "Test session",
             }
 
-        session = Session(**session_data)
+        session = SessionModel(**session_data)
         db.add(session)
         db.commit()
 
-        self.track_session(session.session_id)
-        return session.session_id
+        self.track_session(session.session_id)  # type: ignore[arg-type]
+        return session.session_id  # type: ignore[return-value]
 
     def create_test_task(
         self, db: Session, session_id: str, task_data: Optional[Dict[str, Any]] = None
@@ -311,8 +320,8 @@ class TestDataManager:
         db.add(task)
         db.commit()
 
-        self.track_task(task.task_id)
-        return task.task_id
+        self.track_task(task.task_id)  # type: ignore[arg-type]
+        return task.task_id  # type: ignore[return-value]
 
 
 # Global instances for use in tests

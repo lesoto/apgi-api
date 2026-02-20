@@ -178,14 +178,24 @@ class TestNotificationChannels:
         """Test PagerDuty notification channel."""
         integration_key = "test-integration-key"
 
-        with patch("httpx.AsyncClient") as mock_client_class:
-            mock_client = AsyncMock()
-            mock_response = AsyncMock()
-            mock_response.status_code = 202
-            mock_response.json.return_value = {"dedup_key": "test-dedup"}
-            mock_client.post.return_value = mock_response
-            mock_client_class.return_value.__aenter__.return_value = mock_client
+        mock_client = AsyncMock()
+        mock_response = AsyncMock()
+        mock_response.status_code = 202
+        mock_response.json.return_value = {"dedup_key": "test-dedup"}
+        mock_client.post.return_value = mock_response
 
+        class MockAsyncClient:
+            def __init__(self):
+                self.post = mock_client.post
+
+            async def __aenter__(self):
+                return self
+
+            async def __aexit__(self, *args):
+                pass
+
+        with patch("app.middleware.alerting.httpx") as mock_httpx:
+            mock_httpx.AsyncClient = MockAsyncClient
             channel = PagerDutyNotificationChannel(integration_key)
             alert = Alert(
                 title="Test Alert", message="Test message", severity=AlertSeverity.CRITICAL
@@ -312,7 +322,7 @@ class TestDistributedTracing:
 
         # This should not raise an exception
         try:
-            await configure_distributed_tracing(enable_console_exporter=False)
+            configure_distributed_tracing(enable_console_exporter=False)
         except Exception as e:
             # OpenTelemetry might not be available in test environment
             if "OpenTelemetry" in str(e) or "opentelemetry" in str(e).lower():
@@ -326,7 +336,7 @@ class TestDistributedTracing:
         from app.middleware.tracing import configure_distributed_tracing
 
         try:
-            await configure_distributed_tracing(enable_console_exporter=True, sampling_rate=1.0)
+            configure_distributed_tracing(enable_console_exporter=True, sampling_rate=1.0)
         except Exception as e:
             if "OpenTelemetry" in str(e) or "opentelemetry" in str(e).lower():
                 pytest.skip("OpenTelemetry not available in test environment")
@@ -350,9 +360,30 @@ class TestMetricsEndpoints:
     @pytest.mark.asyncio
     async def test_health_endpoint_with_monitoring(self, client):
         """Test health endpoint includes monitoring information."""
-        response = await client.get("/health")
-        assert response.status_code == 200
+        from unittest.mock import AsyncMock, patch
 
-        data = response.json()
-        # Health endpoint should include some monitoring info
-        assert "status" in data or "healthy" in data
+        # Mock the health check to return healthy status with monitoring info
+        mock_health_result = {
+            "status": "healthy",
+            "timestamp": "2024-01-01T00:00:00Z",
+            "dependencies": {
+                "database": {"status": "healthy", "message": "Connected"},
+                "redis": {"status": "healthy", "message": "Connected and responsive"},
+                "celery": {
+                    "status": "healthy",
+                    "message": "Workers responding: 1, tasks running: 0",
+                },
+            },
+        }
+
+        with patch("app.routes.health.health_service") as mock_service:
+            if mock_service:
+                mock_service.perform_health_check = AsyncMock(return_value=mock_health_result)
+
+            response = await client.get("/health")
+            assert response.status_code == 200
+
+            data = response.json()
+            # Health endpoint should include some monitoring info
+            assert "status" in data or "healthy" in data
+            assert "dependencies" in data  # Monitoring information

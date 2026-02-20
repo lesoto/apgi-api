@@ -5,21 +5,16 @@ Feature: api-migration
 Tests universal properties of CORS header inclusion in responses.
 """
 
-import pytest
 from hypothesis import given, strategies as st, assume, settings
-from unittest.mock import Mock, AsyncMock
-import asyncio
-
-# Import after setting up environment
 import sys
 from pathlib import Path
 
+from fastapi import FastAPI
+from fastapi.testclient import TestClient
+from starlette.middleware.cors import CORSMiddleware
+
 # Add app directory to path for imports
 sys.path.insert(0, str(Path(__file__).parent.parent.parent / "app"))
-
-from fastapi import FastAPI
-from fastapi.middleware.cors import CORSMiddleware
-from fastapi.testclient import TestClient
 
 # ============================================================================
 # Helper Functions
@@ -151,7 +146,7 @@ def test_property_4_cors_headers_on_responses(path, method, origin):
     # when credentials are enabled
     assert (
         "access-control-allow-credentials" in response.headers
-    ), f"Response should include Access-Control-Allow-Credentials header"
+    ), "Response should include Access-Control-Allow-Credentials header"
 
     credentials_header = response.headers.get("access-control-allow-credentials")
     assert (
@@ -213,17 +208,17 @@ def test_property_4_cors_preflight_requests(path, origin):
     # Property 1: Preflight response should include Access-Control-Allow-Origin
     assert (
         "access-control-allow-origin" in response.headers
-    ), f"Preflight response should include Access-Control-Allow-Origin header"
+    ), "Preflight response should include Access-Control-Allow-Origin header"
 
     # Property 2: Preflight response should include Access-Control-Allow-Methods
     assert (
         "access-control-allow-methods" in response.headers
-    ), f"Preflight response should include Access-Control-Allow-Methods header"
+    ), "Preflight response should include Access-Control-Allow-Methods header"
 
     # Property 3: Preflight response should include Access-Control-Allow-Headers
     assert (
         "access-control-allow-headers" in response.headers
-    ), f"Preflight response should include Access-Control-Allow-Headers header"
+    ), "Preflight response should include Access-Control-Allow-Headers header"
 
     # Property 4: Access-Control-Allow-Origin should match the request origin
     allow_origin = response.headers.get("access-control-allow-origin")
@@ -342,7 +337,7 @@ def test_property_4_cors_wildcard_origin(path, method):
     # Property 1: Response should include Access-Control-Allow-Origin header
     assert (
         "access-control-allow-origin" in response.headers
-    ), f"Response should include Access-Control-Allow-Origin header with wildcard CORS"
+    ), "Response should include Access-Control-Allow-Origin header with wildcard CORS"
 
     # Property 2: Access-Control-Allow-Origin should be "*"
     allow_origin = response.headers.get("access-control-allow-origin")
@@ -404,7 +399,7 @@ def test_property_4_cors_headers_with_credentials(path, method, origin):
     # Property 1: Response should include Access-Control-Allow-Credentials header
     assert (
         "access-control-allow-credentials" in response.headers
-    ), f"Response should include Access-Control-Allow-Credentials header when credentials enabled"
+    ), "Response should include Access-Control-Allow-Credentials header when credentials enabled"
 
     # Property 2: Access-Control-Allow-Credentials should be "true"
     credentials_header = response.headers.get("access-control-allow-credentials")
@@ -417,4 +412,4 @@ def test_property_4_cors_headers_with_credentials(path, method, origin):
     allow_origin = response.headers.get("access-control-allow-origin")
     assert (
         allow_origin != "*"
-    ), f"Access-Control-Allow-Origin should not be '*' when credentials are enabled"
+    ), "Access-Control-Allow-Origin should not be '*' when credentials are enabled"

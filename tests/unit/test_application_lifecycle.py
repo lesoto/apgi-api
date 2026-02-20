@@ -80,7 +80,7 @@ class TestApplicationStartup:
         assert hasattr(app, "user_middleware")
 
         # Verify key middleware components are present
-        middleware_classes = [m.cls.__name__ for m in app.user_middleware]
+        middleware_classes = [m.cls.__name__ for m in app.user_middleware]  # type: ignore[attr-defined]
         assert "CORSMiddleware" in middleware_classes
         assert "GZipMiddleware" in middleware_classes
         assert "RequestSizeLimitMiddleware" in middleware_classes
@@ -161,7 +161,7 @@ class TestApplicationStartupValidation:
                 del sys.modules["app.config"]
 
             with pytest.raises(ValueError, match="JWT_SECRET_KEY is shorter than 32 characters"):
-                import app.config
+                import app.config  # noqa: F401
 
 
 class TestGracefulShutdown:

@@ -5,9 +5,7 @@ Feature: api-migration
 Tests universal properties of GZip response compression for large responses.
 """
 
-import pytest
 from hypothesis import given, strategies as st, assume, settings
-import gzip
 import sys
 from pathlib import Path
 
@@ -55,7 +53,7 @@ def create_test_app_with_compression(minimum_size: int = 1000):
         # Return a large list of sessions
         sessions = [
             {
-                "session_id": f"session-{i}",
+                "session_id": "session-" + str(i),
                 "status": "running",
                 "config": {"param1": "value1", "param2": "value2"},
                 "created_at": "2024-01-01T00:00:00Z",
@@ -97,7 +95,7 @@ def test_property_29_response_compression_for_large_responses(response_size_kb):
 
     # Make request with Accept-Encoding: gzip header
     response = client.get(
-        f"/test/custom?size={response_size_bytes}",
+        "/test/custom?size=" + str(response_size_bytes),
         headers={"Accept-Encoding": "gzip"},
     )
 
@@ -119,10 +117,10 @@ def test_property_29_response_compression_for_large_responses(response_size_kb):
 
     # Property 4: Response body should be valid JSON (TestClient auto-decompresses)
     response_data = response.json()
-    assert isinstance(response_data, dict), f"Response should be valid JSON object"
+    assert isinstance(response_data, dict), "Response should be valid JSON object"
 
     # Property 5: Response data should contain the expected content
-    assert "data" in response_data, f"Response should contain 'data' field"
+    assert "data" in response_data, "Response should contain 'data' field"
 
 
 @settings(max_examples=1)
@@ -147,7 +145,7 @@ def test_property_29_no_compression_for_small_responses(response_size_bytes):
 
     # Make request with Accept-Encoding: gzip header
     response = client.get(
-        f"/test/custom?size={response_size_bytes}",
+        "/test/custom?size=" + str(response_size_bytes),
         headers={"Accept-Encoding": "gzip"},
     )
 
@@ -161,11 +159,11 @@ def test_property_29_no_compression_for_small_responses(response_size_bytes):
     content_encoding = response.headers.get("content-encoding")
     assert (
         content_encoding != "gzip"
-    ), f"Small response ({response_size_bytes} bytes) should not be compressed with gzip"
+    ), "Small response ({response_size_bytes} bytes) should not be compressed with gzip"
 
     # Property 3: Response body should be valid JSON
     response_data = response.json()
-    assert isinstance(response_data, dict), f"Response should be valid JSON object"
+    assert isinstance(response_data, dict), "Response should be valid JSON object"
 
 
 @settings(max_examples=1)
@@ -194,7 +192,7 @@ def test_property_29_no_compression_without_accept_encoding(response_size_kb):
 
     # Make request with Accept-Encoding explicitly set to identity (no compression)
     response = client.get(
-        f"/test/custom?size={response_size_bytes}",
+        "/test/custom?size=" + str(response_size_bytes),
         headers={"Accept-Encoding": "identity"},
     )
 
@@ -207,11 +205,11 @@ def test_property_29_no_compression_without_accept_encoding(response_size_kb):
     content_encoding = response.headers.get("content-encoding")
     assert (
         content_encoding != "gzip"
-    ), f"Response should not be compressed when client doesn't support gzip"
+    ), "Response should not be compressed when client doesn't support gzip"
 
     # Property 3: Response body should be valid JSON
     response_data = response.json()
-    assert isinstance(response_data, dict), f"Response should be valid JSON object"
+    assert isinstance(response_data, dict), "Response should be valid JSON object"
 
 
 @settings(max_examples=1)
@@ -241,7 +239,7 @@ def test_property_29_configurable_compression_threshold(minimum_size_kb, respons
 
     # Make request with Accept-Encoding: gzip header
     response = client.get(
-        f"/test/custom?size={response_size_bytes}",
+        "/test/custom?size=" + str(response_size_bytes),
         headers={"Accept-Encoding": "gzip"},
     )
 
@@ -258,7 +256,7 @@ def test_property_29_configurable_compression_threshold(minimum_size_kb, respons
 
     # Property 3: Response body should be valid JSON
     response_data = response.json()
-    assert isinstance(response_data, dict), f"Response should be valid JSON object"
+    assert isinstance(response_data, dict), "Response should be valid JSON object"
 
 
 @settings(max_examples=1)
@@ -311,7 +309,7 @@ def test_property_29_compression_applies_to_all_endpoints(path, method):
 
     # Property 3: Response body should be valid JSON
     response_data = response.json()
-    assert isinstance(response_data, dict), f"Response should be valid JSON object"
+    assert isinstance(response_data, dict), "Response should be valid JSON object"
 
 
 @settings(max_examples=1)
@@ -338,36 +336,36 @@ def test_property_29_compressed_response_is_smaller(response_size_kb):
 
     # Make request WITH compression
     compressed_response = client.get(
-        f"/test/custom?size={response_size_bytes}",
+        "/test/custom?size=" + str(response_size_bytes),
         headers={"Accept-Encoding": "gzip"},
     )
 
     # Make request WITHOUT compression (explicitly reject compression)
     uncompressed_response = client.get(
-        f"/test/custom?size={response_size_bytes}",
+        "/test/custom?size=" + str(response_size_bytes),
         headers={"Accept-Encoding": "identity"},
     )
 
     # Property 1: Both responses should be successful
-    assert 200 <= compressed_response.status_code < 300, f"Compressed request should succeed"
-    assert 200 <= uncompressed_response.status_code < 300, f"Uncompressed request should succeed"
+    assert 200 <= compressed_response.status_code < 300, "Compressed request should succeed"
+    assert 200 <= uncompressed_response.status_code < 300, "Uncompressed request should succeed"
 
     # Property 2: Compressed response should have Content-Encoding: gzip
     assert (
         compressed_response.headers.get("content-encoding") == "gzip"
-    ), f"Compressed response should have Content-Encoding: gzip"
+    ), "Compressed response should have Content-Encoding: gzip"
 
     # Property 3: Uncompressed response should NOT have Content-Encoding: gzip
     assert (
         uncompressed_response.headers.get("content-encoding") != "gzip"
-    ), f"Uncompressed response should not have Content-Encoding: gzip"
+    ), "Uncompressed response should not have Content-Encoding: gzip"
 
     # Property 4: Both responses should have the same JSON content
     compressed_data = compressed_response.json()
     uncompressed_data = uncompressed_response.json()
     assert (
         compressed_data == uncompressed_data
-    ), f"Compressed and uncompressed responses should have the same content"
+    ), "Compressed and uncompressed responses should have the same content"
 
     # Property 5: Compressed response size should be smaller than uncompressed
     # (for highly compressible content like repeated characters)
@@ -377,7 +375,7 @@ def test_property_29_compressed_response_is_smaller(response_size_kb):
     # The actual size reduction is handled by the middleware
     assert (
         "content-encoding" in compressed_response.headers
-    ), f"Compression should be applied to large responses"
+    ), "Compression should be applied to large responses"
 
 
 @settings(max_examples=1)
@@ -413,7 +411,7 @@ def test_property_29_compression_with_multiple_encodings(response_size_kb, accep
 
     # Make request with Accept-Encoding header supporting multiple encodings
     response = client.get(
-        f"/test/custom?size={response_size_bytes}",
+        "/test/custom?size=" + str(response_size_bytes),
         headers={"Accept-Encoding": accept_encoding},
     )
 
@@ -430,4 +428,4 @@ def test_property_29_compression_with_multiple_encodings(response_size_kb, accep
 
     # Property 3: Response body should be valid JSON
     response_data = response.json()
-    assert isinstance(response_data, dict), f"Response should be valid JSON object"
+    assert isinstance(response_data, dict), "Response should be valid JSON object"

@@ -29,6 +29,7 @@ from app.services.authorization import (
     require_permission,
     get_current_user,
     TokenPayload,
+    has_permission,
 )
 from app.services.user_management import get_user_management_service
 
@@ -339,7 +340,7 @@ async def update_user(
     """
     user_service = get_user_management_service(db)
     # Check permissions (admin can update any user, users can only update themselves)
-    is_admin = Permission.USER_ADMIN in current_user.roles
+    is_admin = has_permission(current_user.roles, Permission.USER_ADMIN)
     is_own_user = current_user.user_id == user_id
 
     if not (is_admin or is_own_user):
@@ -407,7 +408,7 @@ async def reset_user_password(
     """
     user_service = get_user_management_service(db)
     # Check permissions
-    is_admin = Permission.USER_ADMIN in current_user.roles
+    is_admin = has_permission(current_user.roles, Permission.USER_ADMIN)
     is_own_user = current_user.user_id == user_id
 
     if not (is_admin or is_own_user):

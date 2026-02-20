@@ -123,7 +123,7 @@ def check_dependencies(
 
             if fail_fast:
                 logger.error("\nDependency check failed. Please install missing dependencies:")
-                logger.error(f"  pip install -r requirements.txt")
+                logger.error("  pip install -r requirements.txt")
                 sys.exit(1)
         else:
             logger.debug(f"✓ {package_name} {installed_version} (>= {min_version})")

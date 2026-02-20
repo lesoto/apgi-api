@@ -133,8 +133,18 @@ class TestHealthEndpoints:
             }
         )
 
+        # Mock perform_readiness_check to return unhealthy
+        mock_readiness_check = AsyncMock(
+            return_value={
+                "status": "not_ready",
+                "database": {"status": "not_ready", "error": "Connection failed"},
+                "redis": {"status": "ready"},
+            }
+        )
+
         with patch("app.routes.health.health_service") as mock_service:
             mock_service.perform_health_check = mock_health_check
+            mock_service.perform_readiness_check = mock_readiness_check
 
             # Test /health
             response = await client.get("/health")
@@ -146,7 +156,7 @@ class TestHealthEndpoints:
             response = await client.get("/health/ready")
             assert response.status_code == 503
             data = response.json()
-            assert data["status"] == "unhealthy"
+            assert data["status"] == "not_ready"
 
 
 class TestAuthenticationFlow:

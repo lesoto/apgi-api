@@ -7,7 +7,7 @@ Middleware to extract and verify JWT tokens from Authorization headers.
 import logging
 from typing import Optional
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import datetime, timezone
 
 from fastapi import Request
 from starlette.middleware.base import BaseHTTPMiddleware

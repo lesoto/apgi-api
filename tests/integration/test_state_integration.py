@@ -7,7 +7,7 @@ Tests state access endpoints through HTTP requests with authentication.
 import pytest
 import uuid
 from datetime import datetime, timedelta, timezone
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import MagicMock, patch
 from httpx import AsyncClient, ASGITransport
 from sqlalchemy.orm import Session
 
@@ -23,50 +23,10 @@ async def authenticated_client(test_environment, mock_database_connection):
     mock_redis_client = AsyncMock()
     mock_redis_client.ping = AsyncMock()
     mock_redis_client.close = AsyncMock()
+    mock_redis_client.get = AsyncMock(return_value=None)
 
-    # Mock User for authentication
-    mock_user = MagicMock()
-    mock_user.user_id = str(uuid.uuid4())
-    mock_user.username = "test_user"
-    mock_user.roles = ["admin"]
-
-    # Create a real JWT token for the mock user
-    mock_session = MagicMock(spec=Session)
-    auth_manager = AuthManager(db=mock_session)  # Use mock session for token creation
-    access_token = auth_manager.create_access_token(
-        user_id=mock_user.user_id, username=mock_user.username, roles=mock_user.roles
-    )
-
-    with (
-        patch("redis.asyncio.from_url", return_value=mock_redis_client),
-        patch("app.services.auth_manager.AuthManager.authenticate_user", return_value=mock_user),
-        patch("app.middleware.authentication.is_authenticated", return_value=True),
-        patch(
-            "app.services.authorization.get_current_user",
-            return_value=TokenPayload(
-                user_id=mock_user.user_id,
-                username=mock_user.username,
-                roles=mock_user.roles,
-                token_type="access",
-                exp=datetime.now(timezone.utc) + timedelta(hours=1),  # Future expiration
-            ),
-        ),
-        patch("app.routes.sessions.get_session_manager", return_value=mock_session_manager),
-    ):
-        app = create_app(test_mode=True)
-        transport = ASGITransport(app=app)
-        async with AsyncClient(transport=transport, base_url="http://test") as ac:
-            # Add the JWT token to default headers
-            ac.headers.update({"Authorization": f"Bearer {access_token}"})
-            # Store the mock redis for use in tests
-            ac._mock_redis = mock_redis_client  # type: ignore[attr-defined]
-            yield ac
-
-
-@pytest.fixture
-def mock_session_manager():
-    """Create mock SessionManager for integration tests."""
-    manager = MagicMock()
+    # Create mock session manager
+    mock_session_mgr = MagicMock()
     mock_session = MagicMock()
     mock_session.get_state = AsyncMock(
         return_value={
@@ -122,22 +82,61 @@ def mock_session_manager():
             },
         }
     )
-    manager.get_session = AsyncMock(return_value=mock_session)
-    return manager
+    mock_session_mgr.get_session = AsyncMock(return_value=mock_session)
+
+    # Set the global session manager
+    from app.routes import sessions
+
+    sessions._session_manager = mock_session_mgr
+
+    # Mock User for authentication
+    mock_user = MagicMock()
+    mock_user.user_id = str(uuid.uuid4())
+    mock_user.username = "test_user"
+    mock_user.roles = ["admin"]
+
+    # Create a real JWT token for the mock user
+    mock_session_db = MagicMock(spec=Session)
+    auth_manager = AuthManager(db=mock_session_db)  # Use mock session for token creation
+    access_token = auth_manager.create_access_token(
+        user_id=mock_user.user_id, username=mock_user.username, roles=mock_user.roles
+    )
+
+    with (
+        patch("redis.asyncio.from_url", return_value=mock_redis_client),
+        patch("app.services.auth_manager.AuthManager.authenticate_user", return_value=mock_user),
+        patch("app.middleware.authentication.is_authenticated", return_value=True),
+        patch("app.services.authorization.check_permission", return_value=None),
+        patch("app.services.authorization.has_permission", return_value=True),
+        patch(
+            "app.services.authorization.get_current_user",
+            return_value=TokenPayload(
+                user_id=mock_user.user_id,
+                username=mock_user.username,
+                roles=mock_user.roles,
+                token_type="access",
+                exp=datetime.now(timezone.utc) + timedelta(hours=1),
+            ),
+        ),
+        patch("app.routes.sessions.get_session_manager", return_value=mock_session_mgr),
+    ):
+        app = create_app(test_mode=True)
+        transport = ASGITransport(app=app)
+        async with AsyncClient(transport=transport, base_url="http://test") as ac:
+            # Add the JWT token to default headers
+            ac.headers.update({"Authorization": f"Bearer {access_token}"})
+            # Store the mock redis for use in tests
+            ac._mock_redis = mock_redis_client  # type: ignore[attr-defined]
+            yield ac
 
 
 class TestStateRoutesIntegration:
     """Integration tests for state access endpoints."""
 
     @pytest.mark.asyncio
-    async def test_get_system_state_authenticated(self, authenticated_client, mock_session_manager):
+    async def test_get_system_state_authenticated(self, authenticated_client):
         """Test getting complete system state with authentication."""
-        from app.routes.sessions import init_session_routes
-
         session_id = str(uuid.uuid4())
-
-        # Initialize session routes with mock redis
-        init_session_routes(authenticated_client._mock_redis)
 
         response = await authenticated_client.get(f"/v1/sessions/{session_id}/state")
 
@@ -153,16 +152,9 @@ class TestStateRoutesIntegration:
         assert "self_model" in data
 
     @pytest.mark.asyncio
-    async def test_get_ignition_history_authenticated(
-        self, authenticated_client, mock_session_manager
-    ):
+    async def test_get_ignition_history_authenticated(self, authenticated_client):
         """Test getting ignition event history with authentication."""
-        from app.routes.sessions import init_session_routes
-
         session_id = str(uuid.uuid4())
-
-        # Initialize session routes with mock redis
-        init_session_routes(authenticated_client._mock_redis)
 
         response = await authenticated_client.get(f"/v1/sessions/{session_id}/ignition-history")
 
@@ -172,16 +164,9 @@ class TestStateRoutesIntegration:
         assert "pagination" in data
 
     @pytest.mark.asyncio
-    async def test_get_interoceptive_state_authenticated(
-        self, authenticated_client, mock_session_manager
-    ):
+    async def test_get_interoceptive_state_authenticated(self, authenticated_client):
         """Test getting interoceptive body state with authentication."""
-        from app.routes.sessions import init_session_routes
-
         session_id = str(uuid.uuid4())
-
-        # Initialize session routes with mock redis
-        init_session_routes(authenticated_client._mock_redis)
 
         response = await authenticated_client.get(f"/v1/sessions/{session_id}/interoception")
 
@@ -192,16 +177,9 @@ class TestStateRoutesIntegration:
         assert "temperature" in data
 
     @pytest.mark.asyncio
-    async def test_get_prediction_errors_authenticated(
-        self, authenticated_client, mock_session_manager
-    ):
+    async def test_get_prediction_errors_authenticated(self, authenticated_client):
         """Test getting prediction errors with authentication."""
-        from app.routes.sessions import init_session_routes
-
         session_id = str(uuid.uuid4())
-
-        # Initialize session routes with mock redis
-        init_session_routes(authenticated_client._mock_redis)
 
         response = await authenticated_client.get(f"/v1/sessions/{session_id}/prediction-errors")
 
@@ -212,16 +190,9 @@ class TestStateRoutesIntegration:
         assert "prediction_errors" in data
 
     @pytest.mark.asyncio
-    async def test_get_somatic_markers_authenticated(
-        self, authenticated_client, mock_session_manager
-    ):
+    async def test_get_somatic_markers_authenticated(self, authenticated_client):
         """Test getting somatic markers with authentication."""
-        from app.routes.sessions import init_session_routes
-
         session_id = str(uuid.uuid4())
-
-        # Initialize session routes with mock redis
-        init_session_routes(authenticated_client._mock_redis)
 
         response = await authenticated_client.get(f"/v1/sessions/{session_id}/somatic-markers")
 

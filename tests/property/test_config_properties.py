@@ -31,14 +31,12 @@ def reload_config_with_env(env_vars):
 
         # Patch it in the dotenv module before config imports it
         with patch("dotenv.load_dotenv", mock_load_dotenv):
-            import importlib
-
             # Remove config from sys.modules to force reimport
             if "app.config" in sys.modules:
                 del sys.modules["app.config"]
 
             # Import config - this will use our patched load_dotenv
-            import app.config
+            import app.config  # noqa: F401
 
             from app.config import Settings
 
@@ -322,27 +320,27 @@ def test_property_2_config_validation_error_logging(validation_scenario):
 
     scenario_config = scenarios[validation_scenario]
     env_vars = scenario_config["env"]
-    expected_key = scenario_config["expected_key"]
-    expected_error_fragment = scenario_config["expected_error_fragment"]
+    expected_key = str(scenario_config["expected_key"])
+    expected_error_fragment = str(scenario_config["expected_error_fragment"])
 
     # Attempt to create settings with invalid configuration
     # This should raise a ValueError with a message containing the config key and error
     with pytest.raises(ValueError) as exc_info:
         reload_config_with_env(env_vars)
 
-    error_message = str(exc_info.value)
+    error_msg = str(exc_info.value)
 
     # Property 1: Error message should contain the configuration key
     assert (
-        expected_key in error_message
-    ), f"Error message should mention configuration key '{expected_key}', but got: {error_message}"
+        expected_key in error_msg
+    ), f"Error message should mention configuration key '{expected_key}', but got: {error_msg}"
 
     # Property 2: Error message should contain specific validation error details
     assert (
-        expected_error_fragment.lower() in error_message.lower()
-    ), f"Error message should contain '{expected_error_fragment}', but got: {error_message}"
+        expected_error_fragment.lower() in error_msg.lower()
+    ), f"Error message should contain '{expected_error_fragment}', but got: {error_msg}"
 
     # Property 3: Error message should be structured (contains "CRITICAL CONFIGURATION ERRORS")
     assert (
-        "CRITICAL CONFIGURATION ERRORS" in error_message
-    ), f"Error message should be structured with header, but got: {error_message}"
+        "CRITICAL CONFIGURATION ERRORS" in error_msg
+    ), f"Error message should be structured with header, but got: {error_msg}"

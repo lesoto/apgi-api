@@ -396,7 +396,7 @@ async def test_cancel_task_success(task_executor, mock_db_session, sample_task_r
             mock_revoke.assert_called_once_with(sample_task_record.task_id, terminate=True)
 
             # Verify database was updated
-            assert sample_task_record.status == TaskStatus.FAILED.value
+            assert sample_task_record.status == TaskStatus.CANCELLED.value
             assert "cancelled" in sample_task_record.error_message.lower()
 
             # Verify response

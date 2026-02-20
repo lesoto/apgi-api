@@ -8,9 +8,9 @@ request ID propagation, and error logging with context.
 
 import json
 import logging
-import pytest
 from hypothesis import given, strategies as st, assume, settings
-from unittest.mock import Mock, patch, MagicMock
+from unittest.mock import Mock
+from typing import Dict, Any
 from contextlib import contextmanager
 import sys
 from pathlib import Path
@@ -21,7 +21,7 @@ sys.path.insert(0, str(Path(__file__).parent.parent.parent / "app"))
 
 from fastapi import FastAPI, Request, HTTPException
 from fastapi.testclient import TestClient
-from middleware.logging import (
+from app.middleware.logging import (
     RequestLoggingMiddleware,
     StructuredLogger,
     ErrorLoggingHandler,
@@ -147,25 +147,25 @@ def test_property_7_structured_json_logging_format(message, level):
         log_entry = entries[-1]
 
         # Property 1: Log entry should be valid JSON (already parsed)
-        assert isinstance(log_entry, dict), f"Log entry should be a valid JSON object"
+        assert isinstance(log_entry, dict), "Log entry should be a valid JSON object"
 
         # Property 2: Log entry should contain timestamp field
-        assert "timestamp" in log_entry, f"Log entry should contain 'timestamp' field"
+        assert "timestamp" in log_entry, "Log entry should contain 'timestamp' field"
 
         # Property 3: Log entry should contain level field
-        assert "level" in log_entry, f"Log entry should contain 'level' field"
+        assert "level" in log_entry, "Log entry should contain 'level' field"
         assert (
             log_entry["level"] == level
         ), f"Log level should be '{level}', got '{log_entry['level']}'"
 
         # Property 4: Log entry should contain message field
-        assert "message" in log_entry, f"Log entry should contain 'message' field"
+        assert "message" in log_entry, "Log entry should contain 'message' field"
         assert (
             log_entry["message"] == message
         ), f"Log message should be '{message}', got '{log_entry['message']}'"
 
         # Property 5: Log entry should contain component field (logger name)
-        assert "logger" in log_entry, f"Log entry should contain 'logger' field"
+        assert "logger" in log_entry, "Log entry should contain 'logger' field"
         assert (
             log_entry["logger"] == "test.component"
         ), f"Logger name should be 'test.component', got '{log_entry['logger']}'"
@@ -174,9 +174,7 @@ def test_property_7_structured_json_logging_format(message, level):
 @settings(max_examples=1)
 @given(
     message=st.text(min_size=1, max_size=100),
-    extra_field_key=st.text(
-        min_size=1, max_size=20, alphabet=st.characters(whitelist_categories=("L",))
-    ),
+    extra_field_key=st.text(min_size=1, max_size=20, alphabet=st.characters(categories=("L",))),  # type: ignore[arg-type]
     extra_field_value=st.one_of(
         st.text(min_size=1, max_size=50), st.integers(), st.floats(allow_nan=False)
     ),
@@ -212,12 +210,12 @@ def test_property_7_structured_logging_with_extra_fields(
         # Property: Extra field should be present in log entry
         assert (
             extra_field_key in log_entry
-        ), f"Log entry should contain extra field '{extra_field_key}'"
+        ), "Log entry should contain extra field '{extra_field_key}'"
 
         # Verify the value matches (handle float comparison)
         actual_value = log_entry[extra_field_key]
         if isinstance(extra_field_value, float):
-            assert isinstance(actual_value, (int, float)), f"Extra field value should be numeric"
+            assert isinstance(actual_value, (int, float)), "Extra field value should be numeric"
         else:
             assert (
                 actual_value == extra_field_value
@@ -266,7 +264,7 @@ def test_property_8_request_logging_completeness(path, method):
         assume(len(entries) > 0)
 
         # Find the request log entry
-        request_log = None
+        request_log: Dict[str, Any] = None  # type: ignore
         for entry in entries:
             if entry.get("message") == "Request processed":
                 request_log = entry
@@ -275,28 +273,28 @@ def test_property_8_request_logging_completeness(path, method):
         assume(request_log is not None)
 
         # Property 1: Log should contain method field
-        assert "method" in request_log, f"Request log should contain 'method' field"
+        assert "method" in request_log, "Request log should contain 'method' field"
         assert (
             request_log["method"] == method
         ), f"Method should be '{method}', got '{request_log['method']}'"
 
         # Property 2: Log should contain path field
-        assert "path" in request_log, f"Request log should contain 'path' field"
+        assert "path" in request_log, "Request log should contain 'path' field"
         assert request_log["path"] == path, f"Path should be '{path}', got '{request_log['path']}'"
 
         # Property 3: Log should contain status_code field
-        assert "status_code" in request_log, f"Request log should contain 'status_code' field"
-        assert isinstance(request_log["status_code"], int), f"Status code should be an integer"
+        assert "status_code" in request_log, "Request log should contain 'status_code' field"
+        assert isinstance(request_log["status_code"], int), "Status code should be an integer"
 
         # Property 4: Log should contain duration_ms field
-        assert "duration_ms" in request_log, f"Request log should contain 'duration_ms' field"
-        assert isinstance(request_log["duration_ms"], (int, float)), f"Duration should be numeric"
-        assert request_log["duration_ms"] >= 0, f"Duration should be non-negative"
+        assert "duration_ms" in request_log, "Request log should contain 'duration_ms' field"
+        assert isinstance(request_log["duration_ms"], (int, float)), "Duration should be numeric"
+        assert request_log["duration_ms"] >= 0, "Duration should be non-negative"
 
         # Property 5: Log should contain request_id field
-        assert "request_id" in request_log, f"Request log should contain 'request_id' field"
-        assert isinstance(request_log["request_id"], str), f"Request ID should be a string"
-        assert len(request_log["request_id"]) > 0, f"Request ID should not be empty"
+        assert "request_id" in request_log, "Request log should contain 'request_id' field"
+        assert isinstance(request_log["request_id"], str), "Request ID should be a string"
+        assert len(request_log["request_id"]) > 0, "Request ID should not be empty"
 
 
 # ============================================================================
@@ -327,19 +325,19 @@ def test_property_9_request_id_propagation_in_response(path):
     response = client.get(path)
 
     # Property 1: Response should contain X-Request-ID header
-    assert "x-request-id" in response.headers, f"Response should contain 'X-Request-ID' header"
+    assert "x-request-id" in response.headers, "Response should contain 'X-Request-ID' header"
 
     # Property 2: Request ID should be a non-empty string
     request_id = response.headers["x-request-id"]
-    assert isinstance(request_id, str), f"Request ID should be a string"
-    assert len(request_id) > 0, f"Request ID should not be empty"
+    assert isinstance(request_id, str), "Request ID should be a string"
+    assert len(request_id) > 0, "Request ID should not be empty"
 
     # Property 3: Request ID should be a valid UUID format
     # UUIDs are 36 characters with hyphens
     assert (
         len(request_id) == 36
     ), f"Request ID should be 36 characters (UUID format), got {len(request_id)}"
-    assert request_id.count("-") == 4, f"Request ID should contain 4 hyphens (UUID format)"
+    assert request_id.count("-") == 4, "Request ID should contain 4 hyphens (UUID format)"
 
 
 @settings(max_examples=1)
@@ -409,7 +407,7 @@ def test_property_9_request_id_in_request_state(path):
     request_id_from_state = response_data.get("request_id")
 
     # Property 1: Request ID should be present in request state
-    assert request_id_from_state is not None, f"Request ID should be available in request.state"
+    assert request_id_from_state is not None, "Request ID should be available in request.state"
 
     # Property 2: Request ID from state should match header
     request_id_from_header = response.headers.get("x-request-id")
@@ -458,26 +456,26 @@ def test_property_10_error_logging_with_context(error_message):
             error_log = entries[-1]
 
             # Property 1: Log should contain error_type field
-            assert "error_type" in error_log, f"Error log should contain 'error_type' field"
+            assert "error_type" in error_log, "Error log should contain 'error_type' field"
             assert (
                 error_log["error_type"] == "ValueError"
             ), f"Error type should be 'ValueError', got '{error_log['error_type']}'"
 
             # Property 2: Log should contain error_message field
-            assert "error_message" in error_log, f"Error log should contain 'error_message' field"
+            assert "error_message" in error_log, "Error log should contain 'error_message' field"
             assert (
                 error_log["error_message"] == error_message
             ), f"Error message should be '{error_message}', got '{error_log['error_message']}'"
 
             # Property 3: Log should contain stack_trace field
-            assert "stack_trace" in error_log, f"Error log should contain 'stack_trace' field"
-            assert isinstance(error_log["stack_trace"], str), f"Stack trace should be a string"
-            assert len(error_log["stack_trace"]) > 0, f"Stack trace should not be empty"
+            assert "stack_trace" in error_log, "Error log should contain 'stack_trace' field"
+            assert isinstance(error_log["stack_trace"], str), "Stack trace should be a string"
+            assert len(error_log["stack_trace"]) > 0, "Stack trace should not be empty"
 
             # Property 4: Stack trace should contain the error message
             assert (
                 error_message in error_log["stack_trace"]
-            ), f"Stack trace should contain the error message"
+            ), "Stack trace should contain the error message"
 
 
 @settings(max_examples=1)
@@ -524,21 +522,21 @@ def test_property_10_error_logging_with_request_context(error_message, path, met
             error_log = entries[-1]
 
             # Property 1: Log should contain request_id from request context
-            assert "request_id" in error_log, f"Error log should contain 'request_id' field"
-            assert error_log["request_id"] == "test-request-id-123", f"Request ID should match"
+            assert "request_id" in error_log, "Error log should contain 'request_id' field"
+            assert error_log["request_id"] == "test-request-id-123", "Request ID should match"
 
             # Property 2: Log should contain method from request context
-            assert "method" in error_log, f"Error log should contain 'method' field"
+            assert "method" in error_log, "Error log should contain 'method' field"
             assert (
                 error_log["method"] == method
             ), f"Method should be '{method}', got '{error_log['method']}'"
 
             # Property 3: Log should contain path from request context
-            assert "path" in error_log, f"Error log should contain 'path' field"
-            assert error_log["path"] == path, f"Path should be '{path}', got '{error_log['path']}'"
+            assert "path" in error_log, "Error log should contain 'path' field"
+            assert error_log["path"] == path, "Path should be '{path}', got '{error_log['path']}'"
 
             # Property 4: Log should contain client_id from request context
-            assert "client_id" in error_log, f"Error log should contain 'client_id' field"
+            assert "client_id" in error_log, "Error log should contain 'client_id' field"
             assert (
                 error_log["client_id"] == "127.0.0.1"
             ), f"Client ID should be '127.0.0.1', got '{error_log['client_id']}'"
@@ -571,8 +569,8 @@ def test_property_10_error_logging_in_middleware(path):
         entries = log_capture.get_log_entries()
         assume(len(entries) > 0)
 
-        # Find the error log entry
-        error_log = None
+        # Find error log entry
+        error_log: Dict[str, Any] = None  # type: ignore
         for entry in entries:
             if entry.get("message") == "Request failed":
                 error_log = entry
@@ -581,15 +579,15 @@ def test_property_10_error_logging_in_middleware(path):
         assume(error_log is not None)
 
         # Property 1: Error log should contain error_type
-        assert "error_type" in error_log, f"Error log should contain 'error_type' field"
+        assert "error_type" in error_log, "Error log should contain 'error_type' field"
 
         # Property 2: Error log should contain error_message
-        assert "error_message" in error_log, f"Error log should contain 'error_message' field"
+        assert "error_message" in error_log, "Error log should contain 'error_message' field"
 
         # Property 3: Error log should contain stack_trace
-        assert "stack_trace" in error_log, f"Error log should contain 'stack_trace' field"
+        assert "stack_trace" in error_log, "Error log should contain 'stack_trace' field"
 
         # Property 4: Error log should contain request context
-        assert "request_id" in error_log, f"Error log should contain 'request_id' field"
-        assert "method" in error_log, f"Error log should contain 'method' field"
-        assert "path" in error_log, f"Error log should contain 'path' field"
+        assert "request_id" in error_log, "Error log should contain 'request_id' field"
+        assert "method" in error_log, "Error log should contain 'method' field"
+        assert "path" in error_log, "Error log should contain 'path' field"

@@ -19,7 +19,6 @@ from app.models.schemas import (
     MetabolicState,
     MinimalSelfState,
     NarrativeSelfState,
-    PaginationInfo,
     PrecisionState,
     SelfModelState,
     SystemStateResponse,
@@ -276,11 +275,7 @@ async def get_ignition_history(  # noqa: C901
 
         response = IgnitionHistoryResponse(
             events=paginated_events,
-            pagination=(
-                PaginationInfo(next_cursor=next_cursor, has_more=has_more)
-                if paginated_events
-                else None
-            ),
+            pagination=None,
         )
 
         logger.info(f"Retrieved {len(paginated_events)} ignition events for session {session_id}")

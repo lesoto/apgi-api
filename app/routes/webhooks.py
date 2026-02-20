@@ -6,6 +6,7 @@ API endpoints for managing webhook deliveries including listing, viewing, and re
 
 from fastapi import APIRouter, Depends, status, HTTPException
 from sqlalchemy.orm import Session
+from typing import Optional
 
 from app.database.connection import get_db
 from app.database.models import WebhookDelivery
@@ -38,11 +39,11 @@ router = APIRouter(
     description="List webhook deliveries with optional filtering by status.",
 )
 async def list_webhook_deliveries(
-    status_filter: str = None,
+    status_filter: Optional[str] = None,
     page: int = 1,
     per_page: int = 10,
     db: Session = Depends(get_db),
-    current_user: TokenPayload = Depends(require_permission(Permission.admin)),
+    current_user: TokenPayload = Depends(require_permission(Permission.SYSTEM_ADMIN)),
 ):
     """
     List webhook deliveries.
@@ -79,17 +80,17 @@ async def list_webhook_deliveries(
         for delivery in deliveries:
             delivery_responses.append(
                 WebhookDeliveryResponse(
-                    delivery_id=delivery.delivery_id,
-                    task_id=delivery.task_id,
-                    webhook_url=delivery.webhook_url,
-                    status=delivery.status,
-                    attempts=delivery.attempts,
-                    last_attempt_at=delivery.last_attempt_at,
-                    next_retry_at=delivery.next_retry_at,
-                    response_status=delivery.response_status,
-                    response_body=delivery.response_body,
-                    error_message=delivery.error_message,
-                    created_at=delivery.created_at,
+                    delivery_id=delivery.delivery_id,  # type: ignore[arg-type]
+                    task_id=delivery.task_id,  # type: ignore[arg-type]
+                    webhook_url=delivery.webhook_url,  # type: ignore[arg-type]
+                    status=delivery.status,  # type: ignore[arg-type]
+                    attempts=delivery.attempts,  # type: ignore[arg-type]
+                    last_attempt_at=delivery.last_attempt_at,  # type: ignore[arg-type]
+                    next_retry_at=delivery.next_retry_at,  # type: ignore[arg-type]
+                    response_status=delivery.response_status,  # type: ignore[arg-type]
+                    response_body=delivery.response_body,  # type: ignore[arg-type]
+                    error_message=delivery.error_message,  # type: ignore[arg-type]
+                    created_at=delivery.created_at,  # type: ignore[arg-type]
                 )
             )
 
@@ -119,7 +120,7 @@ async def list_webhook_deliveries(
 async def get_webhook_delivery(
     delivery_id: str,
     db: Session = Depends(get_db),
-    current_user: TokenPayload = Depends(require_permission(Permission.admin)),
+    current_user: TokenPayload = Depends(require_permission(Permission.SYSTEM_ADMIN)),
 ):
     """
     Get details of a specific webhook delivery.
@@ -140,17 +141,17 @@ async def get_webhook_delivery(
         )
 
     return WebhookDeliveryResponse(
-        delivery_id=delivery.delivery_id,
-        task_id=delivery.task_id,
-        webhook_url=delivery.webhook_url,
-        status=delivery.status,
-        attempts=delivery.attempts,
-        last_attempt_at=delivery.last_attempt_at,
-        next_retry_at=delivery.next_retry_at,
-        response_status=delivery.response_status,
-        response_body=delivery.response_body,
-        error_message=delivery.error_message,
-        created_at=delivery.created_at,
+        delivery_id=delivery.delivery_id,  # type: ignore[arg-type]
+        task_id=delivery.task_id,  # type: ignore[arg-type]
+        webhook_url=delivery.webhook_url,  # type: ignore[arg-type]
+        status=delivery.status,  # type: ignore[arg-type]
+        attempts=delivery.attempts,  # type: ignore[arg-type]
+        last_attempt_at=delivery.last_attempt_at,  # type: ignore[arg-type]
+        next_retry_at=delivery.next_retry_at,  # type: ignore[arg-type]
+        response_status=delivery.response_status,  # type: ignore[arg-type]
+        response_body=delivery.response_body,  # type: ignore[arg-type]
+        error_message=delivery.error_message,  # type: ignore[arg-type]
+        created_at=delivery.created_at,  # type: ignore[arg-type]
     )
 
 
@@ -163,7 +164,7 @@ async def get_webhook_delivery(
 async def retry_webhook_delivery(
     delivery_id: str,
     db: Session = Depends(get_db),
-    current_user: TokenPayload = Depends(require_permission(Permission.admin)),
+    current_user: TokenPayload = Depends(require_permission(Permission.SYSTEM_ADMIN)),
 ):
     """
     Retry a webhook delivery.
@@ -207,9 +208,9 @@ async def retry_webhook_delivery(
         return WebhookRetryResponse(
             delivery_id=delivery_id,
             success=success,
-            status=delivery.status,
-            attempts=delivery.attempts,
-            last_attempt_at=delivery.last_attempt_at,
+            status=delivery.status,  # type: ignore[arg-type]
+            attempts=delivery.attempts,  # type: ignore[arg-type]
+            last_attempt_at=delivery.last_attempt_at,  # type: ignore[arg-type]
         )
     except Exception as e:
         raise HTTPException(
@@ -227,7 +228,7 @@ async def retry_webhook_delivery(
 async def delete_webhook_delivery(
     delivery_id: str,
     db: Session = Depends(get_db),
-    current_user: TokenPayload = Depends(require_permission(Permission.admin)),
+    current_user: TokenPayload = Depends(require_permission(Permission.SYSTEM_ADMIN)),
 ):
     """
     Delete a webhook delivery record.

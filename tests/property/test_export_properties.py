@@ -7,7 +7,6 @@ and content-type headers.
 """
 
 import json
-import pytest
 from hypothesis import given, strategies as st, assume, settings
 from unittest.mock import Mock, AsyncMock
 import sys
@@ -20,7 +19,7 @@ sys.path.insert(0, str(Path(__file__).parent.parent.parent / "app"))
 from fastapi import FastAPI, HTTPException, Depends, Query
 from fastapi.testclient import TestClient
 from fastapi.responses import StreamingResponse
-from services.data_export import DataExportService
+from app.services.data_export import DataExportService
 
 # ============================================================================
 # Helper Functions
@@ -196,7 +195,7 @@ def test_property_19_export_authorization_own_session(user_id, session_id):
         min_size=1, max_size=50, alphabet=st.characters(whitelist_categories=("L", "N"))
     ),
     config=st.dictionaries(
-        st.text(min_size=1, max_size=20, alphabet=st.characters(whitelist_categories=("L",))),
+        st.text(min_size=1, max_size=20, alphabet=st.characters(categories=("L",))),  # type: ignore[arg-type]
         st.one_of(st.text(max_size=50), st.integers(), st.floats(allow_nan=False)),
         min_size=1,
         max_size=5,

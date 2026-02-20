@@ -128,7 +128,7 @@ async def execute_task(
             session_id=session_id,
             task_type=request.task_type,
             parameters=request.parameters,
-            priority=request.priority,
+            priority=request.priority or 0,
             webhook_url=request.webhook_url,
         )
 
@@ -472,11 +472,11 @@ async def list_task_dependencies(
 
         return [
             TaskDependencyResponse(
-                id=dep.id,  # type: ignore[arg-type]
-                dependent_task_id=dep.dependent_task_id,  # type: ignore[arg-type]
-                prerequisite_task_id=dep.prerequisite_task_id,  # type: ignore[arg-type]
-                dependency_type=dep.dependency_type,  # type: ignore[arg-type]
-                created_at=dep.created_at,  # type: ignore[arg-type]
+                id=dep.id,
+                dependent_task_id=dep.dependent_task_id,
+                prerequisite_task_id=dep.prerequisite_task_id,
+                dependency_type=dep.dependency_type,
+                created_at=dep.created_at,
             )
             for dep in dependencies
         ]

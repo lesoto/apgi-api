@@ -7,7 +7,7 @@ through HTTP requests with authentication.
 
 import pytest
 import uuid
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock
 from httpx import AsyncClient, ASGITransport
 
 
@@ -30,7 +30,7 @@ async def authenticated_client(test_environment, mock_database_connection):
     mock_user.roles = ["admin"]
 
     # Create a real JWT token for the mock user
-    auth_manager = AuthManager(db=None)  # We don't need DB for token creation
+    auth_manager = AuthManager(db=None)  # type: ignore[arg-type]  # We don't need DB for token creation
     access_token = auth_manager.create_access_token(
         user_id=mock_user.user_id, username=mock_user.username, roles=mock_user.roles
     )

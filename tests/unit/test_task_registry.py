@@ -50,7 +50,7 @@ class TestTaskRegistry:
     def test_get_task_function_invalid(self):
         """Test get_task_function with invalid task type."""
         with pytest.raises(ValueError, match="Unsupported task type"):
-            get_task_function("invalid_task")
+            get_task_function("invalid_task")  # type: ignore[arg-type]
 
     def test_get_task_name_valid(self):
         """Test get_task_name with valid task type."""
@@ -62,7 +62,7 @@ class TestTaskRegistry:
     def test_get_task_name_invalid(self):
         """Test get_task_name with invalid task type."""
         with pytest.raises(ValueError, match="Unsupported task type"):
-            get_task_name("invalid_task")
+            get_task_name("invalid_task")  # type: ignore[arg-type]
 
     def test_list_available_tasks(self):
         """Test list_available_tasks returns all task types."""

@@ -7,9 +7,9 @@ Monitors critical errors and triggers alerts through configured notification cha
 import asyncio
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timezone, timedelta
 from enum import Enum
-from typing import Dict, List, Optional, Any, Callable
+from typing import Dict, List, Optional, Any, Callable, cast
 
 import httpx
 
@@ -393,7 +393,7 @@ class PagerDutyNotificationChannel(NotificationChannel):
                         "Alert sent to PagerDuty",
                         alert_title=alert.title,
                         severity=alert.severity.value,
-                        dedup_key=response.json().get("dedup_key"),
+                        dedup_key=(await response.json()).get("dedup_key"),
                     )
                     return True
                 else:
@@ -482,7 +482,7 @@ class TeamsNotificationChannel(NotificationChannel):
                     if value is not None
                 ]
                 if metadata_facts:
-                    facts_list = teams_payload["sections"][0]["facts"]
+                    facts_list = cast(List[Dict[str, str]], teams_payload["sections"][0]["facts"])  # type: ignore
                     facts_list.extend(metadata_facts)
 
             async with httpx.AsyncClient() as client:

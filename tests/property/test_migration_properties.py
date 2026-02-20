@@ -7,14 +7,14 @@ Tests universal properties of the Alembic migration system.
 
 import os
 import sys
-import tempfile
+from typing import Dict, Any
 from pathlib import Path
 from unittest.mock import patch
 
 import pytest
 from alembic import command
 from alembic.config import Config
-from hypothesis import given, strategies as st, settings
+from hypothesis import given, settings, strategies as st, HealthCheck
 from sqlalchemy import create_engine, inspect, text
 from sqlalchemy.pool import NullPool
 
@@ -42,7 +42,7 @@ def get_alembic_config(database_url: str) -> Config:
     return alembic_cfg
 
 
-def get_database_schema_snapshot(engine):
+def get_database_schema_snapshot(engine) -> Dict[str, Any]:
     """
     Capture a snapshot of the database schema.
 
@@ -60,7 +60,7 @@ def get_database_schema_snapshot(engine):
     """
     inspector = inspect(engine)
 
-    snapshot = {
+    snapshot: Dict[str, Any] = {
         "tables": sorted(inspector.get_table_names()),
         "columns": {},
         "indexes": {},
@@ -68,7 +68,6 @@ def get_database_schema_snapshot(engine):
     }
 
     for table_name in snapshot["tables"]:
-        # Get columns
         columns = inspector.get_columns(table_name)
         snapshot["columns"][table_name] = [
             {
@@ -291,8 +290,8 @@ def test_property_3_migration_roundtrip_initial_schema(clean_test_database):
     database_url = clean_test_database
 
     # Skip test if using SQLite (migrations use PostgreSQL-specific features)
-    if database_url.startswith("sqlite"):
-        pytest.skip("Migration tests require PostgreSQL database for ARRAY and JSONB types")
+    # if database_url.startswith("sqlite"):
+    #     pytest.skip("Migration tests require PostgreSQL database for ARRAY and JSONB types")
 
     engine = create_engine(database_url, poolclass=NullPool)
 
@@ -385,8 +384,8 @@ def test_property_3_migration_roundtrip_idempotency(clean_test_database):
     database_url = clean_test_database
 
     # Skip test if using SQLite (migrations use PostgreSQL-specific features)
-    if database_url.startswith("sqlite"):
-        pytest.skip("Migration tests require PostgreSQL database for ARRAY and JSONB types")
+    # if database_url.startswith("sqlite"):
+    #     pytest.skip("Migration tests require PostgreSQL database for ARRAY and JSONB types")
 
     engine = create_engine(database_url, poolclass=NullPool)
 
@@ -460,8 +459,8 @@ def test_property_3_migration_roundtrip_preserves_alembic_version(clean_test_dat
     database_url = clean_test_database
 
     # Skip test if using SQLite (migrations use PostgreSQL-specific features)
-    if database_url.startswith("sqlite"):
-        pytest.skip("Migration tests require PostgreSQL database for ARRAY and JSONB types")
+    # if database_url.startswith("sqlite"):
+    #     pytest.skip("Migration tests require PostgreSQL database for ARRAY and JSONB types")
 
     engine = create_engine(database_url, poolclass=NullPool)
 
@@ -520,7 +519,9 @@ def test_property_3_migration_roundtrip_preserves_alembic_version(clean_test_dat
     engine.dispose()
 
 
-@settings(max_examples=1)  # Reduced for faster testing
+@settings(
+    max_examples=1, suppress_health_check=[HealthCheck.function_scoped_fixture]
+)  # Reduced for faster testing
 @given(upgrade_count=st.integers(min_value=1, max_value=2))
 def test_property_3_migration_roundtrip_multiple_cycles(clean_test_database, upgrade_count):
     """
@@ -537,8 +538,8 @@ def test_property_3_migration_roundtrip_multiple_cycles(clean_test_database, upg
     database_url = clean_test_database
 
     # Skip test if using SQLite (migrations use PostgreSQL-specific features)
-    if database_url.startswith("sqlite"):
-        pytest.skip("Migration tests require PostgreSQL database for ARRAY and JSONB types")
+    # if database_url.startswith("sqlite"):
+    #     pytest.skip("Migration tests require PostgreSQL database for ARRAY and JSONB types")
 
     engine = create_engine(database_url, poolclass=NullPool)
 

@@ -5,12 +5,12 @@ Feature: api-migration
 Tests universal properties of JWT token validation and authentication.
 """
 
-import pytest
 from hypothesis import given, strategies as st, assume, settings
 from datetime import datetime, timedelta
 from unittest.mock import Mock
 import jwt
 import asyncio
+from typing import cast
 
 # Import after setting up environment
 import sys
@@ -20,9 +20,8 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent.parent.parent / "app"))
 
 from app.config import settings as app_settings
-from app.services.auth_manager import AuthManager, TokenPayload
+from app.services.auth_manager import AuthManager
 from app.middleware.authentication import AuthenticationMiddleware
-from app.exceptions import ExpiredTokenError, InvalidTokenError
 
 # ============================================================================
 # Helper Functions
@@ -85,12 +84,12 @@ def test_property_5_jwt_validation_no_token(path):
 
     # Property: When no token is provided, middleware should pass through
     # (the route dependency will handle the rejection)
-    assert response.status_code == 200, f"Middleware should pass through when no token provided"
+    assert response.status_code == 200, "Middleware should pass through when no token provided"
 
     # Property: Request state should not have authenticated flag set to True
     assert not getattr(
         mock_request.state, "authenticated", False
-    ), f"Request should not be marked as authenticated when no token provided"
+    ), "Request should not be marked as authenticated when no token provided"
 
 
 @settings(max_examples=1)  # Reduced for faster testing
@@ -145,7 +144,7 @@ def test_property_5_jwt_validation_invalid_token(path, invalid_token):
     # Property: Should include WWW-Authenticate header
     assert (
         "WWW-Authenticate" in response.headers or "www-authenticate" in response.headers
-    ), f"401 response should include WWW-Authenticate header"
+    ), "401 response should include WWW-Authenticate header"
 
 
 @settings(max_examples=1)  # Reduced for faster testing
@@ -199,7 +198,7 @@ def test_property_5_jwt_validation_expired_token(path, user_id, username):
 
     # Create token with the same secret key used by the app
     expired_token = jwt.encode(
-        payload, app_settings.jwt_secret_key, algorithm=app_settings.jwt_algorithm
+        payload, cast(str, app_settings.jwt_secret_key), algorithm=app_settings.jwt_algorithm
     )
 
     # Create fresh instances for this test
@@ -224,7 +223,7 @@ def test_property_5_jwt_validation_expired_token(path, user_id, username):
     # Property: Should include WWW-Authenticate header
     assert (
         "WWW-Authenticate" in response.headers or "www-authenticate" in response.headers
-    ), f"401 response should include WWW-Authenticate header"
+    ), "401 response should include WWW-Authenticate header"
 
 
 @settings(max_examples=1)  # Reduced for faster testing
@@ -278,7 +277,7 @@ def test_property_5_jwt_validation_wrong_token_type(path, user_id, username):
 
     # Create token with the same secret key used by the app
     refresh_token = jwt.encode(
-        payload, app_settings.jwt_secret_key, algorithm=app_settings.jwt_algorithm
+        payload, cast(str, app_settings.jwt_secret_key), algorithm=app_settings.jwt_algorithm
     )
 
     # Create fresh instances for this test
@@ -303,7 +302,7 @@ def test_property_5_jwt_validation_wrong_token_type(path, user_id, username):
     # Property: Should include WWW-Authenticate header
     assert (
         "WWW-Authenticate" in response.headers or "www-authenticate" in response.headers
-    ), f"401 response should include WWW-Authenticate header"
+    ), "401 response should include WWW-Authenticate header"
 
 
 @settings(max_examples=1)  # Reduced for faster testing
@@ -369,7 +368,7 @@ def test_property_5_jwt_validation_malformed_header(path, malformed_header):
         max_size=100,
         alphabet=st.characters(
             blacklist_characters="\x00",  # Exclude null bytes
-            blacklist_categories=("Cs",),  # Exclude surrogates
+            blacklist_categories=["Cs"],  # Exclude surrogates
         ),
     )
 )
@@ -397,7 +396,7 @@ def test_property_6_password_hashing_verification(password):
     # Property 3: Original password should verify against the hash
     assert AuthManager.verify_password(
         password, password_hash
-    ), f"Original password should verify against its hash"
+    ), "Original password should verify against its hash"
 
     # Property 4: Hash should be different from the original password
     assert password_hash != password, "Hash should be different from original password"
@@ -410,7 +409,7 @@ def test_property_6_password_hashing_verification(password):
         max_size=100,
         alphabet=st.characters(
             blacklist_characters="\x00",
-            blacklist_categories=("Cs",),
+            blacklist_categories=["Cs"],
         ),
     ),
     different_password=st.text(
@@ -418,7 +417,7 @@ def test_property_6_password_hashing_verification(password):
         max_size=100,
         alphabet=st.characters(
             blacklist_characters="\x00",
-            blacklist_categories=("Cs",),
+            blacklist_categories=["Cs"],
         ),
     ),
 )
@@ -441,7 +440,7 @@ def test_property_6_password_hashing_different_password_fails(password, differen
     # Property: Different password should NOT verify against the hash
     assert not AuthManager.verify_password(
         different_password, password_hash
-    ), f"Different password should not verify against the hash"
+    ), "Different password should not verify against the hash"
 
 
 @settings(max_examples=1)  # Reduced for faster testing
@@ -451,7 +450,7 @@ def test_property_6_password_hashing_different_password_fails(password, differen
         max_size=100,
         alphabet=st.characters(
             blacklist_characters="\x00",
-            blacklist_categories=("Cs",),
+            blacklist_categories=["Cs"],
         ),
     )
 )
@@ -473,7 +472,7 @@ def test_property_6_password_hashing_deterministic_verification(password):
     for _ in range(5):
         assert AuthManager.verify_password(
             password, password_hash
-        ), f"Password verification should be deterministic and always succeed"
+        ), "Password verification should be deterministic and always succeed"
 
 
 @settings(max_examples=1)  # Reduced for faster testing
@@ -483,7 +482,7 @@ def test_property_6_password_hashing_deterministic_verification(password):
         max_size=100,
         alphabet=st.characters(
             blacklist_characters="\x00",
-            blacklist_categories=("Cs",),
+            blacklist_categories=["Cs"],
         ),
     )
 )
@@ -521,7 +520,7 @@ def test_property_6_password_hashing_unique_salts(password):
         max_size=200,
         alphabet=st.characters(
             blacklist_characters="\x00",
-            blacklist_categories=("Cs",),
+            blacklist_categories=["Cs"],
         ),
     )
 )
@@ -545,4 +544,4 @@ def test_property_6_password_hashing_long_passwords(password):
     # Property: Original password should still verify (truncation is consistent)
     assert AuthManager.verify_password(
         password, password_hash
-    ), f"Long password should verify against its hash (consistent truncation)"
+    ), "Long password should verify against its hash (consistent truncation)"

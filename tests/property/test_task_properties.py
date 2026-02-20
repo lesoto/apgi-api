@@ -8,8 +8,6 @@ Tests universal properties of task status and result retrieval.
 import pytest
 from hypothesis import given, strategies as st, settings
 from unittest.mock import MagicMock
-from datetime import datetime
-import uuid
 import json
 
 # Import after setting up environment
@@ -231,7 +229,7 @@ def test_property_16_task_serialization_roundtrip(task_id, task_data):
     # Property 5: Round-trip should preserve types for JSON-compatible types
     for key, value in task_data.items():
         assert key in deserialized
-        assert type(deserialized[key]) == type(value) or (
+        assert type(deserialized[key]) is type(value) or (
             # JSON converts all numbers to int/float appropriately
             isinstance(value, (int, float))
             and isinstance(deserialized[key], (int, float))

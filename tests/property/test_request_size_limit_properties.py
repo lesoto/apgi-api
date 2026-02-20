@@ -5,7 +5,6 @@ Feature: api-migration
 Tests universal properties of request size limiting to prevent DoS attacks.
 """
 
-import pytest
 from hypothesis import given, strategies as st, assume, settings
 import sys
 from pathlib import Path
@@ -15,7 +14,7 @@ sys.path.insert(0, str(Path(__file__).parent.parent.parent / "app"))
 
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
-from middleware.request_size_limit import RequestSizeLimitMiddleware
+from app.middleware.request_size_limit import RequestSizeLimitMiddleware
 
 # ============================================================================
 # Helper Functions
@@ -99,26 +98,26 @@ def test_property_30_request_size_limiting_exceeds_limit(payload_size_mb, path):
 
     # Property 2: Response should contain error information
     response_data = response.json()
-    assert "error" in response_data, f"Response should contain 'error' field"
+    assert "error" in response_data, "Response should contain 'error' field"
 
     error = response_data["error"]
 
     # Property 3: Error should contain appropriate error code
-    assert "code" in error, f"Error should contain 'code' field"
+    assert "code" in error, "Error should contain 'code' field"
     assert (
         error["code"] == "REQUEST_TOO_LARGE"
     ), f"Error code should be 'REQUEST_TOO_LARGE', got '{error['code']}'"
 
     # Property 4: Error should contain descriptive message
-    assert "message" in error, f"Error should contain 'message' field"
-    assert "too large" in error["message"].lower(), f"Error message should mention 'too large'"
+    assert "message" in error, "Error should contain 'message' field"
+    assert "too large" in error["message"].lower(), "Error message should mention 'too large'"
 
     # Property 5: Error should contain timestamp
-    assert "timestamp" in error, f"Error should contain 'timestamp' field"
+    assert "timestamp" in error, "Error should contain 'timestamp' field"
 
     # Property 6: Error should contain details about size limits
-    assert "details" in error, f"Error should contain 'details' field"
-    assert "max_size_mb" in error["details"], f"Error details should contain 'max_size_mb'"
+    assert "details" in error, "Error should contain 'details' field"
+    assert "max_size_mb" in error["details"], "Error details should contain 'max_size_mb'"
     assert (
         error["details"]["max_size_mb"] == 10
     ), f"Max size should be 10MB, got {error['details']['max_size_mb']}"
@@ -166,7 +165,7 @@ def test_property_30_request_size_limiting_within_limit(payload_size_kb, path):
         error = response_data["error"]
         assert (
             error.get("code") != "REQUEST_TOO_LARGE"
-        ), f"Valid-sized request should not be rejected for size"
+        ), "Valid-sized request should not be rejected for size"
 
 
 @settings(max_examples=1)
@@ -223,7 +222,7 @@ def test_property_30_request_size_limiting_skips_no_body_methods(method, path):
     This property ensures that size limiting only applies to methods with request bodies.
     """
     # Create app with very small size limit (1 byte)
-    app = create_test_app_with_size_limit(max_size_mb=0.000001, enabled=True)
+    app = create_test_app_with_size_limit(max_size_mb=0, enabled=True)
     client = TestClient(app, raise_server_exceptions=False)
 
     # Make request with method that doesn't have a body
@@ -330,10 +329,10 @@ def test_property_30_request_size_limiting_content_length_header(payload_size_mb
 
     # Property 2: Response should contain error information
     response_data = response.json()
-    assert "error" in response_data, f"Response should contain 'error' field"
+    assert "error" in response_data, "Response should contain 'error' field"
     assert (
         response_data["error"]["code"] == "REQUEST_TOO_LARGE"
-    ), f"Error code should be 'REQUEST_TOO_LARGE'"
+    ), "Error code should be 'REQUEST_TOO_LARGE'"
 
 
 @settings(max_examples=1)
@@ -390,7 +389,7 @@ def test_property_30_request_size_limiting_applies_to_all_endpoints(payload_size
 
     # Verify error structure is consistent
     response_data = response.json()
-    assert "error" in response_data, f"Response should contain 'error' field"
+    assert "error" in response_data, "Response should contain 'error' field"
     assert (
         response_data["error"]["code"] == "REQUEST_TOO_LARGE"
-    ), f"Error code should be 'REQUEST_TOO_LARGE'"
+    ), "Error code should be 'REQUEST_TOO_LARGE'"

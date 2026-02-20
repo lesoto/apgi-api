@@ -20,7 +20,12 @@ def upgrade() -> None:
     # Create session_templates table
     op.create_table(
         "session_templates",
-        sa.Column("template_id", sa.String(length=36), nullable=False, comment="Unique template identifier"),
+        sa.Column(
+            "template_id",
+            sa.String(length=36),
+            nullable=False,
+            comment="Unique template identifier",
+        ),
         sa.Column("user_id", sa.String(length=36), nullable=False, comment="Owner user ID"),
         sa.Column("name", sa.String(length=100), nullable=False, comment="Template name"),
         sa.Column("description", sa.Text(), nullable=True, comment="Template description"),
