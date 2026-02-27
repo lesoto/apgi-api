@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
     <meta http-equiv="Content-Type" content="text/html; charset=utf-8">
-    <title>Coverage for app/models/schemas.py: 58%</title>
+    <title>Coverage for app/models/schemas.py: 60%</title>
     <link rel="icon" sizes="32x32" href="favicon_32_cb_58284776.png">
     <link rel="stylesheet" href="style_cb_a5a05ca4.css" type="text/css">
     <script src="coverage_html_cb_bcae5fc4.js" defer></script>
@@ -12,7 +12,7 @@
     <div class="content">
         <h1>
             <span class="text">Coverage for </span><b>app&#8201;/&#8201;models&#8201;/&#8201;schemas.py</b>:
-            <span class="pc_cov">58%</span>
+            <span class="pc_cov">60%</span>
         </h1>
         <aside id="help_panel_wrapper">
             <input id="help_panel_state" type="checkbox">
@@ -55,8 +55,8 @@
         </aside>
         <h2>
             <span class="text">672 statements &nbsp;</span>
-            <button type="button" class="run button_toggle_run" value="run" data-shortcut="r" title="Toggle lines run">392<span class="text"> run</span></button>
-            <button type="button" class="mis show_mis button_toggle_mis" value="mis" data-shortcut="m" title="Toggle lines missing">280<span class="text"> missing</span></button>
+            <button type="button" class="run button_toggle_run" value="run" data-shortcut="r" title="Toggle lines run">402<span class="text"> run</span></button>
+            <button type="button" class="mis show_mis button_toggle_mis" value="mis" data-shortcut="m" title="Toggle lines missing">270<span class="text"> missing</span></button>
             <button type="button" class="exc show_exc button_toggle_exc" value="exc" data-shortcut="x" title="Toggle lines excluded">0<span class="text"> excluded</span></button>
         </h2>
         <p class="text">
@@ -65,7 +65,7 @@
             <a id="nextFileLink" class="nav" href="z_c6de83248c84ada5___init___py.html">&#xbb; next</a>
             &nbsp; &nbsp; &nbsp;
             <a class="nav" href="https://coverage.readthedocs.io/en/7.13.0">coverage.py v7.13.0</a>,
-            created at 2026-02-27 12:37 -0500
+            created at 2026-02-27 14:22 -0500
         </p>
         <aside class="hidden">
             <button type="button" class="button_next_chunk" data-shortcut="j"></button>
@@ -1222,44 +1222,44 @@
     <p class="run"><span class="n"><a id="t1140" href="#t1140">1140</a></span><span class="t">    <span class="op">@</span><span class="nam">classmethod</span>&nbsp;</span><span class="r"></span></p>
     <p class="run"><span class="n"><a id="t1141" href="#t1141">1141</a></span><span class="t">    <span class="key">def</span> <span class="nam">validate_username</span><span class="op">(</span><span class="nam">cls</span><span class="op">,</span> <span class="nam">v</span><span class="op">)</span><span class="op">:</span>&nbsp;</span><span class="r"></span></p>
     <p class="pln"><span class="n"><a id="t1142" href="#t1142">1142</a></span><span class="t">        <span class="str">"""Validate username format."""</span>&nbsp;</span><span class="r"></span></p>
-    <p class="mis show_mis"><span class="n"><a id="t1143" href="#t1143">1143</a></span><span class="t">        <span class="key">if</span> <span class="key">not</span> <span class="nam">v</span> <span class="key">or</span> <span class="key">not</span> <span class="nam">v</span><span class="op">.</span><span class="nam">strip</span><span class="op">(</span><span class="op">)</span><span class="op">:</span>&nbsp;</span><span class="r"></span></p>
+    <p class="run"><span class="n"><a id="t1143" href="#t1143">1143</a></span><span class="t">        <span class="key">if</span> <span class="key">not</span> <span class="nam">v</span> <span class="key">or</span> <span class="key">not</span> <span class="nam">v</span><span class="op">.</span><span class="nam">strip</span><span class="op">(</span><span class="op">)</span><span class="op">:</span>&nbsp;</span><span class="r"></span></p>
     <p class="mis show_mis"><span class="n"><a id="t1144" href="#t1144">1144</a></span><span class="t">            <span class="key">raise</span> <span class="nam">ValueError</span><span class="op">(</span><span class="str">"Username cannot be empty"</span><span class="op">)</span>&nbsp;</span><span class="r"></span></p>
     <p class="pln"><span class="n"><a id="t1145" href="#t1145">1145</a></span><span class="t">&nbsp;</span><span class="r"></span></p>
     <p class="pln"><span class="n"><a id="t1146" href="#t1146">1146</a></span><span class="t">        <span class="com"># Check username format (alphanumeric, underscore, dash, min 3 chars)</span>&nbsp;</span><span class="r"></span></p>
-    <p class="mis show_mis"><span class="n"><a id="t1147" href="#t1147">1147</a></span><span class="t">        <span class="key">if</span> <span class="key">not</span> <span class="nam">re</span><span class="op">.</span><span class="nam">match</span><span class="op">(</span><span class="str">r"^[a-zA-Z0-9_-]{3,50}$"</span><span class="op">,</span> <span class="nam">v</span><span class="op">)</span><span class="op">:</span>&nbsp;</span><span class="r"></span></p>
+    <p class="run"><span class="n"><a id="t1147" href="#t1147">1147</a></span><span class="t">        <span class="key">if</span> <span class="key">not</span> <span class="nam">re</span><span class="op">.</span><span class="nam">match</span><span class="op">(</span><span class="str">r"^[a-zA-Z0-9_-]{3,50}$"</span><span class="op">,</span> <span class="nam">v</span><span class="op">)</span><span class="op">:</span>&nbsp;</span><span class="r"></span></p>
     <p class="mis show_mis"><span class="n"><a id="t1148" href="#t1148">1148</a></span><span class="t">            <span class="key">raise</span> <span class="nam">ValueError</span><span class="op">(</span>&nbsp;</span><span class="r"></span></p>
     <p class="mis mis2 show_mis"><span class="n"><a id="t1149" href="#t1149">1149</a></span><span class="t">                <span class="str">"Username must be 3-50 characters, alphanumeric with underscores or dashes"</span>&nbsp;</span><span class="r"></span></p>
     <p class="mis mis2 show_mis"><span class="n"><a id="t1150" href="#t1150">1150</a></span><span class="t">            <span class="op">)</span>&nbsp;</span><span class="r"></span></p>
     <p class="pln"><span class="n"><a id="t1151" href="#t1151">1151</a></span><span class="t">&nbsp;</span><span class="r"></span></p>
-    <p class="mis show_mis"><span class="n"><a id="t1152" href="#t1152">1152</a></span><span class="t">        <span class="key">return</span> <span class="nam">v</span><span class="op">.</span><span class="nam">strip</span><span class="op">(</span><span class="op">)</span>&nbsp;</span><span class="r"></span></p>
+    <p class="run"><span class="n"><a id="t1152" href="#t1152">1152</a></span><span class="t">        <span class="key">return</span> <span class="nam">v</span><span class="op">.</span><span class="nam">strip</span><span class="op">(</span><span class="op">)</span>&nbsp;</span><span class="r"></span></p>
     <p class="pln"><span class="n"><a id="t1153" href="#t1153">1153</a></span><span class="t">&nbsp;</span><span class="r"></span></p>
     <p class="run"><span class="n"><a id="t1154" href="#t1154">1154</a></span><span class="t">    <span class="op">@</span><span class="nam">field_validator</span><span class="op">(</span><span class="str">"email"</span><span class="op">)</span>&nbsp;</span><span class="r"></span></p>
     <p class="run"><span class="n"><a id="t1155" href="#t1155">1155</a></span><span class="t">    <span class="op">@</span><span class="nam">classmethod</span>&nbsp;</span><span class="r"></span></p>
     <p class="run"><span class="n"><a id="t1156" href="#t1156">1156</a></span><span class="t">    <span class="key">def</span> <span class="nam">validate_email</span><span class="op">(</span><span class="nam">cls</span><span class="op">,</span> <span class="nam">v</span><span class="op">)</span><span class="op">:</span>&nbsp;</span><span class="r"></span></p>
     <p class="pln"><span class="n"><a id="t1157" href="#t1157">1157</a></span><span class="t">        <span class="str">"""Validate email format."""</span>&nbsp;</span><span class="r"></span></p>
-    <p class="mis show_mis"><span class="n"><a id="t1158" href="#t1158">1158</a></span><span class="t">        <span class="key">if</span> <span class="key">not</span> <span class="nam">v</span> <span class="key">or</span> <span class="key">not</span> <span class="nam">v</span><span class="op">.</span><span class="nam">strip</span><span class="op">(</span><span class="op">)</span><span class="op">:</span>&nbsp;</span><span class="r"></span></p>
+    <p class="run"><span class="n"><a id="t1158" href="#t1158">1158</a></span><span class="t">        <span class="key">if</span> <span class="key">not</span> <span class="nam">v</span> <span class="key">or</span> <span class="key">not</span> <span class="nam">v</span><span class="op">.</span><span class="nam">strip</span><span class="op">(</span><span class="op">)</span><span class="op">:</span>&nbsp;</span><span class="r"></span></p>
     <p class="mis show_mis"><span class="n"><a id="t1159" href="#t1159">1159</a></span><span class="t">            <span class="key">raise</span> <span class="nam">ValueError</span><span class="op">(</span><span class="str">"Email cannot be empty"</span><span class="op">)</span>&nbsp;</span><span class="r"></span></p>
     <p class="pln"><span class="n"><a id="t1160" href="#t1160">1160</a></span><span class="t">&nbsp;</span><span class="r"></span></p>
-    <p class="mis show_mis"><span class="n"><a id="t1161" href="#t1161">1161</a></span><span class="t">        <span class="nam">email_regex</span> <span class="op">=</span> <span class="str">r"^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$"</span>&nbsp;</span><span class="r"></span></p>
-    <p class="mis show_mis"><span class="n"><a id="t1162" href="#t1162">1162</a></span><span class="t">        <span class="key">if</span> <span class="key">not</span> <span class="nam">re</span><span class="op">.</span><span class="nam">match</span><span class="op">(</span><span class="nam">email_regex</span><span class="op">,</span> <span class="nam">v</span><span class="op">)</span><span class="op">:</span>&nbsp;</span><span class="r"></span></p>
+    <p class="run"><span class="n"><a id="t1161" href="#t1161">1161</a></span><span class="t">        <span class="nam">email_regex</span> <span class="op">=</span> <span class="str">r"^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$"</span>&nbsp;</span><span class="r"></span></p>
+    <p class="run"><span class="n"><a id="t1162" href="#t1162">1162</a></span><span class="t">        <span class="key">if</span> <span class="key">not</span> <span class="nam">re</span><span class="op">.</span><span class="nam">match</span><span class="op">(</span><span class="nam">email_regex</span><span class="op">,</span> <span class="nam">v</span><span class="op">)</span><span class="op">:</span>&nbsp;</span><span class="r"></span></p>
     <p class="mis show_mis"><span class="n"><a id="t1163" href="#t1163">1163</a></span><span class="t">            <span class="key">raise</span> <span class="nam">ValueError</span><span class="op">(</span><span class="str">"Invalid email format"</span><span class="op">)</span>&nbsp;</span><span class="r"></span></p>
     <p class="pln"><span class="n"><a id="t1164" href="#t1164">1164</a></span><span class="t">&nbsp;</span><span class="r"></span></p>
-    <p class="mis show_mis"><span class="n"><a id="t1165" href="#t1165">1165</a></span><span class="t">        <span class="key">return</span> <span class="nam">v</span><span class="op">.</span><span class="nam">strip</span><span class="op">(</span><span class="op">)</span><span class="op">.</span><span class="nam">lower</span><span class="op">(</span><span class="op">)</span>&nbsp;</span><span class="r"></span></p>
+    <p class="run"><span class="n"><a id="t1165" href="#t1165">1165</a></span><span class="t">        <span class="key">return</span> <span class="nam">v</span><span class="op">.</span><span class="nam">strip</span><span class="op">(</span><span class="op">)</span><span class="op">.</span><span class="nam">lower</span><span class="op">(</span><span class="op">)</span>&nbsp;</span><span class="r"></span></p>
     <p class="pln"><span class="n"><a id="t1166" href="#t1166">1166</a></span><span class="t">&nbsp;</span><span class="r"></span></p>
     <p class="run"><span class="n"><a id="t1167" href="#t1167">1167</a></span><span class="t">    <span class="op">@</span><span class="nam">field_validator</span><span class="op">(</span><span class="str">"password"</span><span class="op">)</span>&nbsp;</span><span class="r"></span></p>
     <p class="run"><span class="n"><a id="t1168" href="#t1168">1168</a></span><span class="t">    <span class="op">@</span><span class="nam">classmethod</span>&nbsp;</span><span class="r"></span></p>
     <p class="run"><span class="n"><a id="t1169" href="#t1169">1169</a></span><span class="t">    <span class="key">def</span> <span class="nam">validate_password</span><span class="op">(</span><span class="nam">cls</span><span class="op">,</span> <span class="nam">v</span><span class="op">)</span><span class="op">:</span>&nbsp;</span><span class="r"></span></p>
     <p class="pln"><span class="n"><a id="t1170" href="#t1170">1170</a></span><span class="t">        <span class="str">"""Validate password strength."""</span>&nbsp;</span><span class="r"></span></p>
-    <p class="mis show_mis"><span class="n"><a id="t1171" href="#t1171">1171</a></span><span class="t">        <span class="key">if</span> <span class="key">not</span> <span class="nam">v</span> <span class="key">or</span> <span class="nam">len</span><span class="op">(</span><span class="nam">v</span><span class="op">)</span> <span class="op">&lt;</span> <span class="num">8</span><span class="op">:</span>&nbsp;</span><span class="r"></span></p>
+    <p class="run"><span class="n"><a id="t1171" href="#t1171">1171</a></span><span class="t">        <span class="key">if</span> <span class="key">not</span> <span class="nam">v</span> <span class="key">or</span> <span class="nam">len</span><span class="op">(</span><span class="nam">v</span><span class="op">)</span> <span class="op">&lt;</span> <span class="num">8</span><span class="op">:</span>&nbsp;</span><span class="r"></span></p>
     <p class="mis show_mis"><span class="n"><a id="t1172" href="#t1172">1172</a></span><span class="t">            <span class="key">raise</span> <span class="nam">ValueError</span><span class="op">(</span><span class="str">"Password must be at least 8 characters long"</span><span class="op">)</span>&nbsp;</span><span class="r"></span></p>
     <p class="pln"><span class="n"><a id="t1173" href="#t1173">1173</a></span><span class="t">&nbsp;</span><span class="r"></span></p>
     <p class="pln"><span class="n"><a id="t1174" href="#t1174">1174</a></span><span class="t">        <span class="com"># Check for at least one uppercase, one lowercase, one digit</span>&nbsp;</span><span class="r"></span></p>
-    <p class="mis show_mis"><span class="n"><a id="t1175" href="#t1175">1175</a></span><span class="t">        <span class="key">if</span> <span class="key">not</span> <span class="op">(</span><span class="nam">re</span><span class="op">.</span><span class="nam">search</span><span class="op">(</span><span class="str">r"[A-Z]"</span><span class="op">,</span> <span class="nam">v</span><span class="op">)</span> <span class="key">and</span> <span class="nam">re</span><span class="op">.</span><span class="nam">search</span><span class="op">(</span><span class="str">r"[a-z]"</span><span class="op">,</span> <span class="nam">v</span><span class="op">)</span> <span class="key">and</span> <span class="nam">re</span><span class="op">.</span><span class="nam">search</span><span class="op">(</span><span class="str">r"\d"</span><span class="op">,</span> <span class="nam">v</span><span class="op">)</span><span class="op">)</span><span class="op">:</span>&nbsp;</span><span class="r"></span></p>
+    <p class="run"><span class="n"><a id="t1175" href="#t1175">1175</a></span><span class="t">        <span class="key">if</span> <span class="key">not</span> <span class="op">(</span><span class="nam">re</span><span class="op">.</span><span class="nam">search</span><span class="op">(</span><span class="str">r"[A-Z]"</span><span class="op">,</span> <span class="nam">v</span><span class="op">)</span> <span class="key">and</span> <span class="nam">re</span><span class="op">.</span><span class="nam">search</span><span class="op">(</span><span class="str">r"[a-z]"</span><span class="op">,</span> <span class="nam">v</span><span class="op">)</span> <span class="key">and</span> <span class="nam">re</span><span class="op">.</span><span class="nam">search</span><span class="op">(</span><span class="str">r"\d"</span><span class="op">,</span> <span class="nam">v</span><span class="op">)</span><span class="op">)</span><span class="op">:</span>&nbsp;</span><span class="r"></span></p>
     <p class="mis show_mis"><span class="n"><a id="t1176" href="#t1176">1176</a></span><span class="t">            <span class="key">raise</span> <span class="nam">ValueError</span><span class="op">(</span>&nbsp;</span><span class="r"></span></p>
     <p class="mis mis2 show_mis"><span class="n"><a id="t1177" href="#t1177">1177</a></span><span class="t">                <span class="str">"Password must contain at least one uppercase letter, one lowercase letter, and one digit"</span>&nbsp;</span><span class="r"></span></p>
     <p class="mis mis2 show_mis"><span class="n"><a id="t1178" href="#t1178">1178</a></span><span class="t">            <span class="op">)</span>&nbsp;</span><span class="r"></span></p>
     <p class="pln"><span class="n"><a id="t1179" href="#t1179">1179</a></span><span class="t">&nbsp;</span><span class="r"></span></p>
-    <p class="mis show_mis"><span class="n"><a id="t1180" href="#t1180">1180</a></span><span class="t">        <span class="key">return</span> <span class="nam">v</span>&nbsp;</span><span class="r"></span></p>
+    <p class="run"><span class="n"><a id="t1180" href="#t1180">1180</a></span><span class="t">        <span class="key">return</span> <span class="nam">v</span>&nbsp;</span><span class="r"></span></p>
     <p class="pln"><span class="n"><a id="t1181" href="#t1181">1181</a></span><span class="t">&nbsp;</span><span class="r"></span></p>
     <p class="pln"><span class="n"><a id="t1182" href="#t1182">1182</a></span><span class="t">&nbsp;</span><span class="r"></span></p>
     <p class="run"><span class="n"><a id="t1183" href="#t1183">1183</a></span><span class="t"><span class="key">class</span> <span class="nam">UserCreateResponse</span><span class="op">(</span><span class="nam">BaseModel</span><span class="op">)</span><span class="op">:</span>&nbsp;</span><span class="r"></span></p>
@@ -1749,7 +1749,7 @@
             <a class="nav" href="z_c6de83248c84ada5___init___py.html">&#xbb; next</a>
             &nbsp; &nbsp; &nbsp;
             <a class="nav" href="https://coverage.readthedocs.io/en/7.13.0">coverage.py v7.13.0</a>,
-            created at 2026-02-27 12:37 -0500
+            created at 2026-02-27 14:22 -0500
         </p>
     </div>
 </footer>

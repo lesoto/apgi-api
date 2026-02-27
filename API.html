@@ -1,0 +1,580 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>APGI System API - Documentation</title>
+    <style>
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+
+      :root {
+        /* APGI Semantic Color System */
+        --threshold-blue: #00b4ff;
+        --precision-red: #ff3366;
+        --modulator-green: #00cc99;
+        --error-yellow: #ffcc00;
+        --workspace-purple: #9966ff;
+        --slate-dark: #2c3e50;
+        --slate-light: #34495e;
+        --bg-dark: #1a1a2e;
+        --bg-darker: #111827;
+        --bg-card: rgba(44, 62, 80, 0.6);
+        --text-primary: #ffffff;
+        --text-secondary: #b8c5d6;
+        --text-muted: #6b7280;
+
+        /* Light theme defaults */
+        --bg-primary: #ffffff;
+        --bg-secondary: #f8fafc;
+        --bg-tertiary: #e2e8f0;
+        --border-color: #e2e8f0;
+        --border-light: #f1f5f9;
+        --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.05);
+        --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.08);
+        --shadow-lg: 0 8px 24px rgba(0, 0, 0, 0.12);
+        --shadow-xl: 0 20px 40px rgba(0, 0, 0, 0.15);
+      }
+
+      [data-theme="light"] {
+        --bg-primary: #ffffff;
+        --bg-secondary: #f8fafc;
+        --bg-tertiary: #e2e8f0;
+        --text-primary: #0f172a;
+        --text-secondary: #334155;
+        --text-muted: #64748b;
+        --border-color: #e2e8f0;
+        --border-light: #f1f5f9;
+        --bg-card: rgba(248, 250, 252, 0.8);
+        --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.05);
+        --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.08);
+        --shadow-lg: 0 8px 24px rgba(0, 0, 0, 0.12);
+        --shadow-xl: 0 20px 40px rgba(0, 0, 0, 0.15);
+      }
+
+      [data-theme="dark"] {
+        --bg-primary: #0a0a1a;
+        --bg-secondary: #12122a;
+        --bg-tertiary: #1a1a35;
+        --text-primary: #f8fafc;
+        --text-secondary: #e2e8f0;
+        --text-muted: #94a3b8;
+        --border-color: #2d2d44;
+        --border-light: #252538;
+        --bg-card: rgba(26, 26, 53, 0.8);
+        --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.3);
+        --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.4);
+        --shadow-lg: 0 8px 24px rgba(0, 0, 0, 0.5);
+        --shadow-xl: 0 20px 40px rgba(0, 0, 0, 0.6);
+      }
+
+      body {
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Helvetica Neue", Arial, sans-serif;
+        background: var(--bg-primary);
+        color: var(--text-primary);
+        line-height: 1.6;
+        min-height: 100vh;
+        transition: background-color 0.3s ease, color 0.3s ease;
+      }
+
+      /* Header */
+      .header {
+        background: var(--bg-secondary);
+        border-bottom: 1px solid var(--border-color);
+        padding: 1rem 0;
+        position: sticky;
+        top: 0;
+        z-index: 100;
+        box-shadow: var(--shadow-sm);
+      }
+
+      .header-container {
+        max-width: 80rem;
+        margin: 0 auto;
+        padding: 0 1rem;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+      }
+
+      .brand {
+        display: flex;
+        align-items: center;
+        color: var(--text-secondary);
+        text-decoration: none;
+        transition: color 0.2s;
+      }
+
+      .brand:hover {
+        color: var(--text-primary);
+      }
+
+      .brand-text {
+        font-size: 1.25rem;
+        font-weight: 700;
+        background: linear-gradient(90deg, var(--threshold-blue), var(--workspace-purple));
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        background-clip: text;
+      }
+
+      /* Theme Toggle */
+      .theme-toggle {
+        background: none;
+        border: 2px solid var(--border-color);
+        border-radius: 50%;
+        width: 2.5rem;
+        height: 2.5rem;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        cursor: pointer;
+        transition: all 0.3s ease;
+        color: var(--text-primary);
+      }
+
+      .theme-toggle:hover {
+        border-color: var(--threshold-blue);
+        transform: rotate(180deg);
+      }
+
+      .theme-icon {
+        width: 1.25rem;
+        height: 1.25rem;
+      }
+
+      /* Main Content */
+      main {
+        scroll-margin-top: 5rem;
+      }
+
+      .container {
+        max-width: 80rem;
+        margin: 0 auto;
+        padding: 3rem 1rem;
+        background: var(--bg-primary);
+        border-radius: 8px;
+        box-shadow: var(--shadow-lg);
+      }
+
+      /* Sections */
+      .section {
+        margin-top: 2rem;
+        background: var(--bg-primary);
+        border-radius: 8px;
+        padding: 1.5rem;
+        margin-bottom: 1rem;
+        border: 1px solid var(--border-color);
+      }
+
+      .section-header {
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        width: 100%;
+        text-align: left;
+        background: none;
+        border: none;
+        padding: 0;
+        color: inherit;
+        font: inherit;
+        transition: all 0.2s;
+      }
+
+      .section-header:hover h2 {
+        color: var(--threshold-blue);
+      }
+
+      .section-header h2 {
+        font-size: 1.5rem;
+        font-weight: 600;
+        color: var(--text-primary);
+        transition: color 0.2s;
+      }
+
+      .chevron {
+        width: 1.5rem;
+        height: 1.5rem;
+        color: var(--text-muted);
+        transition: all 0.2s;
+      }
+
+      .section-header:hover .chevron {
+        color: var(--threshold-blue);
+      }
+
+      .chevron.rotated {
+        transform: rotate(180deg);
+      }
+
+      .section-content {
+        display: none;
+        overflow: hidden;
+        max-height: 0;
+        transition: max-height 0.3s ease-out;
+      }
+
+      .section-content.expanded {
+        display: block;
+        max-height: 2000px;
+        transition: max-height 0.3s ease-in;
+      }
+
+      .section-text {
+        margin-bottom: 1rem;
+        line-height: 1.8;
+        color: var(--text-secondary);
+      }
+
+      .card {
+        background: var(--bg-card);
+        border-radius: 8px;
+        padding: 1.5rem;
+        margin-bottom: 1rem;
+        border: 1px solid var(--border-color);
+      }
+
+      .highlight {
+        padding: 1rem;
+        border-radius: 8px;
+        margin: 1rem 0;
+        border-left: 4px solid;
+        padding-left: 1rem;
+      }
+
+      .highlight-success {
+        background: rgba(0, 204, 102, 0.1);
+        border-left-color: var(--modulator-green);
+      }
+
+      .highlight-warning {
+        background: rgba(255, 204, 0, 0.1);
+        border-left-color: var(--error-yellow);
+      }
+
+      .highlight-error {
+        background: rgba(255, 51, 102, 0.1);
+        border-left-color: var(--precision-red);
+      }
+
+      /* Footer */
+      .footer {
+        background: var(--bg-secondary);
+        border-top: 1px solid var(--border-color);
+        padding: 2rem 0;
+        margin-top: 2rem;
+      }
+
+      .footer-content {
+        max-width: 80rem;
+        margin: 0 auto;
+        padding: 0 1rem;
+        text-align: center;
+      }
+
+      .footer-text {
+        color: var(--text-secondary);
+        font-size: 0.875rem;
+      }
+
+      /* Responsive */
+      @media (max-width: 768px) {
+        .header-container {
+          padding: 0 0.5rem;
+        }
+
+        .container {
+          padding: 2rem 0.5rem;
+        }
+
+        .section {
+          padding: 1rem;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <header class="header">
+      <div class="header-container">
+        <div class="brand">
+          <span class="brand-text">APGI System API</span>
+        </div>
+        <button class="theme-toggle" onclick="toggleTheme()" aria-label="Toggle theme">
+          <svg class="theme-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="12" cy="12" r="5"></circle>
+            <line x1="12" y1="1" x2="12" y2="3"></line>
+            <line x1="12" y1="21" x2="12" y2="23"></line>
+            <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line>
+            <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line>
+            <line x1="1" y1="12" x2="3" y2="12"></line>
+            <line x1="21" y1="12" x2="23" y2="12"></line>
+            <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line>
+            <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line>
+          </svg>
+        </button>
+      </div>
+    </header>
+
+    <main>
+      <div class="container">
+        <!-- Overview Section -->
+        <section class="section">
+          <button class="section-header" onclick="toggleSection('overview-content', this)">
+            <h2>Overview</h2>
+            <svg class="chevron rotated" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="m6 9 6 6 6-6"></path>
+            </svg>
+          </button>
+          <div id="overview-content" class="section-content expanded">
+            <p class="section-text">
+              The APGI System API provides programmatic access to a sophisticated consciousness modeling system based on the Allostatic Precision-Gated Ignition (APGI) framework. This API enables researchers and developers to create, manage, and analyze consciousness simulation sessions that model cognitive processes, physiological states, and ignition dynamics.
+            </p>
+            <p class="section-text">
+              Built on FastAPI with comprehensive middleware for authentication, rate limiting, metrics collection, and distributed tracing, the API supports real-time simulation of consciousness states, prediction error processing, somatic markers, and hierarchical cognitive processing across multiple subsystems.
+            </p>
+          </div>
+        </section>
+
+        <!-- Getting Started Section -->
+        <section class="section">
+          <button class="section-header" onclick="toggleSection('getting-started-content', this)">
+            <h2>Getting Started</h2>
+            <svg class="chevron rotated" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="m6 9 6 6 6-6"></path>
+            </svg>
+          </button>
+          <div id="getting-started-content" class="section-content">
+            <p class="section-text">
+              To begin using the APGI System API, you'll need to authenticate with the system and create consciousness simulation sessions. The API uses JWT-based authentication and provides programmatic access to sophisticated consciousness modeling capabilities.
+            </p>
+          </div>
+        </section>
+
+        <!-- Authentication Section -->
+        <section class="section">
+          <button class="section-header" onclick="toggleSection('authentication-content', this)">
+            <h2>Authentication</h2>
+            <svg class="chevron rotated" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="m6 9 6 6 6-6"></path>
+            </svg>
+          </button>
+          <div id="authentication-content" class="section-content">
+            <p class="section-text">
+              The APGI API uses JWT (JSON Web Token) based authentication. Users authenticate via login credentials to receive access and refresh tokens. All endpoints except health checks and documentation require valid JWT tokens in the Authorization header.
+            </p>
+          </div>
+        </section>
+
+        <!-- Endpoints Section -->
+        <section class="section">
+          <button class="section-header" onclick="toggleSection('endpoints-content', this)">
+            <h2>API Endpoints</h2>
+            <svg class="chevron rotated" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="m6 9 6 6 6-6"></path>
+            </svg>
+          </button>
+          <div id="endpoints-content" class="section-content">
+            <div class="card">
+              <h3>Authentication</h3>
+              <p class="section-text">
+                <strong>POST /v1/auth/login</strong> - Authenticate with username and password to receive JWT tokens
+              </p>
+              <p class="section-text">
+                <strong>POST /v1/auth/refresh</strong> - Refresh access token using refresh token
+              </p>
+            </div>
+            
+            <div class="card">
+              <h3>Sessions</h3>
+              <p class="section-text">
+                <strong>POST /v1/sessions</strong> - Create new consciousness simulation session
+              </p>
+              <p class="section-text">
+                <strong>GET /v1/sessions</strong> - List all sessions
+              </p>
+              <p class="section-text">
+                <strong>GET /v1/sessions/{id}</strong> - Get session details
+              </p>
+              <p class="section-text">
+                <strong>GET /v1/sessions/{id}/state</strong> - Get current session state
+              </p>
+            </div>
+            
+            <div class="card">
+              <h3>Templates</h3>
+              <p class="section-text">
+                <strong>GET /v1/templates</strong> - List available session templates
+              </p>
+              <p class="section-text">
+                <strong>POST /v1/templates</strong> - Create new session template
+              </p>
+            </div>
+            
+            <div class="card">
+              <h3>Health & Monitoring</h3>
+              <p class="section-text">
+                <strong>GET /health</strong> - System health check
+              </p>
+              <p class="section-text">
+                <strong>GET /metrics</strong> - System metrics and performance data
+              </p>
+              <p class="section-text">
+                <strong>GET /version</strong> - API version information
+              </p>
+            </div>
+          </div>
+        </section>
+
+        <!-- Error Codes Section -->
+        <section class="section">
+          <button class="section-header" onclick="toggleSection('error-codes-content', this)">
+            <h2>Error Codes</h2>
+            <svg class="chevron rotated" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="m6 9 6 6 6-6"></path>
+            </svg>
+          </button>
+          <div id="error-codes-content" class="section-content">
+            <div class="card">
+              <h3>Common HTTP Status Codes</h3>
+              <p class="section-text">
+                <strong>200 OK</strong> - Request successful
+              </p>
+              <p class="section-text">
+                <strong>201 Created</strong> - Resource created successfully
+              </p>
+              <p class="section-text">
+                <strong>400 Bad Request</strong> - Invalid request format or parameters
+              </p>
+              <p class="section-text">
+                <strong>401 Unauthorized</strong> - Missing or invalid authentication token
+              </p>
+              <p class="section-text">
+                <strong>403 Forbidden</strong> - Insufficient permissions
+              </p>
+              <p class="section-text">
+                <strong>404 Not Found</strong> - Resource does not exist
+              </p>
+              <p class="section-text">
+                <strong>429 Too Many Requests</strong> - Rate limit exceeded
+              </p>
+              <p class="section-text">
+                <strong>500 Internal Server Error</strong> - Server error occurred
+              </p>
+            </div>
+          </div>
+        </section>
+
+        <!-- FAQ Section -->
+        <section class="section">
+          <button class="section-header" onclick="toggleSection('faq-content', this)">
+            <h2>FAQ</h2>
+            <svg class="chevron rotated" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="m6 9 6 6 6-6"></path>
+            </svg>
+          </button>
+          <div id="faq-content" class="section-content">
+            <div class="card">
+              <h3>How do I get started?</h3>
+              <p class="section-text">
+                First, authenticate using the /v1/auth/login endpoint with your credentials. Then create sessions using /v1/sessions to start consciousness simulations.
+              </p>
+            </div>
+            
+            <div class="card">
+              <h3>What authentication method is used?</h3>
+              <p class="section-text">
+                The API uses JWT (JSON Web Token) authentication. Include the access token in the Authorization header: "Authorization: Bearer &lt;token&gt;".
+              </p>
+            </div>
+            
+            <div class="card">
+              <h3>Can I use this for research?</h3>
+              <p class="section-text">
+                Yes! The API is designed for consciousness research, cognitive modeling, and AI safety studies. It provides detailed telemetry of all subsystem interactions, making it ideal for studying emergence of consciousness-like properties in artificial systems.
+              </p>
+            </div>
+          </div>
+        </section>
+      </div>
+    </main>
+
+    <footer>
+      <div class="footer-content">
+        <p class="footer-text">© 2025 APGI System API. All rights reserved.</p>
+      </div>
+    </footer>
+
+    <script>
+      // Theme management
+      function initTheme() {
+        const savedTheme = localStorage.getItem('theme') || 'light';
+        document.documentElement.setAttribute('data-theme', savedTheme);
+        updateThemeIcon(savedTheme);
+      }
+
+      function toggleTheme() {
+        const currentTheme = document.documentElement.getAttribute('data-theme');
+        const newTheme = currentTheme === 'light' ? 'dark' : 'light';
+        
+        document.documentElement.setAttribute('data-theme', newTheme);
+        localStorage.setItem('theme', newTheme);
+        updateThemeIcon(newTheme);
+      }
+
+      function updateThemeIcon(theme) {
+        const themeIcon = document.querySelector('.theme-icon');
+        if (theme === 'dark') {
+          themeIcon.innerHTML = `
+            <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path>
+          `;
+        } else {
+          themeIcon.innerHTML = `
+            <circle cx="12" cy="12" r="5"></circle>
+            <line x1="12" y1="1" x2="12" y2="3"></line>
+            <line x1="12" y1="21" x2="12" y2="23"></line>
+            <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line>
+            <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line>
+            <line x1="1" y1="12" x2="3" y2="12"></line>
+            <line x1="21" y1="12" x2="23" y2="12"></line>
+            <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line>
+            <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line>
+          `;
+        }
+      }
+
+      function toggleSection(contentId, button) {
+        const content = document.getElementById(contentId);
+        const chevron = button.querySelector('.chevron');
+
+        if (content.classList.contains('expanded')) {
+          content.classList.remove('expanded');
+          chevron.classList.add('rotated');
+        } else {
+          content.classList.add('expanded');
+          chevron.classList.remove('rotated');
+        }
+      }
+
+      // Smooth scroll for anchor links
+      document.querySelectorAll('a[href^="#"]').forEach(anchor => {
+        anchor.addEventListener('click', function(e) {
+          const href = this.getAttribute('href');
+          if (href !== '#') {
+            e.preventDefault();
+            const target = document.querySelector(href);
+            if (target) {
+              target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            }
+          }
+        });
+      });
+
+      // Initialize theme on page load
+      document.addEventListener('DOMContentLoaded', initTheme);
+    </script>
+  </body>
+</html>

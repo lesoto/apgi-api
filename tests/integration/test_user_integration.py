@@ -8,7 +8,7 @@ import pytest
 import uuid
 from unittest.mock import AsyncMock, MagicMock, patch
 from httpx import AsyncClient, ASGITransport
-from typing import Optional, List
+from datetime import datetime
 
 
 @pytest.fixture
@@ -55,25 +55,8 @@ async def authenticated_client(
             yield ac
 
 
-from pydantic import BaseModel
-from datetime import datetime
-
-
-class MockUser(BaseModel):
-    user_id: str
-    username: str
-    email: str
-    roles: List[str]
-    is_active: bool
-    created_at: datetime
-    updated_at: datetime
-    last_login: Optional[datetime] = None
-
-
 # Mock functions
 def create_user_mock(username, email, password, roles=None):
-    from datetime import datetime
-
     return MockUser(
         username=username,
         email=email,
@@ -87,8 +70,6 @@ def create_user_mock(username, email, password, roles=None):
 
 
 def get_user_by_id_mock(user_id):
-    from datetime import datetime
-
     user = MagicMock()
     user.user_id = user_id
     user.username = "test_user"
@@ -106,10 +87,11 @@ class MockUser:
 
     def __init__(self, **kwargs):
         self.user_id = kwargs.get("user_id", str(uuid.uuid4()))
-        self.username = "test_user"
+        self.username = kwargs.get("username", "test_user")
         self.email = kwargs.get("email", "test@example.com")
         self.roles = kwargs.get("roles", ["user"])
         self.is_active = kwargs.get("is_active", True)
+        self.last_login = kwargs.get("last_login", None)
         from datetime import datetime
 
         self.created_at = datetime(2023, 1, 1, 0, 0, 0)
@@ -123,8 +105,6 @@ def update_user_mock(**kwargs):
 @pytest.fixture
 def mock_user_management_service():
     """Create mock UserManagementService for integration tests."""
-    from datetime import datetime
-
     service = MagicMock()
     service.create_user = MagicMock(side_effect=create_user_mock)
     service.get_user = MagicMock(side_effect=get_user_by_id_mock)
@@ -197,7 +177,7 @@ class TestUserRoutesIntegration:
     async def test_update_user(self, authenticated_client, mock_user_management_service):
         """Test updating user with authentication."""
         from app.services.auth_manager import TokenPayload
-        from datetime import datetime, timezone, timedelta
+        from datetime import timezone, timedelta
 
         mock_token_payload = TokenPayload(
             user_id=str(uuid.uuid4()),
