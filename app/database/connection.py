@@ -7,6 +7,7 @@ SQLAlchemy engine and session configuration.
 import logging
 import secrets
 import string
+import sys
 from contextlib import contextmanager
 from typing import Generator
 
@@ -33,10 +34,10 @@ else:
         settings.database_url,
         echo=False,  # Set to True for SQL query logging
         pool_pre_ping=True,  # Verify connections before using
-        pool_size=20,  # Increased pool size for multiple instances
-        max_overflow=30,  # Increased overflow for burst traffic
-        pool_timeout=30,  # Connection timeout
-        pool_recycle=3600,  # Recycle connections after 1 hour
+        pool_size=getattr(settings, "pool_size", 20),  # Configurable pool size
+        max_overflow=getattr(settings, "max_overflow", 30),  # Configurable overflow
+        pool_timeout=getattr(settings, "pool_timeout", 30),  # Configurable timeout
+        pool_recycle=getattr(settings, "pool_recycle", 3600),  # Configurable recycle
         echo_pool=False,  # Disable pool logging in production
     )
 
@@ -117,12 +118,16 @@ def create_default_user():
         secure_username = generate_secure_username("default")
         secure_password = generate_secure_password()
 
-        # Log credentials securely (in production, this should go to a secure secrets manager)
-        logger.warning(
-            f"Generated default user credentials - STORE SECURELY. "
-            f"Username: {secure_username}, Password: {secure_password}. "
-            f"NOTE: These credentials allow full system access - change immediately"
-        )
+        # Print credentials only in interactive mode (never to logs)
+        if sys.stdout.isatty():
+            print(f"\n{'=' * 60}")
+            print("Generated default user credentials - STORE SECURELY")
+            print(f"Username: {secure_username}")
+            print(f"Password: {secure_password}")
+            print("NOTE: These credentials allow full system access - change immediately")
+            print(f"{'=' * 60}\n")
+
+        logger.info(f"Default user created: {secure_username}")
 
         # Import here to avoid circular import
         from app.services.auth_manager import AuthManager
@@ -203,3 +208,56 @@ def close_db():
         logger.info("Database connections closed")
     except Exception as e:
         logger.error(f"Error closing database connections: {e}")
+
+
+def get_pool_status() -> dict:
+    """
+    Get database connection pool status for monitoring.
+
+    Returns:
+        Dictionary with pool status information
+    """
+    pool = engine.pool
+
+    status = {
+        "pool_size": getattr(pool, "size", 0),
+        "checked_in": getattr(pool, "checkedin", 0),
+        "checked_out": getattr(pool, "checkedout", 0),
+        "overflow": getattr(pool, "overflow", 0),
+        "invalid": getattr(pool, "invalid", 0),
+        "timeout": getattr(pool, "timeout", 0),
+    }
+
+    # Calculate utilization
+    total_connections = status["checked_in"] + status["checked_out"]
+    max_connections = status["pool_size"] + status["overflow"]
+    utilization = total_connections / max_connections if max_connections > 0 else 0
+
+    status["utilization"] = utilization
+    status["available_connections"] = max_connections - total_connections
+
+    # Log warnings if pool is under stress
+    if utilization > 0.8:
+        logger.warning(
+            f"Database connection pool under high load: {utilization:.1%} utilized "
+            f"({total_connections}/{max_connections} connections)"
+        )
+    elif status["checked_out"] >= status["pool_size"] + status["overflow"]:
+        logger.error(
+            f"Database connection pool exhausted: {status['checked_out']} connections checked out, "
+            f"pool_size={status['pool_size']}, overflow={status['overflow']}"
+        )
+
+    return status
+
+
+def log_pool_status():
+    """
+    Log current database connection pool status.
+    """
+    status = get_pool_status()
+    logger.info(
+        f"DB Pool Status: size={status['pool_size']}, checked_out={status['checked_out']}, "
+        f"checked_in={status['checked_in']}, overflow={status['overflow']}, "
+        f"utilization={status['utilization']:.1%}"
+    )

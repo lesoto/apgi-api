@@ -33,22 +33,27 @@ class TokenPayload:
         roles: List[str],
         exp: datetime,
         token_type: str = "access",
+        jti: Optional[str] = None,
     ):
         self.user_id = user_id
         self.username = username
         self.roles = roles
         self.exp = exp
         self.token_type = token_type
+        self.jti = jti
 
     def to_dict(self) -> Dict[str, Any]:
         """Convert to dictionary for JWT encoding."""
-        return {
+        data = {
             "user_id": self.user_id,
             "username": self.username,
             "roles": self.roles,
             "exp": int(self.exp.timestamp()),
             "token_type": self.token_type,
         }
+        if self.jti:
+            data["jti"] = self.jti
+        return data
 
     @classmethod
     def from_dict(cls, data: Dict[str, Any]) -> "TokenPayload":
@@ -61,6 +66,7 @@ class TokenPayload:
             roles=data["roles"],
             exp=datetime.fromtimestamp(data["exp"], tz=timezone.utc),
             token_type=data.get("token_type", "access"),
+            jti=data.get("jti"),
         )
 
 
@@ -75,14 +81,16 @@ class AuthManager:
     - Token refresh
     """
 
-    def __init__(self, db: Session):
+    def __init__(self, db: Session, redis_client=None):
         """
         Initialize AuthManager.
 
         Args:
             db: Database session for user lookups
+            redis_client: Redis client for token blocklist (optional)
         """
         self.db = db
+        self.redis = redis_client
         self.secret_key = settings.jwt_secret_key
         self.algorithm = settings.jwt_algorithm
         self.access_token_expire_minutes = settings.jwt_access_token_expire_minutes
@@ -154,13 +162,22 @@ class AuthManager:
             Encoded JWT token string
         """
         from datetime import timezone
+        import uuid
 
         expires_at = datetime.now(timezone.utc) + timedelta(
             minutes=self.access_token_expire_minutes
         )
 
+        # Generate unique JTI for token revocation
+        jti = str(uuid.uuid4())
+
         payload = TokenPayload(
-            user_id=user_id, username=username, roles=roles, exp=expires_at, token_type="access"
+            user_id=user_id,
+            username=username,
+            roles=roles,
+            exp=expires_at,
+            token_type="access",
+            jti=jti,
         )
 
         token = jwt.encode(payload.to_dict(), self.secret_key, algorithm=self.algorithm)
@@ -229,6 +246,11 @@ class AuthManager:
             if datetime.now(timezone.utc) > payload.exp:
                 raise ExpiredTokenError("Token has expired")
 
+            # Check if token has been revoked (only for access tokens with JTI)
+            if payload.jti and self.redis and expected_type == "access":
+                if self.redis.exists(f"revoked_access_tokens:{payload.jti}"):
+                    raise InvalidTokenError("Token has been revoked")
+
             return payload
 
         except jwt.ExpiredSignatureError:
@@ -240,6 +262,61 @@ class AuthManager:
             raise InvalidTokenError(f"Invalid token: {str(e)}")
         except Exception as e:
             raise InvalidTokenError(f"Token verification failed: {str(e)}")
+
+    def revoke_access_token(self, access_token: str) -> bool:
+        """
+        Revoke an access token by adding its JTI to the blocklist.
+
+        Args:
+            access_token: Access token to revoke
+
+        Returns:
+            True if token was revoked, False if invalid or already revoked
+
+        Raises:
+            InvalidTokenError: If token is malformed
+        """
+        if not self.redis:
+            logger.warning("Redis not available, cannot revoke access token")
+            return False
+
+        try:
+            # Verify token to get JTI (but don't check revocation yet)
+            payload_dict = jwt.decode(
+                access_token,
+                self.secret_key,
+                algorithms=[self.algorithm],
+                options={"verify_exp": False},
+            )
+
+            jti = payload_dict.get("jti")
+            exp = payload_dict.get("exp")
+
+            if not jti:
+                logger.warning("Access token has no JTI, cannot revoke")
+                return False
+
+            # Add to blocklist with expiry
+            from datetime import timezone
+
+            expires_at = datetime.fromtimestamp(exp, tz=timezone.utc) if exp else None
+            ttl = None
+            if expires_at:
+                now = datetime.now(timezone.utc)
+                if expires_at > now:
+                    ttl = int((expires_at - now).total_seconds())
+
+            key = f"revoked_access_tokens:{jti}"
+            self.redis.setex(key, ttl or 3600, "1")  # Default 1 hour if no expiry
+
+            logger.info(f"Access token with JTI {jti} revoked")
+            return True
+
+        except jwt.InvalidTokenError as e:
+            raise InvalidTokenError(f"Invalid token: {str(e)}")
+        except Exception as e:
+            logger.error(f"Failed to revoke access token: {str(e)}")
+            return False
 
     # ========================================================================
     # User Authentication

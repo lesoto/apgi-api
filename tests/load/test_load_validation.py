@@ -228,7 +228,7 @@ class TestResponseTimesUnderLoad:
         p95 = calculate_percentile(response_times, 0.95)
         p99 = calculate_percentile(response_times, 0.99)
 
-        print(f"\nReadiness Check Response Times:")
+        print("\nReadiness Check Response Times:")
         print(f"  Mean: {statistics.mean(response_times):.2f}ms")
         print(f"  p95: {p95:.2f}ms")
         print(f"  p99: {p99:.2f}ms")
@@ -253,7 +253,7 @@ class TestResponseTimesUnderLoad:
         p95 = calculate_percentile(response_times, 0.95)
         p99 = calculate_percentile(response_times, 0.99)
 
-        print(f"\nAPI Info Response Times:")
+        print("\nAPI Info Response Times:")
         print(f"  Mean: {statistics.mean(response_times):.2f}ms")
         print(f"  p95: {p95:.2f}ms")
         print(f"  p99: {p99:.2f}ms")
@@ -302,10 +302,10 @@ class TestGracefulDegradationUnderOverload:
         graceful_degradation_rate = (success_count + rate_limited_count + unavailable_count) / total
 
         print(f"\nOverload Test Results (n={total}):")
-        print(f"  Successful (200): {success_count} ({success_count/total:.1%})")
-        print(f"  Rate Limited (429): {rate_limited_count} ({rate_limited_count/total:.1%})")
-        print(f"  Unavailable (503): {unavailable_count} ({unavailable_count/total:.1%})")
-        print(f"  Errors (other): {error_count} ({error_count/total:.1%})")
+        print(f"  Successful (200): {success_count} ({success_count / total :.1%})")
+        print(f"  Rate Limited (429): {rate_limited_count} ({rate_limited_count / total :.1%})")
+        print(f"  Unavailable (503): {unavailable_count} ({unavailable_count / total :.1%})")
+        print(f"  Errors (other): {error_count} ({error_count / total :.1%})")
         print(f"  Graceful Degradation Rate: {graceful_degradation_rate:.1%}")
 
         # Validate graceful degradation
@@ -395,7 +395,7 @@ class TestGracefulDegradationUnderOverload:
 
         p95 = calculate_percentile(all_response_times, 0.95)
 
-        print(f"\nSustained Load Test:")
+        print("\nSustained Load Test:")
         print(f"  Rounds: {rounds}")
         print(f"  Total requests: {len(all_status_codes)}")
         print(f"  Success rate: {success_rate:.1%}")

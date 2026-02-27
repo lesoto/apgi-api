@@ -780,6 +780,90 @@ class TaskSubmitRequest(BaseModel):
 
         return v.strip()
 
+    @model_validator(mode="after")
+    def validate_task_specific_parameters(self):
+        """Validate task-specific parameter ranges."""
+        if self.task_type == "attentional_blink":
+            params = self.parameters
+
+            # Validate stream_length
+            if "stream_length" in params:
+                value = params["stream_length"]
+                if not isinstance(value, int) or not (1 <= value <= 100):
+                    raise ValueError("stream_length must be an integer between 1 and 100")
+
+            # Validate item_duration_ms
+            if "item_duration_ms" in params:
+                value = params["item_duration_ms"]
+                if not isinstance(value, (int, float)) or not (10 <= value <= 2000):
+                    raise ValueError("item_duration_ms must be a number between 10 and 2000")
+
+            # Validate num_trials_per_lag
+            if "num_trials_per_lag" in params:
+                value = params["num_trials_per_lag"]
+                if not isinstance(value, int) or not (5 <= value <= 200):
+                    raise ValueError("num_trials_per_lag must be an integer between 5 and 200")
+
+            # Validate lags
+            if "lags" in params:
+                lags = params["lags"]
+                if not isinstance(lags, list):
+                    raise ValueError("lags must be a list")
+                if not all(isinstance(lag, int) and 1 <= lag <= 20 for lag in lags):
+                    raise ValueError("Each lag in lags must be an integer between 1 and 20")
+
+            # Validate target_salience
+            if "target_salience" in params:
+                value = params["target_salience"]
+                if not isinstance(value, (int, float)) or not (0.1 <= value <= 10.0):
+                    raise ValueError("target_salience must be a number between 0.1 and 10.0")
+
+        elif self.task_type == "iowa_gambling":
+            params = self.parameters
+
+            # Validate num_trials
+            if "num_trials" in params:
+                value = params["num_trials"]
+                if not isinstance(value, int) or not (10 <= value <= 1000):
+                    raise ValueError("num_trials must be an integer between 10 and 1000")
+
+            # Validate initial_balance
+            if "initial_balance" in params:
+                value = params["initial_balance"]
+                if not isinstance(value, int) or not (100 <= value <= 10000):
+                    raise ValueError("initial_balance must be an integer between 100 and 10000")
+
+            # Validate deck_stimulus_strength
+            if "deck_stimulus_strength" in params:
+                value = params["deck_stimulus_strength"]
+                if not isinstance(value, (int, float)) or not (0.1 <= value <= 5.0):
+                    raise ValueError("deck_stimulus_strength must be a number between 0.1 and 5.0")
+
+            # Validate outcome_stimulus_strength
+            if "outcome_stimulus_strength" in params:
+                value = params["outcome_stimulus_strength"]
+                if not isinstance(value, (int, float)) or not (0.1 <= value <= 5.0):
+                    raise ValueError(
+                        "outcome_stimulus_strength must be a number between 0.1 and 5.0"
+                    )
+
+            # Validate interoceptive_gain
+            if "interoceptive_gain" in params:
+                value = params["interoceptive_gain"]
+                if not isinstance(value, (int, float)) or not (0.1 <= value <= 5.0):
+                    raise ValueError("interoceptive_gain must be a number between 0.1 and 5.0")
+
+            # Validate deck_selection_strategy
+            if "deck_selection_strategy" in params:
+                value = params["deck_selection_strategy"]
+                valid_strategies = ["balanced", "random", "preference"]
+                if value not in valid_strategies:
+                    raise ValueError(
+                        f"deck_selection_strategy must be one of: {', '.join(valid_strategies)}"
+                    )
+
+        return self
+
     model_config = ConfigDict(
         json_schema_extra={
             "example": {

@@ -125,21 +125,9 @@ class AuthenticationMiddleware(BaseHTTPMiddleware):
         Returns:
             True if path is public, False otherwise
         """
-        # Check exact matches first
+        # Check exact matches only to prevent authentication bypass via path prefixes
         if path in self.PUBLIC_PATHS:
             return True
-
-        # Check for path patterns that should be public (e.g., static files)
-        # Only use prefix matching for specific safe patterns
-        path_prefixes = [
-            "/static/",
-            "/docs",
-            "/redoc/",
-        ]
-
-        for prefix in path_prefixes:
-            if path.startswith(prefix):
-                return True
 
         return False
 
@@ -252,8 +240,25 @@ class AuthenticationMiddleware(BaseHTTPMiddleware):
         try:
             auth_manager = AuthManager(db)
 
-            # Look up all active API keys (to prevent timing attacks)
-            active_keys = db.query(APIKey).filter(APIKey.is_active.is_(True)).all()
+            # Compute HMAC prefix for fast lookup
+            import hmac
+            import hashlib
+
+            assert auth_manager.secret_key is not None
+            prefix = hmac.new(
+                auth_manager.secret_key.encode(), api_key.encode(), hashlib.sha256
+            ).hexdigest()[:16]
+
+            # Query API keys by prefix (should significantly reduce the number of candidates)
+            active_keys = (
+                db.query(APIKey)
+                .filter(APIKey.key_prefix == prefix, APIKey.is_active.is_(True))
+                .all()
+            )
+
+            # If no keys match the prefix, the key is invalid
+            if not active_keys:
+                raise ValueError("Invalid API key")
 
             # Find the specific key by bcrypt check
             db_api_key = None

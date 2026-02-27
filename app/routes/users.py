@@ -8,6 +8,7 @@ password reset, and user administration.
 from typing import List
 
 import secrets
+import logging
 
 from fastapi import APIRouter, Depends, status, HTTPException
 from sqlalchemy.orm import Session
@@ -32,6 +33,8 @@ from app.services.authorization import (
     has_permission,
 )
 from app.services.user_management import get_user_management_service
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(
     prefix="/v1/users",
@@ -91,9 +94,10 @@ async def register_user(
     except ValueError as e:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
     except Exception as e:
+        logger.error(f"Failed to create user: {str(e)}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to create user: {str(e)}",
+            detail="An internal error occurred",
         )
 
 
@@ -136,9 +140,10 @@ async def create_default_user(
         )
 
     except Exception as e:
+        logger.error(f"Failed to create default user: {str(e)}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to create default user: {str(e)}",
+            detail="An internal error occurred",
         )
 
 
@@ -172,15 +177,16 @@ async def list_users(
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Page must be >= 1")
     if per_page < 1 or per_page > 100:
         raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST, detail="Per page must be between 1 and 100"
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Per page must be between 1 and 100",
         )
 
     user_service = get_user_management_service(db)
-    users = user_service.list_users(active_only=active_only)
-
-    # Apply pagination
-    offset = (page - 1) * per_page
-    paginated_users = users[offset : offset + per_page]
+    users = user_service.list_users(
+        skip=(page - 1) * per_page,
+        limit=per_page,
+        active_only=active_only,
+    )
 
     return [
         UserResponse(
@@ -193,7 +199,7 @@ async def list_users(
             updated_at=user.updated_at,  # type: ignore[arg-type]
             last_login=user.last_login,  # type: ignore[arg-type]
         )
-        for user in paginated_users
+        for user in users
     ]
 
 
@@ -224,15 +230,15 @@ async def get_current_user_profile(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
 
     return UserResponse(
-        user_id=user.user_id,  # type: ignore[arg-type]
-        username=user.username,  # type: ignore[arg-type]
-        email=user.email,  # type: ignore[arg-type]
-        roles=user.roles,  # type: ignore[arg-type]
-        is_active=user.is_active,  # type: ignore[arg-type]
-        created_at=user.created_at,  # type: ignore[arg-type]
-        updated_at=user.updated_at,  # type: ignore[arg-type]
-        last_login=user.last_login,  # type: ignore[arg-type]
-    )
+        user_id=user.user_id,
+        username=user.username,
+        email=user.email,
+        roles=user.roles,
+        is_active=user.is_active,
+        created_at=user.created_at,
+        updated_at=user.updated_at,
+        last_login=user.last_login,
+    )  # type: ignore[arg-type]
 
 
 @router.get(
@@ -299,15 +305,15 @@ async def get_user(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
 
     return UserResponse(
-        user_id=user.user_id,  # type: ignore[arg-type]
-        username=user.username,  # type: ignore[arg-type]
-        email=user.email,  # type: ignore[arg-type]
-        roles=user.roles,  # type: ignore[arg-type]
-        is_active=user.is_active,  # type: ignore[arg-type]
-        created_at=user.created_at,  # type: ignore[arg-type]
-        updated_at=user.updated_at,  # type: ignore[arg-type]
-        last_login=user.last_login,  # type: ignore[arg-type]
-    )
+        user_id=user.user_id,
+        username=user.username,
+        email=user.email,
+        roles=user.roles,
+        is_active=user.is_active,
+        created_at=user.created_at,
+        updated_at=user.updated_at,
+        last_login=user.last_login,
+    )  # type: ignore[arg-type]
 
 
 @router.put(
@@ -359,22 +365,23 @@ async def update_user(
         )
 
         return UserResponse(
-            user_id=user.user_id,  # type: ignore[arg-type]
-            username=user.username,  # type: ignore[arg-type]
-            email=user.email,  # type: ignore[arg-type]
-            roles=user.roles,  # type: ignore[arg-type]
-            is_active=user.is_active,  # type: ignore[arg-type]
-            created_at=user.created_at,  # type: ignore[arg-type]
-            updated_at=user.updated_at,  # type: ignore[arg-type]
-            last_login=user.last_login,  # type: ignore[arg-type]
+            user_id=user.user_id,
+            username=user.username,
+            email=user.email,
+            roles=user.roles,
+            is_active=user.is_active,
+            created_at=user.created_at,
+            updated_at=user.updated_at,
+            last_login=user.last_login,
         )
 
     except UserNotFoundError:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
     except Exception as e:
+        logger.error(f"Failed to update user: {str(e)}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to update user: {str(e)}",
+            detail="An internal error occurred",
         )
 
 
@@ -427,9 +434,10 @@ async def reset_user_password(
     except UserNotFoundError:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
     except Exception as e:
+        logger.error(f"Failed to reset password: {str(e)}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to reset password: {str(e)}",
+            detail="An internal error occurred",
         )
 
 
@@ -461,7 +469,8 @@ async def delete_user(
         if not deleted:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
     except Exception as e:
+        logger.error(f"Failed to delete user: {str(e)}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to delete user: {str(e)}",
+            detail="An internal error occurred",
         )

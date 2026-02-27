@@ -51,7 +51,7 @@ ESSENTIAL_FILES = {
     "AUTHORS",
     "NEWS",
     "HISTORY.md",
-    "delete_pycache.py",
+    # Python packaging and dependencies
     "setup.py",
     "setup.cfg",
     "pyproject.toml",
@@ -62,17 +62,21 @@ ESSENTIAL_FILES = {
     "poetry.lock",
     "environment.yml",
     "conda.yml",
+    # Docker and deployment
     "Dockerfile",
     "docker-compose.yml",
     "docker-compose.yaml",
     ".dockerignore",
+    # Build and make systems
     "Makefile",
     "CMakeLists.txt",
     "configure",
     "config",
     "manifest",
     "MANIFEST.in",
+    # Database and migrations
     "alembic.ini",
+    # Testing and quality tools
     "tox.ini",
     ".flake8",
     ".pylintrc",
@@ -82,11 +86,13 @@ ESSENTIAL_FILES = {
     "black.toml",
     "isort.cfg",
     ".pre-commit-config.yaml",
+    # Environment files
     ".env.example",
     ".env.development",
     ".env.production",
     ".env.production.template",
     "REPORT.md",
+    "delete_pycache.py",  # This cleanup script itself
     "main.py",
     "app.py",
     "run.py",

@@ -254,6 +254,7 @@ class TaskExecutor:
         session_id: str,
         task_type: str,
         parameters: Dict[str, Any],
+        user_id: str,
         webhook_url: Optional[str] = None,
         priority: int = 5,
     ) -> str:
@@ -264,6 +265,7 @@ class TaskExecutor:
             session_id: Session identifier
             task_type: Type of experimental task
             parameters: Task parameters
+            user_id: User ID for ownership validation
             webhook_url: Optional webhook URL for completion notification
             priority: Task priority (1=highest, 10=lowest)
 
@@ -271,7 +273,7 @@ class TaskExecutor:
             Task ID
 
         Raises:
-            ValueError: If task type is invalid
+            ValueError: If task type is invalid or session not found/access denied
         """
         # Validate task type
         if task_type not in self.TASK_MAP:
@@ -283,6 +285,20 @@ class TaskExecutor:
         # Validate priority
         if not (1 <= priority <= 10):
             raise ValueError("Priority must be between 1 (highest) and 10 (lowest)")
+
+        # Validate session ownership
+        with get_db_context() as db:
+            from app.database.models import Session as SessionModel
+
+            session_record = (
+                db.query(SessionModel)
+                .filter(SessionModel.session_id == session_id)
+                .filter(SessionModel.user_id == user_id)
+                .first()
+            )
+
+            if not session_record:
+                raise ValueError(f"Session {session_id} not found or access denied")
 
         # Generate task ID
         task_id = str(uuid.uuid4())
@@ -426,25 +442,34 @@ class TaskExecutor:
                         task.completed_at = datetime.now(timezone.utc)  # type: ignore
                         db.commit()
 
-    async def get_task_status(self, task_id: str) -> Dict[str, Any]:
+    async def get_task_status(self, task_id: str, user_id: str) -> Dict[str, Any]:
         """
         Get task status and results.
 
         Args:
             task_id: Task identifier
+            user_id: User ID for ownership validation
 
         Returns:
             Dict with task status, state, result, and error information
 
         Raises:
-            ValueError: If task not found
+            ValueError: If task not found or access denied
         """
-        # Get task from database
+        # Get task from database with ownership validation
         with get_db_context() as db:
-            task_record = db.query(Task).filter(Task.task_id == task_id).first()
+            from app.database.models import Session as SessionModel
+
+            task_record = (
+                db.query(Task)
+                .join(SessionModel, Task.session_id == SessionModel.session_id)
+                .filter(Task.task_id == task_id)
+                .filter(SessionModel.user_id == user_id)
+                .first()
+            )
 
             if not task_record:
-                raise ValueError(f"Task {task_id} not found")
+                raise ValueError(f"Task {task_id} not found or access denied")
 
             # Get Celery task result
             async_result = AsyncResult(task_id, app=celery_app)
@@ -495,25 +520,34 @@ class TaskExecutor:
 
             return status_info
 
-    async def cancel_task(self, task_id: str) -> Dict[str, Any]:
+    async def cancel_task(self, task_id: str, user_id: str) -> Dict[str, Any]:
         """
         Cancel a running task.
 
         Args:
             task_id: Task identifier
+            user_id: User ID for ownership validation
 
         Returns:
             Dict with cancellation status
 
         Raises:
-            ValueError: If task not found
+            ValueError: If task not found or access denied
         """
-        # Get task from database
+        # Get task from database with ownership validation
         with get_db_context() as db:
-            task_record = db.query(Task).filter(Task.task_id == task_id).first()
+            from app.database.models import Session as SessionModel
+
+            task_record = (
+                db.query(Task)
+                .join(SessionModel, Task.session_id == SessionModel.session_id)
+                .filter(Task.task_id == task_id)
+                .filter(SessionModel.user_id == user_id)
+                .first()
+            )
 
             if not task_record:
-                raise ValueError(f"Task {task_id} not found")
+                raise ValueError(f"Task {task_id} not found or access denied")
 
             # Revoke Celery task
             celery_app.control.revoke(task_id, terminate=True)

@@ -8,6 +8,8 @@ from fastapi import APIRouter, Depends, status, HTTPException
 from sqlalchemy.orm import Session
 from typing import Optional
 
+import logging
+
 from app.database.connection import get_db
 from app.database.models import WebhookDelivery
 from app.models.schemas import (
@@ -30,6 +32,8 @@ router = APIRouter(
         500: {"model": ErrorResponse, "description": "Internal server error"},
     },
 )
+
+logger = logging.getLogger(__name__)
 
 
 @router.get(
@@ -105,9 +109,10 @@ async def list_webhook_deliveries(
             pagination=pagination,
         )
     except Exception as e:
+        logger.exception("Failed to list webhook deliveries")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to list webhook deliveries: {str(e)}",
+            detail="An internal error occurred",
         )
 
 
@@ -213,9 +218,10 @@ async def retry_webhook_delivery(
             last_attempt_at=delivery.last_attempt_at,  # type: ignore[arg-type]
         )
     except Exception as e:
+        logger.exception("Failed to retry webhook delivery")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to retry webhook delivery: {str(e)}",
+            detail="An internal error occurred",
         )
 
 
@@ -250,7 +256,8 @@ async def delete_webhook_delivery(
         db.commit()
     except Exception as e:
         db.rollback()
+        logger.exception("Failed to delete webhook delivery")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to delete webhook delivery: {str(e)}",
+            detail="An internal error occurred",
         )

@@ -9,11 +9,17 @@ import logging
 from datetime import datetime, timedelta, timezone
 from typing import Dict, Any
 import uuid
+import socket
+import ipaddress
+import json
+import hmac
+import hashlib
 
 import aiohttp
 
 from sqlalchemy.orm import Session
 
+from app.config import settings
 from app.database.models import WebhookDelivery
 
 logger = logging.getLogger(__name__)
@@ -21,6 +27,61 @@ logger = logging.getLogger(__name__)
 
 class WebhookManager:
     """Manager for webhook deliveries."""
+
+    # Private IP ranges to block
+    PRIVATE_NETWORKS = [
+        ipaddress.ip_network("10.0.0.0/8"),  # RFC 1918
+        ipaddress.ip_network("172.16.0.0/12"),  # RFC 1918
+        ipaddress.ip_network("192.168.0.0/16"),  # RFC 1918
+        ipaddress.ip_network("127.0.0.0/8"),  # Loopback
+        ipaddress.ip_network("169.254.0.0/16"),  # Link-local
+        ipaddress.ip_network("::1/128"),  # IPv6 loopback
+        ipaddress.ip_network("fc00::/7"),  # IPv6 unique local
+        ipaddress.ip_network("fe80::/10"),  # IPv6 link-local
+    ]
+
+    @staticmethod
+    def _validate_webhook_url(url: str) -> None:
+        """
+        Validate webhook URL to prevent SSRF attacks.
+
+        Args:
+            url: Webhook URL to validate
+
+        Raises:
+            ValueError: If URL is invalid or points to private/internal network
+        """
+        from urllib.parse import urlparse
+
+        try:
+            parsed = urlparse(url)
+            if parsed.scheme not in ["http", "https"]:
+                raise ValueError("Only HTTP and HTTPS URLs are allowed")
+
+            hostname = parsed.hostname
+            if not hostname:
+                raise ValueError("Invalid URL: no hostname")
+
+            # Resolve hostname to IP addresses
+            try:
+                addrinfo = socket.getaddrinfo(hostname, None, socket.AF_UNSPEC, socket.SOCK_STREAM)
+                ip_addresses = [info[4][0] for info in addrinfo]
+            except socket.gaierror as e:
+                raise ValueError(f"Could not resolve hostname {hostname}: {e}")
+
+            # Check each IP address against private networks
+            for ip_str in ip_addresses:
+                try:
+                    ip = ipaddress.ip_address(ip_str)
+                    for private_net in WebhookManager.PRIVATE_NETWORKS:
+                        if ip in private_net:
+                            raise ValueError(f"URL points to private/internal IP address: {ip_str}")
+                except ValueError:
+                    # Invalid IP format, skip
+                    continue
+
+        except Exception as e:
+            raise ValueError(f"Invalid webhook URL: {e}")
 
     def __init__(self):
         """Initialize webhook manager."""
@@ -54,7 +115,13 @@ class WebhookManager:
 
         Returns:
             Delivery ID
+
+        Raises:
+            ValueError: If webhook URL is invalid or insecure
         """
+        # Validate webhook URL to prevent SSRF
+        self._validate_webhook_url(webhook_url)
+
         delivery_id = str(uuid.uuid4())
 
         # Calculate retry schedule (exponential backoff)
@@ -106,19 +173,31 @@ class WebhookManager:
             return True
 
         # Check retry attempts
-        if delivery.attempts >= 5:
+        retry_count = delivery.retry_count  # type: ignore[attr-defined]
+        if delivery.attempts >= retry_count:
             delivery.status = "failed"  # type: ignore[assignment]
             delivery.error_message = "Maximum retry attempts exceeded"  # type: ignore[assignment]
             db.commit()
             return False
 
         try:
+            # Prepare headers with HMAC signature
+            headers = {"Content-Type": "application/json"}
+            if settings.webhook_secret_key:
+                payload_str = json.dumps(delivery.payload, sort_keys=True, separators=(",", ":"))
+                signature = hmac.new(
+                    settings.webhook_secret_key.encode(), payload_str.encode(), hashlib.sha256
+                ).hexdigest()
+                headers["X-Webhook-Signature"] = f"sha256={signature}"
+            else:
+                logger.warning("WEBHOOK_SECRET_KEY not configured, webhook sent without signature")
+
             # Attempt delivery
             async with aiohttp.ClientSession() as session:
                 async with session.post(
                     delivery.webhook_url,  # type: ignore[arg-type]
                     json=delivery.payload,
-                    headers={"Content-Type": "application/json"},
+                    headers=headers,
                     timeout=aiohttp.ClientTimeout(total=30),
                 ) as response:
                     delivery.attempts += 1  # type: ignore[assignment]
@@ -133,7 +212,7 @@ class WebhookManager:
                         return True
                     else:
                         # Schedule next retry
-                        retry_delays = [5, 30, 300, 1800, 3600]
+                        retry_delays = delivery.retry_delays  # type: ignore[attr-defined]
                         if delivery.attempts < len(retry_delays):
                             delivery.next_retry_at = datetime.now(timezone.utc) + timedelta(  # type: ignore[assignment]
                                 seconds=retry_delays[delivery.attempts]
@@ -152,7 +231,7 @@ class WebhookManager:
             delivery.last_attempt_at = datetime.now(timezone.utc)  # type: ignore[assignment]
             delivery.error_message = "Timeout"  # type: ignore[assignment]
             # Schedule next retry
-            retry_delays = [5, 30, 300, 1800, 3600]
+            retry_delays = delivery.retry_delays  # type: ignore[attr-defined]
             if delivery.attempts < len(retry_delays):
                 delivery.next_retry_at = datetime.now(timezone.utc) + timedelta(  # type: ignore[assignment]
                     seconds=retry_delays[delivery.attempts]
@@ -167,7 +246,7 @@ class WebhookManager:
             delivery.last_attempt_at = datetime.now(timezone.utc)  # type: ignore[assignment]
             delivery.error_message = str(e)  # type: ignore[assignment]
             # Schedule next retry
-            retry_delays = [5, 30, 300, 1800, 3600]
+            retry_delays = delivery.retry_delays  # type: ignore[attr-defined]
             if delivery.attempts < len(retry_delays):
                 delivery.next_retry_at = datetime.now(timezone.utc) + timedelta(  # type: ignore[assignment]
                     seconds=retry_delays[delivery.attempts]

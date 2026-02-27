@@ -5,6 +5,7 @@ API endpoints for managing API keys including creation, listing, updating, and d
 """
 
 import secrets
+import logging
 
 from fastapi import APIRouter, Depends, status, HTTPException
 from sqlalchemy.orm import Session
@@ -33,6 +34,8 @@ router = APIRouter(
         500: {"model": ErrorResponse, "description": "Internal server error"},
     },
 )
+
+logger = logging.getLogger(__name__)
 
 
 @router.post(
@@ -90,9 +93,10 @@ async def create_api_key(
         )
     except Exception as e:
         db.rollback()
+        logger.exception("Failed to create API key")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to create API key: {str(e)}",
+            detail="An internal error occurred",
         )
 
 
@@ -155,9 +159,10 @@ async def list_api_keys(
             pagination=pagination,
         )
     except Exception as e:
+        logger.exception("Failed to list API keys")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to list API keys: {str(e)}",
+            detail="An internal error occurred",
         )
 
 
@@ -259,9 +264,93 @@ async def update_api_key(
         )
     except Exception as e:
         db.rollback()
+        logger.exception("Failed to update API key")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to update API key: {str(e)}",
+            detail="An internal error occurred",
+        )
+
+
+@router.post(
+    "/{key_id}/rotate",
+    response_model=APIKeyCreateResponse,
+    status_code=status.HTTP_201_CREATED,
+    summary="Rotate API key",
+    description="Rotate an existing API key by creating a new one and optionally deactivating the old one.",
+)
+async def rotate_api_key(
+    key_id: str,
+    deactivate_old: bool = True,
+    db: Session = Depends(get_db),
+    current_user: TokenPayload = Depends(get_current_user),
+):
+    """
+    Rotate an existing API key.
+
+    Creates a new API key with the same properties as the existing one,
+    and optionally deactivates the old key.
+
+    Args:
+        key_id: API key identifier to rotate
+        deactivate_old: Whether to deactivate the old key (default: True)
+        db: Database session
+        current_user: Current authenticated user
+
+    Returns:
+        New API key creation response with the actual key
+    """
+    # Find the existing API key
+    existing_key = (
+        db.query(APIKey)
+        .filter(APIKey.key_id == key_id, APIKey.user_id == current_user.user_id)
+        .first()
+    )
+
+    if not existing_key:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="API key not found")
+
+    # Generate a new secure API key
+    api_key_plain = f"apgi_{secrets.token_urlsafe(32)}"
+
+    # Hash the API key for storage
+    auth_manager = AuthManager(db)
+    key_hash = auth_manager.hash_password(api_key_plain)
+
+    # Create the new API key record with same properties
+    db_new_api_key = APIKey(
+        user_id=current_user.user_id,
+        name=existing_key.name,  # type: ignore[arg-type]
+        key_hash=key_hash,
+        permissions=existing_key.permissions,  # type: ignore[arg-type]
+        expires_at=existing_key.expires_at,  # type: ignore[arg-type]
+        is_active=True,
+    )
+
+    try:
+        # Add the new key
+        db.add(db_new_api_key)
+
+        # Optionally deactivate the old key
+        if deactivate_old:
+            existing_key.is_active = False  # type: ignore[assignment]
+
+        db.commit()
+        db.refresh(db_new_api_key)
+
+        return APIKeyCreateResponse(
+            key_id=db_new_api_key.key_id,  # type: ignore[arg-type]
+            key=api_key_plain,
+            name=db_new_api_key.name,  # type: ignore[arg-type]
+            permissions=db_new_api_key.permissions,  # type: ignore[arg-type]
+            expires_at=db_new_api_key.expires_at,  # type: ignore[arg-type]
+            created_at=db_new_api_key.created_at,  # type: ignore[arg-type]
+        )
+    except Exception as e:
+        db.rollback()
+        logger.exception("Failed to rotate API key")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="An internal error occurred",
         )
 
 
@@ -298,7 +387,8 @@ async def delete_api_key(
         db.commit()
     except Exception as e:
         db.rollback()
+        logger.exception("Failed to delete API key")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to delete API key: {str(e)}",
+            detail="An internal error occurred",
         )

@@ -7,6 +7,9 @@ Endpoints for exposing Prometheus metrics and business dashboard metrics.
 from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.responses import HTMLResponse
 from typing import Optional
+import json
+import logging
+import html
 
 from app.middleware.metrics import get_metrics_response
 from app.services.business_metrics import BusinessMetricsService
@@ -15,6 +18,8 @@ from app.services.profiling_service import ProfilingService
 from app.services.cache_service import get_cache_service
 
 router = APIRouter(prefix="/v1", tags=["Metrics"])
+
+logger = logging.getLogger(__name__)
 
 # Business metrics service instance
 _business_metrics_service: Optional[BusinessMetricsService] = None
@@ -70,9 +75,10 @@ async def get_dashboard_overview(
     try:
         return service.get_overview_metrics()
     except Exception as e:
+        logger.exception("Failed to get dashboard overview")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to get dashboard overview: {str(e)}",
+            detail="An internal error occurred",
         )
 
 
@@ -103,9 +109,10 @@ async def get_dashboard_sessions(
     except HTTPException:
         raise
     except Exception as e:
+        logger.exception("Failed to get session metrics")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to get session metrics: {str(e)}",
+            detail="An internal error occurred",
         )
 
 
@@ -136,9 +143,10 @@ async def get_dashboard_tasks(
     except HTTPException:
         raise
     except Exception as e:
+        logger.exception("Failed to get task metrics")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to get task metrics: {str(e)}",
+            detail="An internal error occurred",
         )
 
 
@@ -169,9 +177,10 @@ async def get_dashboard_users(
     except HTTPException:
         raise
     except Exception as e:
+        logger.exception("Failed to get user metrics")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to get user metrics: {str(e)}",
+            detail="An internal error occurred",
         )
 
 
@@ -202,9 +211,10 @@ async def get_dashboard_templates(
     except HTTPException:
         raise
     except Exception as e:
+        logger.exception("Failed to get template metrics")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to get template metrics: {str(e)}",
+            detail="An internal error occurred",
         )
 
 
@@ -251,9 +261,10 @@ async def get_complete_dashboard(
     except HTTPException:
         raise
     except Exception as e:
+        logger.exception("Failed to get dashboard data")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to get dashboard data: {str(e)}",
+            detail="An internal error occurred",
         )
 
 
@@ -319,19 +330,19 @@ async def get_dashboard_html(
             <h2>Overview</h2>
             <div class="grid">
                 <div class="metric-card">
-                    <div class="metric-value">{dashboard_data.get('overview', {}).get('total_requests', 0)}</div>
+                    <div class="metric-value">{html.escape(str(dashboard_data.get('overview', {}).get('total_requests', 0)))}</div>
                     <div class="metric-label">Total Requests</div>
                 </div>
                 <div class="metric-card">
-                    <div class="metric-value">{dashboard_data.get('overview', {}).get('active_users', 0)}</div>
+                    <div class="metric-value">{html.escape(str(dashboard_data.get('overview', {}).get('active_users', 0)))}</div>
                     <div class="metric-label">Active Users</div>
                 </div>
                 <div class="metric-card">
-                    <div class="metric-value">{dashboard_data.get('overview', {}).get('avg_response_time', 0):.2f}ms</div>
+                    <div class="metric-value">{html.escape(f"{dashboard_data.get('overview', {}).get('avg_response_time', 0):.2f}")}ms</div>
                     <div class="metric-label">Avg Response Time</div>
                 </div>
                 <div class="metric-card">
-                    <div class="metric-value">{dashboard_data.get('overview', {}).get('error_rate', 0):.2f}%</div>
+                    <div class="metric-value">{html.escape(f"{dashboard_data.get('overview', {}).get('error_rate', 0):.2f}")}%</div>
                     <div class="metric-label">Error Rate</div>
                 </div>
             </div>
@@ -357,15 +368,15 @@ async def get_dashboard_html(
             <h2>System Health</h2>
             <div class="grid">
                 <div class="metric-card">
-                    <div class="metric-value">{dashboard_data.get('system', {}).get('uptime_hours', 0):.1f}h</div>
+                    <div class="metric-value">{html.escape(f"{dashboard_data.get('system', {}).get('uptime_hours', 0):.1f}")}h</div>
                     <div class="metric-label">System Uptime</div>
                 </div>
                 <div class="metric-card">
-                    <div class="metric-value">{dashboard_data.get('system', {}).get('cpu_usage', 0):.1f}%</div>
+                    <div class="metric-value">{html.escape(f"{dashboard_data.get('system', {}).get('cpu_usage', 0):.1f}")}%</div>
                     <div class="metric-label">CPU Usage</div>
                 </div>
                 <div class="metric-card">
-                    <div class="metric-value">{dashboard_data.get('system', {}).get('memory_usage', 0):.1f}%</div>
+                    <div class="metric-value">{html.escape(f"{dashboard_data.get('system', {}).get('memory_usage', 0):.1f}")}%</div>
                     <div class="metric-label">Memory Usage</div>
                 </div>
             </div>
@@ -374,7 +385,7 @@ async def get_dashboard_html(
 
     <script>
         // Dashboard data
-        const dashboardData = {dashboard_data};
+        const dashboardData = {json.dumps(dashboard_data)};
 
         // Performance Trends Chart
         const performanceCtx = document.getElementById('performanceChart').getContext('2d');
@@ -434,9 +445,10 @@ async def get_dashboard_html(
     except HTTPException:
         raise
     except Exception as e:
+        logger.exception("Failed to generate dashboard")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to generate dashboard: {str(e)}",
+            detail="An internal error occurred",
         )
 
 
@@ -457,9 +469,10 @@ async def start_memory_tracing(service: ProfilingService = Depends(get_profiling
         service.start_memory_tracing()
         return {"message": "Memory tracing started successfully"}
     except Exception as e:
+        logger.exception("Failed to start memory tracing")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to start memory tracing: {str(e)}",
+            detail="An internal error occurred",
         )
 
 
@@ -480,9 +493,10 @@ async def stop_memory_tracing(service: ProfilingService = Depends(get_profiling_
         service.stop_memory_tracing()
         return {"message": "Memory tracing stopped successfully"}
     except Exception as e:
+        logger.exception("Failed to stop memory tracing")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to stop memory tracing: {str(e)}",
+            detail="An internal error occurred",
         )
 
 
@@ -502,9 +516,10 @@ async def get_memory_snapshot(service: ProfilingService = Depends(get_profiling_
     try:
         return service.get_memory_snapshot()
     except Exception as e:
+        logger.exception("Failed to get memory snapshot")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to get memory snapshot: {str(e)}",
+            detail="An internal error occurred",
         )
 
 
@@ -524,9 +539,10 @@ async def get_system_performance(service: ProfilingService = Depends(get_profili
     try:
         return service.get_system_performance()
     except Exception as e:
+        logger.exception("Failed to get system performance")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to get system performance: {str(e)}",
+            detail="An internal error occurred",
         )
 
 
@@ -557,9 +573,10 @@ async def get_performance_history(
     except HTTPException:
         raise
     except Exception as e:
+        logger.exception("Failed to get performance history")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to get performance history: {str(e)}",
+            detail="An internal error occurred",
         )
 
 
@@ -579,7 +596,8 @@ async def get_bottleneck_analysis(service: ProfilingService = Depends(get_profil
     try:
         return service.get_bottleneck_analysis()
     except Exception as e:
+        logger.exception("Failed to get bottleneck analysis")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to get bottleneck analysis: {str(e)}",
+            detail="An internal error occurred",
         )

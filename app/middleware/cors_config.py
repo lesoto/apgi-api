@@ -59,7 +59,11 @@ def configure_cors(app: "FastAPI") -> None:
         allow_credentials=settings.cors_allow_credentials,
         allow_methods=settings.cors_allow_methods,
         allow_headers=settings.cors_allow_headers,
-        expose_headers=["*"],  # Allow clients to access all response headers
+        expose_headers=[
+            "X-RateLimit-Limit",
+            "X-RateLimit-Remaining",
+            "X-RateLimit-Reset",
+        ],  # Expose specific headers only
         max_age=600,  # Cache preflight requests for 10 minutes
     )
 

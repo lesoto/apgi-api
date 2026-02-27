@@ -4,7 +4,7 @@ Authentication Routes
 Endpoints for user authentication, token management, and logout.
 """
 
-from fastapi import APIRouter, Depends, status
+from fastapi import APIRouter, Depends, status, Request
 from sqlalchemy.orm import Session
 
 from app.database.connection import get_db
@@ -173,6 +173,62 @@ async def logout(
 
     # Revoke the refresh token
     auth_manager.revoke_refresh_token(request.refresh_token)
+
+    # Return 204 No Content (no response body)
+    return None
+
+
+@router.post(
+    "/logout-access",
+    status_code=status.HTTP_204_NO_CONTENT,
+    summary="Revoke current access token",
+    description="""
+    Revoke the current access token by adding it to the blocklist.
+
+    After revocation, the current access token can no longer be used for authentication.
+    This provides immediate logout functionality.
+
+    Requires authentication with a valid access token (which will be revoked).
+    """,
+    responses={
+        204: {"description": "Access token revoked successfully"},
+        401: {"description": "Invalid or missing authentication token"},
+        400: {"description": "Access token does not support revocation (missing JTI)"},
+    },
+)
+async def logout_access(
+    request: Request,
+    current_user: TokenPayload = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> None:
+    """
+    Revoke the current access token by adding its JTI to the blocklist.
+
+    Args:
+        request: HTTP request containing the Authorization header
+        current_user: Current authenticated user (from access token)
+        db: Database session
+
+    Returns:
+        None (204 No Content)
+
+    Raises:
+        InvalidTokenError: If token cannot be revoked
+    """
+    # Extract access token from Authorization header
+    auth_header = request.headers.get("authorization")
+    if not auth_header or not auth_header.startswith("Bearer "):
+        raise InvalidTokenError("Missing or invalid authorization header")
+
+    access_token = auth_header[len("Bearer ") :]
+
+    auth_manager = AuthManager(db)
+
+    # Revoke the access token
+    revoked = auth_manager.revoke_access_token(access_token)
+
+    if not revoked:
+        raise InvalidTokenError("Access token could not be revoked")
 
     # Return 204 No Content (no response body)
     return None

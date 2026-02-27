@@ -5,10 +5,14 @@ Comprehensive caching implementation for session states, user data, and frequent
 """
 
 import json
-import pickle
 from typing import Any, Dict, Optional
 
 import redis.asyncio as redis
+import hashlib
+import base64
+from cryptography.fernet import Fernet
+
+from app.config import settings
 
 
 class CacheService:
@@ -42,6 +46,10 @@ class CacheService:
             "response": "response:",
             "auth": "auth:",
         }
+
+        # Encryption key for sensitive data
+        key = base64.urlsafe_b64encode(hashlib.sha256(settings.jwt_secret_key.encode()).digest())
+        self.fernet = Fernet(key)
 
     async def set_session_state(
         self, session_id: str, state: Dict[str, Any], ttl: Optional[int] = None
@@ -118,7 +126,9 @@ class CacheService:
             True if successful, False otherwise
         """
         key = f"{self.prefixes['user']}{user_id}:data"
-        return await self._set_json(key, user_data, ttl or self.default_ttl * 2)  # 2 hours
+        return await self._set_encrypted_json(
+            key, user_data, ttl or self.default_ttl * 2
+        )  # 2 hours
 
     async def get_user_data(self, user_id: str) -> Optional[Dict[str, Any]]:
         """
@@ -131,7 +141,7 @@ class CacheService:
             User data or None if not found
         """
         key = f"{self.prefixes['user']}{user_id}:data"
-        return await self._get_json(key)
+        return await self._get_encrypted_json(key)
 
     async def set_auth_token(self, token_hash: str, token_data: Dict[str, Any], ttl: int) -> bool:
         """
@@ -174,7 +184,7 @@ class CacheService:
             True if successful, False otherwise
         """
         key = f"{self.prefixes['task']}{task_id}:result"
-        return await self._set_pickle(key, result, ttl or self.default_ttl * 6)  # 6 hours
+        return await self._set_json(key, result, ttl or self.default_ttl * 6)  # 6 hours
 
     async def get_task_result(self, task_id: str) -> Optional[Any]:
         """
@@ -187,7 +197,7 @@ class CacheService:
             Task result or None if not found
         """
         key = f"{self.prefixes['task']}{task_id}:result"
-        return await self._get_pickle(key)
+        return await self._get_json(key)
 
     async def set_query_result(
         self, query_hash: str, result: Any, ttl: Optional[int] = None
@@ -204,7 +214,7 @@ class CacheService:
             True if successful, False otherwise
         """
         key = f"{self.prefixes['query']}{query_hash}"
-        return await self._set_pickle(key, result, ttl or self.default_ttl // 4)  # 15 minutes
+        return await self._set_json(key, result, ttl or self.default_ttl // 4)  # 15 minutes
 
     async def get_query_result(self, query_hash: str) -> Optional[Any]:
         """
@@ -217,7 +227,7 @@ class CacheService:
             Query result or None if not found
         """
         key = f"{self.prefixes['query']}{query_hash}"
-        return await self._get_pickle(key)
+        return await self._get_json(key)
 
     async def set_api_response(
         self, endpoint: str, params_hash: str, response: Dict[str, Any], ttl: Optional[int] = None
@@ -317,6 +327,26 @@ class CacheService:
 
         return stats
 
+    async def _set_encrypted_json(self, key: str, data: Any, ttl: int) -> bool:
+        """Set encrypted JSON data in cache for sensitive information."""
+        try:
+            json_data = json.dumps(data, default=str)
+            encrypted = self.fernet.encrypt(json_data.encode())
+            return await self.redis.setex(key, ttl, encrypted)
+        except Exception:
+            return False
+
+    async def _get_encrypted_json(self, key: str) -> Optional[Any]:
+        """Get encrypted JSON data from cache."""
+        try:
+            data = await self.redis.get(key)
+            if data:
+                decrypted = self.fernet.decrypt(data)
+                return json.loads(decrypted)
+        except Exception:
+            pass
+        return None
+
     async def _set_json(self, key: str, data: Any, ttl: int) -> bool:
         """Set JSON data in cache."""
         try:
@@ -331,24 +361,6 @@ class CacheService:
             data = await self.redis.get(key)
             if data:
                 return json.loads(data)
-        except Exception:
-            pass
-        return None
-
-    async def _set_pickle(self, key: str, data: Any, ttl: int) -> bool:
-        """Set pickled data in cache."""
-        try:
-            pickled_data = pickle.dumps(data)
-            return await self.redis.setex(key, ttl, pickled_data)
-        except Exception:
-            return False
-
-    async def _get_pickle(self, key: str) -> Optional[Any]:
-        """Get pickled data from cache."""
-        try:
-            data = await self.redis.get(key)
-            if data:
-                return pickle.loads(data)
         except Exception:
             pass
         return None

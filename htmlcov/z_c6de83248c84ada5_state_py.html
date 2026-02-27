@@ -65,7 +65,7 @@
             <a id="nextFileLink" class="nav" href="z_c6de83248c84ada5_tasks_py.html">&#xbb; next</a>
             &nbsp; &nbsp; &nbsp;
             <a class="nav" href="https://coverage.readthedocs.io/en/7.13.0">coverage.py v7.13.0</a>,
-            created at 2026-02-20 16:21 -0500
+            created at 2026-02-27 09:44 -0500
         </p>
         <aside class="hidden">
             <button type="button" class="button_next_chunk" data-shortcut="j"></button>
@@ -165,8 +165,8 @@
     <p class="pln"><span class="n"><a id="t83" href="#t83">83</a></span><span class="t"><span class="str">        HTTPException: If session not found or state cannot be retrieved</span>&nbsp;</span><span class="r"></span></p>
     <p class="pln"><span class="n"><a id="t84" href="#t84">84</a></span><span class="t"><span class="str">    """</span>&nbsp;</span><span class="r"></span></p>
     <p class="run"><span class="n"><a id="t85" href="#t85">85</a></span><span class="t">    <span class="key">try</span><span class="op">:</span>&nbsp;</span><span class="r"></span></p>
-    <p class="pln"><span class="n"><a id="t86" href="#t86">86</a></span><span class="t">        <span class="com"># Get session</span>&nbsp;</span><span class="r"></span></p>
-    <p class="run"><span class="n"><a id="t87" href="#t87">87</a></span><span class="t">        <span class="nam">sim_session</span> <span class="op">=</span> <span class="key">await</span> <span class="nam">manager</span><span class="op">.</span><span class="nam">get_session</span><span class="op">(</span><span class="nam">session_id</span><span class="op">)</span>&nbsp;</span><span class="r"></span></p>
+    <p class="pln"><span class="n"><a id="t86" href="#t86">86</a></span><span class="t">        <span class="com"># Get session with ownership validation</span>&nbsp;</span><span class="r"></span></p>
+    <p class="run"><span class="n"><a id="t87" href="#t87">87</a></span><span class="t">        <span class="nam">sim_session</span> <span class="op">=</span> <span class="key">await</span> <span class="nam">manager</span><span class="op">.</span><span class="nam">get_session</span><span class="op">(</span><span class="nam">session_id</span><span class="op">,</span> <span class="nam">current_user</span><span class="op">.</span><span class="nam">user_id</span><span class="op">)</span>&nbsp;</span><span class="r"></span></p>
     <p class="pln"><span class="n"><a id="t88" href="#t88">88</a></span><span class="t">&nbsp;</span><span class="r"></span></p>
     <p class="pln"><span class="n"><a id="t89" href="#t89">89</a></span><span class="t">        <span class="com"># Get complete state</span>&nbsp;</span><span class="r"></span></p>
     <p class="run"><span class="n"><a id="t90" href="#t90">90</a></span><span class="t">        <span class="nam">state</span> <span class="op">=</span> <span class="key">await</span> <span class="nam">sim_session</span><span class="op">.</span><span class="nam">get_state</span><span class="op">(</span><span class="op">)</span>&nbsp;</span><span class="r"></span></p>
@@ -283,7 +283,7 @@
     <p class="mis mis2 show_mis"><span class="n"><a id="t201" href="#t201">201</a></span><span class="t">            <span class="op">)</span>&nbsp;</span><span class="r"></span></p>
     <p class="pln"><span class="n"><a id="t202" href="#t202">202</a></span><span class="t">&nbsp;</span><span class="r"></span></p>
     <p class="pln"><span class="n"><a id="t203" href="#t203">203</a></span><span class="t">        <span class="com"># Get session</span>&nbsp;</span><span class="r"></span></p>
-    <p class="run"><span class="n"><a id="t204" href="#t204">204</a></span><span class="t">        <span class="nam">sim_session</span> <span class="op">=</span> <span class="key">await</span> <span class="nam">manager</span><span class="op">.</span><span class="nam">get_session</span><span class="op">(</span><span class="nam">session_id</span><span class="op">)</span>&nbsp;</span><span class="r"></span></p>
+    <p class="run"><span class="n"><a id="t204" href="#t204">204</a></span><span class="t">        <span class="nam">sim_session</span> <span class="op">=</span> <span class="key">await</span> <span class="nam">manager</span><span class="op">.</span><span class="nam">get_session</span><span class="op">(</span><span class="nam">session_id</span><span class="op">,</span> <span class="nam">current_user</span><span class="op">.</span><span class="nam">user_id</span><span class="op">)</span>&nbsp;</span><span class="r"></span></p>
     <p class="pln"><span class="n"><a id="t205" href="#t205">205</a></span><span class="t">&nbsp;</span><span class="r"></span></p>
     <p class="pln"><span class="n"><a id="t206" href="#t206">206</a></span><span class="t">        <span class="com"># Get complete state to access history</span>&nbsp;</span><span class="r"></span></p>
     <p class="run"><span class="n"><a id="t207" href="#t207">207</a></span><span class="t">        <span class="nam">state</span> <span class="op">=</span> <span class="key">await</span> <span class="nam">sim_session</span><span class="op">.</span><span class="nam">get_state</span><span class="op">(</span><span class="op">)</span>&nbsp;</span><span class="r"></span></p>
@@ -408,7 +408,7 @@
     <p class="pln"><span class="n"><a id="t326" href="#t326">326</a></span><span class="t"><span class="str">    """</span>&nbsp;</span><span class="r"></span></p>
     <p class="run"><span class="n"><a id="t327" href="#t327">327</a></span><span class="t">    <span class="key">try</span><span class="op">:</span>&nbsp;</span><span class="r"></span></p>
     <p class="pln"><span class="n"><a id="t328" href="#t328">328</a></span><span class="t">        <span class="com"># Get session</span>&nbsp;</span><span class="r"></span></p>
-    <p class="run"><span class="n"><a id="t329" href="#t329">329</a></span><span class="t">        <span class="nam">sim_session</span> <span class="op">=</span> <span class="key">await</span> <span class="nam">manager</span><span class="op">.</span><span class="nam">get_session</span><span class="op">(</span><span class="nam">session_id</span><span class="op">)</span>&nbsp;</span><span class="r"></span></p>
+    <p class="run"><span class="n"><a id="t329" href="#t329">329</a></span><span class="t">        <span class="nam">sim_session</span> <span class="op">=</span> <span class="key">await</span> <span class="nam">manager</span><span class="op">.</span><span class="nam">get_session</span><span class="op">(</span><span class="nam">session_id</span><span class="op">,</span> <span class="nam">current_user</span><span class="op">.</span><span class="nam">user_id</span><span class="op">)</span>&nbsp;</span><span class="r"></span></p>
     <p class="pln"><span class="n"><a id="t330" href="#t330">330</a></span><span class="t">&nbsp;</span><span class="r"></span></p>
     <p class="pln"><span class="n"><a id="t331" href="#t331">331</a></span><span class="t">        <span class="com"># Get complete state</span>&nbsp;</span><span class="r"></span></p>
     <p class="run"><span class="n"><a id="t332" href="#t332">332</a></span><span class="t">        <span class="nam">state</span> <span class="op">=</span> <span class="key">await</span> <span class="nam">sim_session</span><span class="op">.</span><span class="nam">get_state</span><span class="op">(</span><span class="op">)</span>&nbsp;</span><span class="r"></span></p>
@@ -466,7 +466,7 @@
     <p class="pln"><span class="n"><a id="t384" href="#t384">384</a></span><span class="t"><span class="str">    """</span>&nbsp;</span><span class="r"></span></p>
     <p class="run"><span class="n"><a id="t385" href="#t385">385</a></span><span class="t">    <span class="key">try</span><span class="op">:</span>&nbsp;</span><span class="r"></span></p>
     <p class="pln"><span class="n"><a id="t386" href="#t386">386</a></span><span class="t">        <span class="com"># Get session</span>&nbsp;</span><span class="r"></span></p>
-    <p class="run"><span class="n"><a id="t387" href="#t387">387</a></span><span class="t">        <span class="nam">sim_session</span> <span class="op">=</span> <span class="key">await</span> <span class="nam">manager</span><span class="op">.</span><span class="nam">get_session</span><span class="op">(</span><span class="nam">session_id</span><span class="op">)</span>&nbsp;</span><span class="r"></span></p>
+    <p class="run"><span class="n"><a id="t387" href="#t387">387</a></span><span class="t">        <span class="nam">sim_session</span> <span class="op">=</span> <span class="key">await</span> <span class="nam">manager</span><span class="op">.</span><span class="nam">get_session</span><span class="op">(</span><span class="nam">session_id</span><span class="op">,</span> <span class="nam">current_user</span><span class="op">.</span><span class="nam">user_id</span><span class="op">)</span>&nbsp;</span><span class="r"></span></p>
     <p class="pln"><span class="n"><a id="t388" href="#t388">388</a></span><span class="t">&nbsp;</span><span class="r"></span></p>
     <p class="pln"><span class="n"><a id="t389" href="#t389">389</a></span><span class="t">        <span class="com"># Get complete state</span>&nbsp;</span><span class="r"></span></p>
     <p class="run"><span class="n"><a id="t390" href="#t390">390</a></span><span class="t">        <span class="nam">state</span> <span class="op">=</span> <span class="key">await</span> <span class="nam">sim_session</span><span class="op">.</span><span class="nam">get_state</span><span class="op">(</span><span class="op">)</span>&nbsp;</span><span class="r"></span></p>
@@ -527,7 +527,7 @@
     <p class="pln"><span class="n"><a id="t445" href="#t445">445</a></span><span class="t"><span class="str">    """</span>&nbsp;</span><span class="r"></span></p>
     <p class="run"><span class="n"><a id="t446" href="#t446">446</a></span><span class="t">    <span class="key">try</span><span class="op">:</span>&nbsp;</span><span class="r"></span></p>
     <p class="pln"><span class="n"><a id="t447" href="#t447">447</a></span><span class="t">        <span class="com"># Get session</span>&nbsp;</span><span class="r"></span></p>
-    <p class="run"><span class="n"><a id="t448" href="#t448">448</a></span><span class="t">        <span class="nam">sim_session</span> <span class="op">=</span> <span class="key">await</span> <span class="nam">manager</span><span class="op">.</span><span class="nam">get_session</span><span class="op">(</span><span class="nam">session_id</span><span class="op">)</span>&nbsp;</span><span class="r"></span></p>
+    <p class="run"><span class="n"><a id="t448" href="#t448">448</a></span><span class="t">        <span class="nam">sim_session</span> <span class="op">=</span> <span class="key">await</span> <span class="nam">manager</span><span class="op">.</span><span class="nam">get_session</span><span class="op">(</span><span class="nam">session_id</span><span class="op">,</span> <span class="nam">current_user</span><span class="op">.</span><span class="nam">user_id</span><span class="op">)</span>&nbsp;</span><span class="r"></span></p>
     <p class="pln"><span class="n"><a id="t449" href="#t449">449</a></span><span class="t">&nbsp;</span><span class="r"></span></p>
     <p class="pln"><span class="n"><a id="t450" href="#t450">450</a></span><span class="t">        <span class="com"># Get complete state</span>&nbsp;</span><span class="r"></span></p>
     <p class="run"><span class="n"><a id="t451" href="#t451">451</a></span><span class="t">        <span class="nam">state</span> <span class="op">=</span> <span class="key">await</span> <span class="nam">sim_session</span><span class="op">.</span><span class="nam">get_state</span><span class="op">(</span><span class="op">)</span>&nbsp;</span><span class="r"></span></p>
@@ -569,7 +569,7 @@
             <a class="nav" href="z_c6de83248c84ada5_tasks_py.html">&#xbb; next</a>
             &nbsp; &nbsp; &nbsp;
             <a class="nav" href="https://coverage.readthedocs.io/en/7.13.0">coverage.py v7.13.0</a>,
-            created at 2026-02-20 16:21 -0500
+            created at 2026-02-27 09:44 -0500
         </p>
     </div>
 </footer>

@@ -6,8 +6,9 @@ Handles exporting simulation session data in various formats (JSON, CSV).
 
 import json
 import logging
-from typing import Optional, List, Tuple, Dict, Any
+from typing import Optional, List, Tuple, Dict, Any, Generator, Union
 
+from app.config import settings
 from app.services.session_manager import SessionManager
 
 logger = logging.getLogger(__name__)
@@ -38,9 +39,10 @@ class DataExportService:
         variables: Optional[List[str]] = None,
         start_time: Optional[float] = None,
         end_time: Optional[float] = None,
-    ) -> Tuple[bytes, str]:
+        user_id: Optional[str] = None,
+    ) -> Tuple[Union[bytes, Generator[bytes, None, None]], str]:
         """
-        Export session data in the specified format.
+        Export session data in specified format.
 
         Args:
             session_id: Session identifier
@@ -48,16 +50,17 @@ class DataExportService:
             variables: Optional list of variables to include
             start_time: Optional start time filter (milliseconds)
             end_time: Optional end time filter (milliseconds)
+            user_id: Optional user ID for ownership validation
 
         Returns:
-            Tuple of (data_bytes, content_type)
+            Tuple of (data_bytes or data_generator, content_type)
 
         Raises:
             ValueError: If session not found or format invalid
         """
-        # Get session
+        # Get session with ownership validation
         try:
-            session = await self.session_manager.get_session(session_id)
+            session = await self.session_manager.get_session(session_id, user_id)
         except ValueError as e:
             raise ValueError(f"Session {session_id} not found") from e
 
@@ -76,9 +79,17 @@ class DataExportService:
 
         # Export in requested format
         if format.lower() == "json":
-            return self._export_json(export_data)
+            data_bytes, content_type = self._export_json(export_data)
+            # Check export size limit
+            if len(data_bytes) > settings.max_export_mb * 1024 * 1024:
+                raise ValueError(
+                    f"Export size {len(data_bytes) / 1024 / 1024:.1f}MB exceeds maximum allowed {settings.max_export_mb}MB"
+                )
+            return data_bytes, content_type
         elif format.lower() == "csv":
-            return self._export_csv(export_data)
+            data_generator = self._export_csv(export_data)
+            content_type = "text/csv"
+            return data_generator, content_type
         else:
             raise ValueError(f"Unsupported export format: {format}")
 
@@ -135,6 +146,14 @@ class DataExportService:
 
             time_series.append(data_point)
 
+        # Limit the number of points to prevent unbounded memory allocation
+        if len(time_series) > settings.max_export_points:
+            logger.warning(
+                f"Time series for session truncated to {settings.max_export_points} points "
+                f"(was {len(time_series)}). Consider using pagination or time filters."
+            )
+            time_series = time_series[: settings.max_export_points]
+
         return time_series
 
     def _export_json(self, export_data: Dict[str, Any]) -> Tuple[bytes, str]:
@@ -150,19 +169,18 @@ class DataExportService:
         json_str = json.dumps(export_data, indent=2)
         return (json_str.encode("utf-8"), "application/json")
 
-    def _export_csv(self, export_data: Dict[str, Any]) -> Tuple[bytes, str]:
+    def _export_csv(self, export_data: Dict[str, Any]) -> Generator[bytes, None, None]:
         """
-        Export data as CSV with metadata in comments.
+        Export data as CSV with metadata in comments, yielding bytes for streaming.
 
         Args:
             export_data: Data to export
 
-        Returns:
-            Tuple of (csv_bytes, content_type)
+        Yields:
+            Bytes of the CSV data
         """
-        lines = []
-
         # Add metadata as comments
+        lines = []
         lines.append("# Session Metadata")
         lines.append(f"# session_id: {export_data['session_id']}")
         lines.append(f"# created_at: {export_data['created_at']}")
@@ -170,6 +188,9 @@ class DataExportService:
         lines.append(f"# config: {json.dumps(export_data['config'])}")
         lines.append(f"# state: {export_data['state']}")
         lines.append("")
+
+        for line in lines:
+            yield (line + "\n").encode("utf-8")
 
         # Get time series data
         time_series = export_data.get("data", [])
@@ -180,26 +201,34 @@ class DataExportService:
             for point in time_series:
                 var_names.extend(point.keys())
             var_names = sorted(set(var_names))
-            var_names.remove("time") if "time" in var_names else None
+            if "time" in var_names:
+                var_names.remove("time")
 
             # Write header
             header = "time," + ",".join(var_names)
-            lines.append(header)
+            yield (header + "\n").encode("utf-8")
 
             # Write data rows
             for point in time_series:
-                time_val = point.get("time", "")
+                time_val = str(point.get("time", ""))
                 values = [str(point.get(var, "")) for var in var_names]
-                row = f"{time_val}," + ",".join(values)
-                lines.append(row)
+
+                # Prevent CSV injection by escaping formula characters
+                def escape_csv_value(value: str) -> str:
+                    if value.startswith(("+", "-", "=", "@")):
+                        return "'" + value
+                    return value
+
+                escaped_values = [escape_csv_value(v) for v in values]
+                row = time_val + "," + ",".join(escaped_values)
+                yield (row + "\n").encode("utf-8")
         else:
             # Empty data
-            lines.append("time")
+            yield "time\n".encode("utf-8")
 
-        csv_str = "\n".join(lines) + "\n"
-        return (csv_str.encode("utf-8"), "text/csv")
-
-    async def generate_summary_stats(self, session_id: str) -> Dict[str, Any]:
+    async def generate_summary_stats(
+        self, session_id: str, user_id: Optional[str] = None
+    ) -> Dict[str, Any]:
         """
         Generate summary statistics for a session.
 
@@ -214,7 +243,8 @@ class DataExportService:
         """
         # Get session
         try:
-            session = await self.session_manager.get_session(session_id)
+            # Get session with ownership validation
+            session = await self.session_manager.get_session(session_id, user_id)
         except ValueError as e:
             raise ValueError(f"Session {session_id} not found") from e
 
@@ -242,6 +272,7 @@ class DataExportService:
         downsample: Optional[int] = None,
         limit: Optional[int] = None,
         cursor: Optional[str] = None,
+        user_id: Optional[str] = None,
     ) -> Dict[str, Any]:
         """
         Export time series data with pagination.
@@ -263,7 +294,8 @@ class DataExportService:
         """
         # Get session
         try:
-            session = await self.session_manager.get_session(session_id)
+            # Get session with ownership validation
+            session = await self.session_manager.get_session(session_id, user_id)
         except ValueError as e:
             raise ValueError(f"Session {session_id} not found") from e
 
@@ -290,7 +322,7 @@ class DataExportService:
         }
 
     async def get_event_analysis(
-        self, session_id: str, event_type: str = "ignition"
+        self, session_id: str, event_type: str = "ignition", user_id: Optional[str] = None
     ) -> Dict[str, Any]:
         """
         Get event analysis for a session.
@@ -307,7 +339,8 @@ class DataExportService:
         """
         # Get session
         try:
-            session = await self.session_manager.get_session(session_id)
+            # Get session with ownership validation
+            session = await self.session_manager.get_session(session_id, user_id)
         except ValueError as e:
             raise ValueError(f"Session {session_id} not found") from e
 

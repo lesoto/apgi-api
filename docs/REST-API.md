@@ -332,6 +332,48 @@ Key design principles:
 - **Password Hashing**: Bcrypt with appropriate cost factor
 - **Secrets Management**: Environment variables, never in code
 
+### Rate Limiting
+
+The API implements rate limiting to prevent abuse and ensure fair resource allocation. Rate limits are applied per authenticated user and IP address.
+
+**Rate Limit Headers:**
+
+All API responses include the following headers to inform clients of their current rate limit status:
+
+- `X-RateLimit-Limit`: Maximum number of requests allowed per time window
+- `X-RateLimit-Remaining`: Number of requests remaining in the current time window
+- `X-RateLimit-Reset`: Unix timestamp when the rate limit window resets
+
+**Default Limits:**
+
+- Authenticated users: 60 requests per minute
+- Unauthenticated requests: 30 requests per minute
+
+**Rate Limit Exceeded:**
+
+When rate limits are exceeded, the API returns HTTP 429 (Too Many Requests) with a JSON response:
+
+```json
+{
+  "error": {
+    "code": "RATE_LIMIT_EXCEEDED",
+    "message": "Rate limit exceeded. Try again later.",
+    "retry_after": 60
+  }
+}
+```
+
+The `retry_after` field indicates the number of seconds to wait before retrying.
+
+**Configuration:**
+
+Rate limiting can be configured via environment variables:
+
+- `RATE_LIMIT_ENABLED`: Enable/disable rate limiting (default: true)
+- `RATE_LIMIT_PER_MINUTE`: Requests per minute per user/IP (default: 60)
+
+**Note:** Rate limiting is currently not implemented (MF-01). This documentation describes the intended behavior.
+
 ## Monitoring
 
 The API provides comprehensive monitoring capabilities for operational insights and alerting:

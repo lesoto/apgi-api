@@ -14,11 +14,11 @@ Test scenarios:
 Usage:
     # Run with Locust web UI
     locust -f tests/load/test_performance.py --host=http://localhost:8000
-    
+
     # Run headless with specific load
     locust -f tests/load/test_performance.py --host=http://localhost:8000 \
            --users 100 --spawn-rate 10 --run-time 60s --headless
-    
+
     # Run with custom configuration
     locust -f tests/load/test_performance.py --host=http://localhost:8000 \
            --users 50 --spawn-rate 5 --run-time 120s --headless \
@@ -27,7 +27,6 @@ Usage:
 
 import json
 import random
-import time
 from locust import HttpUser, task, between, events
 from locust.runners import MasterRunner
 
@@ -350,8 +349,9 @@ def on_test_start(environment, **kwargs):
     print("\n" + "=" * 80)
     print("LOAD TEST STARTING")
     print("=" * 80)
-    print(f"Target host: {environment.host}")
-    print(f"Performance thresholds:")
+    print("Target host: " + environment.host)
+    print("=" * 80)
+    print("Performance thresholds:")
     print(f"  - Max p95 response time: {MAX_RESPONSE_TIME_MS}ms")
     print(f"  - Expected RPS: {EXPECTED_RPS}")
     print(f"  - Max error rate: {ERROR_RATE_THRESHOLD * 100}%")
@@ -386,19 +386,19 @@ def on_test_stop(environment, **kwargs):
     total_runtime = stats.total.last_request_timestamp - stats.total.start_time
     actual_rps = total_requests / total_runtime if total_runtime > 0 else 0
 
-    print(f"\nPerformance Metrics:")
+    print("\nPerformance Metrics:")
     print(f"  Total Requests: {total_requests}")
     print(f"  Total Failures: {total_failures}")
     print(f"  Error Rate: {error_rate * 100:.2f}%")
     print(f"  Actual RPS: {actual_rps:.2f}")
-    print(f"\nResponse Times:")
+    print("\nResponse Times:")
     print(f"  p50: {response_time_p50:.0f}ms")
     print(f"  p95: {response_time_p95:.0f}ms")
     print(f"  p99: {response_time_p99:.0f}ms")
 
     # Validate against thresholds
     validation_passed = True
-    print(f"\nValidation Results:")
+    print("\nValidation Results:")
 
     # Test 1: Response time under load (Requirement 20.1, 20.2)
     if response_time_p95 <= MAX_RESPONSE_TIME_MS:

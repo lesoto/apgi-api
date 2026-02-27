@@ -9,6 +9,10 @@ from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 
+from app.services.authorization import Permission, get_current_user, require_permission
+from app.routes.sessions import get_session_manager
+from app.services.session_manager import SessionManager
+
 from app.models.schemas import (
     AllostaticState,
     BodyState,
@@ -26,13 +30,7 @@ from app.models.schemas import (
     PredictionErrorsResponse,
     SomaticMarkersResponse,
 )
-from app.services.authorization import (
-    Permission,
-    require_permission,
-    get_current_user,
-)
-from app.routes.sessions import get_session_manager
-from app.services.session_manager import SessionManager
+from app.config import settings
 
 logger = logging.getLogger(__name__)
 
@@ -83,8 +81,8 @@ async def get_system_state(
         HTTPException: If session not found or state cannot be retrieved
     """
     try:
-        # Get session
-        sim_session = await manager.get_session(session_id)
+        # Get session with ownership validation
+        sim_session = await manager.get_session(session_id, current_user.user_id)
 
         # Get complete state
         state = await sim_session.get_state()
@@ -145,10 +143,10 @@ async def get_system_state(
             status_code=status.HTTP_404_NOT_FOUND, detail=f"Session {session_id} not found"
         )
     except Exception as e:
-        logger.error(f"Failed to get state for session {session_id}: {e}")
+        logger.exception("Failed to get system state")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to get system state: {str(e)}",
+            detail="An internal error occurred",
         )
 
 
@@ -201,7 +199,7 @@ async def get_ignition_history(  # noqa: C901
             )
 
         # Get session
-        sim_session = await manager.get_session(session_id)
+        sim_session = await manager.get_session(session_id, current_user.user_id)
 
         # Get complete state to access history
         state = await sim_session.get_state()
@@ -248,13 +246,25 @@ async def get_ignition_history(  # noqa: C901
 
         # Apply pagination
         limit_val = limit or 100  # Default to 100 if None
+        limit_val = min(limit_val, 500)  # Hard cap to prevent expensive queries
         start_idx = 0
         if cursor:
             try:
                 import base64
                 import json
+                import hmac
+                import hashlib
 
-                cursor_data = json.loads(base64.b64decode(cursor))
+                signed_cursor = base64.b64decode(cursor).decode()
+                json_str, signature = signed_cursor.rsplit(".", 1)
+                expected_signature = hmac.new(
+                    settings.jwt_secret_key.encode(), json_str.encode(), hashlib.sha256  # type: ignore[union-attr]
+                ).hexdigest()
+
+                if not hmac.compare_digest(signature, expected_signature):
+                    raise ValueError("Invalid cursor signature")
+
+                cursor_data = json.loads(json_str)
                 start_idx = cursor_data.get("offset", 0)
             except Exception as e:
                 logger.warning(f"Invalid cursor: {e}")
@@ -269,9 +279,16 @@ async def get_ignition_history(  # noqa: C901
         if has_more:
             import base64
             import json
+            import hmac
+            import hashlib
 
             cursor_data = {"offset": end_idx}
-            next_cursor = base64.b64encode(json.dumps(cursor_data).encode()).decode()
+            json_str = json.dumps(cursor_data)
+            signature = hmac.new(
+                settings.jwt_secret_key.encode(), json_str.encode(), hashlib.sha256  # type: ignore[union-attr]
+            ).hexdigest()
+            signed_cursor = json_str + "." + signature
+            next_cursor = base64.b64encode(signed_cursor.encode()).decode()
 
         response = IgnitionHistoryResponse(
             events=paginated_events,
@@ -287,10 +304,10 @@ async def get_ignition_history(  # noqa: C901
             status_code=status.HTTP_404_NOT_FOUND, detail=f"Session {session_id} not found"
         )
     except Exception as e:
-        logger.error(f"Failed to get ignition history for session {session_id}: {e}")
+        logger.exception("Failed to get ignition history")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to get ignition history: {str(e)}",
+            detail="An internal error occurred",
         )
 
 
@@ -326,7 +343,7 @@ async def get_interoceptive_state(
     """
     try:
         # Get session
-        sim_session = await manager.get_session(session_id)
+        sim_session = await manager.get_session(session_id, current_user.user_id)
 
         # Get complete state
         state = await sim_session.get_state()
@@ -347,10 +364,10 @@ async def get_interoceptive_state(
             status_code=status.HTTP_404_NOT_FOUND, detail=f"Session {session_id} not found"
         )
     except Exception as e:
-        logger.error(f"Failed to get interoceptive state for session {session_id}: {e}")
+        logger.exception("Failed to get interoceptive state")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to get interoceptive state: {str(e)}",
+            detail="An internal error occurred",
         )
 
 
@@ -384,7 +401,7 @@ async def get_prediction_errors(
     """
     try:
         # Get session
-        sim_session = await manager.get_session(session_id)
+        sim_session = await manager.get_session(session_id, current_user.user_id)
 
         # Get complete state
         state = await sim_session.get_state()
@@ -408,10 +425,10 @@ async def get_prediction_errors(
             status_code=status.HTTP_404_NOT_FOUND, detail=f"Session {session_id} not found"
         )
     except Exception as e:
-        logger.error(f"Failed to get prediction errors for session {session_id}: {e}")
+        logger.exception("Failed to get prediction errors")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to get prediction errors: {str(e)}",
+            detail="An internal error occurred",
         )
 
 
@@ -445,7 +462,7 @@ async def get_somatic_markers(
     """
     try:
         # Get session
-        sim_session = await manager.get_session(session_id)
+        sim_session = await manager.get_session(session_id, current_user.user_id)
 
         # Get complete state
         state = await sim_session.get_state()
@@ -473,8 +490,8 @@ async def get_somatic_markers(
             status_code=status.HTTP_404_NOT_FOUND, detail=f"Session {session_id} not found"
         )
     except Exception as e:
-        logger.error(f"Failed to get somatic markers for session {session_id}: {e}")
+        logger.exception("Failed to get somatic markers")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to get somatic markers: {str(e)}",
+            detail="An internal error occurred",
         )

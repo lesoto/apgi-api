@@ -8,6 +8,7 @@ supported versions, and deprecation notices.
 import os
 from datetime import datetime, timezone
 from typing import Dict, List, Optional
+from urllib.parse import urlparse
 
 from fastapi import APIRouter
 from fastapi.responses import JSONResponse
@@ -59,6 +60,11 @@ async def get_client_documentation(language: str = "python"):
         Client library documentation and code examples
     """
     base_url = os.getenv("API_BASE_URL", "http://localhost:8000")
+
+    # Validate base_url to prevent injection or misconfiguration
+    parsed = urlparse(base_url)
+    if not parsed.scheme or not parsed.netloc:
+        base_url = "http://localhost:8000"
 
     examples = {
         "python": f"""

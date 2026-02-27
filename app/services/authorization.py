@@ -4,16 +4,20 @@ Authorization Service
 Role-Based Access Control (RBAC) for API endpoints.
 """
 
+import logging
 from enum import Enum
-from typing import Dict, List, Set
+from typing import Any, Dict, List, Optional, Set
 
 from fastapi import Depends
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from sqlalchemy.orm import Session
 
 from app.database.connection import get_db
+from app.database.models import AuditLog
 from app.exceptions import AuthorizationError, InvalidTokenError
 from app.services.auth_manager import AuthManager, TokenPayload
+
+logger = logging.getLogger(__name__)
 
 # ============================================================================
 # Roles and Permissions
@@ -150,17 +154,24 @@ def get_permissions_for_roles(roles: List[str]) -> Set[Permission]:
 
 def has_permission(user_roles: List[str], required_permission: Permission) -> bool:
     """
-    Check if user has a specific permission.
+    Check if any of the user's roles grants the required permission.
 
     Args:
-        user_roles: List of user's roles
-        required_permission: Permission to check
+        user_roles: List of role strings from the user's token
+        required_permission: The permission to check for
 
     Returns:
-        True if user has the permission, False otherwise
+        True if any role grants the permission, False otherwise
     """
-    user_permissions = get_permissions_for_roles(user_roles)
-    return required_permission in user_permissions
+    for role_str in user_roles:
+        try:
+            role = Role(role_str)
+            if required_permission in ROLE_PERMISSIONS[role]:
+                return True
+        except ValueError:
+            # Invalid role string, skip
+            continue
+    return False
 
 
 def has_any_role(user_roles: List[str], required_roles: List[Role]) -> bool:
@@ -189,6 +200,10 @@ def check_permission(
     required_permission: Permission,
     resource: str = "resource",
     action: str = "access",
+    db: Session = None,
+    user_id: str = None,
+    ip_address: str = None,
+    user_agent: str = None,
 ) -> None:
     """
     Check if user has permission, raise exception if not.
@@ -198,11 +213,42 @@ def check_permission(
         required_permission: Permission to check
         resource: Resource being accessed (for error message)
         action: Action being performed (for error message)
+        db: Database session for audit logging (optional)
+        user_id: User ID for audit logging (optional)
+        ip_address: Client IP address for audit logging (optional)
+        user_agent: Client user agent for audit logging (optional)
 
     Raises:
         AuthorizationError: If user lacks the required permission
     """
     if not has_permission(user_roles, required_permission):
+        # Log failed authorization attempt
+        logger.warning(
+            "Authorization denied",
+            extra={
+                "user_roles": user_roles,
+                "required_permission": required_permission.value,
+                "resource": resource,
+                "action": action,
+            },
+        )
+
+        # Log audit event if database session provided
+        if db:
+            log_audit_event(
+                db=db,
+                user_id=user_id,
+                action=f"access:{action}",
+                resource_type=resource,
+                status="denied",
+                details={
+                    "required_permission": required_permission.value,
+                    "user_roles": user_roles,
+                },
+                ip_address=ip_address,
+                user_agent=user_agent,
+            )
+
         # Find which role would grant this permission
         required_role = None
         for role, perms in ROLE_PERMISSIONS.items():
@@ -211,6 +257,33 @@ def check_permission(
                 break
 
         raise AuthorizationError(resource=resource, action=action, required_role=required_role)
+    else:
+        # Log successful authorization
+        logger.info(
+            "Authorization granted",
+            extra={
+                "user_roles": user_roles,
+                "permission": required_permission.value,
+                "resource": resource,
+                "action": action,
+            },
+        )
+
+        # Log audit event if database session provided
+        if db:
+            log_audit_event(
+                db=db,
+                user_id=user_id,
+                action=f"access:{action}",
+                resource_type=resource,
+                status="granted",
+                details={
+                    "permission": required_permission.value,
+                    "user_roles": user_roles,
+                },
+                ip_address=ip_address,
+                user_agent=user_agent,
+            )
 
 
 # ============================================================================
@@ -347,6 +420,57 @@ def require_any_role(roles: List[Role]):
 
 
 # ============================================================================
+# Audit Logging
+# ============================================================================
+
+
+def log_audit_event(
+    db: Optional[Session],
+    user_id: Optional[str] = None,
+    action: Optional[str] = None,
+    resource_type: Optional[str] = None,
+    resource_id: Optional[str] = None,
+    details: Optional[Dict[str, Any]] = None,
+    ip_address: Optional[str] = None,
+    user_agent: Optional[str] = None,
+    status: str = "success",
+) -> None:
+    """
+    Log an audit event to the database.
+
+    Args:
+        db: Database session
+        user_id: User who performed the action (optional)
+        action: Action performed (e.g., 'login', 'create_session')
+        resource_type: Type of resource affected (e.g., 'session', 'user')
+        resource_id: ID of the affected resource (optional)
+        details: Additional details about the action (optional)
+        ip_address: Client IP address for audit logging (optional)
+        user_agent: Client user agent for audit logging (optional)
+        status: Action outcome ('success', 'failure', etc.)
+    """
+    if db is None:
+        return
+
+    try:
+        audit_log = AuditLog(
+            user_id=user_id,
+            action=action,
+            resource_type=resource_type,
+            resource_id=resource_id,
+            details=details or {},
+            ip_address=ip_address,
+            user_agent=user_agent,
+            status=status,
+        )
+        db.add(audit_log)
+        db.commit()
+    except Exception as e:
+        logger.error(f"Failed to log audit event: {e}")
+        # Don't raise exception to avoid breaking the main flow
+
+
+# ============================================================================
 # Resource Ownership Checks
 # ============================================================================
 
@@ -367,10 +491,36 @@ def check_resource_ownership(
     """
     # Check if user owns the resource
     if resource_owner_id == current_user.user_id:
+        logger.info(
+            "Resource ownership granted",
+            extra={
+                "user_id": current_user.user_id,
+                "resource_owner_id": resource_owner_id,
+                "reason": "user owns resource",
+            },
+        )
         return
 
     # Check if user is admin (if allowed)
     if allow_admin and has_any_role(current_user.roles, [Role.ADMIN]):
+        logger.info(
+            "Resource ownership granted",
+            extra={
+                "user_id": current_user.user_id,
+                "resource_owner_id": resource_owner_id,
+                "reason": "user is admin",
+            },
+        )
         return
 
+    # Access denied
+    logger.warning(
+        "Resource ownership denied",
+        extra={
+            "user_id": current_user.user_id,
+            "resource_owner_id": resource_owner_id,
+            "user_roles": current_user.roles,
+            "reason": "user does not own resource and is not admin",
+        },
+    )
     raise AuthorizationError(resource="resource", action="access", required_role="owner or admin")

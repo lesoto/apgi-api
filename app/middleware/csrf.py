@@ -153,7 +153,7 @@ class CSRFMiddleware(BaseHTTPMiddleware):
             # Set CSRF token in cookie
             response.set_cookie(
                 key=self.cookie_name,
-                value=token,
+                value=self._hash_token(token),
                 max_age=self.token_expiry_minutes * 60,
                 httponly=False,  # JavaScript needs to read this for AJAX requests
                 samesite="strict",
@@ -188,7 +188,7 @@ class CSRFMiddleware(BaseHTTPMiddleware):
                     )
 
                 # Validate token (constant-time comparison would be ideal here)
-                if not secrets.compare_digest(request_token, cookie_token):
+                if not secrets.compare_digest(self._hash_token(request_token), cookie_token):
                     logger.warning(
                         "CSRF token mismatch", method=request.method, path=request.url.path
                     )

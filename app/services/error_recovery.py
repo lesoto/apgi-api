@@ -53,7 +53,7 @@ class CircuitBreaker:
     # Internal state
     state: CircuitState = CircuitState.CLOSED
     stats: CircuitBreakerStats = field(default_factory=CircuitBreakerStats)
-    logger: Optional[StructuredLogger] = None
+    logger: StructuredLogger = field(default_factory=lambda: StructuredLogger("circuit_breaker"))
 
     def __post_init__(self):
         if self.logger is None:
@@ -187,7 +187,7 @@ class RetryService:
     """
 
     def __init__(self, logger: Optional[StructuredLogger] = None):
-        self.logger = logger or StructuredLogger("retry_service")
+        self.logger: StructuredLogger = logger or StructuredLogger("retry_service")
 
     async def execute_with_retry(self, func: Callable, config: RetryConfig, *args, **kwargs) -> Any:
         """
@@ -231,7 +231,7 @@ class RetryService:
                     )
 
         # All retries exhausted
-        raise last_exception
+        raise last_exception  # type: ignore[misc]
 
     def _calculate_delay(self, attempt: int, config: RetryConfig) -> float:
         """Calculate delay for exponential backoff with optional jitter."""
@@ -324,6 +324,7 @@ class ErrorRecoveryService:
                 func, service_config.retry_config, *args, **kwargs
             )
 
+        assert service_config.circuit_breaker is not None
         return await service_config.circuit_breaker.call(protected_call)
 
     def get_service_stats(self, service_name: str) -> Optional[Dict[str, Any]]:
@@ -340,6 +341,7 @@ class ErrorRecoveryService:
             return None
 
         service_config = self.services[service_name]
+        assert service_config.circuit_breaker is not None
         return {
             "service_name": service_name,
             "circuit_breaker": service_config.circuit_breaker.get_stats(),
@@ -352,7 +354,7 @@ class ErrorRecoveryService:
             },
         }
 
-    def get_all_stats(self) -> Dict[str, Dict[str, Any]]:
+    def get_all_stats(self) -> Dict[str, Optional[Dict[str, Any]]]:
         """Get statistics for all registered services."""
         return {name: self.get_service_stats(name) for name in self.services.keys()}
 
@@ -365,6 +367,7 @@ class ErrorRecoveryService:
         """
         if service_name in self.services:
             service_config = self.services[service_name]
+            assert service_config.circuit_breaker is not None
             service_config.circuit_breaker.state = CircuitState.CLOSED
             service_config.circuit_breaker.stats.consecutive_failures = 0
             service_config.circuit_breaker.stats.state_changes += 1

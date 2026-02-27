@@ -10,7 +10,7 @@ from typing import Optional
 from fastapi import APIRouter, Depends, HTTPException, status
 
 from app.database.connection import get_db
-from app.database.models import Task as TaskModel
+from app.database.models import Task as TaskModel, Session as SessionModel
 from app.database.models import TaskDependency as TaskDependencyModel
 from app.models.schemas import (
     ErrorResponse,
@@ -87,10 +87,10 @@ async def list_tasks(
 
         return TaskListResponse(tasks=tasks_info["tasks"])
     except Exception as e:
-        logger.error(f"Failed to list tasks: {e}")
+        logger.exception("Failed to list tasks")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to list tasks: {str(e)}",
+            detail="An internal error occurred",
         )
 
 
@@ -128,6 +128,7 @@ async def execute_task(
             session_id=session_id,
             task_type=request.task_type,
             parameters=request.parameters,
+            user_id=current_user.user_id,
             priority=request.priority or 0,
             webhook_url=request.webhook_url,
         )
@@ -145,10 +146,10 @@ async def execute_task(
         logger.warning(f"Invalid task submission: {e}")
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
     except Exception as e:
-        logger.error(f"Failed to submit task: {e}")
+        logger.exception("Failed to submit task")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to submit task: {str(e)}",
+            detail="An internal error occurred",
         )
 
 
@@ -178,8 +179,8 @@ async def get_task_status(
         HTTPException: If task not found
     """
     try:
-        # Get task status
-        status_info = await executor.get_task_status(task_id)
+        # Get task status with ownership validation
+        status_info = await executor.get_task_status(task_id, current_user.user_id)
 
         # Build response
         response = TaskStatusResponse(
@@ -202,10 +203,10 @@ async def get_task_status(
         # Other value errors
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
     except Exception as e:
-        logger.error(f"Failed to get task status for {task_id}: {e}")
+        logger.exception("Failed to get task status")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to get task status: {str(e)}",
+            detail="An internal error occurred",
         )
 
 
@@ -235,8 +236,14 @@ async def get_task_result(
         HTTPException: If task not found or not completed
     """
     try:
-        # Get task from database
-        task = db.query(TaskModel).filter(TaskModel.task_id == task_id).first()
+        # Get task from database with ownership validation
+        task = (
+            db.query(TaskModel)
+            .join(SessionModel, TaskModel.session_id == SessionModel.session_id)
+            .filter(TaskModel.task_id == task_id)
+            .filter(SessionModel.user_id == current_user.user_id)
+            .first()
+        )
 
         if not task:
             raise HTTPException(
@@ -267,10 +274,10 @@ async def get_task_result(
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"Failed to get task result for {task_id}: {e}")
+        logger.exception("Failed to get task result")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to get task result: {str(e)}",
+            detail="An internal error occurred",
         )
 
 
@@ -308,7 +315,7 @@ async def cancel_task(
                 detail=f"Task {task_id} not found",
             )
 
-        result = await executor.cancel_task(task_id)
+        result = await executor.cancel_task(task_id, current_user.user_id)
 
         logger.info(f"Task {task_id} cancellation requested")
 
@@ -317,10 +324,10 @@ async def cancel_task(
         # Re-raise HTTP exceptions (like 404) as-is
         raise
     except Exception as e:
-        logger.error(f"Failed to cancel task {task_id}: {e}")
+        logger.exception("Failed to cancel task")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to cancel task: {str(e)}",
+            detail="An internal error occurred",
         )
 
 
@@ -423,10 +430,10 @@ async def create_task_dependency(
         raise
     except Exception as e:
         db.rollback()
-        logger.error(f"Failed to create task dependency: {e}")
+        logger.exception("Failed to create task dependency")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to create task dependency: {str(e)}",
+            detail="An internal error occurred",
         )
 
 
@@ -484,10 +491,10 @@ async def list_task_dependencies(
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"Failed to list task dependencies: {e}")
+        logger.exception("Failed to list task dependencies")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to list task dependencies: {str(e)}",
+            detail="An internal error occurred",
         )
 
 
@@ -541,8 +548,8 @@ async def delete_task_dependency(
         raise
     except Exception as e:
         db.rollback()
-        logger.error(f"Failed to delete task dependency: {e}")
+        logger.exception("Failed to delete task dependency")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to delete task dependency: {str(e)}",
+            detail="An internal error occurred",
         )

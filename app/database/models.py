@@ -5,22 +5,24 @@ ORM models for persistent storage of sessions, tasks, and user data.
 """
 
 import uuid
-from enum import Enum
+from enum import Enum as PythonEnum
 
 from sqlalchemy import (
     ARRAY,
     Boolean,
     Column,
     DateTime,
+    Enum as SQLEnum,
     Float,
     ForeignKey,
     Index,
     Integer,
     String,
     Text,
+    UniqueConstraint,
 )
 from sqlalchemy.dialects.postgresql import JSONB
-from sqlalchemy.orm import declarative_base, relationship
+from sqlalchemy.orm import declarative_base, relationship, Mapped, mapped_column
 from sqlalchemy.sql import func
 
 Base = declarative_base()
@@ -31,7 +33,7 @@ Base = declarative_base()
 # ============================================================================
 
 
-class SessionState(str, Enum):
+class SessionState(str, PythonEnum):
     """Session lifecycle states."""
 
     CREATED = "created"
@@ -41,7 +43,7 @@ class SessionState(str, Enum):
     ERROR = "error"
 
 
-class TaskStatus(str, Enum):
+class TaskStatus(str, PythonEnum):
     """Task execution states."""
 
     PENDING = "pending"
@@ -83,12 +85,6 @@ class User(Base):  # type: ignore[misc, valid-type]
         nullable=False,
         server_default=func.now(),
         comment="Account creation timestamp",
-    )
-    updated_at = Column(
-        DateTime(timezone=True),
-        nullable=False,
-        server_default=func.now(),
-        comment="Last update timestamp",
     )
     last_login = Column(DateTime(timezone=True), nullable=True, comment="Last login timestamp")
 
@@ -138,6 +134,7 @@ class SessionTemplate(Base):  # type: ignore[misc, valid-type]
         DateTime(timezone=True),
         nullable=False,
         server_default=func.now(),
+        onupdate=func.now(),
         comment="Last update timestamp",
     )
 
@@ -147,6 +144,7 @@ class SessionTemplate(Base):  # type: ignore[misc, valid-type]
 
     # Indexes
     __table_args__ = (
+        UniqueConstraint("user_id", "name", name="uq_session_templates_user_name"),
         Index("idx_session_templates_user_name", "user_id", "name"),
         Index("idx_session_templates_public", "is_public"),
         Index("idx_session_templates_created_at", "created_at"),
@@ -182,10 +180,11 @@ class Session(Base):  # type: ignore[misc, valid-type]
         comment="Template used to create this session",
     )
     config = Column(JSONB, nullable=False, comment="Session configuration as JSON")
-    state = Column(
-        String(20),
+    full_state = Column(JSONB, nullable=True, comment="Full APGI system state for persistence")
+    state: Mapped[SessionState] = mapped_column(
+        SQLEnum(SessionState),
         nullable=False,
-        default=SessionState.CREATED.value,
+        default=SessionState.CREATED,
         index=True,
         comment="Current session state",
     )
@@ -199,6 +198,7 @@ class Session(Base):  # type: ignore[misc, valid-type]
         DateTime(timezone=True),
         nullable=False,
         server_default=func.now(),
+        onupdate=func.now(),
         comment="Last update timestamp",
     )
     description = Column(Text, nullable=True, comment="Human-readable session description")
@@ -245,10 +245,11 @@ class Task(Base):  # type: ignore[misc, valid-type]
     )
     task_type = Column(String(50), nullable=False, index=True, comment="Type of experimental task")
     parameters = Column(JSONB, nullable=False, comment="Task parameters as JSON")
-    status = Column(
-        String(20),
+    status: Mapped[TaskStatus] = mapped_column(
+        SQLEnum(TaskStatus),
+        name="status",
         nullable=False,
-        default=TaskStatus.PENDING.value,
+        default=TaskStatus.PENDING,
         index=True,
         comment="Current task status",
     )
@@ -284,7 +285,7 @@ class Task(Base):  # type: ignore[misc, valid-type]
         "TaskDependency",
         foreign_keys="TaskDependency.prerequisite_task_id",
         back_populates="prerequisite_task",
-        cascade="all, delete-orphan",
+        passive_deletes=True,
     )
 
     # Indexes
@@ -452,6 +453,9 @@ class APIKey(Base):  # type: ignore[misc, valid-type]
     )
     name = Column(String(100), nullable=False, comment="API key name/description")
     key_hash = Column(String(255), nullable=False, unique=True, comment="Hashed API key")
+    key_prefix = Column(
+        String(16), nullable=False, index=True, comment="HMAC prefix for fast lookup"
+    )
     permissions = Column(ARRAY(Text), nullable=False, default=list, comment="Permissions for this key")  # type: ignore[var-annotated]
     expires_at = Column(DateTime(timezone=True), nullable=True, comment="Expiration timestamp")
     is_active = Column(Boolean, nullable=False, default=True, comment="Whether the key is active")
@@ -499,6 +503,13 @@ class WebhookDelivery(Base):  # type: ignore[misc, valid-type]
     payload = Column(JSONB, nullable=False, comment="Webhook payload as JSON")
     status = Column(String(20), nullable=False, default="pending", comment="Delivery status")
     attempts = Column(Integer, nullable=False, default=0, comment="Number of delivery attempts")
+    retry_count = Column(Integer, nullable=False, default=5, comment="Maximum retry attempts")
+    retry_delays = Column(
+        JSONB,
+        nullable=False,
+        default=lambda: [5, 30, 300, 1800, 3600],
+        comment="Retry delay schedule in seconds",
+    )
     last_attempt_at = Column(
         DateTime(timezone=True), nullable=True, comment="Last delivery attempt timestamp"
     )
@@ -522,3 +533,53 @@ class WebhookDelivery(Base):  # type: ignore[misc, valid-type]
 
     def __repr__(self):
         return f"<WebhookDelivery(delivery_id={self.delivery_id}, status={self.status})>"
+
+
+class AuditLog(Base):  # type: ignore[misc, valid-type]
+    """Audit log for tracking user actions and access events."""
+
+    __tablename__ = "audit_logs"
+
+    audit_id = Column(
+        String(36),
+        primary_key=True,
+        default=lambda: str(uuid.uuid4()),
+        comment="Unique audit event identifier",
+    )
+    user_id = Column(
+        String(36),
+        ForeignKey("users.user_id"),
+        nullable=True,
+        index=True,
+        comment="User who performed the action (null for anonymous actions)",
+    )
+    action = Column(String(100), nullable=False, index=True, comment="Action performed")
+    resource_type = Column(
+        String(50), nullable=False, index=True, comment="Type of resource affected"
+    )
+    resource_id = Column(
+        String(255), nullable=True, index=True, comment="ID of the affected resource"
+    )
+    timestamp = Column(
+        DateTime(timezone=True),
+        nullable=False,
+        server_default=func.now(),
+        comment="When the action occurred",
+    )
+    details = Column(JSONB, nullable=True, comment="Additional details about the action")
+    ip_address = Column(String(45), nullable=True, comment="Client IP address")
+    user_agent = Column(Text, nullable=True, comment="Client user agent string")
+    status = Column(String(20), nullable=False, default="success", comment="Action outcome")
+
+    # Relationships
+    user = relationship("User", backref="audit_logs")
+
+    # Indexes
+    __table_args__ = (
+        Index("idx_audit_logs_user_timestamp", "user_id", "timestamp"),
+        Index("idx_audit_logs_resource", "resource_type", "resource_id"),
+        Index("idx_audit_logs_timestamp", "timestamp"),
+    )
+
+    def __repr__(self):
+        return f"<AuditLog(audit_id={self.audit_id}, user_id={self.user_id}, action={self.action})>"

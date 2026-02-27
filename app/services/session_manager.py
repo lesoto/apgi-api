@@ -381,12 +381,54 @@ class SessionManager:
             del self.sessions[key]
             logger.debug(f"Removed expired session {key} from cache")
 
-    def _evict_oldest_sessions(self) -> None:
+    async def _persist_session(self, session_id: str):
+        """Persist the full session state to database."""
+        if session_id not in self.sessions:
+            return
+
+        session, _ = self.sessions[session_id]
+
+        try:
+            state = await session.get_state()
+
+            # Remove session metadata before saving
+            if "session_metadata" in state:
+                del state["session_metadata"]
+
+            # Update database
+            db_session = self.db_session_factory()
+            try:
+                stmt = select(SessionModel).where(SessionModel.session_id == session_id)
+                result = db_session.execute(stmt)
+                db_model = result.scalar_one_or_none()
+
+                if db_model:
+                    db_model.full_state = state
+                    db_model.updated_at = datetime.now(timezone.utc)
+                    db_session.commit()
+                    logger.debug(f"Persisted full state for session {session_id}")
+            except Exception as e:
+                db_session.rollback()
+                logger.error(f"Failed to persist session state for {session_id}: {e}")
+            finally:
+                db_session.close()
+
+        except Exception as e:
+            logger.error(f"Failed to get state for session {session_id}: {e}")
+
+    async def _evict_oldest_sessions(self) -> None:
         """Remove oldest sessions to maintain cache size limit (called within lock)."""
         while len(self.sessions) > self.session_cache_max_size:
             oldest_key = next(iter(self.sessions))  # OrderedDict preserves insertion order
+
+            # Persist session state before eviction
+            try:
+                await self._persist_session(oldest_key)
+            except Exception as e:
+                logger.warning(f"Failed to persist session {oldest_key} before eviction: {e}")
+
             del self.sessions[oldest_key]
-            logger.debug(f"Evicted oldest session {oldest_key} from cache")
+            logger.debug(f"Evicted oldest session {oldest_key} from cache (state persisted)")
 
     async def create_session(
         self, request: SessionCreateRequest, user_id: str = "default_user"
@@ -492,25 +534,28 @@ class SessionManager:
                 db_session.close()
 
             # Enforce cache size limit
-            self._evict_oldest_sessions()
+            await self._evict_oldest_sessions()
 
         # Cache session metadata in Redis
         await self._cache_session_metadata(session_id, sim_session)
 
         return session_id
 
-    async def get_session(self, session_id: str) -> SimulationSession:
+    async def get_session(
+        self, session_id: str, user_id: Optional[str] = None
+    ) -> SimulationSession:
         """
         Retrieve existing session.
 
         Args:
             session_id: Session identifier
+            user_id: Optional user ID to validate ownership
 
         Returns:
             SimulationSession instance
 
         Raises:
-            ValueError: If session not found or invalid session ID
+            ValueError: If session not found, invalid session ID, or access denied
         """
         # Validate session ID format
         validate_session_id(session_id)
@@ -551,17 +596,31 @@ class SessionManager:
         db_session = self.db_session_factory()
         try:
             stmt = select(SessionModel).where(SessionModel.session_id == session_id)
+
+            # Add user_id filter if provided for ownership validation
+            if user_id:
+                stmt = stmt.where(SessionModel.user_id == user_id)
+
             result = db_session.execute(stmt)
             db_model = result.scalar_one_or_none()
 
             if not db_model:
-                raise ValueError(f"Session {session_id} not found")
+                if user_id:
+                    # Don't reveal if session exists or not for security
+                    raise ValueError(f"Session {session_id} not found or access denied")
+                else:
+                    raise ValueError(f"Session {session_id} not found")
 
             # Reconstruct session
             sim_session = SimulationSession(session_id, db_model.config)
             sim_session.state = SessionLifecycleState(db_model.state)
             sim_session.created_at = db_model.created_at
             sim_session.updated_at = db_model.updated_at
+
+            # Restore full state if persisted
+            if db_model.full_state:
+                sim_session._restore_state(db_model.full_state)
+                logger.debug(f"Restored full state for session {session_id}")
 
             # Add to caches
             async with self.cache_lock:
