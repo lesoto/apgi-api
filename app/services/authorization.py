@@ -200,10 +200,10 @@ def check_permission(
     required_permission: Permission,
     resource: str = "resource",
     action: str = "access",
-    db: Session = None,
-    user_id: str = None,
-    ip_address: str = None,
-    user_agent: str = None,
+    db: Optional[Session] = None,
+    user_id: Optional[str] = None,
+    ip_address: Optional[str] = None,
+    user_agent: Optional[str] = None,
 ) -> None:
     """
     Check if user has permission, raise exception if not.

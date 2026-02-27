@@ -90,7 +90,7 @@ async def list_tasks(
         logger.exception("Failed to list tasks")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="An internal error occurred",
+            detail="Failed to list tasks",
         )
 
 
@@ -149,7 +149,7 @@ async def execute_task(
         logger.exception("Failed to submit task")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="An internal error occurred",
+            detail="Failed to submit task",
         )
 
 
@@ -206,7 +206,7 @@ async def get_task_status(
         logger.exception("Failed to get task status")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="An internal error occurred",
+            detail="Failed to get task status",
         )
 
 
@@ -327,7 +327,7 @@ async def cancel_task(
         logger.exception("Failed to cancel task")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="An internal error occurred",
+            detail="Failed to cancel task",
         )
 
 

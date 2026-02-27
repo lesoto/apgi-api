@@ -66,7 +66,9 @@ def reload_config_with_env(env_vars):
         ]
     ),
     env_value=st.text(
-        min_size=1, max_size=100, alphabet=st.characters(blacklist_characters="\x00")
+        min_size=1,
+        max_size=100,
+        alphabet=st.characters(blacklist_characters="\x00", blacklist_categories=frozenset(["Cs"])),
     ),
     bool_value=st.sampled_from(["true", "false", "True", "False", "TRUE", "FALSE"]),
 )
@@ -106,6 +108,7 @@ def test_property_1_config_env_override(config_key, env_value, bool_value):
     # Set environment to development to avoid production validation errors
     env_vars = {
         "ENVIRONMENT": "development",
+        "JWT_SECRET_KEY": "test-secret-key-at-least-32-characters-long-for-testing",
         config_key: env_value,
     }
 

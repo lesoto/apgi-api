@@ -57,6 +57,7 @@ def sample_task_record():
 async def test_submit_task_valid_type(task_executor, mock_db_session):
     """Test task submission with valid task type."""
     session_id = str(uuid.uuid4())
+    user_id = str(uuid.uuid4())
     task_type = "iowa_gambling"
     parameters = {"num_trials": 100, "initial_balance": 2000}
 
@@ -68,6 +69,7 @@ async def test_submit_task_valid_type(task_executor, mock_db_session):
                 session_id=session_id,
                 task_type=task_type,
                 parameters=parameters,
+                user_id=user_id,
             )
 
             # Verify task ID is a valid UUID
@@ -94,6 +96,7 @@ async def test_submit_task_valid_type(task_executor, mock_db_session):
 async def test_submit_task_with_webhook(task_executor, mock_db_session):
     """Test task submission with webhook URL."""
     session_id = str(uuid.uuid4())
+    user_id = str(uuid.uuid4())
     task_type = "masking_paradigm"
     parameters = {"target_duration_ms": 50.0}
     webhook_url = "https://example.com/webhook"
@@ -106,6 +109,7 @@ async def test_submit_task_with_webhook(task_executor, mock_db_session):
                 session_id=session_id,
                 task_type=task_type,
                 parameters=parameters,
+                user_id=user_id,
                 webhook_url=webhook_url,
             )
 
@@ -118,6 +122,7 @@ async def test_submit_task_with_webhook(task_executor, mock_db_session):
 async def test_submit_task_invalid_type(task_executor):
     """Test task submission with invalid task type."""
     session_id = str(uuid.uuid4())
+    user_id = str(uuid.uuid4())
     task_type = "invalid_task_type"
     parameters: dict[str, Any] = {}
 
@@ -126,6 +131,7 @@ async def test_submit_task_invalid_type(task_executor):
             session_id=session_id,
             task_type=task_type,
             parameters=parameters,
+            user_id=user_id,
         )
 
     assert "Invalid task type" in str(exc_info.value)
@@ -136,6 +142,7 @@ async def test_submit_task_invalid_type(task_executor):
 async def test_submit_task_all_types(task_executor, mock_db_session):
     """Test task submission for all available task types."""
     session_id = str(uuid.uuid4())
+    user_id = str(uuid.uuid4())
     task_types = [
         "iowa_gambling",
         "masking_paradigm",
@@ -153,6 +160,7 @@ async def test_submit_task_all_types(task_executor, mock_db_session):
                     session_id=session_id,
                     task_type=task_type,
                     parameters={},
+                    user_id=user_id,
                 )
 
                 # Verify task was created
@@ -168,8 +176,11 @@ async def test_submit_task_all_types(task_executor, mock_db_session):
 async def test_get_task_status_pending(task_executor, mock_db_session, sample_task_record):
     """Test getting status of pending task."""
     sample_task_record.status = TaskStatus.PENDING.value
+    user_id = str(uuid.uuid4())
 
-    mock_db_session.query.return_value.filter.return_value.first.return_value = sample_task_record
+    mock_db_session.query.return_value.join.return_value.filter.return_value.filter.return_value.first.return_value = (
+        sample_task_record
+    )
 
     with patch("app.services.task_executor.get_db_context") as mock_get_db:
         mock_get_db.return_value.__enter__.return_value = mock_db_session
@@ -180,7 +191,7 @@ async def test_get_task_status_pending(task_executor, mock_db_session, sample_ta
             mock_result.info = None
             mock_async_result.return_value = mock_result
 
-            status = await task_executor.get_task_status(sample_task_record.task_id)
+            status = await task_executor.get_task_status(sample_task_record.task_id, user_id)
 
             assert status["status"] == TaskStatus.PENDING.value
             assert status["state"] == states.PENDING
@@ -192,8 +203,11 @@ async def test_get_task_status_pending(task_executor, mock_db_session, sample_ta
 async def test_get_task_status_running(task_executor, mock_db_session, sample_task_record):
     """Test getting status of running task."""
     sample_task_record.status = TaskStatus.RUNNING.value
+    user_id = str(uuid.uuid4())
 
-    mock_db_session.query.return_value.filter.return_value.first.return_value = sample_task_record
+    mock_db_session.query.return_value.join.return_value.filter.return_value.filter.return_value.first.return_value = (
+        sample_task_record
+    )
 
     with patch("app.services.task_executor.get_db_context") as mock_get_db:
         mock_get_db.return_value.__enter__.return_value = mock_db_session
@@ -204,7 +218,7 @@ async def test_get_task_status_running(task_executor, mock_db_session, sample_ta
             mock_result.info = {"progress": 50}
             mock_async_result.return_value = mock_result
 
-            status = await task_executor.get_task_status(sample_task_record.task_id)
+            status = await task_executor.get_task_status(sample_task_record.task_id, user_id)
 
             assert status["status"] == TaskStatus.RUNNING.value
             assert status["state"] == states.STARTED
@@ -216,8 +230,11 @@ async def test_get_task_status_completed(task_executor, mock_db_session, sample_
     """Test getting status of completed task."""
     sample_task_record.status = TaskStatus.COMPLETED.value
     sample_task_record.result_data = {"results": {"accuracy": 0.85}}
+    user_id = str(uuid.uuid4())
 
-    mock_db_session.query.return_value.filter.return_value.first.return_value = sample_task_record
+    mock_db_session.query.return_value.join.return_value.filter.return_value.filter.return_value.first.return_value = (
+        sample_task_record
+    )
 
     with patch("app.services.task_executor.get_db_context") as mock_get_db:
         mock_get_db.return_value.__enter__.return_value = mock_db_session
@@ -228,7 +245,7 @@ async def test_get_task_status_completed(task_executor, mock_db_session, sample_
             mock_result.info = None
             mock_async_result.return_value = mock_result
 
-            status = await task_executor.get_task_status(sample_task_record.task_id)
+            status = await task_executor.get_task_status(sample_task_record.task_id, user_id)
 
             assert status["status"] == TaskStatus.COMPLETED.value
             assert status["state"] == states.SUCCESS
@@ -240,8 +257,11 @@ async def test_get_task_status_failed(task_executor, mock_db_session, sample_tas
     """Test getting status of failed task."""
     sample_task_record.status = TaskStatus.FAILED.value
     sample_task_record.error_message = "Task execution failed"
+    user_id = str(uuid.uuid4())
 
-    mock_db_session.query.return_value.filter.return_value.first.return_value = sample_task_record
+    mock_db_session.query.return_value.join.return_value.filter.return_value.filter.return_value.first.return_value = (
+        sample_task_record
+    )
 
     with patch("app.services.task_executor.get_db_context") as mock_get_db:
         mock_get_db.return_value.__enter__.return_value = mock_db_session
@@ -252,7 +272,7 @@ async def test_get_task_status_failed(task_executor, mock_db_session, sample_tas
             mock_result.info = None
             mock_async_result.return_value = mock_result
 
-            status = await task_executor.get_task_status(sample_task_record.task_id)
+            status = await task_executor.get_task_status(sample_task_record.task_id, user_id)
 
             assert status["status"] == TaskStatus.FAILED.value
             assert status["state"] == states.FAILURE
@@ -263,14 +283,17 @@ async def test_get_task_status_failed(task_executor, mock_db_session, sample_tas
 async def test_get_task_status_not_found(task_executor, mock_db_session):
     """Test getting status of non-existent task."""
     task_id = str(uuid.uuid4())
+    user_id = str(uuid.uuid4())
 
-    mock_db_session.query.return_value.filter.return_value.first.return_value = None
+    mock_db_session.query.return_value.join.return_value.filter.return_value.filter.return_value.first.return_value = (
+        None
+    )
 
     with patch("app.services.task_executor.get_db_context") as mock_get_db:
         mock_get_db.return_value.__enter__.return_value = mock_db_session
 
         with pytest.raises(ValueError) as exc_info:
-            await task_executor.get_task_status(task_id)
+            await task_executor.get_task_status(task_id, user_id)
 
         assert "not found" in str(exc_info.value)
         assert task_id in str(exc_info.value)
@@ -293,8 +316,11 @@ async def test_get_task_result_success(task_executor, mock_db_session, sample_ta
             "deck_selections": [25, 25, 25, 25],
         },
     }
+    user_id = str(uuid.uuid4())
 
-    mock_db_session.query.return_value.filter.return_value.first.return_value = sample_task_record
+    mock_db_session.query.return_value.join.return_value.filter.return_value.filter.return_value.first.return_value = (
+        sample_task_record
+    )
 
     with patch("app.services.task_executor.get_db_context") as mock_get_db:
         mock_get_db.return_value.__enter__.return_value = mock_db_session
@@ -304,7 +330,7 @@ async def test_get_task_result_success(task_executor, mock_db_session, sample_ta
             mock_result.state = states.SUCCESS
             mock_async_result.return_value = mock_result
 
-            status = await task_executor.get_task_status(sample_task_record.task_id)
+            status = await task_executor.get_task_status(sample_task_record.task_id, user_id)
 
             # Verify result is returned
             assert status["result"] is not None
@@ -318,8 +344,11 @@ async def test_get_task_result_not_completed(task_executor, mock_db_session, sam
     """Test retrieving result from incomplete task."""
     sample_task_record.status = TaskStatus.RUNNING.value
     sample_task_record.result_data = None
+    user_id = str(uuid.uuid4())
 
-    mock_db_session.query.return_value.filter.return_value.first.return_value = sample_task_record
+    mock_db_session.query.return_value.join.return_value.filter.return_value.filter.return_value.first.return_value = (
+        sample_task_record
+    )
 
     with patch("app.services.task_executor.get_db_context") as mock_get_db:
         mock_get_db.return_value.__enter__.return_value = mock_db_session
@@ -329,7 +358,7 @@ async def test_get_task_result_not_completed(task_executor, mock_db_session, sam
             mock_result.state = states.STARTED
             mock_async_result.return_value = mock_result
 
-            status = await task_executor.get_task_status(sample_task_record.task_id)
+            status = await task_executor.get_task_status(sample_task_record.task_id, user_id)
 
             # Verify result is None for incomplete task
             assert status["result"] is None
@@ -357,8 +386,11 @@ async def test_get_task_status_timeout(task_executor, mock_db_session, sample_ta
     """Test getting status of task that exceeded timeout."""
     sample_task_record.status = TaskStatus.FAILED.value
     sample_task_record.error_message = "Task exceeded time limit"
+    user_id = str(uuid.uuid4())
 
-    mock_db_session.query.return_value.filter.return_value.first.return_value = sample_task_record
+    mock_db_session.query.return_value.join.return_value.filter.return_value.filter.return_value.first.return_value = (
+        sample_task_record
+    )
 
     with patch("app.services.task_executor.get_db_context") as mock_get_db:
         mock_get_db.return_value.__enter__.return_value = mock_db_session
@@ -368,7 +400,7 @@ async def test_get_task_status_timeout(task_executor, mock_db_session, sample_ta
             mock_result.state = states.FAILURE
             mock_async_result.return_value = mock_result
 
-            status = await task_executor.get_task_status(sample_task_record.task_id)
+            status = await task_executor.get_task_status(sample_task_record.task_id, user_id)
 
             assert status["status"] == TaskStatus.FAILED.value
             assert "time limit" in status["error"]
@@ -383,14 +415,17 @@ async def test_get_task_status_timeout(task_executor, mock_db_session, sample_ta
 async def test_cancel_task_success(task_executor, mock_db_session, sample_task_record):
     """Test cancelling a running task."""
     sample_task_record.status = TaskStatus.RUNNING.value
+    user_id = str(uuid.uuid4())
 
-    mock_db_session.query.return_value.filter.return_value.first.return_value = sample_task_record
+    mock_db_session.query.return_value.join.return_value.filter.return_value.filter.return_value.first.return_value = (
+        sample_task_record
+    )
 
     with patch("app.services.task_executor.get_db_context") as mock_get_db:
         mock_get_db.return_value.__enter__.return_value = mock_db_session
 
         with patch("app.services.task_executor.celery_app.control.revoke") as mock_revoke:
-            result = await task_executor.cancel_task(sample_task_record.task_id)
+            result = await task_executor.cancel_task(sample_task_record.task_id, user_id)
 
             # Verify task was revoked
             mock_revoke.assert_called_once_with(sample_task_record.task_id, terminate=True)
@@ -408,14 +443,17 @@ async def test_cancel_task_success(task_executor, mock_db_session, sample_task_r
 async def test_cancel_task_not_found(task_executor, mock_db_session):
     """Test cancelling non-existent task."""
     task_id = str(uuid.uuid4())
+    user_id = str(uuid.uuid4())
 
-    mock_db_session.query.return_value.filter.return_value.first.return_value = None
+    mock_db_session.query.return_value.join.return_value.filter.return_value.filter.return_value.first.return_value = (
+        None
+    )
 
     with patch("app.services.task_executor.get_db_context") as mock_get_db:
         mock_get_db.return_value.__enter__.return_value = mock_db_session
 
         with pytest.raises(ValueError) as exc_info:
-            await task_executor.cancel_task(task_id)
+            await task_executor.cancel_task(task_id, user_id)
 
         assert "not found" in str(exc_info.value)
 

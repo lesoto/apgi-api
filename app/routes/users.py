@@ -189,15 +189,15 @@ async def list_users(
     )
 
     return [
-        UserResponse(
-            user_id=user.user_id,  # type: ignore[arg-type]
-            username=user.username,  # type: ignore[arg-type]
-            email=user.email,  # type: ignore[arg-type]
-            roles=user.roles,  # type: ignore[arg-type]
-            is_active=user.is_active,  # type: ignore[arg-type]
-            created_at=user.created_at,  # type: ignore[arg-type]
-            updated_at=user.updated_at,  # type: ignore[arg-type]
-            last_login=user.last_login,  # type: ignore[arg-type]
+        UserResponse(  # type: ignore[arg-type]
+            user_id=user.user_id,
+            username=user.username,
+            email=user.email,
+            roles=user.roles,
+            is_active=user.is_active,
+            created_at=user.created_at,
+            updated_at=user.updated_at,
+            last_login=user.last_login,
         )
         for user in users
     ]
@@ -229,7 +229,7 @@ async def get_current_user_profile(
     if not user:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
 
-    return UserResponse(
+    return UserResponse(  # type: ignore[arg-type]
         user_id=user.user_id,
         username=user.username,
         email=user.email,
@@ -238,7 +238,7 @@ async def get_current_user_profile(
         created_at=user.created_at,
         updated_at=user.updated_at,
         last_login=user.last_login,
-    )  # type: ignore[arg-type]
+    )
 
 
 @router.get(
@@ -304,7 +304,7 @@ async def get_user(
     if not user:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
 
-    return UserResponse(
+    return UserResponse(  # type: ignore[arg-type]
         user_id=user.user_id,
         username=user.username,
         email=user.email,
@@ -313,7 +313,7 @@ async def get_user(
         created_at=user.created_at,
         updated_at=user.updated_at,
         last_login=user.last_login,
-    )  # type: ignore[arg-type]
+    )
 
 
 @router.put(
@@ -364,7 +364,7 @@ async def update_user(
             ),  # Only admins can change active status
         )
 
-        return UserResponse(
+        return UserResponse(  # type: ignore[arg-type]
             user_id=user.user_id,
             username=user.username,
             email=user.email,

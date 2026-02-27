@@ -17,7 +17,7 @@ def create_demo_user():
         existing = db.query(User).filter(User.email == "user@example.com").first()
         if existing:
             if "admin" not in existing.roles or "user" not in existing.roles:
-                existing.roles = ["user", "admin"]
+                existing.roles = ["user", "admin"]  # type: ignore[assignment]
                 db.commit()
                 print("Demo user updated with user and admin roles")
             else:

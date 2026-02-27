@@ -101,28 +101,45 @@ def get_user_by_id_mock(user_id):
     return user
 
 
-def update_user_mock(**kwargs):
-    from datetime import datetime
+class MockUser:
+    """Mock user object for testing."""
 
-    return MockUser(
-        user_id=kwargs.get("user_id", str(uuid.uuid4())),
-        username="test_user",
-        email=kwargs.get("email", "test@example.com"),
-        roles=kwargs.get("roles", ["user"]),
-        is_active=kwargs.get("is_active", True),
-        created_at=datetime(2023, 1, 1, 0, 0, 0),
-        updated_at=datetime(2023, 1, 1, 0, 0, 0),
-        last_login=None,
-    )
+    def __init__(self, **kwargs):
+        self.user_id = kwargs.get("user_id", str(uuid.uuid4()))
+        self.username = "test_user"
+        self.email = kwargs.get("email", "test@example.com")
+        self.roles = kwargs.get("roles", ["user"])
+        self.is_active = kwargs.get("is_active", True)
+        from datetime import datetime
+
+        self.created_at = datetime(2023, 1, 1, 0, 0, 0)
+        self.updated_at = datetime(2023, 1, 1, 0, 0, 0)
+
+
+def update_user_mock(**kwargs):
+    return MockUser(**kwargs)
 
 
 @pytest.fixture
 def mock_user_management_service():
     """Create mock UserManagementService for integration tests."""
+    from datetime import datetime
+
     service = MagicMock()
     service.create_user = MagicMock(side_effect=create_user_mock)
     service.get_user = MagicMock(side_effect=get_user_by_id_mock)
-    service.update_user = MagicMock(side_effect=update_user_mock)
+    service.update_user = MagicMock(
+        return_value=MockUser(
+            user_id="test_user_id",
+            username="test_user",
+            email="updated@example.com",
+            roles=["user", "admin"],
+            is_active=True,
+            created_at=datetime(2023, 1, 1, 0, 0, 0),
+            updated_at=datetime(2023, 1, 1, 0, 0, 0),
+            last_login=None,
+        )
+    )
     service.delete_user = MagicMock(return_value=True)
     service.reset_user_password = MagicMock(return_value="new_password")
     service.get_user_stats = AsyncMock(return_value={"total_users": 10, "active_users": 8})
@@ -193,7 +210,7 @@ class TestUserRoutesIntegration:
         with patch(
             "app.services.authorization.get_current_user", return_value=mock_token_payload
         ), patch(
-            "app.services.user_management.get_user_management_service",
+            "app.routes.users.get_user_management_service",
             return_value=mock_user_management_service,
         ):
             user_id = str(uuid.uuid4())
