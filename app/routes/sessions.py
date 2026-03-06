@@ -36,6 +36,18 @@ from app.services.session_manager import SessionLifecycleState, SessionManager
 logger = logging.getLogger(__name__)
 
 
+class SessionRoutesState:
+    """Encapsulate session routes state to avoid global mutable state."""
+
+    def __init__(self):
+        self.redis_client: Optional[redis.Redis] = None
+        self.session_manager: Optional[SessionManager] = None
+
+
+# Global state instance
+_state = SessionRoutesState()
+
+
 async def validate_session_ownership(
     session_id: str, user_id: str, manager: SessionManager, db_session: Session
 ) -> SessionModel:
@@ -83,22 +95,22 @@ router = APIRouter(
 
 
 # Redis client (will be initialized in main app)
-_redis_client: Optional[redis.Redis] = None
-_session_manager: Optional[SessionManager] = None
+# _redis_client: Optional[redis.Redis] = None
+# _session_manager: Optional[SessionManager] = None
 
 
 def get_redis_client() -> redis.Redis:
     """Get Redis client dependency."""
-    if _redis_client is None:
+    if _state.redis_client is None:
         raise ServiceUnavailableError("Redis", "Redis client not initialized")
-    return _redis_client
+    return _state.redis_client
 
 
 def get_session_manager() -> SessionManager:
     """Get SessionManager dependency."""
-    if _session_manager is None:
+    if _state.session_manager is None:
         raise ServiceUnavailableError("SessionManager", "Session manager not initialized")
-    return _session_manager
+    return _state.session_manager
 
 
 def init_session_routes(redis_client: redis.Redis):
@@ -108,9 +120,8 @@ def init_session_routes(redis_client: redis.Redis):
     Args:
         redis_client: Async Redis client instance
     """
-    global _redis_client, _session_manager
-    _redis_client = redis_client
-    _session_manager = SessionManager(redis_client, SessionLocal)
+    _state.redis_client = redis_client
+    _state.session_manager = SessionManager(redis_client, SessionLocal)
     logger.info("Session routes initialized")
 
 
@@ -377,7 +388,7 @@ async def get_session_tasks(
             TaskStatusResponse(
                 task_id=task.task_id,
                 status=task.status,
-                state=None,  # Celery state not stored in DB
+                state=task.status,  # Use status as state since Celery state not stored in DB
                 result=task.result_data,
                 error=task.error_message,
                 info=None,
@@ -533,7 +544,11 @@ async def stop_session(
     except ValueError:
         raise SessionNotFoundError(session_id)
 
-    result = await sim_session.stop()
+    try:
+        result = await sim_session.stop()
+    except ValueError:
+        # State conflict - trying to stop session in invalid state
+        raise SessionStateConflictError(session_id, sim_session.state.value, "stop")
 
     # Update state in database
     await manager.update_session_state(session_id, SessionLifecycleState.STOPPED)
@@ -579,7 +594,11 @@ async def reset_session(
     except ValueError:
         raise SessionNotFoundError(session_id)
 
-    result = await sim_session.reset()
+    try:
+        result = await sim_session.reset()
+    except ValueError:
+        # State conflict - trying to reset session in invalid state
+        raise SessionStateConflictError(session_id, sim_session.state.value, "reset")
 
     # Update state in database
     await manager.update_session_state(session_id, SessionLifecycleState.CREATED)

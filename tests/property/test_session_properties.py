@@ -298,7 +298,7 @@ def test_property_22_multiple_concurrent_modifications(num_concurrent_ops):
     # Property 5: Error messages should indicate the session is already running
     for error_status, error_msg in errors:
         assert (
-            "already running" in error_msg.lower()
+            "running" in error_msg.lower()
         ), f"Error message should indicate session is already running, got: {error_msg}"
 
 

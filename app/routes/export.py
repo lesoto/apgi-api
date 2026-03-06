@@ -6,6 +6,9 @@ API endpoints for exporting simulation data, summary statistics, and event analy
 
 import io
 import logging
+import re
+import hashlib
+from datetime import datetime
 from typing import Optional, Union, Generator
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
@@ -104,6 +107,13 @@ async def export_session_data(
         HTTPException: If session not found or export fails
     """
     try:
+        # Validate format
+        if format.lower() not in ["json", "csv"]:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Invalid format. Must be 'json' or 'csv'",
+            )
+
         # Parse variables list
         var_list = None
         if variables:
@@ -121,7 +131,17 @@ async def export_session_data(
 
         # Determine filename
         extension = "json" if format.lower() == "json" else "csv"
-        filename = f"session_{session_id}_export.{extension}"
+
+        # Sanitize session ID to prevent path traversal and injection
+        # Create a safe filename component from session ID
+        safe_session_id = re.sub(r"[^a-zA-Z0-9_-]", "_", session_id)
+        safe_session_id = safe_session_id[:50]  # Limit length
+
+        # Add timestamp and hash for uniqueness and security
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        session_hash = hashlib.md5(f"{session_id}{current_user.user_id}".encode()).hexdigest()[:8]
+
+        filename = f"session_{safe_session_id}_{timestamp}_{session_hash}_export.{extension}"
 
         # Return as streaming response
         response_data: Union[io.BytesIO, Generator[bytes, None, None]]
@@ -246,6 +266,16 @@ async def get_time_series_data(
     try:
         # Parse variables list
         var_list = [v.strip() for v in variables.split(",")]
+
+        # Validate variable names (alphanumeric with underscores and hyphens)
+        import re
+
+        for var in var_list:
+            if not var or not re.match(r"^[a-zA-Z0-9_-]+$", var):
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail=f"Invalid variable name: '{var}'. Variable names must be alphanumeric with underscores and hyphens.",
+                )
 
         # Get time series data with ownership validation
         result = await service.export_time_series(

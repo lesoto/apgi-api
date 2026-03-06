@@ -4,23 +4,28 @@ API Versioning Middleware
 Adds semantic versioning headers to all API responses.
 """
 
-from typing import Callable
+from typing import Callable, Awaitable
 
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.requests import Request
 from starlette.responses import Response
 
-from app.routes.version import CURRENT_VERSION, API_VERSION
+from app.routes.version import (
+    CURRENT_VERSION,
+    API_VERSION,
+    is_endpoint_deprecated,
+)
 
 
 class APIVersioningMiddleware(BaseHTTPMiddleware):
     """
     Middleware that adds API versioning headers to all responses.
 
-    Requirements: 6.1, 6.4
     """
 
-    async def dispatch(self, request: Request, call_next: Callable) -> Response:
+    async def dispatch(
+        self, request: Request, call_next: Callable[[Request], Awaitable[Response]]
+    ) -> Response:
         """
         Process request and add API versioning headers to response.
 
@@ -37,6 +42,20 @@ class APIVersioningMiddleware(BaseHTTPMiddleware):
         # Add semantic versioning headers
         response.headers["API-Version"] = CURRENT_VERSION
         response.headers["API-Version-Prefix"] = API_VERSION
+
+        # Check if endpoint is deprecated and add deprecation headers
+        deprecation_info = is_endpoint_deprecated(request.url.path)
+        if deprecation_info:
+            response.headers["Deprecation"] = "true"
+            if "sunset" in deprecation_info:
+                response.headers["Sunset"] = deprecation_info["sunset"]
+            if "replacement" in deprecation_info:
+                response.headers[
+                    "Link"
+                ] = f'<{deprecation_info["replacement"]}>; rel="successor-version"'
+            response.headers[
+                "Warning"
+            ] = f'199 - "Endpoint is deprecated and will be removed on {deprecation_info.get("sunset", "TBD")}"'
 
         # Add content type version info for JSON responses
         if response.headers.get("content-type", "").startswith("application/json"):

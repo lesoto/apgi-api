@@ -4,14 +4,34 @@ Celery Application Configuration
 Configures Celery for asynchronous task execution with Redis broker.
 """
 
-import sys
-from pathlib import Path
 from celery import Celery
 
-# Add parent directory to path to allow imports
-sys.path.insert(0, str(Path(__file__).parent.parent))
-
 from app.config import settings
+
+
+# Validate broker and backend URLs
+
+
+def _validate_celery_urls():
+    """Validate Celery broker and backend URLs."""
+    from urllib.parse import urlparse
+
+    for url_name, url_value in [
+        ("broker", settings.celery_broker_url),
+        ("backend", settings.celery_result_backend),
+    ]:
+        if not url_value:
+            raise ValueError(f"Celery {url_name} URL is not configured")
+
+        parsed = urlparse(url_value)
+        if parsed.scheme not in ["redis", "redis+socket"]:
+            raise ValueError(f"Celery {url_name} URL must use redis scheme, got: {parsed.scheme}")
+
+        if not parsed.hostname and not parsed.path:
+            raise ValueError(f"Celery {url_name} URL is invalid: {url_value}")
+
+
+_validate_celery_urls()
 
 # Create Celery app
 celery_app = Celery(

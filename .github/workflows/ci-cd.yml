@@ -44,6 +44,32 @@ jobs:
         python -m pip install --upgrade pip
         pip install -r requirements-dev.txt
 
+    - name: Run Bandit (SAST)
+      run: |
+        pip install bandit
+        bandit -r app -f json -o bandit-report.json || true
+
+    - name: Run Safety (dependency audit)
+      run: |
+        pip install safety
+        safety check --json > safety-report.json || true
+
+    - name: Create test database
+      env:
+        PGPASSWORD: postgres
+      run: |
+        # Wait for PostgreSQL to be ready
+        until pg_isready -h localhost -p 5432 -U postgres; do
+          echo "Waiting for PostgreSQL..."
+          sleep 2
+        done
+        
+        # Create test database
+        psql -h localhost -p 5432 -U postgres -c "CREATE DATABASE test_db;" || echo "Database already exists"
+        
+        # Run database migrations
+        alembic upgrade head
+
     - name: Run tests
       env:
         DATABASE_URL: postgresql://postgres:postgres@localhost:5432/test_db
@@ -55,6 +81,14 @@ jobs:
       uses: codecov/codecov-action@v3
       with:
         file: ./coverage.xml
+
+    - name: Upload security reports
+      uses: actions/upload-artifact@v3
+      with:
+        name: security-reports
+        path: |
+          bandit-report.json
+          safety-report.json
 
   build-and-push:
     needs: test
@@ -72,7 +106,7 @@ jobs:
       with:
         registry: ${{ env.REGISTRY }}
         username: ${{ github.actor }}
-        password: ${{ secrets.GITHUB_TOKEN }}
+        password: ${{ secrets.CONTAINER_REGISTRY_PAT }}
 
     - name: Extract metadata
       id: meta
@@ -99,11 +133,30 @@ jobs:
     if: github.ref == 'refs/heads/develop'
 
     steps:
+    - uses: actions/checkout@v4
+    
+    - name: Set up kubectl
+      uses: azure/setup-kubectl@v3
+      with:
+        version: 'v1.28.0'
+    
+    - name: Configure kubectl
+      run: |
+        echo "${{ secrets.KUBE_CONFIG_STAGING }}" | base64 -d > kubeconfig
+        export KUBECONFIG=kubeconfig
+        
     - name: Deploy to staging
       run: |
-        echo "Deploying to staging environment"
-        # Add your staging deployment commands here
-        # For example: kubectl apply -f deployment/kubernetes/ -n staging
+        export KUBECONFIG=kubeconfig
+        
+        # Update image tag in deployment
+        sed -i 's|image: .*:.*|image: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.sha }}|g' deployment/kubernetes/deployment.yaml
+        
+        # Apply Kubernetes configurations
+        kubectl apply -f deployment/kubernetes/ -n staging
+        
+        # Wait for deployment to be ready
+        kubectl rollout status deployment/apgi-api -n staging --timeout=300s
 
   deploy-production:
     needs: build-and-push
@@ -111,8 +164,27 @@ jobs:
     if: github.ref == 'refs/heads/main'
 
     steps:
+    - uses: actions/checkout@v4
+    
+    - name: Set up kubectl
+      uses: azure/setup-kubectl@v3
+      with:
+        version: 'v1.28.0'
+    
+    - name: Configure kubectl
+      run: |
+        echo "${{ secrets.KUBE_CONFIG_PRODUCTION }}" | base64 -d > kubeconfig
+        export KUBECONFIG=kubeconfig
+        
     - name: Deploy to production
       run: |
-        echo "Deploying to production environment"
-        # Add your production deployment commands here
-        # For example: kubectl apply -f deployment/kubernetes/ -n production
+        export KUBECONFIG=kubeconfig
+        
+        # Update image tag in deployment
+        sed -i 's|image: .*:.*|image: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.sha }}|g' deployment/kubernetes/deployment.yaml
+        
+        # Apply Kubernetes configurations with rolling update
+        kubectl apply -f deployment/kubernetes/ -n production
+        
+        # Wait for deployment to be ready
+        kubectl rollout status deployment/apgi-api -n production --timeout=600s

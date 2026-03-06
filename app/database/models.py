@@ -17,11 +17,11 @@ from sqlalchemy import (
     ForeignKey,
     Index,
     Integer,
+    JSON,
     String,
     Text,
     UniqueConstraint,
 )
-from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import declarative_base, relationship, Mapped, mapped_column
 from sqlalchemy.sql import func
 
@@ -76,10 +76,25 @@ class User(Base):  # type: ignore[misc, valid-type]
         String(255), unique=True, nullable=False, index=True, comment="User email address"
     )
     password_hash = Column(String(255), nullable=False, comment="Hashed password")
-    roles = Column(ARRAY(Text), nullable=False, default=list, comment="User roles for RBAC")  # type: ignore[var-annotated]
+    roles = Column(ARRAY(Text), nullable=False, default=lambda: [], comment="User roles for RBAC")  # type: ignore[var-annotated]
     is_active = Column(
         Boolean, nullable=False, default=True, comment="Whether the user account is active"
     )
+    failed_login_attempts = Column(
+        Integer, nullable=False, default=0, comment="Number of consecutive failed login attempts"
+    )
+    locked_until = Column(
+        DateTime(timezone=True), nullable=True, comment="Account lockout expiration timestamp"
+    )
+    mfa_secret = Column(String(255), nullable=True, comment="TOTP secret for MFA")
+    mfa_enabled = Column(Boolean, nullable=False, default=False, comment="Whether MFA is enabled")
+    email_verification_token = Column(
+        String(255), nullable=True, comment="Token for email verification"
+    )
+    email_verification_expires_at = Column(
+        DateTime(timezone=True), nullable=True, comment="Token expiration"
+    )
+    is_deleted = Column(Boolean, nullable=False, default=False, comment="Soft delete flag")
     created_at = Column(
         DateTime(timezone=True),
         nullable=False,
@@ -120,9 +135,9 @@ class SessionTemplate(Base):  # type: ignore[misc, valid-type]
     name = Column(String(100), nullable=False, index=True, comment="Template name")
     description = Column(Text, nullable=True, comment="Template description")
     config_path = Column(String(255), nullable=True, comment="Path to YAML configuration file")
-    custom_config = Column(JSONB, nullable=True, comment="Default custom configuration overrides")
+    custom_config = Column(JSON, nullable=True, comment="Default custom configuration overrides")
     default_description = Column(Text, nullable=True, comment="Default session description")
-    tags = Column(ARRAY(Text), nullable=True, default=list, comment="Template tags for organization")  # type: ignore[var-annotated]
+    tags = Column(ARRAY(Text), nullable=True, default=lambda: [], comment="Template tags for organization")  # type: ignore[var-annotated]
     is_public = Column(Boolean, nullable=False, default=False, comment="Whether template is public")
     created_at = Column(
         DateTime(timezone=True),
@@ -179,8 +194,16 @@ class Session(Base):  # type: ignore[misc, valid-type]
         index=True,
         comment="Template used to create this session",
     )
-    config = Column(JSONB, nullable=False, comment="Session configuration as JSON")
-    full_state = Column(JSONB, nullable=True, comment="Full APGI system state for persistence")
+    config = Column(
+        JSON,
+        nullable=False,
+        comment="Session configuration as JSON",
+    )
+    full_state = Column(
+        JSON,
+        nullable=True,
+        comment="Full APGI system state for persistence",
+    )
     state: Mapped[SessionState] = mapped_column(
         SQLEnum(SessionState),
         nullable=False,
@@ -202,7 +225,8 @@ class Session(Base):  # type: ignore[misc, valid-type]
         comment="Last update timestamp",
     )
     description = Column(Text, nullable=True, comment="Human-readable session description")
-    tags = Column(ARRAY(Text), nullable=True, default=list, comment="Session tags for organization")  # type: ignore[var-annotated]
+    tags = Column(ARRAY(Text), nullable=True, default=lambda: [], comment="Session tags for organization")  # type: ignore[var-annotated]
+    is_deleted = Column(Boolean, nullable=False, default=False, comment="Soft delete flag")
 
     # Relationships
     user = relationship("User", back_populates="sessions")
@@ -244,7 +268,7 @@ class Task(Base):  # type: ignore[misc, valid-type]
         comment="Associated session ID",
     )
     task_type = Column(String(50), nullable=False, index=True, comment="Type of experimental task")
-    parameters = Column(JSONB, nullable=False, comment="Task parameters as JSON")
+    parameters = Column(JSON, nullable=False, comment="Task parameters as JSON")
     status: Mapped[TaskStatus] = mapped_column(
         SQLEnum(TaskStatus),
         name="status",
@@ -257,7 +281,7 @@ class Task(Base):  # type: ignore[misc, valid-type]
         Integer, nullable=False, default=5, comment="Task priority (1=highest, 10=lowest)"
     )
     progress = Column(Integer, nullable=True, comment="Progress percentage (0-100)")
-    result_data = Column(JSONB, nullable=True, comment="Task results as JSON")
+    result_data = Column(JSON, nullable=True, comment="Task results as JSON")
     created_at = Column(
         DateTime(timezone=True),
         nullable=False,
@@ -370,7 +394,7 @@ class SessionData(Base):  # type: ignore[misc, valid-type]
         comment="Associated session ID",
     )
     time_ms = Column(Float, nullable=False, comment="Simulation time in milliseconds")
-    data = Column(JSONB, nullable=False, comment="State data as JSON")
+    data = Column(JSON, nullable=False, comment="State data as JSON")
     created_at = Column(
         DateTime(timezone=True),
         nullable=False,
@@ -409,7 +433,7 @@ class RefreshToken(Base):  # type: ignore[misc, valid-type]
         index=True,
         comment="Associated user ID",
     )
-    token_hash = Column(String(255), nullable=False, unique=True, comment="Hashed refresh token")
+    token_hash = Column(String(255), nullable=False, comment="Hashed refresh token")
     expires_at = Column(
         DateTime(timezone=True), nullable=False, index=True, comment="Token expiration timestamp"
     )
@@ -456,8 +480,12 @@ class APIKey(Base):  # type: ignore[misc, valid-type]
     key_prefix = Column(
         String(16), nullable=False, index=True, comment="HMAC prefix for fast lookup"
     )
-    permissions = Column(ARRAY(Text), nullable=False, default=list, comment="Permissions for this key")  # type: ignore[var-annotated]
-    expires_at = Column(DateTime(timezone=True), nullable=True, comment="Expiration timestamp")
+    permissions = Column(ARRAY(Text), nullable=False, default=lambda: [], comment="Permissions for this key")  # type: ignore[var-annotated]
+    expires_at = Column(
+        DateTime(timezone=True),
+        nullable=False,
+        comment="Expiration timestamp - API keys must have an expiry date",
+    )
     is_active = Column(Boolean, nullable=False, default=True, comment="Whether the key is active")
     created_at = Column(
         DateTime(timezone=True),
@@ -500,12 +528,12 @@ class WebhookDelivery(Base):  # type: ignore[misc, valid-type]
         comment="Associated task ID",
     )
     webhook_url = Column(String(500), nullable=False, comment="Target webhook URL")
-    payload = Column(JSONB, nullable=False, comment="Webhook payload as JSON")
+    payload = Column(JSON, nullable=False, comment="Webhook payload as JSON")
     status = Column(String(20), nullable=False, default="pending", comment="Delivery status")
     attempts = Column(Integer, nullable=False, default=0, comment="Number of delivery attempts")
     retry_count = Column(Integer, nullable=False, default=5, comment="Maximum retry attempts")
     retry_delays = Column(
-        JSONB,
+        JSON,
         nullable=False,
         default=lambda: [5, 30, 300, 1800, 3600],
         comment="Retry delay schedule in seconds",
@@ -548,7 +576,7 @@ class AuditLog(Base):  # type: ignore[misc, valid-type]
     )
     user_id = Column(
         String(36),
-        ForeignKey("users.user_id"),
+        ForeignKey("users.user_id", ondelete="SET NULL"),
         nullable=True,
         index=True,
         comment="User who performed the action (null for anonymous actions)",
@@ -566,7 +594,7 @@ class AuditLog(Base):  # type: ignore[misc, valid-type]
         server_default=func.now(),
         comment="When the action occurred",
     )
-    details = Column(JSONB, nullable=True, comment="Additional details about the action")
+    details = Column(JSON, nullable=True, comment="Additional details about the action")
     ip_address = Column(String(45), nullable=True, comment="Client IP address")
     user_agent = Column(Text, nullable=True, comment="Client user agent string")
     status = Column(String(20), nullable=False, default="success", comment="Action outcome")

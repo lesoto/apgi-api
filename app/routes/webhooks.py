@@ -12,6 +12,7 @@ import logging
 
 from app.database.connection import get_db
 from app.database.models import WebhookDelivery
+from app.config import settings
 from app.models.schemas import (
     ErrorResponse,
     WebhookDeliveryResponse,
@@ -41,13 +42,14 @@ logger = logging.getLogger(__name__)
     response_model=WebhookDeliveryListResponse,
     summary="List webhook deliveries",
     description="List webhook deliveries with optional filtering by status.",
+    dependencies=[Depends(require_permission(Permission.DATA_READ))],
 )
 async def list_webhook_deliveries(
     status_filter: Optional[str] = None,
     page: int = 1,
     per_page: int = 10,
     db: Session = Depends(get_db),
-    current_user: TokenPayload = Depends(require_permission(Permission.SYSTEM_ADMIN)),
+    current_user: TokenPayload = Depends(require_permission(Permission.DATA_READ)),
 ):
     """
     List webhook deliveries.
@@ -63,6 +65,14 @@ async def list_webhook_deliveries(
         List of webhook deliveries with pagination info
     """
     try:
+        # Validate status_filter
+        ALLOWED_STATUSES = ["pending", "retry", "delivered", "failed"]
+        if status_filter and status_filter not in ALLOWED_STATUSES:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Invalid status_filter. Must be one of {ALLOWED_STATUSES}",
+            )
+
         # Calculate offset
         offset = (page - 1) * per_page
 
@@ -108,12 +118,15 @@ async def list_webhook_deliveries(
             deliveries=delivery_responses,
             pagination=pagination,
         )
+    except HTTPException:
+        # Re-raise HTTP exceptions (like validation errors)
+        raise
     except Exception as e:
         logger.exception("Failed to list webhook deliveries")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="An internal error occurred",
-        )
+        ) from e
 
 
 @router.get(
@@ -197,7 +210,7 @@ async def retry_webhook_delivery(
             detail="Cannot retry a successfully delivered webhook",
         )
 
-    if delivery.attempts >= 5:
+    if delivery.attempts >= settings.webhook_retry_limit:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST, detail="Maximum retry attempts exceeded"
         )

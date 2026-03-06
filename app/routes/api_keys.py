@@ -6,12 +6,15 @@ API endpoints for managing API keys including creation, listing, updating, and d
 
 import secrets
 import logging
+from typing import cast
+from datetime import datetime, timezone, timedelta
 
 from fastapi import APIRouter, Depends, status, HTTPException
 from sqlalchemy.orm import Session
 
 from app.database.connection import get_db
 from app.database.models import APIKey
+from app.config import settings
 from app.models.schemas import (
     ErrorResponse,
     APIKeyCreateRequest,
@@ -64,6 +67,19 @@ async def create_api_key(
     # Generate a secure API key
     api_key_plain = f"apgi_{secrets.token_urlsafe(32)}"
 
+    # Enforce default expiry if not provided
+    expires_at = request.expires_at or (datetime.now(timezone.utc) + timedelta(days=365))
+
+    # Compute HMAC prefix for fast lookup
+    import hmac
+    import hashlib
+
+    prefix = hmac.new(
+        cast(str, settings.jwt_secret_key).encode(),
+        api_key_plain.encode(),
+        hashlib.sha256,
+    ).hexdigest()[:16]
+
     # Hash the API key for storage
     auth_manager = AuthManager(db)
     key_hash = auth_manager.hash_password(api_key_plain)
@@ -73,8 +89,9 @@ async def create_api_key(
         user_id=current_user.user_id,
         name=request.name,
         key_hash=key_hash,
+        key_prefix=prefix,
         permissions=request.permissions,
-        expires_at=request.expires_at,
+        expires_at=expires_at,
         is_active=True,
     )
 
@@ -125,6 +142,11 @@ async def list_api_keys(
         List of API keys with pagination info
     """
     try:
+        if per_page < 1 or per_page > 100:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST, detail="Per page must be between 1 and 100"
+            )
+
         # Calculate offset
         offset = (page - 1) * per_page
 
@@ -158,6 +180,8 @@ async def list_api_keys(
             api_keys=api_key_responses,
             pagination=pagination,
         )
+    except HTTPException:
+        raise
     except Exception as e:
         logger.exception("Failed to list API keys")
         raise HTTPException(
@@ -312,6 +336,16 @@ async def rotate_api_key(
     # Generate a new secure API key
     api_key_plain = f"apgi_{secrets.token_urlsafe(32)}"
 
+    # Compute HMAC prefix for fast lookup
+    import hmac
+    import hashlib
+
+    prefix = hmac.new(
+        cast(str, settings.jwt_secret_key).encode(),
+        api_key_plain.encode(),
+        hashlib.sha256,
+    ).hexdigest()[:16]
+
     # Hash the API key for storage
     auth_manager = AuthManager(db)
     key_hash = auth_manager.hash_password(api_key_plain)
@@ -319,10 +353,11 @@ async def rotate_api_key(
     # Create the new API key record with same properties
     db_new_api_key = APIKey(
         user_id=current_user.user_id,
-        name=existing_key.name,  # type: ignore[arg-type]
+        name=existing_key.name,
         key_hash=key_hash,
-        permissions=existing_key.permissions,  # type: ignore[arg-type]
-        expires_at=existing_key.expires_at,  # type: ignore[arg-type]
+        key_prefix=prefix,
+        permissions=existing_key.permissions,
+        expires_at=existing_key.expires_at,
         is_active=True,
     )
 

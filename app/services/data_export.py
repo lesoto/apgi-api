@@ -74,17 +74,14 @@ class DataExportService:
             "updated_at": session.updated_at.isoformat() + "Z",
             "config": session.config,
             "state": session.state.value,
-            "data": self._extract_time_series(state, variables, start_time, end_time),
+            "data": self._extract_time_series(
+                state, variables, start_time, end_time, settings.max_export_mb * 1024 * 1024
+            ),
         }
 
         # Export in requested format
         if format.lower() == "json":
             data_bytes, content_type = self._export_json(export_data)
-            # Check export size limit
-            if len(data_bytes) > settings.max_export_mb * 1024 * 1024:
-                raise ValueError(
-                    f"Export size {len(data_bytes) / 1024 / 1024:.1f}MB exceeds maximum allowed {settings.max_export_mb}MB"
-                )
             return data_bytes, content_type
         elif format.lower() == "csv":
             data_generator = self._export_csv(export_data)
@@ -99,6 +96,7 @@ class DataExportService:
         variables: Optional[List[str]],
         start_time: Optional[float],
         end_time: Optional[float],
+        max_size_bytes: Optional[int] = None,
     ) -> List[Dict[str, Any]]:
         """
         Extract time series data from session state.
@@ -116,7 +114,8 @@ class DataExportService:
         history = state.get("history", {})
 
         # Build time series data
-        time_series = []
+        time_series: List[Dict[str, Any]] = []
+        current_size = 0
 
         # Get time points
         time_points = history.get("time", [])
@@ -141,8 +140,17 @@ class DataExportService:
                     continue
 
                 # Add value if available
-                if i < len(var_values):
-                    data_point[var_name] = var_values[i]
+                data_point[var_name] = var_values[i] if i < len(var_values) else None
+
+            # Check size limit
+            if max_size_bytes:
+                estimated_size = len(json.dumps(data_point).encode("utf-8"))
+                if current_size + estimated_size > max_size_bytes:
+                    logger.warning(
+                        f"Export size limit reached at {len(time_series)} points, truncating"
+                    )
+                    break
+                current_size += estimated_size
 
             time_series.append(data_point)
 
@@ -167,30 +175,44 @@ class DataExportService:
             Tuple of (json_bytes, content_type)
         """
         json_str = json.dumps(export_data, indent=2)
-        return (json_str.encode("utf-8"), "application/json")
+        return json_str.encode("utf-8"), "application/json"
 
-    def _export_csv(self, export_data: Dict[str, Any]) -> Generator[bytes, None, None]:
+    def _redact_config(self, config: Dict[str, Any]) -> Dict[str, Any]:
         """
-        Export data as CSV with metadata in comments, yielding bytes for streaming.
+        Redact sensitive fields from config for export.
+
+        Args:
+            config: Configuration dictionary
+
+        Returns:
+            Redacted configuration dictionary
+        """
+        redacted = config.copy()
+        sensitive_keys = ["password", "secret", "key", "token", "api_key"]
+        for key in sensitive_keys:
+            if key in redacted:
+                redacted[key] = "[REDACTED]"
+        return redacted
+
+    def _export_csv(self, export_data: Dict[str, Any]) -> bytes:
+        """
+        Export data as CSV with metadata in comments.
 
         Args:
             export_data: Data to export
 
-        Yields:
+        Returns:
             Bytes of the CSV data
         """
-        # Add metadata as comments
         lines = []
+        # Add metadata as comments
         lines.append("# Session Metadata")
         lines.append(f"# session_id: {export_data['session_id']}")
         lines.append(f"# created_at: {export_data['created_at']}")
         lines.append(f"# updated_at: {export_data['updated_at']}")
-        lines.append(f"# config: {json.dumps(export_data['config'])}")
+        lines.append(f"# config: {json.dumps(self._redact_config(export_data['config']))}")
         lines.append(f"# state: {export_data['state']}")
         lines.append("")
-
-        for line in lines:
-            yield (line + "\n").encode("utf-8")
 
         # Get time series data
         time_series = export_data.get("data", [])
@@ -206,25 +228,54 @@ class DataExportService:
 
             # Write header
             header = "time," + ",".join(var_names)
-            yield (header + "\n").encode("utf-8")
+            lines.append(header)
 
             # Write data rows
             for point in time_series:
                 time_val = str(point.get("time", ""))
                 values = [str(point.get(var, "")) for var in var_names]
 
-                # Prevent CSV injection by escaping formula characters
+                # Prevent CSV injection by escaping formula characters and dangerous content
                 def escape_csv_value(value: str) -> str:
-                    if value.startswith(("+", "-", "=", "@")):
-                        return "'" + value
+                    if not value:
+                        return ""
+
+                    # Strip leading/trailing whitespace
+                    value = str(value).strip()
+
+                    # Check for dangerous patterns
+                    dangerous_patterns = [
+                        value.startswith(("+", "-", "=", "@", "\t")),
+                        value.lower().startswith(("=cmd", "=power", "=sum", "=hyperlink")),
+                        "," in value or "\n" in value or "\r" in value,
+                        value.startswith(("0x", "0X")),  # Hex patterns
+                    ]
+
+                    # If any dangerous pattern detected, sanitize the value
+                    if any(dangerous_patterns):
+                        # Replace dangerous characters and wrap in quotes
+                        sanitized = value.replace(",", ";").replace("\n", " ").replace("\r", " ")
+                        sanitized = (
+                            sanitized.replace("=", "\\=").replace("+", "\\+").replace("-", "\\-")
+                        )
+                        sanitized = sanitized.replace("@", "\\@").replace("\t", " ")
+                        return f"'{sanitized}'"
+
+                    # If value contains comma, newline, or quote, wrap in quotes
+                    if any(char in value for char in [",", "\n", "\r", '"']):
+                        escaped_value = value.replace('"', '""')
+                        return f'"{escaped_value}"'
+
                     return value
 
                 escaped_values = [escape_csv_value(v) for v in values]
                 row = time_val + "," + ",".join(escaped_values)
-                yield (row + "\n").encode("utf-8")
+                lines.append(row)
         else:
             # Empty data
-            yield "time\n".encode("utf-8")
+            lines.append("time")
+
+        return "\n".join(lines).encode("utf-8")
 
     async def generate_summary_stats(
         self, session_id: str, user_id: Optional[str] = None

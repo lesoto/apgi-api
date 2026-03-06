@@ -6,7 +6,8 @@ Configuration settings for the standalone APGI REST API.
 
 import os
 import warnings
-from typing import List, Optional
+from typing import List, Optional, Dict
+from urllib.parse import urlparse
 
 from dotenv import load_dotenv
 
@@ -25,10 +26,20 @@ class Settings:
         # Environment Detection
         self.environment: str = os.getenv("ENVIRONMENT", "development")
 
+        # Validate environment
+        ALLOWED_ENVIRONMENTS = ["development", "staging", "production", "prod"]
+        if self.environment not in ALLOWED_ENVIRONMENTS:
+            raise ValueError(
+                f"Invalid ENVIRONMENT: {self.environment}. Must be one of {ALLOWED_ENVIRONMENTS}"
+            )
+
         # API Settings
         self.api_title: str = "APGI System API"
         self.api_version: str = "1.0.0"
         self.api_description: str = "REST API for consciousness modeling"
+
+        # Base URL for generating links
+        self.base_url: str = os.getenv("BASE_URL", "https://localhost:8000")
 
         # Server Settings
         self.host: str = os.getenv("HOST", "0.0.0.0")
@@ -49,6 +60,10 @@ class Settings:
         self.health_critical_services: List[str] = [
             s.strip() for s in os.getenv("HEALTH_CRITICAL_SERVICES", "redis,database").split(",")
         ]
+        self.health_connectivity_threshold: float = float(
+            os.getenv("HEALTH_CONNECTIVITY_THRESHOLD", "0.1")
+        )
+        self.health_query_threshold: float = float(os.getenv("HEALTH_QUERY_THRESHOLD", "0.5"))
 
         # Celery Settings
         self.celery_broker_url: str = os.getenv("CELERY_BROKER_URL", "redis://localhost:6379/1")
@@ -56,8 +71,21 @@ class Settings:
             "CELERY_RESULT_BACKEND", "redis://localhost:6379/2"
         )
 
+        # Cache TTL Settings
+        self.cache_default_ttl: int = int(os.getenv("CACHE_DEFAULT_TTL", "3600"))  # 1 hour
+        self.cache_session_ttl_multiplier: int = int(
+            os.getenv("CACHE_SESSION_TTL_MULTIPLIER", "24")
+        )  # 24 hours
+        self.cache_user_ttl_multiplier: int = int(
+            os.getenv("CACHE_USER_TTL_MULTIPLIER", "2")
+        )  # 2 hours
+        self.cache_task_ttl_multiplier: int = int(
+            os.getenv("CACHE_TASK_TTL_MULTIPLIER", "6")
+        )  # 6 hours
+
         # Authentication Settings
         self.jwt_secret_key: Optional[str] = os.getenv("JWT_SECRET_KEY")
+        self.cursor_signing_key: Optional[str] = os.getenv("CURSOR_SIGNING_KEY")
         self.webhook_secret_key: Optional[str] = os.getenv("WEBHOOK_SECRET_KEY")
         self.jwt_algorithm: str = "HS256"
         self.jwt_access_token_expire_minutes: int = int(
@@ -76,19 +104,30 @@ class Settings:
         self.cors_allow_credentials: bool = (
             os.getenv("CORS_ALLOW_CREDENTIALS", "true").lower() == "true"
         )
-        self.cors_allow_methods: List[str] = (
-            os.getenv("CORS_ALLOW_METHODS", "*").split(",")
-            if os.getenv("CORS_ALLOW_METHODS")
-            else ["*"]
-        )
-        self.cors_allow_headers: List[str] = (
-            os.getenv("CORS_ALLOW_HEADERS", "*").split(",")
-            if os.getenv("CORS_ALLOW_HEADERS")
-            else ["*"]
-        )
+        cors_methods_env = os.getenv("CORS_ALLOW_METHODS")
+        if cors_methods_env:
+            self.cors_allow_methods: List[str] = [
+                method.strip() for method in cors_methods_env.split(",") if method.strip()
+            ]
+        else:
+            self.cors_allow_methods = ["*"]
+        cors_headers_env = os.getenv("CORS_ALLOW_HEADERS")
+        if cors_headers_env:
+            self.cors_allow_headers: List[str] = [
+                header.strip() for header in cors_headers_env.split(",") if header.strip()
+            ]
+        else:
+            self.cors_allow_headers = ["*"]
 
         # Logging Settings
         self.log_level: str = os.getenv("LOG_LEVEL", self._get_default_log_level())
+
+        # Validate log level
+        ALLOWED_LOG_LEVELS = ["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"]
+        if self.log_level.upper() not in ALLOWED_LOG_LEVELS:
+            raise ValueError(
+                f"Invalid LOG_LEVEL: {self.log_level}. Must be one of {ALLOWED_LOG_LEVELS}"
+            )
 
         # Schema Validation Settings
         self.schema_validation_enabled: bool = (
@@ -100,7 +139,7 @@ class Settings:
 
         # Alerting Settings
         self.alert_webhook_urls: List[str] = (
-            os.getenv("ALERT_WEBHOOK_URLS", "").split(",")
+            [url.strip() for url in os.getenv("ALERT_WEBHOOK_URLS", "").split(",") if url.strip()]
             if os.getenv("ALERT_WEBHOOK_URLS")
             else []
         )
@@ -113,15 +152,28 @@ class Settings:
         )
         self.alert_cooldown_minutes: int = int(os.getenv("ALERT_COOLDOWN_MINUTES", "5"))
 
+        # Email Settings for notifications and password reset
+        self.smtp_server: Optional[str] = os.getenv("SMTP_SERVER")
+        self.smtp_port: int = int(os.getenv("SMTP_PORT", "587"))
+        self.smtp_username: Optional[str] = os.getenv("SMTP_USERNAME")
+        self.smtp_password: Optional[str] = os.getenv("SMTP_PASSWORD")
+        self.smtp_from_email: str = os.getenv("SMTP_FROM_EMAIL", "noreply@apgi-api.com")
+
         # Request Size Limiting
         self.max_request_size_mb: int = int(os.getenv("MAX_REQUEST_SIZE_MB", "10"))
         self.request_size_limit_enabled: bool = (
             os.getenv("REQUEST_SIZE_LIMIT_ENABLED", "true").lower() == "true"
         )
 
+        # Webhook Settings
+        self.webhook_retry_limit: int = int(os.getenv("WEBHOOK_RETRY_LIMIT", "5"))
+
         # Export Size Limiting
         self.max_export_mb: int = int(os.getenv("MAX_EXPORT_MB", "10"))
         self.max_export_points: int = int(os.getenv("MAX_EXPORT_POINTS", "100000"))
+
+        # Task Execution Settings
+        self.task_timeout_seconds: int = int(os.getenv("TASK_TIMEOUT_SECONDS", "3600"))
 
         # CSRF Protection Settings
         self.csrf_protection_enabled: bool = (
@@ -144,13 +196,14 @@ class Settings:
         )
         self.database_shards_count: int = int(os.getenv("DATABASE_SHARDS_COUNT", "1"))
         self.database_shard_key: str = os.getenv("DATABASE_SHARD_KEY", "user_id")
+        self.database_shard_urls: Dict[int, str] = {}
 
         # Individual shard URLs (for when sharding is enabled)
         # These will be used by the sharding service
         for i in range(10):  # Support up to 10 shards for now
             shard_url = os.getenv(f"DATABASE_SHARD_{i}_URL")
             if shard_url:
-                setattr(self, f"database_shard_{i}_url", shard_url)
+                self.database_shard_urls[i] = shard_url
 
         # Validate security settings after initialization
         self.__post_init__()
@@ -159,11 +212,10 @@ class Settings:
         """Parse CORS origins from environment variable."""
         cors_origins_env = os.getenv("CORS_ORIGINS")
         if cors_origins_env:
-            return [origin.strip() for origin in cors_origins_env.split(",")]
+            return [origin.strip() for origin in cors_origins_env.split(",") if origin.strip()]
         # Default origins for development
         if self.environment == "development":
             return ["http://localhost:3000", "http://localhost:8000"]
-        # No default for production - must be explicitly configured
         return []
 
     def _get_default_log_level(self) -> str:
@@ -214,6 +266,28 @@ class Settings:
                     "Use a secure, random key with at least 32 characters."
                 )
 
+        # Validate cursor signing key
+        if not self.cursor_signing_key:
+            errors.append(
+                "CURSOR_SIGNING_KEY environment variable is not set. "
+                "This is required for secure cursor signing in pagination."
+            )
+        else:
+            # Check for known insecure default values
+            if self.cursor_signing_key.lower() in [d.lower() for d in insecure_defaults]:
+                errors.append(
+                    "CURSOR_SIGNING_KEY is set to a known insecure default value. "
+                    "This allows attackers to forge pagination cursors."
+                )
+
+            # Validate minimum key length
+            if len(self.cursor_signing_key) < 32:
+                errors.append(
+                    "CURSOR_SIGNING_KEY is shorter than 32 characters. "
+                    "Short keys are vulnerable to brute force attacks. "
+                    "Use a secure, random key with at least 32 characters."
+                )
+
         # Validate CORS origins
         if self.cors_origins == ["*"] or "*" in self.cors_origins:
             if self.cors_allow_credentials:
@@ -221,6 +295,12 @@ class Settings:
                     "CORS origins are set to wildcard [*] with credentials enabled. "
                     "This allows any origin to access the API with credentials, enabling CSRF attacks. "
                     "Either set CORS_ORIGINS to specific allowed origins, or set CORS_ALLOW_CREDENTIALS=false."
+                )
+            elif is_production:
+                errors.append(
+                    "CORS origins are set to wildcard [*] in production. "
+                    "This allows any origin to access the API. "
+                    "Set CORS_ORIGINS environment variable to specific allowed origins for production."
                 )
             else:
                 warnings.warn(
@@ -259,8 +339,30 @@ class Settings:
                     "Set REDIS_URL environment variable with production Redis connection string."
                 )
 
+        # Validate URL formats
+        try:
+            parsed = urlparse(self.database_url)
+            if not parsed.scheme or not parsed.netloc:
+                errors.append("DATABASE_URL is not a valid URL format.")
+        except Exception:
+            errors.append("DATABASE_URL is not a valid URL.")
+
+        try:
+            parsed = urlparse(self.redis_url)
+            if not parsed.scheme or not parsed.netloc:
+                errors.append("REDIS_URL is not a valid URL format.")
+        except Exception:
+            errors.append("REDIS_URL is not a valid URL.")
+
+        try:
+            parsed = urlparse(self.celery_broker_url)
+            if not parsed.scheme or not parsed.netloc:
+                errors.append("CELERY_BROKER_URL is not a valid URL format.")
+        except Exception:
+            errors.append("CELERY_BROKER_URL is not a valid URL.")
+
         # If there are critical errors in production, fail fast
-        if errors:
+        if errors and is_production:
             error_message = "CRITICAL CONFIGURATION ERRORS:\n" + "\n".join(
                 f"  - {error}" for error in errors
             )

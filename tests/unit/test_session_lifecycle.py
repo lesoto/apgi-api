@@ -307,7 +307,7 @@ class TestInvalidStateTransitions:
         with pytest.raises(ValueError) as exc_info:
             await session.pause()
 
-        assert "not running" in str(exc_info.value).lower()
+        assert "cannot pause session in state created" in str(exc_info.value).lower()
 
     @pytest.mark.asyncio
     async def test_cannot_pause_stopped_session(self, sample_config, mock_apgi_system):
@@ -315,14 +315,15 @@ class TestInvalidStateTransitions:
         session_id = str(uuid.uuid4())
         session = SimulationSession(session_id, sample_config)
 
-        # Stop session
+        # Start and stop session
+        await session.start()
         await session.stop()
         assert session.state == SessionLifecycleState.STOPPED
 
         with pytest.raises(ValueError) as exc_info:
             await session.pause()
 
-        assert "not running" in str(exc_info.value).lower()
+        assert "cannot pause session in state stopped" in str(exc_info.value).lower()
 
     @pytest.mark.asyncio
     async def test_cannot_pause_paused_session(self, sample_config, mock_apgi_system):
@@ -338,7 +339,7 @@ class TestInvalidStateTransitions:
         with pytest.raises(ValueError) as exc_info:
             await session.pause()
 
-        assert "not running" in str(exc_info.value).lower()
+        assert "cannot pause session in state paused" in str(exc_info.value).lower()
 
     @pytest.mark.asyncio
     async def test_cannot_start_running_session(self, sample_config, mock_apgi_system):
@@ -353,7 +354,7 @@ class TestInvalidStateTransitions:
         with pytest.raises(ValueError) as exc_info:
             await session.start()
 
-        assert "already running" in str(exc_info.value).lower()
+        assert "cannot start session in state running" in str(exc_info.value).lower()
 
     @pytest.mark.asyncio
     async def test_state_remains_unchanged_after_invalid_transition(
@@ -446,8 +447,8 @@ class TestSessionDeletion:
         # Delete session
         await session_manager.delete_session(session_id)
 
-        # Verify database delete was called
-        mock_db_session.delete.assert_called_once_with(mock_db_model)
+        # Verify database soft delete was performed
+        assert mock_db_model.is_deleted
         mock_db_session.commit.assert_called()
 
     @pytest.mark.asyncio

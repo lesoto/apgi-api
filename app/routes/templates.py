@@ -8,7 +8,7 @@ import logging
 from uuid import uuid4
 
 from fastapi import APIRouter, Depends, HTTPException, status
-from sqlalchemy import select, func
+from sqlalchemy import select
 from app.database.connection import get_db_context
 from app.database.models import SessionTemplate
 from app.models.schemas import (
@@ -75,6 +75,7 @@ async def list_templates(
         )
 
     try:
+        result = None
         with get_db_context() as db:
             # Build query
             query = select(SessionTemplate)
@@ -89,8 +90,11 @@ async def list_templates(
                 )
 
             # Get total count
-            count_stmt = select(func.count()).select_from(SessionTemplate).where(query.whereclause)  # type: ignore
-            total = db.execute(count_stmt).scalar() or 0
+            total = (
+                db.query(SessionTemplate).filter(query.whereclause).count()
+                if query.whereclause
+                else db.query(SessionTemplate).count()
+            )
 
             # Apply pagination
             offset = (page - 1) * per_page
@@ -100,33 +104,33 @@ async def list_templates(
             result = db.execute(query)
             templates_db = result.scalars().all()
 
-            # Convert to response format
-            templates = [
-                SessionTemplateResponse(
-                    template_id=str(template.template_id),
-                    user_id=str(template.user_id),
-                    name=str(template.name),
-                    description=template.description,  # type: ignore[arg-type]
-                    config_path=template.config_path,  # type: ignore[arg-type]
-                    custom_config=template.custom_config,  # type: ignore[arg-type]
-                    default_description=template.default_description,  # type: ignore[arg-type]
-                    tags=list(template.tags) if template.tags else [],
-                    is_public=bool(template.is_public),
-                    created_at=template.created_at,  # type: ignore[arg-type]
-                    updated_at=template.updated_at,  # type: ignore[arg-type]
-                )
-                for template in templates_db
-            ]
-
-            pagination = PaginationInfo(
-                page=page,
-                per_page=per_page,
-                total=total,
+        # Process results outside of context manager
+        templates = [
+            SessionTemplateResponse(
+                template_id=str(template.template_id),
+                user_id=str(template.user_id),
+                name=str(template.name),
+                description=template.description,  # type: ignore[arg-type]
+                config_path=template.config_path,  # type: ignore[arg-type]
+                custom_config=template.custom_config,  # type: ignore[arg-type]
+                default_description=template.default_description,  # type: ignore[arg-type]
+                tags=list(template.tags) if template.tags else [],  # type: ignore[arg-type]
+                is_public=bool(template.is_public),
+                created_at=template.created_at,  # type: ignore[arg-type]
+                updated_at=template.updated_at,  # type: ignore[arg-type]
             )
+            for template in templates_db
+        ]
 
-            logger.info(f"Listed {len(templates)} templates for user {current_user.user_id}")
+        pagination = PaginationInfo(
+            page=page,
+            per_page=per_page,
+            total=total,
+        )
 
-            return SessionTemplateListResponse(templates=templates, pagination=pagination)
+        logger.info(f"Listed {len(templates)} templates for user {current_user.user_id}")
+
+        return SessionTemplateListResponse(templates=templates, pagination=pagination)
 
     except Exception as e:
         logger.error(f"Failed to list templates: {e}")
@@ -162,6 +166,7 @@ async def create_template(
         HTTPException: If template creation fails
     """
     try:
+        template = None
         with get_db_context() as db:
             # Check for duplicate name for this user
             existing_stmt = select(SessionTemplate).where(
@@ -192,26 +197,56 @@ async def create_template(
             )
 
             db.add(template)
-            db.commit()
-            db.refresh(template)
+
+            try:
+                db.commit()
+                db.refresh(template)
+            except Exception as e:
+                db.rollback()
+
+                # Handle specific database constraint errors
+                error_msg = str(e).lower()
+                if "unique" in error_msg and "name" in error_msg:
+                    raise HTTPException(
+                        status_code=status.HTTP_409_CONFLICT,
+                        detail=f"Template with name '{request.name}' already exists for this user",
+                    )
+                elif "foreign key" in error_msg:
+                    raise HTTPException(
+                        status_code=status.HTTP_400_BAD_REQUEST,
+                        detail="Invalid user reference",
+                    )
+                elif "check constraint" in error_msg:
+                    raise HTTPException(
+                        status_code=status.HTTP_400_BAD_REQUEST,
+                        detail="Invalid template data: " + str(e),
+                    )
+                else:
+                    # Generic database error
+                    logger.error(f"Database error creating template: {e}")
+                    raise HTTPException(
+                        status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                        detail="Failed to create template due to database error",
+                    )
 
             logger.info(
                 f"Template {template_id} created successfully by user {current_user.user_id}"
             )
 
-            return SessionTemplateResponse(
-                template_id=str(template.template_id),
-                user_id=str(template.user_id),
-                name=str(template.name),
-                description=template.description,  # type: ignore[arg-type]
-                config_path=template.config_path,  # type: ignore[arg-type]
-                custom_config=template.custom_config,  # type: ignore[arg-type]
-                default_description=template.default_description,  # type: ignore[arg-type]
-                tags=list(template.tags) if template.tags else [],
-                is_public=bool(template.is_public),
-                created_at=template.created_at,  # type: ignore[arg-type]
-                updated_at=template.updated_at,  # type: ignore[arg-type]
-            )
+        # Return response outside of context manager
+        return SessionTemplateResponse(
+            template_id=str(template.template_id),
+            user_id=str(template.user_id),
+            name=str(template.name),
+            description=template.description,  # type: ignore[arg-type]
+            config_path=template.config_path,  # type: ignore[arg-type]
+            custom_config=template.custom_config,  # type: ignore[arg-type]
+            default_description=template.default_description,  # type: ignore[arg-type]
+            tags=list(template.tags) if template.tags else [],
+            is_public=bool(template.is_public),
+            created_at=template.created_at,  # type: ignore[arg-type]
+            updated_at=template.updated_at,  # type: ignore[arg-type]
+        )
 
     except HTTPException:
         raise
@@ -242,6 +277,7 @@ async def get_template(
         HTTPException: If template not found or access denied
     """
     try:
+        template = None
         with get_db_context() as db:
             stmt = select(SessionTemplate).where(SessionTemplate.template_id == template_id)
             result = db.execute(stmt)
@@ -259,19 +295,20 @@ async def get_template(
                     status_code=status.HTTP_403_FORBIDDEN, detail="Access denied to this template"
                 )
 
-            return SessionTemplateResponse(
-                template_id=str(template.template_id),
-                user_id=str(template.user_id),
-                name=str(template.name),
-                description=template.description,  # type: ignore[arg-type]
-                config_path=template.config_path,  # type: ignore[arg-type]
-                custom_config=template.custom_config,  # type: ignore[arg-type]
-                default_description=template.default_description,  # type: ignore[arg-type]
-                tags=list(template.tags) if template.tags else [],
-                is_public=bool(template.is_public),
-                created_at=template.created_at,  # type: ignore[arg-type]
-                updated_at=template.updated_at,  # type: ignore[arg-type]
-            )
+        # Return response outside of context manager
+        return SessionTemplateResponse(
+            template_id=str(template.template_id),
+            user_id=str(template.user_id),
+            name=str(template.name),
+            description=template.description,  # type: ignore[arg-type]
+            config_path=template.config_path,  # type: ignore[arg-type]
+            custom_config=template.custom_config,  # type: ignore[arg-type]
+            default_description=template.default_description,  # type: ignore[arg-type]
+            tags=list(template.tags) if template.tags else [],
+            is_public=bool(template.is_public),
+            created_at=template.created_at,  # type: ignore[arg-type]
+            updated_at=template.updated_at,  # type: ignore[arg-type]
+        )
 
     except HTTPException:
         raise
@@ -310,6 +347,7 @@ async def update_template(
         HTTPException: If template not found or access denied
     """
     try:
+        template = None
         with get_db_context() as db:
             stmt = select(SessionTemplate).where(SessionTemplate.template_id == template_id)
             result = db.execute(stmt)
@@ -344,28 +382,41 @@ async def update_template(
                         detail=f"Template with name '{request.name}' already exists for this user",
                     )
 
-            # Update fields
+            # Update fields explicitly
             update_data = request.model_dump(exclude_unset=True)
-            for field, value in update_data.items():
-                setattr(template, field, value)
+            if "name" in update_data:
+                template.name = update_data["name"]
+            if "description" in update_data:
+                template.description = update_data["description"]
+            if "config_path" in update_data:
+                template.config_path = update_data["config_path"]
+            if "custom_config" in update_data:
+                template.custom_config = update_data["custom_config"]
+            if "default_description" in update_data:
+                template.default_description = update_data["default_description"]
+            if "tags" in update_data:
+                template.tags = update_data["tags"]
+            if "is_public" in update_data:
+                template.is_public = update_data["is_public"]
 
             # Context manager will commit automatically
 
             logger.info(f"Template {template_id} updated by user {current_user.user_id}")
 
-            return SessionTemplateResponse(
-                template_id=str(template.template_id),
-                user_id=str(template.user_id),
-                name=str(template.name),
-                description=template.description,  # type: ignore[arg-type]
-                config_path=template.config_path,  # type: ignore[arg-type]
-                custom_config=template.custom_config,  # type: ignore[arg-type]
-                default_description=template.default_description,  # type: ignore[arg-type]
-                tags=list(template.tags) if template.tags else [],
-                is_public=bool(template.is_public),
-                created_at=template.created_at,  # type: ignore[arg-type]
-                updated_at=template.updated_at,  # type: ignore[arg-type]
-            )
+        # Return response outside of context manager
+        return SessionTemplateResponse(
+            template_id=str(template.template_id),
+            user_id=str(template.user_id),
+            name=str(template.name),
+            description=template.description,  # type: ignore[arg-type]
+            config_path=template.config_path,  # type: ignore[arg-type]
+            custom_config=template.custom_config,  # type: ignore[arg-type]
+            default_description=template.default_description,  # type: ignore[arg-type]
+            tags=list(template.tags) if template.tags else [],
+            is_public=bool(template.is_public),
+            created_at=template.created_at,  # type: ignore[arg-type]
+            updated_at=template.updated_at,  # type: ignore[arg-type]
+        )
 
     except HTTPException:
         raise

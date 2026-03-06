@@ -226,7 +226,7 @@ class ResponseSchemaValidationMiddleware(BaseHTTPMiddleware):
             response_schema = responses.get("default")
 
         # Try status code range (e.g., "2XX")
-        if response_schema is None:
+        if response_schema is None and status_str:
             status_range = f"{status_str[0]}XX"
             response_schema = responses.get(status_range)
 
@@ -289,7 +289,7 @@ class ResponseSchemaValidationMiddleware(BaseHTTPMiddleware):
 
         body = response.body
 
-        if body is None or len(body) == 0:
+        if len(body) == 0 or body is None:
             return None
 
         # Decode bytes to string
@@ -390,6 +390,33 @@ class ResponseSchemaValidationMiddleware(BaseHTTPMiddleware):
                         "error": f"Expected {expected_type}, got {type(value).__name__}",
                     }
                 )
+
+        # Additional validations for specific types
+        if expected_type == "array" and isinstance(value, list):
+            items_schema = schema.get("items")
+            if items_schema:
+                for i, item in enumerate(value):
+                    item_errors = self._validate_field(item, items_schema, f"{field_path}[{i}]")
+                    errors.extend(item_errors)
+
+        elif expected_type == "object" and isinstance(value, dict):
+            properties = schema.get("properties", {})
+            for prop, prop_schema in properties.items():
+                if prop in value:
+                    prop_errors = self._validate_field(
+                        value[prop], prop_schema, f"{field_path}.{prop}"
+                    )
+                    errors.extend(prop_errors)
+
+        elif expected_type == "string" and isinstance(value, str):
+            pattern = schema.get("pattern")
+            if pattern:
+                import re
+
+                if not re.match(pattern, value):
+                    errors.append(
+                        {"field": field_path, "error": f"String does not match pattern {pattern}"}
+                    )
 
         return errors
 

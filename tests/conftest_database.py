@@ -57,7 +57,7 @@ def test_environment():
     """Set test environment variables."""
     original_env = {}
     test_vars = {
-        "ENVIRONMENT": "testing",
+        "ENVIRONMENT": "development",
         "DATABASE_URL": TEST_DATABASE_URL,
         "REDIS_URL": "redis://localhost:6379/1",  # Different DB for tests
         "JWT_SECRET_KEY": "test_secret_key_that_is_long_enough_for_testing_32chars",

@@ -4,8 +4,11 @@ Authentication Routes
 Endpoints for user authentication, token management, and logout.
 """
 
-from fastapi import APIRouter, Depends, status, Request
+import logging
+from fastapi import APIRouter, Depends, status, Request, Body
 from sqlalchemy.orm import Session
+
+logger = logging.getLogger(__name__)
 
 from app.database.connection import get_db
 from app.exceptions import AuthenticationError, ExpiredTokenError, InvalidTokenError
@@ -51,12 +54,15 @@ router = APIRouter(prefix="/v1/auth", tags=["Authentication"])
         401: {"description": "Authentication failed - invalid credentials"},
     },
 )
-async def login(request: LoginRequest, db: Session = Depends(get_db)) -> TokenResponse:
+async def login(
+    request: Request, body: LoginRequest = Body(...), db: Session = Depends(get_db)
+) -> TokenResponse:
     """
     Authenticate user and return JWT tokens.
 
     Args:
-        request: Login credentials (username and password)
+        request: HTTP request for logging IP
+        body: Login credentials (username and password)
         db: Database session
 
     Returns:
@@ -68,13 +74,22 @@ async def login(request: LoginRequest, db: Session = Depends(get_db)) -> TokenRe
     auth_manager = AuthManager(db)
 
     # Authenticate user
-    user = auth_manager.authenticate_user(request.username, request.password)
+    user = auth_manager.authenticate_user(body.username, body.password, body.mfa_code)
 
     if not user:
+        # Log security event for failed authentication
+        logger.warning(
+            "Authentication failed",
+            extra={
+                "username": body.username,
+                "ip": request.client.host if request.client else None,
+                "event_type": "authentication_failure",
+            },
+        )
         raise AuthenticationError("Invalid username or password")
 
     # Create tokens
-    tokens = auth_manager.create_tokens_for_user(user, request.remember_me or False)
+    tokens = auth_manager.create_tokens_for_user(user, body.remember_me or False)
 
     return TokenResponse(**tokens)
 
@@ -128,7 +143,7 @@ async def refresh_token(
 
     try:
         # Get new access token
-        tokens = auth_manager.refresh_access_token(request.refresh_token)
+        tokens = await auth_manager.refresh_access_token(request.refresh_token)
         return TokenRefreshResponse(**tokens)
     except (InvalidTokenError, ExpiredTokenError, AuthenticationError) as e:
         raise e
@@ -172,7 +187,7 @@ async def logout(
     auth_manager = AuthManager(db)
 
     # Revoke the refresh token
-    auth_manager.revoke_refresh_token(request.refresh_token)
+    await auth_manager.revoke_refresh_token(request.refresh_token)
 
     # Return 204 No Content (no response body)
     return None
@@ -225,7 +240,7 @@ async def logout_access(
     auth_manager = AuthManager(db)
 
     # Revoke the access token
-    revoked = auth_manager.revoke_access_token(access_token)
+    revoked = await auth_manager.revoke_access_token(access_token)
 
     if not revoked:
         raise InvalidTokenError("Access token could not be revoked")

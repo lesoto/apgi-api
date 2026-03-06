@@ -282,6 +282,88 @@ async def get_task_result(
 
 
 @router.delete(
+    "/sessions/{session_id}/tasks/{task_id}",
+    status_code=status.HTTP_200_OK,
+    summary="Cancel task in session",
+    description="Cancel a running experimental task in a specific session",
+    dependencies=[Depends(require_permission(Permission.TASK_DELETE))],
+)
+async def cancel_task_in_session(
+    session_id: str,
+    task_id: str,
+    db=Depends(get_db),
+    executor: TaskExecutor = Depends(get_task_executor),
+    current_user=Depends(get_current_user),
+):
+    """
+    Cancel a running task in a specific session.
+
+    Args:
+        session_id: Session identifier
+        task_id: Task identifier
+        db: Database session
+        executor: Task executor dependency
+
+    Returns:
+        Cancellation status
+
+    Raises:
+        HTTPException: If cancellation fails or access denied
+    """
+    try:
+        # First validate session ownership
+        from app.database.models import Session as SessionModel
+
+        session = (
+            db.query(SessionModel)
+            .filter(
+                SessionModel.session_id == session_id, SessionModel.user_id == current_user.user_id
+            )
+            .first()
+        )
+
+        if not session:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Session {session_id} not found or access denied",
+            )
+
+        # Check if task exists and belongs to the session
+        task = (
+            db.query(TaskModel)
+            .filter(TaskModel.task_id == task_id, TaskModel.session_id == session_id)
+            .first()
+        )
+
+        if not task:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Task {task_id} not found in session {session_id}",
+            )
+
+        # Cancel task with ownership validation
+        result = await executor.cancel_task(task_id, current_user.user_id)
+
+        logger.info(f"Task {task_id} in session {session_id} cancellation requested")
+
+        return result
+    except HTTPException:
+        # Re-raise HTTP exceptions (like 404) as-is
+        raise
+    except ValueError as e:
+        # Handle ValueError from executor (access denied)
+        if "access denied" in str(e).lower():
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Access denied")
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
+    except Exception as e:
+        logger.exception("Failed to cancel task in session")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to cancel task",
+        )
+
+
+@router.delete(
     "/tasks/{task_id}",
     status_code=status.HTTP_200_OK,
     summary="Cancel task",
@@ -308,7 +390,7 @@ async def cancel_task(
     """
     try:
         # Check if task exists before attempting cancellation
-        task_status = await executor.get_task_status(task_id)
+        task_status = await executor.get_task_status(task_id, current_user.user_id)
         if task_status is None:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
@@ -323,6 +405,11 @@ async def cancel_task(
     except HTTPException:
         # Re-raise HTTP exceptions (like 404) as-is
         raise
+    except ValueError as e:
+        # Handle ValueError from executor (access denied)
+        if "access denied" in str(e).lower():
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Access denied")
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
     except Exception as e:
         logger.exception("Failed to cancel task")
         raise HTTPException(

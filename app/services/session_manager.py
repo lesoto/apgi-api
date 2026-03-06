@@ -64,6 +64,28 @@ class SessionLifecycleState(str, Enum):
     ERROR = "error"
 
 
+# State transition table
+ALLOWED_TRANSITIONS = {
+    SessionLifecycleState.CREATED: [
+        SessionLifecycleState.RUNNING,
+        SessionLifecycleState.STOPPED,
+        SessionLifecycleState.ERROR,
+    ],
+    SessionLifecycleState.RUNNING: [
+        SessionLifecycleState.PAUSED,
+        SessionLifecycleState.STOPPED,
+        SessionLifecycleState.ERROR,
+    ],
+    SessionLifecycleState.PAUSED: [
+        SessionLifecycleState.RUNNING,
+        SessionLifecycleState.STOPPED,
+        SessionLifecycleState.ERROR,
+    ],
+    SessionLifecycleState.STOPPED: [SessionLifecycleState.CREATED, SessionLifecycleState.ERROR],
+    SessionLifecycleState.ERROR: [SessionLifecycleState.CREATED],
+}
+
+
 class SimulationSession:
     """
     Represents a single APGI simulation instance with async interface.
@@ -105,6 +127,10 @@ class SimulationSession:
 
         logger.info(f"SimulationSession {session_id} initialized")
 
+    def _can_transition_to(self, new_state: SessionLifecycleState) -> bool:
+        """Check if transition to new_state is allowed from current state."""
+        return new_state in ALLOWED_TRANSITIONS.get(self.state, [])
+
     def _apply_custom_config(self, custom_config: Dict[str, Any]):
         """Apply custom configuration overrides to APGI system."""
 
@@ -129,8 +155,8 @@ class SimulationSession:
             Dict with status information
         """
         async with self.lock:
-            if self.state == SessionLifecycleState.RUNNING:
-                raise ValueError(f"Session {self.session_id} is already running")
+            if not self._can_transition_to(SessionLifecycleState.RUNNING):
+                raise ValueError(f"Cannot start session in state {self.state.value}")
 
             if self.state == SessionLifecycleState.PAUSED:
                 # Resume from paused state
@@ -159,8 +185,8 @@ class SimulationSession:
             Dict with status information
         """
         async with self.lock:
-            if self.state != SessionLifecycleState.RUNNING:
-                raise ValueError(f"Session {self.session_id} is not running")
+            if not self._can_transition_to(SessionLifecycleState.PAUSED):
+                raise ValueError(f"Cannot pause session in state {self.state.value}")
 
             # Capture current state
             self._paused_state = self._capture_state()
@@ -186,6 +212,9 @@ class SimulationSession:
             Dict with status information
         """
         async with self.lock:
+            if not self._can_transition_to(SessionLifecycleState.STOPPED):
+                raise ValueError(f"Cannot stop session in state {self.state.value}")
+
             self.is_running = False
             self.is_paused = False
             self.state = SessionLifecycleState.STOPPED
@@ -207,6 +236,9 @@ class SimulationSession:
             Dict with status information
         """
         async with self.lock:
+            if not self._can_transition_to(SessionLifecycleState.CREATED):
+                raise ValueError(f"Cannot reset session in state {self.state.value}")
+
             # Reset APGI system
             self.apgi_system.reset()
 
@@ -282,9 +314,9 @@ class SimulationSession:
         state = cast(Dict[str, Any], self.apgi_system.get_state())
 
         # Explicitly capture subsystem states for full restoration
-        state["allostasis"] = self.apgi_system.allostasis.save_state()
-        state["body"] = self.apgi_system.body.save_state()
-        state["precision"] = self.apgi_system.precision.save_state()
+        state["allostasis"] = self.apgi_system.allostasis.save_state()  # type: ignore[attr-defined]
+        state["body"] = self.apgi_system.body.save_state()  # type: ignore[attr-defined]
+        state["precision"] = self.apgi_system.precision.save_state()  # type: ignore[attr-defined]
         state["workspace"] = self.apgi_system.workspace.save_state()
         state["self_model"] = self.apgi_system.self_model.save_state()
         state["ignition"] = self.apgi_system.ignition.save_state()
@@ -304,35 +336,40 @@ class SimulationSession:
 
         # Restore subsystem states if available
         if "allostasis" in state:
-            self.apgi_system.allostasis.load_state(state["allostasis"])
+            self.apgi_system.allostasis.load_state(state["allostasis"])  # type: ignore[attr-defined]
 
         if "body" in state:
-            self.apgi_system.body.load_state(state["body"])
+            self.apgi_system.body.load_state(state["body"])  # type: ignore[attr-defined]
 
         if "precision" in state:
-            self.apgi_system.precision.load_state(state["precision"])
+            self.apgi_system.precision.load_state(state["precision"])  # type: ignore[attr-defined]
 
         if "workspace" in state:
-            self.apgi_system.workspace.load_state(state["workspace"])
+            self.apgi_system.workspace.load_state(state["workspace"])  # type: ignore[attr-defined]
 
         if "self_model" in state:
-            self.apgi_system.self_model.load_state(state["self_model"])
+            self.apgi_system.self_model.load_state(state["self_model"])  # type: ignore[attr-defined]
 
         if "ignition" in state:
-            self.apgi_system.ignition.load_state(state["ignition"])
+            self.apgi_system.ignition.load_state(state["ignition"])  # type: ignore[attr-defined]
 
         # Restore any other dynamic attributes from state
         for key, value in state.items():
-            if hasattr(self.apgi_system, key) and key not in [
-                "time",
-                "history",
-                "allostasis",
-                "body",
-                "precision",
-                "workspace",
-                "self_model",
-                "ignition",
-            ]:
+            if (
+                hasattr(self.apgi_system, key)
+                and key
+                not in [
+                    "time",
+                    "history",
+                    "allostasis",
+                    "body",
+                    "precision",
+                    "workspace",
+                    "self_model",
+                    "ignition",
+                ]
+                and key.isidentifier()
+            ):
                 setattr(self.apgi_system, key, value)
 
         logger.info(f"Session {self.session_id} full state restored")
@@ -537,7 +574,7 @@ class SessionManager:
             await self._evict_oldest_sessions()
 
         # Cache session metadata in Redis
-        await self._cache_session_metadata(session_id, sim_session)
+        await self._cache_session_metadata(session_id, sim_session, user_id)
 
         return session_id
 
@@ -577,20 +614,26 @@ class SessionManager:
         if cached_data:
             # Reconstruct session from cache
             metadata = json.loads(cached_data)
-            sim_session = SimulationSession(session_id, metadata["config"])
-            sim_session.state = SessionLifecycleState(metadata["state"])
-            sim_session.created_at = datetime.fromisoformat(
-                metadata["created_at"].replace("Z", "+00:00")
-            )
-            sim_session.updated_at = datetime.fromisoformat(
-                metadata["updated_at"].replace("Z", "+00:00")
-            )
 
-            # Add to memory cache
-            async with self.cache_lock:
-                self.sessions[session_id] = (sim_session, time.time())  # Store with timestamp
+            # Validate ownership if user_id is provided
+            if user_id and metadata.get("user_id") != user_id:
+                # Cache hit but wrong owner - don't reveal, fall through to DB check
+                logger.warning(f"Cache hit for session {session_id} but ownership mismatch")
+            else:
+                sim_session = SimulationSession(session_id, metadata["config"])
+                sim_session.state = SessionLifecycleState(metadata["state"])
+                sim_session.created_at = datetime.fromisoformat(
+                    metadata["created_at"].replace("Z", "+00:00")
+                )
+                sim_session.updated_at = datetime.fromisoformat(
+                    metadata["updated_at"].replace("Z", "+00:00")
+                )
 
-            return sim_session
+                # Add to memory cache
+                async with self.cache_lock:
+                    self.sessions[session_id] = (sim_session, time.time())  # Store with timestamp
+
+                return sim_session
 
         # Load from database
         db_session = self.db_session_factory()
@@ -600,6 +643,8 @@ class SessionManager:
             # Add user_id filter if provided for ownership validation
             if user_id:
                 stmt = stmt.where(SessionModel.user_id == user_id)
+
+            stmt = stmt.where(SessionModel.is_deleted.is_(False))
 
             result = db_session.execute(stmt)
             db_model = result.scalar_one_or_none()
@@ -626,7 +671,7 @@ class SessionManager:
             async with self.cache_lock:
                 self.sessions[session_id] = (sim_session, time.time())  # Store with timestamp
 
-            await self._cache_session_metadata(session_id, sim_session)
+            await self._cache_session_metadata(session_id, sim_session, db_model.user_id)
 
             logger.info(f"Session {session_id} loaded from database")
 
@@ -662,9 +707,10 @@ class SessionManager:
             db_model = result.scalar_one_or_none()
 
             if db_model:
-                db_session.delete(db_model)
+                db_model.is_deleted = True
+                db_model.updated_at = datetime.now(timezone.utc)
                 db_session.commit()
-                logger.info(f"Session {session_id} deleted from database")
+                logger.info(f"Session {session_id} soft deleted from database")
         except Exception as e:
             db_session.rollback()
             logger.error(f"Failed to delete session {session_id}: {e}")
@@ -674,13 +720,16 @@ class SessionManager:
 
         logger.info(f"Session {session_id} cleaned up")
 
-    async def update_session_state(self, session_id: str, new_state: SessionLifecycleState):
+    async def update_session_state(
+        self, session_id: str, new_state: SessionLifecycleState, user_id: Optional[str] = None
+    ):
         """
         Update session state in database and cache.
 
         Args:
             session_id: Session identifier
             new_state: New session state
+            user_id: Optional user ID for ownership validation
 
         Raises:
             ValueError: If session ID is invalid
@@ -706,13 +755,17 @@ class SessionManager:
             db_session.close()
 
         # Update Redis cache
-        sim_session = await self.get_session(session_id)
-        await self._cache_session_metadata(session_id, sim_session)
+        if user_id:
+            sim_session = await self.get_session(session_id, user_id)
+            await self._cache_session_metadata(session_id, sim_session, user_id)
 
-    async def _cache_session_metadata(self, session_id: str, sim_session: SimulationSession):
+    async def _cache_session_metadata(
+        self, session_id: str, sim_session: SimulationSession, user_id: str
+    ):
         """Cache session metadata in Redis."""
         metadata = {
             "session_id": session_id,
+            "user_id": user_id,
             "state": sim_session.state.value,
             "config": sim_session.config,
             "created_at": sim_session.created_at.isoformat() + "Z",
@@ -752,10 +805,16 @@ class SessionManager:
             if state:
                 stmt = stmt.where(SessionModel.state == state)
 
+            stmt = stmt.where(SessionModel.is_deleted.is_(False))
+
             # Get total count
-            count_stmt = select(func.count()).select_from(stmt.subquery())
-            total_result = db_session.execute(count_stmt)
-            total = total_result.scalar()
+            total = (
+                db_session.scalar(
+                    select(func.count(SessionModel.session_id)).where(stmt.whereclause)
+                )
+                if stmt.whereclause
+                else db_session.scalar(select(func.count(SessionModel.session_id)))
+            )
 
             # Apply pagination
             offset = (page - 1) * per_page

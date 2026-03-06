@@ -17,6 +17,9 @@ from app.database.models import AuditLog
 from app.exceptions import AuthorizationError, InvalidTokenError
 from app.services.auth_manager import AuthManager, TokenPayload
 
+import asyncio
+from app.middleware.alerting import alert_manager, AlertSeverity
+
 logger = logging.getLogger(__name__)
 
 # ============================================================================
@@ -148,7 +151,15 @@ def get_permissions_for_roles(roles: List[str]) -> Set[Permission]:
             permissions.update(ROLE_PERMISSIONS.get(role, set()))
         except ValueError:
             # Unknown role, skip it
-            continue
+            logger.warning(f"Invalid role '{role_name}' provided, skipping")
+            asyncio.create_task(
+                alert_manager.trigger_custom_alert(
+                    title="Invalid Role Detected",
+                    message=f"User provided invalid role: {role_name}",
+                    severity=AlertSeverity.WARNING,
+                    metadata={"invalid_role": role_name},
+                )
+            )
     return permissions
 
 
@@ -196,12 +207,11 @@ def has_any_role(user_roles: List[str], required_roles: List[Role]) -> bool:
 
 
 def check_permission(
-    user_roles: List[str],
+    current_user: TokenPayload,
     required_permission: Permission,
     resource: str = "resource",
     action: str = "access",
     db: Optional[Session] = None,
-    user_id: Optional[str] = None,
     ip_address: Optional[str] = None,
     user_agent: Optional[str] = None,
 ) -> None:
@@ -209,24 +219,55 @@ def check_permission(
     Check if user has permission, raise exception if not.
 
     Args:
-        user_roles: List of user's roles
+        current_user: Current authenticated user
         required_permission: Permission to check
         resource: Resource being accessed (for error message)
         action: Action being performed (for error message)
         db: Database session for audit logging (optional)
-        user_id: User ID for audit logging (optional)
         ip_address: Client IP address for audit logging (optional)
         user_agent: Client user agent for audit logging (optional)
 
     Raises:
         AuthorizationError: If user lacks the required permission
     """
-    if not has_permission(user_roles, required_permission):
+    # Check if user has permission via direct permissions (e.g., API key)
+    if current_user.permissions and required_permission.value in current_user.permissions:
+        # Log successful authorization
+        logger.info(
+            "Authorization granted via permissions",
+            extra={
+                "user_id": current_user.user_id,
+                "permission": required_permission.value,
+                "resource": resource,
+                "action": action,
+            },
+        )
+
+        # Log audit event if database session provided
+        if db:
+            log_audit_event(
+                db=db,
+                user_id=current_user.user_id,
+                action=f"access:{action}",
+                resource_type=resource,
+                status="granted",
+                details={
+                    "permission": required_permission.value,
+                    "permissions": current_user.permissions,
+                },
+                ip_address=ip_address,
+                user_agent=user_agent,
+            )
+        return
+
+    # Check via roles
+    if not has_permission(current_user.roles, required_permission):
         # Log failed authorization attempt
         logger.warning(
             "Authorization denied",
             extra={
-                "user_roles": user_roles,
+                "user_id": current_user.user_id,
+                "user_roles": current_user.roles,
                 "required_permission": required_permission.value,
                 "resource": resource,
                 "action": action,
@@ -237,16 +278,31 @@ def check_permission(
         if db:
             log_audit_event(
                 db=db,
-                user_id=user_id,
+                user_id=current_user.user_id,
                 action=f"access:{action}",
                 resource_type=resource,
                 status="denied",
                 details={
                     "required_permission": required_permission.value,
-                    "user_roles": user_roles,
+                    "user_roles": current_user.roles,
                 },
                 ip_address=ip_address,
                 user_agent=user_agent,
+            )
+        else:
+            # Always log authorization failures, even without explicit DB session
+            # This prevents silent audit log failures
+            logger.error(
+                "Authorization audit log failed - no database session provided",
+                extra={
+                    "user_id": current_user.user_id,
+                    "user_roles": current_user.roles,
+                    "required_permission": required_permission.value,
+                    "resource": resource,
+                    "action": action,
+                    "ip_address": ip_address,
+                    "user_agent": user_agent,
+                },
             )
 
         # Find which role would grant this permission
@@ -262,7 +318,8 @@ def check_permission(
         logger.info(
             "Authorization granted",
             extra={
-                "user_roles": user_roles,
+                "user_id": current_user.user_id,
+                "user_roles": current_user.roles,
                 "permission": required_permission.value,
                 "resource": resource,
                 "action": action,
@@ -273,13 +330,13 @@ def check_permission(
         if db:
             log_audit_event(
                 db=db,
-                user_id=user_id,
+                user_id=current_user.user_id,
                 action=f"access:{action}",
                 resource_type=resource,
                 status="granted",
                 details={
                     "permission": required_permission.value,
-                    "user_roles": user_roles,
+                    "user_roles": current_user.roles,
                 },
                 ip_address=ip_address,
                 user_agent=user_agent,
@@ -319,7 +376,7 @@ async def get_current_user(
     auth_manager = AuthManager(db)
 
     try:
-        payload = auth_manager.verify_token(token, expected_type="access")
+        payload = await auth_manager.verify_token(token, expected_type="access")
         return payload
     except Exception as e:
         # Provide more helpful error messages based on the exception type
@@ -358,11 +415,19 @@ def require_permission(permission: Permission):
         current_user: TokenPayload = Depends(get_current_user),
     ) -> TokenPayload:
         """Check if current user has required permission."""
+        # Safely split permission value to handle malformed permissions
+        permission_parts = permission.value.split(":", 1)  # Split only on first colon
+        if len(permission_parts) != 2:
+            raise ValueError(
+                f"Invalid permission format: {permission.value}. Expected format: 'resource:action'"
+            )
+
+        resource, action = permission_parts
         check_permission(
-            user_roles=current_user.roles,
+            current_user=current_user,
             required_permission=permission,
-            resource=permission.value.split(":")[0],
-            action=permission.value.split(":")[1],
+            resource=resource,
+            action=action,
         )
         return current_user
 
@@ -467,6 +532,22 @@ def log_audit_event(
         db.commit()
     except Exception as e:
         logger.error(f"Failed to log audit event: {e}")
+        # Alert about audit log failure
+        asyncio.create_task(
+            alert_manager.trigger_custom_alert(
+                title="Audit Log Failure",
+                message=f"Failed to log audit event: {str(e)}",
+                severity=AlertSeverity.ERROR,
+                metadata={
+                    "user_id": user_id,
+                    "action": action,
+                    "resource_type": resource_type,
+                    "resource_id": resource_id,
+                    "status": status,
+                    "error": str(e),
+                },
+            )
+        )
         # Don't raise exception to avoid breaking the main flow
 
 
@@ -476,7 +557,13 @@ def log_audit_event(
 
 
 def check_resource_ownership(
-    resource_owner_id: str, current_user: TokenPayload, allow_admin: bool = True
+    resource_owner_id: str,
+    current_user: TokenPayload,
+    allow_admin: bool = True,
+    db: Optional[Session] = None,
+    user_id: Optional[str] = None,
+    ip_address: Optional[str] = None,
+    user_agent: Optional[str] = None,
 ) -> None:
     """
     Check if user owns a resource or is an admin.
@@ -485,6 +572,10 @@ def check_resource_ownership(
         resource_owner_id: User ID of resource owner
         current_user: Current authenticated user
         allow_admin: Whether admins can access any resource
+        db: Database session for audit logging (optional)
+        user_id: User ID for audit logging (optional)
+        ip_address: Client IP address for audit logging (optional)
+        user_agent: Client user agent for audit logging (optional)
 
     Raises:
         AuthorizationError: If user doesn't own resource and isn't admin
@@ -511,6 +602,22 @@ def check_resource_ownership(
                 "reason": "user is admin",
             },
         )
+        # Log audit event if database session provided
+        if db:
+            log_audit_event(
+                db=db,
+                user_id=user_id or current_user.user_id,
+                action="admin_access",
+                resource_type="resource",
+                resource_id=resource_owner_id,
+                status="granted",
+                details={
+                    "reason": "admin access to user-owned resource",
+                    "resource_owner_id": resource_owner_id,
+                },
+                ip_address=ip_address,
+                user_agent=user_agent,
+            )
         return
 
     # Access denied

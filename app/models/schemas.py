@@ -6,11 +6,17 @@ Defines the data schemas for API requests and responses.
 
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import datetime, timezone, timedelta
 from typing import Any, Dict, List, Optional
 import re
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
+
+
+# Pre-compiled regex patterns for performance
+UUID_PATTERN = re.compile(
+    r"^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$", re.IGNORECASE
+)
 
 
 class SessionTemplateCreateRequest(BaseModel):
@@ -49,7 +55,7 @@ class SessionTemplateCreateRequest(BaseModel):
             raise ValueError("Configuration path must be a non-empty string")
 
         # Basic path validation - prevent directory traversal
-        if ".." in v or v.startswith("/"):
+        if ".." in v:
             raise ValueError("Invalid configuration path: directory traversal not allowed")
 
         # Check for valid file extension
@@ -95,10 +101,14 @@ class SessionTemplateCreateRequest(BaseModel):
             raise ValueError("Tags must be a list")
 
         for tag in v:
-            if not isinstance(tag, str) or not tag.strip():
-                raise ValueError("Each tag must be a non-empty string")
+            if not isinstance(tag, str):
+                raise ValueError("Each tag must be a string")
 
-            if len(tag) > 50:
+            tag_stripped = tag.strip()
+            if not tag_stripped:
+                raise ValueError("Each tag must contain non-whitespace characters")
+
+            if len(tag_stripped) > 50:
                 raise ValueError("Tag is too long (max 50 characters)")
 
         return [tag.strip() for tag in v]
@@ -167,7 +177,7 @@ class SessionTemplateUpdateRequest(BaseModel):
             raise ValueError("Configuration path must be a non-empty string")
 
         # Basic path validation - prevent directory traversal
-        if ".." in v or v.startswith("/"):
+        if ".." in v:
             raise ValueError("Invalid configuration path: directory traversal not allowed")
 
         # Check for valid file extension
@@ -213,10 +223,14 @@ class SessionTemplateUpdateRequest(BaseModel):
             raise ValueError("Tags must be a list")
 
         for tag in v:
-            if not isinstance(tag, str) or not tag.strip():
-                raise ValueError("Each tag must be a non-empty string")
+            if not isinstance(tag, str):
+                raise ValueError("Each tag must be a string")
 
-            if len(tag) > 50:
+            tag_stripped = tag.strip()
+            if not tag_stripped:
+                raise ValueError("Each tag must contain non-whitespace characters")
+
+            if len(tag_stripped) > 50:
                 raise ValueError("Tag is too long (max 50 characters)")
 
         return [tag.strip() for tag in v]
@@ -326,12 +340,7 @@ class SessionCreateRequest(BaseModel):
             raise ValueError("Template ID must be a non-empty string")
 
         # UUID validation pattern
-        import re
-
-        uuid_pattern = re.compile(
-            r"^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$", re.IGNORECASE
-        )
-        if not uuid_pattern.match(v):
+        if not UUID_PATTERN.match(v):
             raise ValueError(f"Invalid template ID format: {v}")
 
         return v.strip()
@@ -347,7 +356,7 @@ class SessionCreateRequest(BaseModel):
             raise ValueError("Configuration path must be a non-empty string")
 
         # Basic path validation - prevent directory traversal
-        if ".." in v or v.startswith("/"):
+        if ".." in v:
             raise ValueError("Invalid configuration path: directory traversal not allowed")
 
         # Check for valid file extension
@@ -427,6 +436,7 @@ class LoginRequest(BaseModel):
 
     username: str = Field(..., description="Username or email address")
     password: str = Field(..., description="User password", min_length=1)
+    mfa_code: Optional[str] = Field(None, description="MFA verification code if enabled")
     remember_me: Optional[bool] = Field(False, description="Extend session duration")
 
     @field_validator("username")
@@ -659,12 +669,7 @@ class TaskDependencyCreateRequest(BaseModel):
             raise ValueError("Prerequisite task ID must be a non-empty string")
 
         # UUID validation pattern
-        import re
-
-        uuid_pattern = re.compile(
-            r"^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$", re.IGNORECASE
-        )
-        if not uuid_pattern.match(v):
+        if not UUID_PATTERN.match(v):
             raise ValueError(f"Invalid prerequisite task ID format: {v}")
 
         return v.strip()
@@ -1389,7 +1394,10 @@ class APIKeyCreateRequest(BaseModel):
 
     name: str = Field(..., description="API key name/description")
     permissions: List[str] = Field(default_factory=list, description="Permissions for this key")
-    expires_at: Optional[datetime] = Field(None, description="Optional expiration timestamp")
+    expires_at: Optional[datetime] = Field(
+        None,
+        description="Optional expiration timestamp. If not provided, defaults to 1 year from creation.",
+    )
 
     @field_validator("name")
     @classmethod
@@ -1402,6 +1410,32 @@ class APIKeyCreateRequest(BaseModel):
             raise ValueError("API key name is too long (max 100 characters)")
 
         return v.strip()
+
+    @field_validator("expires_at")
+    @classmethod
+    def validate_expires_at(cls, v):
+        """Validate expiration date."""
+        if v is not None:
+            now = datetime.now(timezone.utc)
+            if v <= now:
+                raise ValueError("Expiration date must be in the future")
+
+            # Limit maximum expiry to 2 years
+            max_expiry = now + timedelta(days=730)
+            if v > max_expiry:
+                raise ValueError("API key expiry cannot exceed 2 years from creation")
+
+        return v
+
+    @model_validator(mode="before")
+    @classmethod
+    def validate_request(cls, data):
+        """Ensure API key has reasonable expiry if provided."""
+        if data.get("expires_at") is None:
+            # Set default expiry to 1 year if not provided
+            data["expires_at"] = datetime.now(timezone.utc) + timedelta(days=365)
+
+        return data
 
     @field_validator("permissions")
     @classmethod

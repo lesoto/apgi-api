@@ -3,7 +3,6 @@ Unit tests for JWT token generation and verification.
 
 Tests access token creation/verification, refresh token creation/verification,
 token expiration handling, and invalid token rejection.
-Validates Requirements 8.2, 8.3, 8.4.
 """
 
 import pytest
@@ -199,21 +198,23 @@ class TestRefreshTokenCreation:
 class TestAccessTokenVerification:
     """Test access token verification."""
 
-    def test_verify_token_accepts_valid_access_token(self, auth_manager):
+    @pytest.mark.asyncio
+    async def test_verify_token_accepts_valid_access_token(self, auth_manager):
         """Test that verify_token accepts a valid access token."""
         user_id = "user123"
         username = "testuser"
         roles = ["researcher"]
 
         token = auth_manager.create_access_token(user_id, username, roles)
-        payload = auth_manager.verify_token(token, expected_type="access")
+        payload = await auth_manager.verify_token(token, expected_type="access")
 
         assert payload.user_id == user_id
         assert payload.username == username
         assert payload.roles == roles
         assert payload.token_type == "access"
 
-    def test_verify_token_rejects_expired_access_token(self, auth_manager):
+    @pytest.mark.asyncio
+    async def test_verify_token_rejects_expired_access_token(self, auth_manager):
         """Test that verify_token rejects an expired access token."""
         user_id = "user123"
         username = "testuser"
@@ -234,9 +235,10 @@ class TestAccessTokenVerification:
 
         # Verify token raises ExpiredTokenError
         with pytest.raises(ExpiredTokenError):
-            auth_manager.verify_token(expired_token, expected_type="access")
+            await auth_manager.verify_token(expired_token, expected_type="access")
 
-    def test_verify_token_rejects_invalid_signature(self, auth_manager):
+    @pytest.mark.asyncio
+    async def test_verify_token_rejects_invalid_signature(self, auth_manager):
         """Test that verify_token rejects token with invalid signature."""
         user_id = "user123"
         username = "testuser"
@@ -257,9 +259,10 @@ class TestAccessTokenVerification:
 
         # Verify token raises InvalidTokenError
         with pytest.raises(InvalidTokenError):
-            auth_manager.verify_token(invalid_token, expected_type="access")
+            await auth_manager.verify_token(invalid_token, expected_type="access")
 
-    def test_verify_token_rejects_malformed_token(self, auth_manager):
+    @pytest.mark.asyncio
+    async def test_verify_token_rejects_malformed_token(self, auth_manager):
         """Test that verify_token rejects malformed token."""
         malformed_tokens = [
             "not.a.jwt",
@@ -271,9 +274,10 @@ class TestAccessTokenVerification:
 
         for token in malformed_tokens:
             with pytest.raises(InvalidTokenError):
-                auth_manager.verify_token(token, expected_type="access")
+                await auth_manager.verify_token(token, expected_type="access")
 
-    def test_verify_token_rejects_wrong_token_type(self, auth_manager):
+    @pytest.mark.asyncio
+    async def test_verify_token_rejects_wrong_token_type(self, auth_manager):
         """Test that verify_token rejects token with wrong type."""
         user_id = "user123"
         username = "testuser"
@@ -284,7 +288,7 @@ class TestAccessTokenVerification:
 
         # Try to verify as access token
         with pytest.raises(InvalidTokenError) as exc_info:
-            auth_manager.verify_token(refresh_token, expected_type="access")
+            await auth_manager.verify_token(refresh_token, expected_type="access")
 
         assert "token type" in str(exc_info.value).lower()
 
@@ -292,21 +296,23 @@ class TestAccessTokenVerification:
 class TestRefreshTokenVerification:
     """Test refresh token verification."""
 
-    def test_verify_token_accepts_valid_refresh_token(self, auth_manager):
+    @pytest.mark.asyncio
+    async def test_verify_token_accepts_valid_refresh_token(self, auth_manager):
         """Test that verify_token accepts a valid refresh token."""
         user_id = "user123"
         username = "testuser"
         roles = ["researcher"]
 
         token = auth_manager.create_refresh_token(user_id, username, roles)
-        payload = auth_manager.verify_token(token, expected_type="refresh")
+        payload = await auth_manager.verify_token(token, expected_type="refresh")
 
         assert payload.user_id == user_id
         assert payload.username == username
         assert payload.roles == roles
         assert payload.token_type == "refresh"
 
-    def test_verify_token_rejects_expired_refresh_token(self, auth_manager):
+    @pytest.mark.asyncio
+    async def test_verify_token_rejects_expired_refresh_token(self, auth_manager):
         """Test that verify_token rejects an expired refresh token."""
         user_id = "user123"
         username = "testuser"
@@ -327,9 +333,10 @@ class TestRefreshTokenVerification:
 
         # Verify token raises ExpiredTokenError
         with pytest.raises(ExpiredTokenError):
-            auth_manager.verify_token(expired_token, expected_type="refresh")
+            await auth_manager.verify_token(expired_token, expected_type="refresh")
 
-    def test_verify_token_rejects_access_token_as_refresh(self, auth_manager):
+    @pytest.mark.asyncio
+    async def test_verify_token_rejects_access_token_as_refresh(self, auth_manager):
         """Test that verify_token rejects access token when expecting refresh."""
         user_id = "user123"
         username = "testuser"
@@ -340,7 +347,7 @@ class TestRefreshTokenVerification:
 
         # Try to verify as refresh token
         with pytest.raises(InvalidTokenError) as exc_info:
-            auth_manager.verify_token(access_token, expected_type="refresh")
+            await auth_manager.verify_token(access_token, expected_type="refresh")
 
         assert "token type" in str(exc_info.value).lower()
 
@@ -392,7 +399,8 @@ class TestTokenExpiration:
         time_diff = abs((exp_datetime - expected_exp).total_seconds())
         assert time_diff < 60
 
-    def test_token_becomes_invalid_after_expiration(self, auth_manager):
+    @pytest.mark.asyncio
+    async def test_token_becomes_invalid_after_expiration(self, auth_manager):
         """Test that token cannot be verified after expiration."""
         user_id = "user123"
         username = "testuser"
@@ -412,7 +420,7 @@ class TestTokenExpiration:
         )
 
         # Token should be valid immediately
-        payload = auth_manager.verify_token(short_lived_token, expected_type="access")
+        payload = await auth_manager.verify_token(short_lived_token, expected_type="access")
         assert payload.user_id == user_id
 
         # Wait for token to expire
@@ -422,13 +430,14 @@ class TestTokenExpiration:
 
         # Token should now be expired
         with pytest.raises(ExpiredTokenError):
-            auth_manager.verify_token(short_lived_token, expected_type="access")
+            await auth_manager.verify_token(short_lived_token, expected_type="access")
 
 
 class TestInvalidTokenRejection:
     """Test invalid token rejection."""
 
-    def test_verify_token_rejects_token_with_missing_fields(self, auth_manager):
+    @pytest.mark.asyncio
+    async def test_verify_token_rejects_token_with_missing_fields(self, auth_manager):
         """Test that verify_token rejects token with missing required fields."""
         # Create token with missing user_id
         expires_at = datetime.now(timezone.utc) + timedelta(hours=1)
@@ -443,9 +452,10 @@ class TestInvalidTokenRejection:
         )
 
         with pytest.raises(InvalidTokenError):
-            auth_manager.verify_token(invalid_token, expected_type="access")
+            await auth_manager.verify_token(invalid_token, expected_type="access")
 
-    def test_verify_token_rejects_token_with_wrong_algorithm(self, auth_manager):
+    @pytest.mark.asyncio
+    async def test_verify_token_rejects_token_with_wrong_algorithm(self, auth_manager):
         """Test that verify_token rejects token signed with wrong algorithm."""
         user_id = "user123"
         username = "testuser"
@@ -466,9 +476,10 @@ class TestInvalidTokenRejection:
         )
 
         with pytest.raises(InvalidTokenError):
-            auth_manager.verify_token(wrong_algo_token, expected_type="access")
+            await auth_manager.verify_token(wrong_algo_token, expected_type="access")
 
-    def test_verify_token_rejects_none_algorithm_attack(self, auth_manager):
+    @pytest.mark.asyncio
+    async def test_verify_token_rejects_none_algorithm_attack(self, auth_manager):
         """Test that verify_token rejects 'none' algorithm attack."""
         user_id = "user123"
         username = "testuser"
@@ -489,12 +500,13 @@ class TestInvalidTokenRejection:
             none_algo_token = jwt.encode(payload_dict, "", algorithm="none")
 
             with pytest.raises(InvalidTokenError):
-                auth_manager.verify_token(none_algo_token, expected_type="access")
+                await auth_manager.verify_token(none_algo_token, expected_type="access")
         except Exception:
             # Some JWT libraries prevent 'none' algorithm entirely, which is good
             pass
 
-    def test_verify_token_rejects_tampered_payload(self, auth_manager):
+    @pytest.mark.asyncio
+    async def test_verify_token_rejects_tampered_payload(self, auth_manager):
         """Test that verify_token rejects token with tampered payload."""
         user_id = "user123"
         username = "testuser"
@@ -521,14 +533,16 @@ class TestInvalidTokenRejection:
 
         # Verify token raises InvalidTokenError due to signature mismatch
         with pytest.raises(InvalidTokenError):
-            auth_manager.verify_token(tampered_token, expected_type="access")
+            await auth_manager.verify_token(tampered_token, expected_type="access")
 
-    def test_verify_token_rejects_empty_string(self, auth_manager):
+    @pytest.mark.asyncio
+    async def test_verify_token_rejects_empty_string(self, auth_manager):
         """Test that verify_token rejects empty string."""
         with pytest.raises(InvalidTokenError):
-            auth_manager.verify_token("", expected_type="access")
+            await auth_manager.verify_token("", expected_type="access")
 
-    def test_verify_token_rejects_random_string(self, auth_manager):
+    @pytest.mark.asyncio
+    async def test_verify_token_rejects_random_string(self, auth_manager):
         """Test that verify_token rejects random non-JWT string."""
         with pytest.raises(InvalidTokenError):
-            auth_manager.verify_token("this_is_not_a_jwt_token", expected_type="access")
+            await auth_manager.verify_token("this_is_not_a_jwt_token", expected_type="access")

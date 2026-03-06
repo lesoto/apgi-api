@@ -238,9 +238,9 @@ class RetryService:
         delay = min(config.base_delay * (config.backoff_factor**attempt), config.max_delay)
 
         if config.jitter:
-            # Add random jitter (±25% of delay)
+            # Add random jitter (+0-25% of delay)
             jitter_range = delay * 0.25
-            delay += random.uniform(-jitter_range, jitter_range)
+            delay += random.uniform(0, jitter_range)
 
         return max(0.1, delay)  # Minimum 100ms delay
 
@@ -324,7 +324,8 @@ class ErrorRecoveryService:
                 func, service_config.retry_config, *args, **kwargs
             )
 
-        assert service_config.circuit_breaker is not None
+        if service_config.circuit_breaker is None:
+            raise ValueError("Circuit breaker not configured for service")
         return await service_config.circuit_breaker.call(protected_call)
 
     def get_service_stats(self, service_name: str) -> Optional[Dict[str, Any]]:
@@ -341,7 +342,8 @@ class ErrorRecoveryService:
             return None
 
         service_config = self.services[service_name]
-        assert service_config.circuit_breaker is not None
+        if service_config.circuit_breaker is None:
+            return None  # or raise error?
         return {
             "service_name": service_name,
             "circuit_breaker": service_config.circuit_breaker.get_stats(),
@@ -367,7 +369,8 @@ class ErrorRecoveryService:
         """
         if service_name in self.services:
             service_config = self.services[service_name]
-            assert service_config.circuit_breaker is not None
+            if service_config.circuit_breaker is None:
+                raise ValueError("Circuit breaker not configured for service")
             service_config.circuit_breaker.state = CircuitState.CLOSED
             service_config.circuit_breaker.stats.consecutive_failures = 0
             service_config.circuit_breaker.stats.state_changes += 1

@@ -220,20 +220,37 @@ async def unhandled_exception_handler(request: Request, exc: Exception) -> JSONR
     try:
         content_type = request.headers.get("content-type", "")
         if "application/json" in content_type:
-            body = await request.body()
-            if len(body) < 1000:  # Only log small bodies
-                try:
-                    import json
+            content_length = request.headers.get("content-length")
+            if content_length and int(content_length) > 10000:
+                metadata["body"] = "[BODY TOO LARGE]"
+            else:
+                body = await request.body()
+                if len(body) < 1000:  # Only log small bodies
+                    try:
+                        import json
 
-                    body_data = json.loads(body.decode())
-                    # Remove sensitive fields
-                    sensitive_keys = ["password", "token", "secret", "key", "auth"]
-                    for key in sensitive_keys:
-                        if key in body_data:
-                            body_data[key] = "[REDACTED]"
-                    metadata["body"] = body_data
-                except (json.JSONDecodeError, UnicodeDecodeError):
-                    metadata["body"] = "[UNPARSEABLE]"
+                        body_data = json.loads(body.decode())
+
+                        # Remove sensitive fields recursively
+
+                        def redact_sensitive(data):
+                            if isinstance(data, dict):
+                                for key, value in list(data.items()):
+                                    if any(
+                                        s in key.lower()
+                                        for s in ["password", "token", "secret", "key", "auth"]
+                                    ):
+                                        data[key] = "[REDACTED]"
+                                    else:
+                                        redact_sensitive(value)
+                            elif isinstance(data, list):
+                                for item in data:
+                                    redact_sensitive(item)
+
+                        redact_sensitive(body_data)
+                        metadata["body"] = body_data
+                    except (json.JSONDecodeError, UnicodeDecodeError):
+                        metadata["body"] = "[UNPARSEABLE]"
         elif "application/x-www-form-urlencoded" in content_type:
             form_data = await request.form()
             metadata["form"] = {
@@ -251,7 +268,7 @@ async def unhandled_exception_handler(request: Request, exc: Exception) -> JSONR
     if alert_manager.channels:
         await alert_manager.record_error(
             error_type=type(exc).__name__,
-            error_message=str(exc),
+            error_message=f"{type(exc).__name__}: An internal error occurred",
             metadata=metadata,
         )
 

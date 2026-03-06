@@ -7,7 +7,8 @@ Middleware to extract and verify JWT tokens from Authorization headers.
 import logging
 from typing import Optional
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
+import asyncio
 
 from fastapi import Request
 from starlette.middleware.base import BaseHTTPMiddleware
@@ -149,7 +150,7 @@ class AuthenticationMiddleware(BaseHTTPMiddleware):
         token = self._extract_token(request)
         if token:
             try:
-                user_payload = self._verify_token(token)
+                user_payload = await self._verify_token(token)
                 return ("jwt", user_payload)
             except (ExpiredTokenError, InvalidTokenError):
                 # Token invalid, continue to check API key
@@ -164,13 +165,14 @@ class AuthenticationMiddleware(BaseHTTPMiddleware):
                 user_payload = TokenPayload(
                     user_id=api_key_info.user_id,
                     username="",  # API keys don't have usernames
-                    roles=api_key_info.permissions,
+                    roles=[],  # API keys have no roles, permissions are checked separately
+                    exp=datetime.now(timezone.utc)
+                    + timedelta(hours=1),  # API keys are session-based
                     token_type="api_key",
-                    exp=api_key_info.expires_at
-                    or datetime(9999, 12, 31).replace(tzinfo=timezone.utc),
+                    permissions=api_key_info.permissions,
                 )
                 return ("api_key", user_payload)
-            except Exception:
+            except ValueError:
                 # API key invalid, authentication failed
                 pass
 
@@ -199,7 +201,7 @@ class AuthenticationMiddleware(BaseHTTPMiddleware):
 
         return parts[1]
 
-    def _verify_token(self, token: str) -> TokenPayload:
+    async def _verify_token(self, token: str) -> TokenPayload:
         """
         Verify JWT token and extract payload.
 
@@ -213,11 +215,21 @@ class AuthenticationMiddleware(BaseHTTPMiddleware):
             InvalidTokenError: If token is invalid
             ExpiredTokenError: If token has expired
         """
+        loop = asyncio.get_event_loop()
+        payload = await loop.run_in_executor(None, self._blocking_verify_token, token)
+        return payload
+
+    def _blocking_verify_token(self, token: str) -> TokenPayload:
+        """
+        Blocking version of token verification for use in executor.
+        """
+        import asyncio
+
         # Create database session for token verification
         db = SessionLocal()
         try:
             auth_manager = AuthManager(db)
-            payload = auth_manager.verify_token(token, expected_type="access")
+            payload = asyncio.run(auth_manager.verify_token(token, expected_type="access"))
             return payload
         finally:
             db.close()
@@ -235,6 +247,14 @@ class AuthenticationMiddleware(BaseHTTPMiddleware):
         Raises:
             ValueError: If API key is invalid or expired
         """
+        loop = asyncio.get_event_loop()
+        api_key_info = await loop.run_in_executor(None, self._blocking_verify_api_key, api_key)
+        return api_key_info
+
+    def _blocking_verify_api_key(self, api_key: str) -> APIKeyInfo:
+        """
+        Blocking version of API key verification for use in executor.
+        """
         # Create database session for API key verification
         db = SessionLocal()
         try:
@@ -244,26 +264,27 @@ class AuthenticationMiddleware(BaseHTTPMiddleware):
             import hmac
             import hashlib
 
-            assert auth_manager.secret_key is not None
+            if auth_manager.secret_key is None:
+                raise ValueError("Secret key not configured")
             prefix = hmac.new(
                 auth_manager.secret_key.encode(), api_key.encode(), hashlib.sha256
-            ).hexdigest()[:16]
+            ).hexdigest()[:32]
 
             # Query API keys by prefix (should significantly reduce the number of candidates)
-            active_keys = (
-                db.query(APIKey)
-                .filter(APIKey.key_prefix == prefix, APIKey.is_active.is_(True))
-                .all()
-            )
+            active_keys = db.query(APIKey).filter(APIKey.is_active.is_(True)).all()
 
-            # If no keys match the prefix, the key is invalid
+            # If no keys, the key is invalid
             if not active_keys:
                 raise ValueError("Invalid API key")
 
-            # Find the specific key by bcrypt check
+            # Find the specific key by prefix and bcrypt check
             db_api_key = None
             for candidate_key in active_keys:
-                if auth_manager.verify_password(api_key, candidate_key.key_hash):  # type: ignore[arg-type]
+                if hmac.compare_digest(
+                    str(candidate_key.key_prefix), prefix
+                ) and auth_manager.verify_password(
+                    api_key, candidate_key.key_hash
+                ):  # type: ignore[arg-type]
                     db_api_key = candidate_key
                     break
 
@@ -271,8 +292,6 @@ class AuthenticationMiddleware(BaseHTTPMiddleware):
                 raise ValueError("Invalid API key")
 
             # Check expiration
-            from datetime import timezone
-
             if db_api_key.expires_at and db_api_key.expires_at < datetime.now(timezone.utc):
                 raise ValueError("API key has expired")
 
@@ -311,8 +330,6 @@ class AuthenticationMiddleware(BaseHTTPMiddleware):
         Returns:
             JSONResponse with error details
         """
-        from datetime import datetime, timezone
-
         return JSONResponse(
             status_code=status_code,
             content={

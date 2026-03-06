@@ -2,7 +2,6 @@
 Unit tests for database connection and initialization.
 
 Tests database initialization, connection pooling, and health checks.
-Validates Requirement 3.5: Database connectivity and schema verification on startup.
 """
 
 import pytest

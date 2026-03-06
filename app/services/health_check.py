@@ -46,7 +46,7 @@ class HealthCheckService:
             redis_time = time.time() - start_time
 
             # Performance threshold (in seconds)
-            redis_threshold = 0.05  # 50ms
+            redis_threshold = settings.health_connectivity_threshold
 
             if redis_time > redis_threshold:
                 dependencies["redis"] = {
@@ -106,6 +106,8 @@ class HealthCheckService:
         Returns:
             Dict containing health status and dependency information
         """
+        from app.config import settings
+
         dependencies = {}
         all_healthy = True
         critical_services = settings.health_critical_services
@@ -117,7 +119,7 @@ class HealthCheckService:
             redis_time = time.time() - start_time
 
             # Performance threshold (in seconds)
-            redis_threshold = 0.05  # 50ms
+            redis_threshold = settings.health_connectivity_threshold
 
             if redis_time > redis_threshold:
                 dependencies["redis"] = {
@@ -150,17 +152,19 @@ class HealthCheckService:
             start_time = time.time()
             with engine.connect() as conn:
                 # Test a simple query that works across databases
-                result = conn.execute(text("SELECT COUNT(*) FROM users"))
+                result = conn.execute(text("SELECT COUNT(*) FROM (SELECT 1) AS dummy"))
                 row = result.fetchone()
                 if row is not None:
-                    user_count = row[0]
+                    dummy_count = row[0]
                 else:
-                    user_count = 0
+                    dummy_count = 0
             query_time = time.time() - start_time
 
             # Performance thresholds (in seconds)
-            connectivity_threshold = 0.1  # 100ms
-            query_threshold = 0.5  # 500ms
+            from app.config import settings
+
+            connectivity_threshold = settings.health_connectivity_threshold  # 100ms default
+            query_threshold = settings.health_query_threshold  # 500ms default
 
             # Check performance
             performance_issues = []
@@ -179,7 +183,6 @@ class HealthCheckService:
                     "message": f"Connected but performance issues: {'; '.join(performance_issues)}",
                     "connectivity_time": f"{connectivity_time:.3f}s",
                     "query_time": f"{query_time:.3f}s",
-                    "active_users_30d": user_count,
                 }
                 all_healthy = False
             else:

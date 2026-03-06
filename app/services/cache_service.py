@@ -8,9 +8,10 @@ import json
 from typing import Any, Dict, Optional
 
 import redis.asyncio as redis
-import hashlib
 import base64
 from cryptography.fernet import Fernet
+from cryptography.hazmat.primitives import hashes
+from cryptography.hazmat.primitives.kdf.hkdf import HKDF
 
 from app.config import settings
 
@@ -47,8 +48,12 @@ class CacheService:
             "auth": "auth:",
         }
 
-        # Encryption key for sensitive data
-        key = base64.urlsafe_b64encode(hashlib.sha256(settings.jwt_secret_key.encode()).digest())
+        # Encryption key for sensitive data (derived using HKDF)
+        if settings.jwt_secret_key is None:
+            raise ValueError("JWT secret key is required for cache encryption")
+        hkdf = HKDF(algorithm=hashes.SHA256(), length=32, salt=None, info=b"cache_encryption_key")
+        key_bytes = hkdf.derive(settings.jwt_secret_key.encode())
+        key = base64.urlsafe_b64encode(key_bytes)
         self.fernet = Fernet(key)
 
     async def set_session_state(
@@ -95,8 +100,12 @@ class CacheService:
         Returns:
             True if successful, False otherwise
         """
+        from app.config import settings
+
         key = f"{self.prefixes['session']}{session_id}:metadata"
-        return await self._set_json(key, metadata, ttl or self.default_ttl * 24)  # 24 hours
+        return await self._set_json(
+            key, metadata, ttl or settings.cache_default_ttl * settings.cache_session_ttl_multiplier
+        )
 
     async def get_session_metadata(self, session_id: str) -> Optional[Dict[str, Any]]:
         """
@@ -125,10 +134,12 @@ class CacheService:
         Returns:
             True if successful, False otherwise
         """
+        from app.config import settings
+
         key = f"{self.prefixes['user']}{user_id}:data"
         return await self._set_encrypted_json(
-            key, user_data, ttl or self.default_ttl * 2
-        )  # 2 hours
+            key, user_data, ttl or settings.cache_default_ttl * settings.cache_user_ttl_multiplier
+        )
 
     async def get_user_data(self, user_id: str) -> Optional[Dict[str, Any]]:
         """
@@ -183,8 +194,12 @@ class CacheService:
         Returns:
             True if successful, False otherwise
         """
+        from app.config import settings
+
         key = f"{self.prefixes['task']}{task_id}:result"
-        return await self._set_json(key, result, ttl or self.default_ttl * 6)  # 6 hours
+        return await self._set_json(
+            key, result, ttl or settings.cache_default_ttl * settings.cache_task_ttl_multiplier
+        )
 
     async def get_task_result(self, task_id: str) -> Optional[Any]:
         """
@@ -272,9 +287,9 @@ class CacheService:
             Number of keys deleted
         """
         pattern = f"{self.prefixes['session']}{session_id}:*"
-        keys = await self.redis.keys(pattern)
+        keys = [key async for key in self.redis.scan_iter(pattern)]
         if keys:
-            return await self.redis.delete(*keys)  # type: ignore[return-value]
+            return await self.redis.delete(*keys)  # type: ignore[no-any-return]
         return 0
 
     async def invalidate_user_cache(self, user_id: str) -> int:
@@ -288,9 +303,9 @@ class CacheService:
             Number of keys deleted
         """
         pattern = f"{self.prefixes['user']}{user_id}:*"
-        keys = await self.redis.keys(pattern)
+        keys = [key async for key in self.redis.scan_iter(pattern)]
         if keys:
-            return await self.redis.delete(*keys)  # type: ignore[return-value]
+            return await self.redis.delete(*keys)  # type: ignore[no-any-return]
         return 0
 
     async def clear_expired_cache(self) -> int:
@@ -317,7 +332,7 @@ class CacheService:
         stats = {}
         for prefix_name, prefix in self.prefixes.items():
             pattern = f"{prefix}*"
-            keys = await self.redis.keys(pattern)
+            keys = [key async for key in self.redis.scan_iter(pattern)]
             stats[f"{prefix_name}_keys"] = len(keys)
 
         # Get Redis memory info
@@ -332,7 +347,7 @@ class CacheService:
         try:
             json_data = json.dumps(data, default=str)
             encrypted = self.fernet.encrypt(json_data.encode())
-            return await self.redis.setex(key, ttl, encrypted)
+            return await self.redis.setex(key, ttl, encrypted)  # type: ignore[no-any-return]
         except Exception:
             return False
 
@@ -351,7 +366,7 @@ class CacheService:
         """Set JSON data in cache."""
         try:
             json_data = json.dumps(data, default=str)
-            return await self.redis.setex(key, ttl, json_data)
+            return await self.redis.setex(key, ttl, json_data)  # type: ignore[no-any-return]
         except Exception:
             return False
 

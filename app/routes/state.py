@@ -194,8 +194,9 @@ async def get_ignition_history(  # noqa: C901
     try:
         # Warn about potentially expensive queries
         if limit and limit > 500:
-            logger.warning(
-                f"Expensive query requested for session {session_id}: limit={limit}. Consider using smaller limits or time filters."
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Limit {limit} is too large. Maximum allowed limit is 500. Consider using smaller limits or time filters.",
             )
 
         # Get session
@@ -258,7 +259,7 @@ async def get_ignition_history(  # noqa: C901
                 signed_cursor = base64.b64decode(cursor).decode()
                 json_str, signature = signed_cursor.rsplit(".", 1)
                 expected_signature = hmac.new(
-                    settings.jwt_secret_key.encode(), json_str.encode(), hashlib.sha256  # type: ignore[union-attr]
+                    settings.cursor_signing_key.encode(), json_str.encode(), hashlib.sha256  # type: ignore[union-attr]
                 ).hexdigest()
 
                 if not hmac.compare_digest(signature, expected_signature):
@@ -268,7 +269,10 @@ async def get_ignition_history(  # noqa: C901
                 start_idx = cursor_data.get("offset", 0)
             except Exception as e:
                 logger.warning(f"Invalid cursor: {e}")
-                start_idx = 0
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="Invalid cursor provided",
+                )
 
         end_idx = start_idx + limit_val
         paginated_events = events[start_idx:end_idx]
@@ -285,7 +289,7 @@ async def get_ignition_history(  # noqa: C901
             cursor_data = {"offset": end_idx}
             json_str = json.dumps(cursor_data)
             signature = hmac.new(
-                settings.jwt_secret_key.encode(), json_str.encode(), hashlib.sha256  # type: ignore[union-attr]
+                settings.cursor_signing_key.encode(), json_str.encode(), hashlib.sha256  # type: ignore[union-attr]
             ).hexdigest()
             signed_cursor = json_str + "." + signature
             next_cursor = base64.b64encode(signed_cursor.encode()).decode()

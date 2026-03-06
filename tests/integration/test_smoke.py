@@ -31,6 +31,14 @@ async def client(test_environment, mock_database_connection):
 
     with patch("redis.asyncio.from_url", return_value=mock_redis_client):
         app = create_app(test_mode=True)
+
+        # Manually initialize routes that require Redis (since lifespan may not run with ASGITransport)
+        import app.routes.sessions as sessions
+        import app.routes.health as health
+
+        sessions.init_session_routes(mock_redis_client)
+        health.init_health_routes(mock_redis_client)
+
         transport = ASGITransport(app=app)
         async with AsyncClient(transport=transport, base_url="http://test") as ac:
             yield ac
@@ -81,11 +89,14 @@ class TestHealthEndpoints:
         # or 503 if any dependency is unavailable
         assert response.status_code in [200, 503]
         data = response.json()
-        assert "status" in data
 
-        # If healthy, should have dependency information
         if response.status_code == 200:
+            assert "status" in data
             assert data["status"] in ["healthy", "ready"]
+        else:
+            # When service unavailable, response is error format
+            assert "error" in data
+            assert data["error"]["code"] == "SERVICE_UNAVAILABLE"
 
     @pytest.mark.asyncio
     async def test_health_service_not_initialized(self, client):
@@ -102,17 +113,17 @@ class TestHealthEndpoints:
             response = await client.get("/health")
             assert response.status_code == 503
             data = response.json()
-            assert data["status"] == "unhealthy"
             assert "error" in data
-            assert "Health service not initialized" in data["error"]
+            assert data["error"]["code"] == "SERVICE_UNAVAILABLE"
+            assert "Health service not initialized" in data["error"]["message"]
 
             # Test /health/ready
             response = await client.get("/health/ready")
             assert response.status_code == 503
             data = response.json()
-            assert data["status"] == "not_ready"
             assert "error" in data
-            assert "Health service not initialized" in data["error"]
+            assert data["error"]["code"] == "SERVICE_UNAVAILABLE"
+            assert "Health service not initialized" in data["error"]["message"]
 
     @pytest.mark.asyncio
     async def test_health_check_unhealthy(self, client):

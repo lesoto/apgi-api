@@ -10,6 +10,8 @@ import redis.asyncio as redis
 from fastapi import Request
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.responses import JSONResponse
+
+from app.config import settings
 from typing import Optional
 
 from app.middleware.logging import StructuredLogger
@@ -42,7 +44,17 @@ class RateLimitingMiddleware(BaseHTTPMiddleware):
         self.enabled = enabled
         self.rate_limiter = None
 
-        # Initialize rate limitter when Redis client is available
+        # Endpoint-specific rate limits (requests per minute)
+        self.endpoint_rates = {
+            "session:create": 10,  # Allow creating sessions more frequently
+            "session:read": 60,  # Standard rate for reads
+            "session:delete": 30,  # Moderate rate for deletes
+            "task:execute": 5,  # Limit task execution
+            "data:export": 10,  # Limit data exports
+            "global": 60,  # Default rate
+        }
+
+        # Initialize rate limiter when Redis client is available
         if redis_client:
             self.rate_limiter = RateLimiter(redis_client)
 
@@ -77,8 +89,18 @@ class RateLimitingMiddleware(BaseHTTPMiddleware):
         if hasattr(request.state, "user") and request.state.user:
             return f"user:{request.state.user.user_id}"
 
-        # Fall back to IP address
-        client_ip = request.client.host if request.client else "unknown"
+        # Fall back to IP address - prefer X-Forwarded-For header for proxy support
+        client_ip = None
+        if "X-Forwarded-For" in request.headers:
+            # X-Forwarded-For can contain multiple IPs, take the first one
+            forwarded_for = request.headers["X-Forwarded-For"]
+            client_ip = forwarded_for.split(",")[0].strip()
+        elif "X-Real-IP" in request.headers:
+            client_ip = request.headers["X-Real-IP"]
+        else:
+            # Fallback to direct client IP
+            client_ip = request.client.host if request.client else "unknown"
+
         return f"ip:{client_ip}"
 
     def _get_endpoint_identifier(self, request: Request) -> str:
@@ -173,12 +195,13 @@ class RateLimitingMiddleware(BaseHTTPMiddleware):
         # Get client and endpoint identifiers
         client_id = self._get_client_id(request)
         endpoint = self._get_endpoint_identifier(request)
+        limit = self.endpoint_rates.get(endpoint, self.endpoint_rates["global"])
 
         try:
             # Check rate limit - combine client and endpoint into key
             rate_limit_key = f"{client_id}:{endpoint}"
             allowed, remaining, reset_time = await self.rate_limiter.check_rate_limit(
-                rate_limit_key
+                rate_limit_key, limit
             )
 
             # Safely calculate reset timestamp
@@ -196,7 +219,7 @@ class RateLimitingMiddleware(BaseHTTPMiddleware):
             # Update rate limit headers with actual values
             rate_limit_headers.update(
                 {
-                    "X-RateLimit-Limit": "60",  # Default limit
+                    "X-RateLimit-Limit": str(limit),  # Endpoint-specific limit
                     "X-RateLimit-Remaining": str(max(0, remaining)),
                     "X-RateLimit-Reset": str(reset_timestamp),
                 }
@@ -208,7 +231,7 @@ class RateLimitingMiddleware(BaseHTTPMiddleware):
                     "Rate limit exceeded",
                     client_id=client_id,
                     endpoint=endpoint,
-                    limit=60,
+                    limit=settings.rate_limit_per_minute,
                     retry_after=reset_time,
                 )
 
@@ -220,7 +243,7 @@ class RateLimitingMiddleware(BaseHTTPMiddleware):
                             "message": "Too many requests. Please try again later.",
                             "timestamp": datetime.now(timezone.utc).isoformat() + "Z",
                             "details": {
-                                "limit": 60,
+                                "limit": settings.rate_limit_per_minute,
                                 "retry_after": reset_time,
                                 "reset_at": (
                                     datetime.now(timezone.utc) + timedelta(seconds=reset_time)

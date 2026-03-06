@@ -21,12 +21,15 @@ from sqlalchemy.orm import Session
 
 from app.config import settings
 from app.database.models import WebhookDelivery
+from app.middleware.alerting import alert_manager, AlertSeverity
 
 logger = logging.getLogger(__name__)
 
 
 class WebhookManager:
     """Manager for webhook deliveries."""
+
+    MAX_RESPONSE_SIZE = 1024 * 1024  # 1MB limit for response bodies
 
     # Private IP ranges to block
     PRIVATE_NETWORKS = [
@@ -62,6 +65,19 @@ class WebhookManager:
             if not hostname:
                 raise ValueError("Invalid URL: no hostname")
 
+            # Block cloud metadata endpoints
+            blocked_hostnames = [
+                "metadata.google.internal",
+                "169.254.169.254",
+                "metadata",
+                "ec2metadata",
+                "instance-data",
+                "linklocal.amazonaws.com",
+            ]
+
+            if hostname.lower() in blocked_hostnames:
+                raise ValueError(f"Access to cloud metadata endpoint {hostname} is blocked")
+
             # Resolve hostname to IP addresses
             try:
                 addrinfo = socket.getaddrinfo(hostname, None, socket.AF_UNSPEC, socket.SOCK_STREAM)
@@ -69,10 +85,15 @@ class WebhookManager:
             except socket.gaierror as e:
                 raise ValueError(f"Could not resolve hostname {hostname}: {e}")
 
-            # Check each IP address against private networks
+            # Check each IP address against private networks and metadata IPs
             for ip_str in ip_addresses:
                 try:
                     ip = ipaddress.ip_address(ip_str)
+
+                    # Block cloud metadata IP ranges
+                    if ip_str in ["169.254.169.254", "169.254.169.253", "169.254.169.252"]:
+                        raise ValueError(f"Access to cloud metadata IP {ip_str} is blocked")
+
                     for private_net in WebhookManager.PRIVATE_NETWORKS:
                         if ip in private_net:
                             raise ValueError(f"URL points to private/internal IP address: {ip_str}")
@@ -126,7 +147,7 @@ class WebhookManager:
 
         # Calculate retry schedule (exponential backoff)
         now = datetime.now(timezone.utc)
-        retry_delays = [5, 30, 300, 1800, 3600]  # 5min, 30min, 5h, 30min, 1h
+        retry_delays = [5, 30, 300, 1800, 3600]  # 5s, 30s, 5min, 30min, 1h
 
         delivery = WebhookDelivery(
             delivery_id=delivery_id,
@@ -173,11 +194,24 @@ class WebhookManager:
             return True
 
         # Check retry attempts
-        retry_count = delivery.retry_count  # type: ignore[attr-defined]
+        retry_count = delivery.retry_count
         if delivery.attempts >= retry_count:
-            delivery.status = "failed"  # type: ignore[assignment]
-            delivery.error_message = "Maximum retry attempts exceeded"  # type: ignore[assignment]
+            delivery.status = "dead_letter"  # type: ignore[assignment]
+            delivery.error_message = "Maximum retry attempts exceeded, moved to dead-letter queue"  # type: ignore[assignment]
             db.commit()
+            # Alert about dead-letter webhook
+            await alert_manager.trigger_custom_alert(
+                title="Webhook Dead-Letter",
+                message=f"Webhook delivery {delivery_id} for task {delivery.task_id} moved to dead-letter queue after {delivery.attempts} attempts",
+                severity=AlertSeverity.WARNING,
+                metadata={
+                    "delivery_id": delivery_id,
+                    "task_id": delivery.task_id,
+                    "webhook_url": delivery.webhook_url,
+                    "attempts": delivery.attempts,
+                    "error_message": delivery.error_message,
+                },
+            )
             return False
 
         try:
@@ -188,7 +222,7 @@ class WebhookManager:
                 signature = hmac.new(
                     settings.webhook_secret_key.encode(), payload_str.encode(), hashlib.sha256
                 ).hexdigest()
-                headers["X-Webhook-Signature"] = f"sha256={signature}"
+                headers["X-Signature-256"] = f"sha256={signature}"
             else:
                 logger.warning("WEBHOOK_SECRET_KEY not configured, webhook sent without signature")
 
@@ -206,23 +240,29 @@ class WebhookManager:
                     if response.status >= 200 and response.status < 300:
                         delivery.status = "delivered"  # type: ignore[assignment]
                         delivery.response_status = response.status  # type: ignore[assignment]
-                        delivery.response_body = await response.text()  # type: ignore[assignment]
+                        text = await response.text()
+                        if len(text) > self.MAX_RESPONSE_SIZE:
+                            text = text[: self.MAX_RESPONSE_SIZE] + "... (truncated)"
+                        delivery.response_body = text  # type: ignore[assignment]
                         logger.info(f"Webhook delivery {delivery_id} successful")
                         db.commit()
                         return True
                     else:
                         # Schedule next retry
-                        retry_delays = delivery.retry_delays  # type: ignore[attr-defined]
-                        if delivery.attempts < len(retry_delays):
+                        retry_delays = delivery.retry_delays
+                        if delivery.attempts < len(retry_delays):  # type: ignore[arg-type]
                             delivery.next_retry_at = datetime.now(timezone.utc) + timedelta(  # type: ignore[assignment]
-                                seconds=retry_delays[delivery.attempts]
+                                seconds=retry_delays[delivery.attempts]  # type: ignore[arg-type]
                             )
                         else:
-                            delivery.status = "failed"  # type: ignore[assignment]
+                            delivery.status = "dead_letter"  # type: ignore[assignment]
                             delivery.error_message = f"HTTP {response.status}"  # type: ignore[assignment]
 
                         delivery.response_status = response.status  # type: ignore[assignment]
-                        delivery.response_body = await response.text()  # type: ignore[assignment]
+                        text = await response.text()
+                        if len(text) > self.MAX_RESPONSE_SIZE:
+                            text = text[: self.MAX_RESPONSE_SIZE] + "... (truncated)"
+                        delivery.response_body = text  # type: ignore[assignment]
                         db.commit()
                         return False
 
@@ -231,13 +271,13 @@ class WebhookManager:
             delivery.last_attempt_at = datetime.now(timezone.utc)  # type: ignore[assignment]
             delivery.error_message = "Timeout"  # type: ignore[assignment]
             # Schedule next retry
-            retry_delays = delivery.retry_delays  # type: ignore[attr-defined]
-            if delivery.attempts < len(retry_delays):
+            retry_delays = delivery.retry_delays
+            if delivery.attempts < len(retry_delays):  # type: ignore[arg-type]
                 delivery.next_retry_at = datetime.now(timezone.utc) + timedelta(  # type: ignore[assignment]
-                    seconds=retry_delays[delivery.attempts]
+                    seconds=retry_delays[delivery.attempts]  # type: ignore[arg-type]
                 )
             else:
-                delivery.status = "failed"  # type: ignore[assignment]
+                delivery.status = "dead_letter"  # type: ignore[assignment]
             db.commit()
             return False
 
@@ -246,13 +286,13 @@ class WebhookManager:
             delivery.last_attempt_at = datetime.now(timezone.utc)  # type: ignore[assignment]
             delivery.error_message = str(e)  # type: ignore[assignment]
             # Schedule next retry
-            retry_delays = delivery.retry_delays  # type: ignore[attr-defined]
-            if delivery.attempts < len(retry_delays):
+            retry_delays = delivery.retry_delays
+            if delivery.attempts < len(retry_delays):  # type: ignore[arg-type]
                 delivery.next_retry_at = datetime.now(timezone.utc) + timedelta(  # type: ignore[assignment]
-                    seconds=retry_delays[delivery.attempts]
+                    seconds=retry_delays[delivery.attempts]  # type: ignore[arg-type]
                 )
             else:
-                delivery.status = "failed"  # type: ignore[assignment]
+                delivery.status = "dead_letter"  # type: ignore[assignment]
             db.commit()
             return False
 

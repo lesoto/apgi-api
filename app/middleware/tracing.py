@@ -107,7 +107,7 @@ def configure_distributed_tracing(
         # SQLAlchemy instrumentation
         SQLAlchemyInstrumentor().instrument(
             engine=(
-                SQLAlchemyInstrumentor()._engines[0] if SQLAlchemyInstrumentor()._engines else None
+                SQLAlchemyInstrumentor()._engines[0] if SQLAlchemyInstrumentor()._engines else None  # type: ignore[attr-defined]
             )
         )
 
@@ -131,7 +131,7 @@ def _server_request_hook(span, scope):
             route = scope.get("route")
             if route:
                 span.set_attribute(
-                    "http.route", route.path if hasattr(route, "path") else str(route)
+                    "http.route", route.path if hasattr(route, "path") else str(route)  # type: ignore[attr-defined]
                 )
 
         # Add user information if available

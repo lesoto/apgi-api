@@ -31,6 +31,7 @@ def migrate(revision: str, verbose: bool):
     """
     try:
         import alembic.config
+        from alembic import command
 
         # Get the alembic configuration
         config = alembic.config.Config("alembic.ini")
@@ -39,7 +40,7 @@ def migrate(revision: str, verbose: bool):
             config.set_main_option("sql", "true")
 
         # Run the upgrade
-        alembic.command.upgrade(config, revision)
+        command.upgrade(config, revision)
 
         logger.info(f"Database migrated to revision: {revision}")
 

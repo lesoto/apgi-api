@@ -350,22 +350,7 @@ if __name__ == "__main__":
     import uvicorn
 
     default_port = 8000
-    default_host = "0.0.0.0"
-
-    # Check if default port is available
-    if not is_port_available(default_host, default_port):
-        print(f"⚠️  Port {default_port} is already in use. Trying alternative ports...")
-        # Try to find an available port
-        for port in range(default_port + 1, default_port + 100):
-            if is_port_available(default_host, port):
-                print(f"✓ Using port {port}")
-                default_port = port
-                break
-        else:
-            print(
-                f"❌ Could not find an available port between {default_port} and {default_port + 99}"
-            )
-            sys.exit(1)
+    default_host = "127.0.0.1"  # Bind to localhost for security
 
     uvicorn.run("app.main:app", host=default_host, port=default_port, reload=True, log_level="info")
 

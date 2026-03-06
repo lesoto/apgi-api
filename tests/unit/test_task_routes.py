@@ -167,6 +167,7 @@ class TestTaskRoutes:
         """Test getting task status successfully."""
         task_id = str(uuid.uuid4())
 
+        # Ensure the mock returns the expected dict
         mock_task_executor.get_task_status.return_value = {
             "status": "completed",
             "state": "SUCCESS",
@@ -184,7 +185,7 @@ class TestTaskRoutes:
         assert response.task_id == task_id
         assert response.status == "completed"
         assert response.state == "SUCCESS"
-        assert response.result["accuracy"] == 0.85
+        assert response.result["accuracy"] == 0.85  # type: ignore[union-attr]
 
     @pytest.mark.asyncio
     async def test_get_task_status_not_found(self, mock_task_executor, mock_current_user):

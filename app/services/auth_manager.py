@@ -4,14 +4,14 @@ Authentication Manager Service
 Handles JWT token creation/verification and password hashing for user authentication.
 """
 
-import hashlib
 import hmac
 import logging
 from datetime import datetime, timedelta
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, cast
 
 import bcrypt
 import jwt
+import pyotp
 
 from sqlalchemy import and_
 from sqlalchemy.orm import Session
@@ -34,6 +34,7 @@ class TokenPayload:
         exp: datetime,
         token_type: str = "access",
         jti: Optional[str] = None,
+        permissions: Optional[List[str]] = None,
     ):
         self.user_id = user_id
         self.username = username
@@ -41,6 +42,7 @@ class TokenPayload:
         self.exp = exp
         self.token_type = token_type
         self.jti = jti
+        self.permissions = permissions
 
     def to_dict(self) -> Dict[str, Any]:
         """Convert to dictionary for JWT encoding."""
@@ -53,6 +55,8 @@ class TokenPayload:
         }
         if self.jti:
             data["jti"] = self.jti
+        if self.permissions:
+            data["permissions"] = self.permissions
         return data
 
     @classmethod
@@ -67,6 +71,7 @@ class TokenPayload:
             exp=datetime.fromtimestamp(data["exp"], tz=timezone.utc),
             token_type=data.get("token_type", "access"),
             jti=data.get("jti"),
+            permissions=data.get("permissions"),
         )
 
 
@@ -100,30 +105,29 @@ class AuthManager:
     # Password Hashing
     # ========================================================================
 
-    @staticmethod
-    def hash_password(password: str) -> str:
+    def hash_password(self, password: str) -> str:
         """
-        Hash a password using bcrypt with SHA-256 pre-hashing.
+        Hash a password using bcrypt.
 
         Args:
-            password: Plain text password
+            password: Plain text password to hash
 
         Returns:
             Hashed password string
 
         Raises:
-            ValueError: If password is too long (> 1024 characters)
+            ValueError: If password is empty
         """
-        # Validate password length to prevent extremely long inputs
-        if len(password) > 1024:
-            raise ValueError("Password too long (maximum 1024 characters)")
+        if not password:
+            raise ValueError("Password cannot be empty")
 
-        # Pre-hash with SHA-256 to handle bcrypt's 72-byte limit uniformly
+        # Truncate password to bcrypt's 72-byte limit for consistent behavior
         password_bytes = password.encode("utf-8")
-        sha256_hash = hashlib.sha256(password_bytes).digest()
+        if len(password_bytes) > 72:
+            password_bytes = password_bytes[:72]
 
         salt = bcrypt.gensalt(rounds=12)
-        hashed = bcrypt.hashpw(sha256_hash, salt)
+        hashed = bcrypt.hashpw(password_bytes, salt)
         return hashed.decode("utf-8")
 
     @staticmethod
@@ -138,12 +142,33 @@ class AuthManager:
         Returns:
             True if password matches, False otherwise
         """
-        # Pre-hash with SHA-256 to match hash_password behavior
-        password_bytes = plain_password.encode("utf-8")
-        sha256_hash = hashlib.sha256(password_bytes).digest()
+        # Truncate password to bcrypt's 72-byte limit for consistent behavior
+        plain_password_bytes = plain_password.encode("utf-8")
+        if len(plain_password_bytes) > 72:
+            plain_password_bytes = plain_password_bytes[:72]
 
-        hashed_bytes = hashed_password.encode("utf-8")
-        return bcrypt.checkpw(sha256_hash, hashed_bytes)
+        hashed_password_bytes = hashed_password.encode("utf-8")
+        return bcrypt.checkpw(plain_password_bytes, hashed_password_bytes)
+
+    # ========================================================================
+    # MFA Support
+    # ========================================================================
+
+    @staticmethod
+    def generate_mfa_secret() -> str:
+        """Generate a new TOTP secret for MFA."""
+        return pyotp.random_base32()
+
+    @staticmethod
+    def get_mfa_qr_url(username: str, secret: str) -> str:
+        """Get QR code URL for MFA setup."""
+        return pyotp.totp.TOTP(secret).provisioning_uri(name=username, issuer_name="APGI API")
+
+    @staticmethod
+    def verify_mfa_code(secret: str, code: str) -> bool:
+        """Verify a TOTP code."""
+        totp = pyotp.TOTP(secret)
+        return totp.verify(code)
 
     # ========================================================================
     # Token Creation
@@ -180,7 +205,7 @@ class AuthManager:
             jti=jti,
         )
 
-        token = jwt.encode(payload.to_dict(), self.secret_key, algorithm=self.algorithm)
+        token = jwt.encode(payload.to_dict(), cast(str, self.secret_key), algorithm=self.algorithm)
 
         return token
 
@@ -204,7 +229,7 @@ class AuthManager:
             user_id=user_id, username=username, roles=roles, exp=expires_at, token_type="refresh"
         )
 
-        token = jwt.encode(payload.to_dict(), self.secret_key, algorithm=self.algorithm)
+        token = jwt.encode(payload.to_dict(), cast(str, self.secret_key), algorithm=self.algorithm)
 
         return token
 
@@ -212,7 +237,7 @@ class AuthManager:
     # Token Verification
     # ========================================================================
 
-    def verify_token(self, token: str, expected_type: str = "access") -> TokenPayload:
+    async def verify_token(self, token: str, expected_type: str = "access") -> TokenPayload:
         """
         Verify and decode a JWT token.
 
@@ -229,7 +254,11 @@ class AuthManager:
         """
         try:
             # Decode token
-            payload_dict = jwt.decode(token, self.secret_key, algorithms=[self.algorithm])
+            payload_dict = jwt.decode(
+                token,
+                cast(str, self.secret_key),
+                algorithms=[self.algorithm],
+            )
 
             # Parse payload
             payload = TokenPayload.from_dict(payload_dict)
@@ -248,7 +277,7 @@ class AuthManager:
 
             # Check if token has been revoked (only for access tokens with JTI)
             if payload.jti and self.redis and expected_type == "access":
-                if self.redis.exists(f"revoked_access_tokens:{payload.jti}"):
+                if await self.redis.exists(f"revoked_access_tokens:{payload.jti}"):
                     raise InvalidTokenError("Token has been revoked")
 
             return payload
@@ -263,7 +292,7 @@ class AuthManager:
         except Exception as e:
             raise InvalidTokenError(f"Token verification failed: {str(e)}")
 
-    def revoke_access_token(self, access_token: str) -> bool:
+    async def revoke_access_token(self, access_token: str) -> bool:
         """
         Revoke an access token by adding its JTI to the blocklist.
 
@@ -284,7 +313,7 @@ class AuthManager:
             # Verify token to get JTI (but don't check revocation yet)
             payload_dict = jwt.decode(
                 access_token,
-                self.secret_key,
+                cast(str, self.secret_key),
                 algorithms=[self.algorithm],
                 options={"verify_exp": False},
             )
@@ -307,7 +336,7 @@ class AuthManager:
                     ttl = int((expires_at - now).total_seconds())
 
             key = f"revoked_access_tokens:{jti}"
-            self.redis.setex(key, ttl or 3600, "1")  # Default 1 hour if no expiry
+            await self.redis.setex(key, ttl or 3600, "1")  # Default 1 hour if no expiry
 
             logger.info(f"Access token with JTI {jti} revoked")
             return True
@@ -322,13 +351,16 @@ class AuthManager:
     # User Authentication
     # ========================================================================
 
-    def authenticate_user(self, username: str, password: str) -> Optional[User]:
+    def authenticate_user(
+        self, username: str, password: str, mfa_code: Optional[str] = None
+    ) -> Optional[User]:
         """
         Authenticate a user with username and password.
 
         Args:
             username: Username
             password: Plain text password
+            mfa_code: MFA verification code if required
 
         Returns:
             User object if authentication successful, None otherwise
@@ -339,19 +371,47 @@ class AuthManager:
         if not user:
             return None
 
+        # Check if account is locked
+        from datetime import timezone
+
+        now = datetime.now(timezone.utc)
+        if user.locked_until and now < user.locked_until:
+            raise AuthenticationError("Account is locked due to too many failed login attempts")
+
         # Verify password
         if not self.verify_password(password, user.password_hash):  # type: ignore[arg-type]
+            # Increment failed login attempts
+            user.failed_login_attempts = (user.failed_login_attempts or 0) + 1  # type: ignore[assignment]
+            # Check if should lock account (5 attempts)
+            if user.failed_login_attempts >= 5:
+                user.locked_until = now + timedelta(minutes=15)  # type: ignore[assignment]
+                logger.warning(
+                    f"Account locked for user {username} due to too many failed attempts"
+                )
+            try:
+                self.db.commit()
+            except Exception as e:
+                self.db.rollback()
+                logger.error(f"Failed to update failed login attempts for user {username}: {e}")
             return None
 
-        # Update last login
-        try:
-            from datetime import timezone
+        # Verify MFA if enabled
+        if user.mfa_enabled:
+            if not mfa_code:
+                raise AuthenticationError("MFA code required")
+            if not self.verify_mfa_code(user.mfa_secret, mfa_code):  # type: ignore[arg-type]  # type: ignore[attr-defined]
+                raise AuthenticationError("Invalid MFA code")
 
-            user.last_login = datetime.now(timezone.utc)  # type: ignore[assignment]
+        # Successful login: reset failed attempts and update last login
+        user.failed_login_attempts = 0  # type: ignore[assignment]
+        user.locked_until = None  # type: ignore[assignment]
+        user.last_login = now  # type: ignore[assignment]
+
+        try:
             self.db.commit()
         except Exception as e:
             self.db.rollback()
-            logger.error(f"Failed to update last login for user {username}: {e}")
+            logger.error(f"Failed to update login info for user {username}: {e}")
             # Still return user since login succeeded, just log the error
 
         return user
@@ -424,7 +484,7 @@ class AuthManager:
         """
         return hmac.compare_digest(val1.encode(), val2.encode())
 
-    def refresh_access_token(self, refresh_token: str) -> Dict[str, Any]:
+    async def refresh_access_token(self, refresh_token: str) -> Dict[str, Any]:
         """
         Create a new access token using a refresh token.
 
@@ -440,7 +500,7 @@ class AuthManager:
             AuthenticationError: If refresh token has been revoked
         """
         # Verify refresh token
-        payload = self.verify_token(refresh_token, expected_type="refresh")
+        payload = await self.verify_token(refresh_token, expected_type="refresh")
 
         # Look up all non-revoked tokens for this user (to prevent timing attacks)
         db_tokens = (
@@ -448,7 +508,7 @@ class AuthManager:
             .filter(
                 and_(
                     RefreshToken.user_id == payload.user_id,
-                    RefreshToken.revoked.is_(False),  # type: ignore[arg-type]
+                    RefreshToken.revoked.is_(False),
                 )
             )
             .all()
@@ -475,17 +535,43 @@ class AuthManager:
             user_id=payload.user_id, username=payload.username, roles=payload.roles
         )
 
+        # Create new refresh token (rotation)
+        new_refresh_token = self.create_refresh_token(
+            user_id=payload.user_id, username=payload.username, roles=payload.roles
+        )
+
+        # Store new refresh token in database
+        token_hash = self.hash_password(new_refresh_token)
+        expires_at = datetime.now(timezone.utc) + timedelta(days=self.refresh_token_expire_days)
+
+        try:
+            new_db_refresh_token = RefreshToken(
+                user_id=payload.user_id, token_hash=token_hash, expires_at=expires_at
+            )
+            self.db.add(new_db_refresh_token)
+
+            # Revoke the old refresh token
+            db_token.revoked = True  # type: ignore[assignment]
+
+            self.db.commit()
+        except Exception as e:
+            self.db.rollback()
+            logger.error(f"Failed to rotate refresh token for user {payload.user_id}: {e}")
+            raise
+
         return {
             "access_token": access_token,
+            "refresh_token": new_refresh_token,
             "token_type": "bearer",
             "expires_in": self.access_token_expire_minutes * 60,
+            "refresh_expires_in": self.refresh_token_expire_days * 24 * 60 * 60,
         }
 
     # ========================================================================
     # Token Revocation
     # ========================================================================
 
-    def revoke_refresh_token(self, refresh_token: str) -> bool:
+    async def revoke_refresh_token(self, refresh_token: str) -> bool:
         """
         Revoke a refresh token (logout).
 
@@ -497,7 +583,7 @@ class AuthManager:
         """
         try:
             # Verify token to get user_id
-            payload = self.verify_token(refresh_token, expected_type="refresh")
+            payload = await self.verify_token(refresh_token, expected_type="refresh")
 
             # Look up all non-revoked tokens for this user (to prevent timing attacks)
             db_tokens = (
@@ -505,7 +591,7 @@ class AuthManager:
                 .filter(
                     and_(
                         RefreshToken.user_id == payload.user_id,
-                        RefreshToken.revoked.is_(False),  # type: ignore[arg-type]
+                        RefreshToken.revoked.is_(False),
                     )
                 )
                 .all()
@@ -546,7 +632,7 @@ class AuthManager:
         try:
             tokens = (
                 self.db.query(RefreshToken)
-                .filter(and_(RefreshToken.user_id == user_id, RefreshToken.revoked.is_(False)))  # type: ignore[arg-type]
+                .filter(and_(RefreshToken.user_id == user_id, RefreshToken.revoked.is_(False)))
                 .all()
             )
         except Exception as e:

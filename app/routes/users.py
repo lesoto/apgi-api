@@ -14,6 +14,7 @@ from fastapi import APIRouter, Depends, status, HTTPException
 from sqlalchemy.orm import Session
 
 from app.database.connection import get_db
+from app.database.models import User
 from app.exceptions import UserNotFoundError
 from app.models.schemas import (
     ErrorResponse,
@@ -89,7 +90,7 @@ async def register_user(
             roles=list(user.roles) if user.roles else [],
             created_at=user.created_at,  # type: ignore[arg-type]
             message="User created successfully",
-        )
+        )  # type: ignore[arg-type]
 
     except ValueError as e:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
@@ -98,6 +99,65 @@ async def register_user(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="An internal error occurred",
+        )
+
+
+@router.get(
+    "/verify-email",
+    summary="Verify email address",
+    description="Verify user email address using verification token",
+)
+async def verify_email(
+    token: str,
+    db: Session = Depends(get_db),
+):
+    """
+    Verify user email address.
+
+    Args:
+        token: Email verification token
+        db: Database session
+
+    Returns:
+        Success message
+
+    Raises:
+        HTTPException: If token is invalid or expired
+    """
+    user_service = get_user_management_service(db)
+
+    # Find user with matching token
+    from datetime import datetime, timezone
+
+    user = (
+        db.query(User)
+        .filter(
+            User.email_verification_token == token,
+            User.email_verification_expires_at > datetime.now(timezone.utc),
+        )
+        .first()
+    )
+
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid or expired verification token"
+        )
+
+    # Activate user and clear verification fields
+    user.is_active = True  # type: ignore[assignment]
+    user.email_verification_token = None  # type: ignore[assignment]
+    user.email_verification_expires_at = None  # type: ignore[assignment]
+    user.updated_at = datetime.now(timezone.utc)  # type: ignore[assignment]
+
+    try:
+        db.commit()
+        return {"message": "Email verified successfully. You can now log in."}
+    except Exception as e:
+        db.rollback()
+        logger.error(f"Failed to verify email for user {user.user_id}: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="An internal error occurred during verification",
         )
 
 
@@ -125,7 +185,7 @@ async def create_default_user(
     user_service = get_user_management_service(db)
 
     try:
-        password = secrets.token_urlsafe(16)
+        password = secrets.token_urlsafe(32)
         user = user_service.create_default_user(
             username="admin", email="admin@example.com", password=password
         )
@@ -137,7 +197,7 @@ async def create_default_user(
             roles=user.roles,  # type: ignore[arg-type]
             created_at=user.created_at,  # type: ignore[arg-type]
             message="Default user created successfully",
-        )
+        )  # type: ignore[arg-type]
 
     except Exception as e:
         logger.error(f"Failed to create default user: {str(e)}")
@@ -189,15 +249,15 @@ async def list_users(
     )
 
     return [
-        UserResponse(  # type: ignore[arg-type]
-            user_id=user.user_id,
-            username=user.username,
-            email=user.email,
-            roles=user.roles,
-            is_active=user.is_active,
-            created_at=user.created_at,
-            updated_at=user.updated_at,
-            last_login=user.last_login,
+        UserResponse(
+            user_id=user.user_id,  # type: ignore[arg-type]
+            username=user.username,  # type: ignore[arg-type]
+            email=user.email,  # type: ignore[arg-type]
+            roles=user.roles,  # type: ignore[arg-type]
+            is_active=user.is_active,  # type: ignore[arg-type]
+            created_at=user.created_at,  # type: ignore[arg-type]  # type: ignore[arg-type]
+            updated_at=user.updated_at,  # type: ignore[arg-type]
+            last_login=user.last_login,  # type: ignore[arg-type]
         )
         for user in users
     ]
@@ -229,15 +289,15 @@ async def get_current_user_profile(
     if not user:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
 
-    return UserResponse(  # type: ignore[arg-type]
-        user_id=user.user_id,
-        username=user.username,
-        email=user.email,
-        roles=user.roles,
-        is_active=user.is_active,
-        created_at=user.created_at,
-        updated_at=user.updated_at,
-        last_login=user.last_login,
+    return UserResponse(
+        user_id=user.user_id,  # type: ignore[arg-type]
+        username=user.username,  # type: ignore[arg-type]
+        email=user.email,  # type: ignore[arg-type]
+        roles=user.roles,  # type: ignore[arg-type]
+        is_active=user.is_active,  # type: ignore[arg-type]
+        created_at=user.created_at,  # type: ignore[arg-type]
+        updated_at=user.updated_at,  # type: ignore[arg-type]
+        last_login=user.last_login,  # type: ignore[arg-type]
     )
 
 
@@ -304,15 +364,15 @@ async def get_user(
     if not user:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
 
-    return UserResponse(  # type: ignore[arg-type]
-        user_id=user.user_id,
-        username=user.username,
-        email=user.email,
-        roles=user.roles,
-        is_active=user.is_active,
-        created_at=user.created_at,
-        updated_at=user.updated_at,
-        last_login=user.last_login,
+    return UserResponse(
+        user_id=user.user_id,  # type: ignore[arg-type]
+        username=user.username,  # type: ignore[arg-type]
+        email=user.email,  # type: ignore[arg-type]
+        roles=user.roles,  # type: ignore[arg-type]
+        is_active=user.is_active,  # type: ignore[arg-type]
+        created_at=user.created_at,  # type: ignore[arg-type]
+        updated_at=user.updated_at,  # type: ignore[arg-type]
+        last_login=user.last_login,  # type: ignore[arg-type]
     )
 
 
@@ -364,14 +424,20 @@ async def update_user(
             ),  # Only admins can change active status
         )
 
-        return UserResponse(  # type: ignore[arg-type]
-            user_id=user.user_id,
-            username=user.username,
-            email=user.email,
-            roles=user.roles,
-            is_active=user.is_active,
-            created_at=user.created_at,
-            updated_at=user.updated_at,
+        # Audit log role changes
+        if request.roles is not None and is_admin:
+            logger.info(
+                f"User {user_id} roles updated to {request.roles} by admin {current_user.user_id}"
+            )
+
+        return UserResponse(
+            user_id=user.user_id,  # type: ignore[arg-type]
+            username=user.username,  # type: ignore[arg-type]
+            email=user.email,  # type: ignore[arg-type]
+            roles=user.roles,  # type: ignore[arg-type]
+            is_active=user.is_active,  # type: ignore[arg-type]
+            created_at=user.created_at,  # type: ignore[arg-type]  # type: ignore[arg-type]
+            updated_at=user.updated_at,  # type: ignore[arg-type]
             last_login=user.last_login,
         )
 
