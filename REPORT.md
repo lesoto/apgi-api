@@ -1,797 +1,742 @@
-# APGI API — End-to-End Audit Report
+# APGI System API — End-to-End Audit Report
 
-**Report Version:** 4.0
-**Audit Date:** 2026-03-06
+**Report Version:** 5.0
+**Audit Date:** 2026-03-08
 **Auditor:** Claude Code (claude-sonnet-4-6)
-**Branch:** `claude/app-audit-security-GjtO8`
-**Application:** APGI System REST API — FastAPI/Python
+**Repository:** lesoto/apgi-api
+**Branch:** `claude/app-audit-security-gVXx4`
+**Stack:** FastAPI + PostgreSQL + Redis + Celery, Python 3.x
 
 ---
 
-## Table of Contents
+## Executive Summary
 
-1. [Executive Summary](#1-executive-summary)
-2. [KPI Scores](#2-kpi-scores)
-3. [Audit Methodology](#3-audit-methodology)
-4. [Bug Inventory](#4-bug-inventory)
-   - [Critical](#41-critical-severity)
-   - [High](#42-high-severity)
-   - [Medium](#43-medium-severity)
-   - [Low](#44-low-severity)
-5. [Missing Features Log](#5-missing-features-log)
-6. [Implementation Quality Assessment](#6-implementation-quality-assessment)
-   - [Functional Completeness](#61-functional-completeness)
-   - [Security Architecture](#62-security-architecture)
-   - [Error Handling & Resilience](#63-error-handling--resilience)
-   - [Performance & Scalability](#64-performance--scalability)
-   - [Test Coverage](#65-test-coverage)
-7. [Actionable Recommendations](#7-actionable-recommendations)
+This report documents the results of a rigorous end-to-end audit of the APGI System API — a REST API for Allostatic Precision-Gated Ignition consciousness modeling. The audit covered all route handlers, middleware, authentication/authorization services, database models, configuration management, error handling, and test infrastructure.
+
+**Overall Assessment:** The codebase demonstrates a mature, well-structured architecture with strong security foundations (JWT with rotation, bcrypt, RBAC, CSRF, rate limiting, structured logging, alerting). However, several critical defects — including unreachable API routes, a broken async pattern causing `RuntimeError` in auth middleware, and debug `print()` statements leaking internals — significantly undermine production readiness.
+
+**Immediate action required on 3 Critical items before any production deployment.**
 
 ---
 
-## 1. Executive Summary
+## KPI Scores
 
-This report presents a rigorous end-to-end audit of the APGI REST API — a FastAPI-based service that provides RESTful access to the APGI (Allostatic Precision-Gated Ignition) consciousness modeling system. The audit covered all route modules, middleware, service layers, database models, configuration management, and test suites.
+| Dimension | Score | Threshold | Status |
+|-----------|-------|-----------|--------|
+| Functional Completeness | **52 / 100** | ≥ 75 | 🔴 FAIL |
+| Security | **68 / 100** | ≥ 80 | 🔴 FAIL |
+| Error Handling & Resilience | **74 / 100** | ≥ 75 | 🟡 WARN |
+| Implementation Quality | **71 / 100** | ≥ 75 | 🟡 WARN |
+| API Design Consistency | **78 / 100** | ≥ 75 | 🟢 PASS |
 
-### Overall Health: 🟡 MODERATE RISK
+**Legend:** 🔴 < 70 · 🟡 70–79 · 🟢 ≥ 80
 
-The API demonstrates a solid architectural foundation with well-designed RBAC, JWT lifecycle management, bcrypt password hashing, token rotation, and SSRF-protected webhook delivery. However, the audit uncovered **3 critical defects** and **8 high-severity issues** that directly compromise availability, data integrity, and security posture.
-
-### Key Findings
-
-| Category | Count | Highest Severity |
-|---|---|---|
-| Authentication / Authorization | 4 | 🔴 Critical |
-| Functional Completeness | 4 | 🔴 Critical |
-| Input Validation | 3 | 🟠 High |
-| Error Handling | 2 | 🟡 Medium |
-| Test Coverage | 6 | 🟡 Medium |
-| Configuration / Secrets | 3 | 🟡 Medium |
-| Code Quality | 4 | 🟢 Low |
-
-### Immediate Action Required
-
-1. **Register missing routers** — `/v1/api-keys` and `/v1/webhooks` endpoints are completely unreachable.
-2. **Fix CSRF cryptographic weakness** — Current CSRF token hashing is client-predictable, providing no CSRF protection.
-3. **Add ownership check on `GET /v1/sessions/{id}/tasks`** — Any authenticated user can read tasks from any session.
-4. **Fix `User` model missing `updated_at`** — Multiple endpoints will crash with `AttributeError` in production.
+**Overall Health Score: 69 / 100** 🔴
 
 ---
 
-## 2. KPI Scores
+## Bug Inventory
 
-| Dimension | Score | Status | Key Driver |
-|---|:---:|---|---|
-| Functional Completeness | **52/100** | 🔴 Critical | 2 entire endpoint groups unreachable; missing `updated_at` on User model crashes live routes |
-| Security Architecture | **61/100** | 🟠 High | CSRF bypass, auth middleware passthrough, rate-limit spoofing, missing session ownership |
-| Error Handling & Resilience | **75/100** | 🟡 Moderate | Consistent exception handlers, but internal details leaked in session errors |
-| API Consistency & Standards | **78/100** | 🟡 Moderate | Good OpenAPI docs; unquoted Content-Disposition header; inconsistent response shapes |
-| Test Coverage | **47/100** | 🔴 Critical | 7 critical modules below 30%; `data_export.py` at 12%, `templates.py` at 16% |
-
-### Visual KPI Summary
-
-```
-Functional Completeness  [████████████░░░░░░░░░░░░]  52/100  🔴
-Security Architecture    [███████████████░░░░░░░░░]  61/100  🟠
-Error Handling           [███████████████████░░░░░]  75/100  🟡
-API Consistency          [████████████████████░░░░]  78/100  🟡
-Test Coverage            [████████████░░░░░░░░░░░░]  47/100  🔴
-                                              OVERALL: 63/100
-```
-
-**Score Thresholds:** 🔴 < 60 | 🟠 60–74 | 🟡 75–84 | 🟢 85+
+### CRITICAL Severity
 
 ---
 
-## 3. Audit Methodology
+#### BUG-001 — Webhooks and API-Key endpoints are entirely unreachable
 
-The following systematic steps were performed:
-
-1. **Static code analysis** — All 60+ Python source files read and analyzed for logic errors, security anti-patterns, and standards violations.
-2. **Dependency graph tracing** — Middleware stack, router registration, dependency injection chains, and service layers traced end-to-end.
-3. **Security threat modeling** — OWASP Top 10, API Security Top 10, and JWT-specific threats evaluated against implementation.
-4. **Data flow analysis** — Request path traced from HTTP ingress through authentication, authorization, business logic, and persistence.
-5. **Test coverage analysis** — Coverage report (from `TODO.md`) examined against implementation risk surface.
-6. **Configuration audit** — `.env`, `config.py`, and deployment artifacts reviewed for secrets management and environment hardening.
-
----
-
-## 4. Bug Inventory
-
-### 4.1 Critical Severity
-
----
-
-#### BUG-001 — `api_keys` and `webhooks` Routers Never Registered
-
-| Field | Value |
-|---|---|
-| **Severity** | 🔴 Critical |
-| **Category** | Functional Completeness |
-| **Affected Files** | `app/main.py`, `app/routes/__init__.py` |
-| **Affected Endpoints** | All of `GET/POST/PATCH/DELETE /v1/api-keys/*` and `GET/POST/DELETE /v1/webhooks/*` |
+- **Severity:** Critical
+- **Category:** Functional Completeness
+- **Affected Files:** `app/main.py`, `app/routes/__init__.py`
 
 **Description:**
-`app/routes/api_keys.py` and `app/routes/webhooks.py` define fully implemented routers, but neither is imported or registered with the FastAPI application. The `create_app()` function in `main.py` (lines 316–325) registers 10 routers but omits both. The `routes/__init__.py` also does not export them. All API key management and webhook delivery management endpoints are completely inaccessible — returning 404 for every request.
+`app/routes/webhooks.py` and `app/routes/api_keys.py` both define complete, fully-implemented `APIRouter` instances, but neither router is imported or registered in `app/main.py`. As a result, every endpoint in these two files — webhook delivery management and API key CRUD — returns `404 Not Found` for all clients.
 
-**Reproduction:**
-```bash
-curl -X POST http://localhost:8000/v1/api-keys  # → 404 Not Found
-curl -X GET  http://localhost:8000/v1/webhooks/deliveries  # → 404 Not Found
-```
+**Reproduction Steps:**
+1. `GET /v1/webhooks/deliveries` → `404 Not Found`
+2. `POST /v1/api-keys` → `404 Not Found`
+3. `GET /v1/api-keys` → `404 Not Found`
 
-**Expected:** HTTP 200/201/401 depending on auth.
-**Actual:** HTTP 404 — route not found.
+**Expected:** HTTP 200/201 responses from properly registered routes.
+**Actual:** HTTP 404 — routes not registered with the FastAPI application.
+
+**Root Cause:**
+`app/main.py` imports and includes: `auth`, `export`, `health`, `metrics`, `sessions`, `state`, `tasks`, `templates`, `users`, `version`, `payments`.
+Missing: `webhooks`, `api_keys`.
 
 **Fix:**
 ```python
-# In app/main.py create_app():
+# app/main.py — add to imports:
 from app.routes import api_keys, webhooks
+
+# app/main.py — add to router registrations:
 app.include_router(api_keys.router)
 app.include_router(webhooks.router)
-
-# In app/routes/__init__.py:
-from app.routes.api_keys import router as api_keys_router
-from app.routes.webhooks import router as webhooks_router
 ```
 
 ---
 
-#### BUG-002 — `User` Database Model Missing `updated_at` Column — Runtime `AttributeError`
+#### BUG-002 — `asyncio.run()` nested inside async event loop causes `RuntimeError` in authentication middleware
 
-| Field | Value |
-|---|---|
-| **Severity** | 🔴 Critical |
-| **Category** | Functional Completeness |
-| **Affected Files** | `app/database/models.py`, `app/routes/users.py:151`, `app/routes/users.py:259` |
-| **Affected Endpoints** | `GET /v1/users`, `GET /v1/users/me`, `GET /v1/users/{id}`, `PUT /v1/users/{id}`, `GET /v1/users/verify-email` |
+- **Severity:** Critical
+- **Category:** Error Handling & Resilience / Security
+- **Affected Files:** `app/middleware/authentication.py:232`
 
 **Description:**
-The `User` ORM model (`database/models.py:61–114`) defines `created_at` and `last_login` but has **no `updated_at` column**. The `UserResponse` Pydantic schema includes `updated_at: Optional[datetime]`, and multiple route handlers reference `user.updated_at` directly (e.g., `users.py:259`, `users.py:299`, `users.py:375`). Additionally, `verify_email` (line 150) attempts to set `user.updated_at = datetime.now()` on a non-existent column.
+`AuthenticationMiddleware._blocking_verify_token()` is called via `loop.run_in_executor()`, making it run in a thread pool. Inside that thread, it calls `asyncio.run(auth_manager.verify_token(...))`. In Python ≥ 3.10 (and on many asyncio implementations), calling `asyncio.run()` when an event loop is already active raises `RuntimeError: This event loop is already running`, causing all JWT-authenticated requests to fail with 500 Internal Server Error.
 
-**Reproduction:**
-```bash
-curl -H "Authorization: Bearer $TOKEN" http://localhost:8000/v1/users/me
-# → AttributeError: 'User' object has no attribute 'updated_at'
-# → HTTP 500 Internal Server Error
+**Affected Code (`app/middleware/authentication.py:222–235`):**
+```python
+def _blocking_verify_token(self, token: str) -> TokenPayload:
+    import asyncio
+    db = SessionLocal()
+    try:
+        auth_manager = AuthManager(db)
+        payload = asyncio.run(auth_manager.verify_token(token, expected_type="access"))  # BUG
+        return payload
+    finally:
+        db.close()
 ```
 
-**Expected:** `200 OK` with `"updated_at": "2026-03-06T..."`
-**Actual:** `500 Internal Server Error` (AttributeError)
+**Reproduction Steps:**
+1. Send any authenticated request with a valid JWT Bearer token.
+2. Observe `RuntimeError: This event loop is already running` in logs; endpoint returns 500.
 
-**Fix:** Add `updated_at` column to the `User` model and create a corresponding Alembic migration:
+**Expected:** Token verified successfully, request proceeds.
+**Actual:** `RuntimeError` raised, authentication fails.
+
+**Fix:** Use a dedicated new event loop in the blocking wrapper:
 ```python
-updated_at = Column(
-    DateTime(timezone=True),
-    nullable=False,
-    server_default=func.now(),
-    onupdate=func.now(),
-    comment="Last profile update timestamp",
-)
+loop = asyncio.new_event_loop()
+try:
+    payload = loop.run_until_complete(auth_manager.verify_token(token, expected_type="access"))
+finally:
+    loop.close()
 ```
 
 ---
 
-#### BUG-003 — CSRF Token Hashing Uses Client-Predictable Derivation (CSRF Bypass)
+#### BUG-003 — Debug `print()` statements leak API key internals to stdout in production
 
-| Field | Value |
-|---|---|
-| **Severity** | 🔴 Critical |
-| **Category** | Security — CSRF |
-| **Affected Files** | `app/middleware/csrf.py:63–82` |
-| **CWE** | CWE-352 (Cross-Site Request Forgery) |
+- **Severity:** Critical
+- **Category:** Security
+- **Affected Files:** `app/middleware/authentication.py:282–296`
 
 **Description:**
-The `_hash_token()` method derives its HMAC secret key directly from the token being hashed:
+The `_blocking_verify_api_key()` method contains five `print()` statements that dump internal API key validation state to stdout: the HMAC prefix computed from each incoming API key, total count of active keys, candidate key prefixes, and match results. In production deployments with log aggregation (CloudWatch, Datadog, Splunk, etc.), this output can be captured and used to enumerate the key prefix space or monitor authentication patterns.
 
+**Affected Lines:**
 ```python
-# csrf.py:78-82
-secret_key = hmac.new(token.encode(), b"csrf-salt", hashlib.sha256).digest()
-return hmac.new(secret_key, token.encode(), hashlib.sha256).hexdigest()
+print(f"DEBUG: prefix={prefix}")                         # Line 282
+print(f"DEBUG: active_keys count={len(active_keys)}")    # Line 283
+print(f"DEBUG: candidate prefix={candidate_key.key_prefix}")  # Line 285
+print("DEBUG: found match!")                             # Line 292
+print("DEBUG: no match found")                           # Line 296
 ```
 
-Because the secret is deterministically derived from the token (with a fixed, public salt `b"csrf-salt"`), any client that obtains their CSRF token can compute the expected cookie value and set a matching cookie. This completely negates CSRF protection: an attacker can craft a page that sets `document.cookie = "csrf_token=" + compute_hash(token)` and send a cross-origin state-changing request.
-
-**Expected:** HMAC key must incorporate a server-side secret unknown to the client.
-**Actual:** HMAC key is fully derivable by any client knowing the token.
-
-**Fix:** Import and use `settings.jwt_secret_key` (or a dedicated `CSRF_SECRET_KEY`) as the HMAC key:
-```python
-import hmac, hashlib
-from app.config import settings
-
-def _hash_token(self, token: str) -> str:
-    return hmac.new(
-        settings.jwt_secret_key.encode(),
-        token.encode(),
-        hashlib.sha256
-    ).hexdigest()
-```
+**Fix:** Remove all five `print()` statements. Replace with `logger.debug()` calls if needed during local development, gated by log level.
 
 ---
 
-#### BUG-004 — `GET /v1/sessions/{id}/tasks` Missing Session Ownership Check (IDOR)
+### HIGH Severity
 
-| Field | Value |
-|---|---|
-| **Severity** | 🔴 Critical |
-| **Category** | Security — Authorization / IDOR |
-| **Affected Files** | `app/routes/sessions.py:350–410` |
-| **CWE** | CWE-639 (Authorization Bypass Through User-Controlled Key) |
+---
+
+#### BUG-004 — `GET /v1/sessions/{session_id}/tasks` missing session ownership check
+
+- **Severity:** High
+- **Category:** Security / Authorization
+- **Affected Files:** `app/routes/sessions.py:357–410`
 
 **Description:**
-The `get_session_tasks` handler checks that the session exists (`session is not None`) but does **not** verify that `session.user_id == current_user.user_id`. Every other session endpoint calls `validate_session_ownership()` before proceeding, but this endpoint omits that check.
+The endpoint `GET /v1/sessions/{session_id}/tasks` verifies that the session *exists* but does not verify that the requesting user *owns* the session. Any authenticated user with the `TASK_READ` permission (all roles including `viewer`) can enumerate tasks from any other user's session if they know the session ID.
 
-**Reproduction:**
-```
-User A creates session S1, executes tasks.
-User B (any authenticated user) calls GET /v1/sessions/S1/tasks
-→ 200 OK — returns User A's task list
-```
+All other session-scoped endpoints (`GET /{id}`, `POST /{id}/start`, `POST /{id}/pause`, `POST /{id}/stop`, `POST /{id}/reset`, `DELETE /{id}`, `POST /{id}/step`) correctly call `validate_session_ownership()`.
 
-**Expected:** `403 Forbidden` for User B.
-**Actual:** `200 OK` — full task list returned.
+**Reproduction Steps:**
+1. Authenticate as User A. Create a session; note its `session_id`.
+2. Authenticate as User B (different account).
+3. `GET /v1/sessions/{user_a_session_id}/tasks` → Returns User A's tasks (should be 403).
 
-**Fix:** Add ownership validation before querying tasks:
+**Expected:** HTTP 403 Forbidden.
+**Actual:** HTTP 200 with tasks from another user's session.
+
+**Fix:** Add an ownership check immediately after the session existence check in `get_session_tasks()`:
 ```python
-# sessions.py: get_session_tasks handler
-session = db.query(SessionModel).filter(SessionModel.session_id == session_id).first()
-if not session:
-    raise HTTPException(status_code=404, detail=f"Session {session_id} not found")
 if session.user_id != current_user.user_id:
-    raise HTTPException(status_code=403, detail="Access denied")
+    raise HTTPException(status_code=403, detail="Access denied: you do not own this session")
 ```
 
 ---
 
-### 4.2 High Severity
+#### BUG-005 — `POST /v1/payments/create-intent` has no authentication requirement
 
----
-
-#### BUG-005 — Authentication Middleware Silently Passes Unauthenticated Requests
-
-| Field | Value |
-|---|---|
-| **Severity** | 🟠 High |
-| **Category** | Security — Authentication |
-| **Affected Files** | `app/middleware/authentication.py:96–107` |
-| **CWE** | CWE-306 (Missing Authentication for Critical Function) |
+- **Severity:** High
+- **Category:** Security
+- **Affected Files:** `app/routes/payments.py:39–78`
 
 **Description:**
-When a request carries **no** `Authorization` or `X-API-Key` header, `dispatch()` passes the request directly to `call_next()` without setting `request.state.authenticated`. This means security depends entirely on each endpoint's individual dependency declarations. Any route handler that omits `Depends(get_current_user)` or `Depends(require_permission(...))` is silently accessible without authentication. This is an unsafe default that violates defense-in-depth.
+The payment intent creation endpoint has no `Depends(get_current_user)` or `Depends(require_permission(...))` dependency. Any unauthenticated party can call `POST /v1/payments/create-intent` and receive a Stripe `clientSecret`. The `AuthenticationMiddleware` passes unauthenticated requests through when no `Authorization` header is present (line 107 of `authentication.py`), so middleware does not compensate for the missing dependency.
 
-**Affected Pattern:** `sessions.py:356–360` — `get_session_tasks` has `Depends(require_permission(Permission.TASK_READ))` but if this dependency ever fails to be included, the middleware provides no fallback.
-
-**Fix:** Adopt a deny-by-default posture: reject requests to non-public paths if `request.state.authenticated` is not set after middleware processing. Alternatively, require all non-public endpoints to explicitly opt in through a verified mechanism.
-
----
-
-#### BUG-006 — API Key Lookup Ignores `key_prefix` Index (Full Table Scan + Performance Vulnerability)
-
-| Field | Value |
-|---|---|
-| **Severity** | 🟠 High |
-| **Category** | Security / Performance |
-| **Affected Files** | `app/middleware/authentication.py:274` |
-
-**Description:**
-`_blocking_verify_api_key()` computes the HMAC prefix for fast lookup but then fetches **all** active API keys without filtering by prefix:
-
-```python
-# authentication.py:274
-active_keys = db.query(APIKey).filter(APIKey.is_active.is_(True)).all()
-```
-
-The `key_prefix` field and its index exist precisely to avoid this, but the query does not use them. This causes: (1) a full table scan on every authenticated request using an API key, scaling linearly with the number of keys; (2) bcrypt comparisons against every key in the table — DoS risk if key table is large.
+**Reproduction Steps:**
+1. `POST /v1/payments/create-intent` with no `Authorization` header, body `{"items": []}`.
+2. Observe HTTP 200 with `clientSecret`.
 
 **Fix:**
 ```python
-active_keys = db.query(APIKey).filter(
-    APIKey.is_active.is_(True),
-    APIKey.key_prefix == prefix
-).all()
+async def create_payment_intent(
+    request: PaymentIntentCreateRequest,
+    current_user: TokenPayload = Depends(get_current_user),  # Add this
+):
 ```
 
 ---
 
-#### BUG-007 — `X-Forwarded-For` Header Trusted Without Validation (Rate Limit Bypass)
+#### BUG-006 — Insecure default `JWT_SECRET_KEY` committed in `.env`
 
-| Field | Value |
-|---|---|
-| **Severity** | 🟠 High |
-| **Category** | Security — Rate Limiting |
-| **Affected Files** | `app/middleware/rate_limiting.py:93–97` |
-| **CWE** | CWE-348 (Use of Less Trusted Source) |
+- **Severity:** High
+- **Category:** Security
+- **Affected Files:** `.env:9`
 
 **Description:**
-`_get_client_id()` uses the first value from `X-Forwarded-For` as the client IP without validating whether the request passed through a trusted proxy. An attacker can set `X-Forwarded-For: 10.0.0.1` to impersonate any IP, bypassing IP-based rate limiting entirely.
+The `.env` file contains `JWT_SECRET_KEY=your-secret-key-change-in-production-min-32-chars`. This exact string is in `config.py`'s `insecure_defaults` list and will trigger a config error only in production. In development the key is loaded and used, allowing trivial JWT token forgery by anyone who knows the key value (it's now public via the repository).
 
-**Fix:** Either validate that the request originated from a known trusted proxy before trusting forwarded headers, or configure rate limiting to use authenticated user ID (already done when authenticated) and only fall back to direct `request.client.host` for unauthenticated requests.
+**Fix:** Rotate all secrets. Generate a new key: `python -c "import secrets; print(secrets.token_urlsafe(32))"`. Ensure `.env` is never committed (enforce via pre-commit or CI).
 
 ---
 
-#### BUG-008 — Task Dependency Endpoints Lack Session Ownership Validation (IDOR)
+#### BUG-007 — Stripe API keys committed in `.env`
 
-| Field | Value |
-|---|---|
-| **Severity** | 🟠 High |
-| **Category** | Security — Authorization / IDOR |
-| **Affected Files** | `app/routes/tasks.py:421–584` |
-| **CWE** | CWE-639 |
+- **Severity:** High
+- **Category:** Security
+- **Affected Files:** `.env:27–28`
 
 **Description:**
-`create_task_dependency`, `list_task_dependencies`, and `delete_task_dependency` verify that the task IDs exist but do not check that the authenticated user owns the session containing those tasks. Any researcher can create, list, or delete dependencies on tasks they do not own.
+The `.env` file contains real Stripe test API keys:
+- `STRIPE_SECRET_KEY=sk_test_4eC39HqLyjWDarjtT1zdp7dc`
+- `STRIPE_PUBLISHABLE_KEY=pk_test_TYooMQauvdEDq54NiTphI7jx`
 
-**Fix:** Add a join-based ownership check before any dependency operation:
+Even test keys should not be committed to version control. This establishes practices that may be replicated with live keys and may violate Stripe's terms of service.
+
+**Fix:** Rotate keys in the Stripe dashboard. Remove from `.env`. Use environment injection at runtime or a secrets manager.
+
+---
+
+#### BUG-008 — `asyncio.get_event_loop()` deprecated; raises `RuntimeError` in Python 3.12+
+
+- **Severity:** High
+- **Category:** Implementation Quality
+- **Affected Files:** `app/middleware/authentication.py:218, 250`
+
+**Description:**
+Both `_verify_token()` and `_verify_api_key()` call `asyncio.get_event_loop()`. This is deprecated since Python 3.10 and emits `DeprecationWarning`. In Python 3.12+ it raises `RuntimeError` if there is no current event loop in the calling context. The correct API inside an `async` method is `asyncio.get_running_loop()`.
+
+**Fix:** Replace both occurrences:
 ```python
-task = (db.query(TaskModel)
-    .join(SessionModel, TaskModel.session_id == SessionModel.session_id)
-    .filter(TaskModel.task_id == task_id, SessionModel.user_id == current_user.user_id)
-    .first())
+loop = asyncio.get_running_loop()  # was: asyncio.get_event_loop()
 ```
 
 ---
 
-#### BUG-009 — `asyncio.run()` Inside Thread-Pool Executor (Reliability Risk)
+#### BUG-009 — CSRF token scheme is broken for non-JWT form submissions
 
-| Field | Value |
-|---|---|
-| **Severity** | 🟠 High |
-| **Category** | Reliability / Concurrency |
-| **Affected Files** | `app/middleware/authentication.py:222–235` |
+- **Severity:** High
+- **Category:** Security
+- **Affected Files:** `app/middleware/csrf.py:54–115`
 
 **Description:**
-`_blocking_verify_token()` is submitted to `loop.run_in_executor()` (a thread-pool thread) and internally calls `asyncio.run(auth_manager.verify_token(...))`. While `asyncio.run()` technically creates a new event loop in a thread (which has none), this pattern is fragile: it creates a nested event loop, prevents context propagation, will fail if the thread ever inherits an event loop (e.g., under certain test configurations), and adds measurable latency.
+The CSRF middleware generates a random token on GET requests, stores its HMAC hash in the cookie, but **never returns the raw token to the client**. When validating POST/DELETE requests, it expects the client to send the raw token in `X-CSRF-Token`, then re-hashes it and compares with the cookie value. Since clients only possess `hash(token)` and not `token`, no value they send will pass validation.
 
-**Fix:** Make `verify_token` synchronous for the middleware use case or use `anyio.from_thread.run_sync()`.
+The middleware is effectively short-circuited for JWT-authenticated requests (the common API use case), but for any form-based or cookie-authenticated client, CSRF protection is non-functional.
+
+**Flow breakdown:**
+1. GET: `token = random()` → cookie = `hash(token)` → raw `token` is **discarded**
+2. POST: receives header value `H` → validates `hash(H) == cookie` → `hash(H) == hash(token)` requires `H == token`, but client never received `token`
+
+**Fix:** Implement the double-submit cookie pattern correctly by storing the raw token in the cookie and validating the header against it directly, or return the raw token in a response header for AJAX clients.
 
 ---
 
-#### BUG-010 — Registered Users Assigned Invalid Role `"user"` (No Permissions)
+#### BUG-010 — `asyncio.create_task()` called in synchronous authorization function
 
-| Field | Value |
-|---|---|
-| **Severity** | 🟠 High |
-| **Category** | Functional / Authorization |
-| **Affected Files** | `app/routes/users.py:83`, `app/services/authorization.py:30–35` |
+- **Severity:** High
+- **Category:** Implementation Quality
+- **Affected Files:** `app/services/authorization.py:155`
 
 **Description:**
-`register_user` assigns `roles=["user"]` to every new registration. However, the RBAC system only recognizes `"admin"`, `"researcher"`, and `"viewer"` as valid roles. The role `"user"` is silently skipped in `get_permissions_for_roles()`, resulting in **zero permissions** for all self-registered users. They cannot create sessions, read data, or perform any action. Additionally, `asyncio.create_task()` is called from a synchronous `get_permissions_for_roles()` function (line 155) when the role is invalid — this will fail if called outside an async context.
+`get_permissions_for_roles()` is a synchronous function that calls `asyncio.create_task()` in the exception handler for invalid role strings. `asyncio.create_task()` requires an active running event loop; calling it in a synchronous context (e.g., during startup, testing, or from a non-async call path) raises `RuntimeError: no running event loop`.
 
-**Expected:** New users have at least `viewer` or `researcher` permissions.
-**Actual:** All self-registered users have no permissions, making every protected API call fail with 403.
-
-**Fix:** Change the default role assignment to a valid role:
+**Affected Code:**
 ```python
-# users.py:83
-roles=["viewer"],  # or "researcher" per policy
+def get_permissions_for_roles(roles: List[str]) -> Set[Permission]:
+    ...
+    except ValueError:
+        asyncio.create_task(alert_manager.trigger_custom_alert(...))  # BUG
 ```
+
+**Fix:** Guard with a try/except for `RuntimeError`, use `asyncio.ensure_future()`, or replace with a synchronous log call for the non-async context.
 
 ---
 
-#### BUG-011 — `Content-Disposition` Header Filename Not Quoted (RFC 6266 Violation)
+### MEDIUM Severity
 
-| Field | Value |
-|---|---|
-| **Severity** | 🟠 High |
-| **Category** | API Standards / Security |
-| **Affected Files** | `app/routes/export.py:155` |
-| **CWE** | CWE-116 (Improper Encoding or Escaping of Output) |
+---
+
+#### BUG-011 — Task dependency creation lacks cycle detection
+
+- **Severity:** Medium
+- **Category:** Functional Completeness
+- **Affected Files:** `app/routes/tasks.py:449–503`
 
 **Description:**
+`POST /v1/tasks/{task_id}/dependencies` checks for self-dependencies and duplicate dependencies but does not detect circular chains (e.g., A→B, B→C, C→A). A circular dependency graph could cause Celery task execution to deadlock or loop indefinitely, consuming worker processes.
+
+**Fix:** Before inserting the new dependency, perform a BFS/DFS traversal of existing dependencies starting from `prerequisite_task_id` to verify that `dependent_task_id` is not already reachable.
+
+---
+
+#### BUG-012 — `Content-Disposition` filename not quoted per RFC 6266
+
+- **Severity:** Medium
+- **Category:** Security
+- **Affected Files:** `app/routes/export.py:154–156`
+
+**Description:**
+The export endpoint builds the `Content-Disposition` header without quoting the filename:
 ```python
-headers={"Content-Disposition": f"attachment; filename={filename}"}
+headers={"Content-Disposition": f"attachment; filename={filename}"},
 ```
-The filename parameter is not enclosed in quotes. Per RFC 6266, filenames must be quoted. While the filename is sanitized with `re.sub(r"[^a-zA-Z0-9_-]", "_", session_id)`, the missing quotes could cause header parsing failures in strict HTTP clients and is a deviation from standards. Additionally, the RFC 5987 `filename*` parameter is not used for proper encoding.
+While the filename is regex-sanitized (only `[a-zA-Z0-9_-]` characters plus the extension and dots), RFC 6266 requires filename values to be quoted strings. Some HTTP clients and middleware may parse unquoted filenames incorrectly or reject the header.
 
 **Fix:**
 ```python
-headers={"Content-Disposition": f'attachment; filename="{filename}"'}
+headers={"Content-Disposition": f'attachment; filename="{filename}"'},
 ```
 
 ---
 
-#### BUG-012 — `cors_config.py` Helper Module Never Used (Missing Security Headers)
+#### BUG-013 — `new_password` return value silently discarded in password reset
 
-| Field | Value |
-|---|---|
-| **Severity** | 🟠 High |
-| **Category** | Security / Configuration |
-| **Affected Files** | `app/middleware/cors_config.py`, `app/main.py:291–298` |
+- **Severity:** Medium
+- **Category:** Functional Completeness
+- **Affected Files:** `app/routes/users.py:494–498`
 
 **Description:**
-`cors_config.py` defines `configure_cors()` which adds CORS with `expose_headers` and `max_age` parameters. However, `main.py` configures CORS directly via `CORSMiddleware` without these additions. As a result, `X-RateLimit-*` headers are not exposed to browser clients (needed for rate limit transparency), and preflight responses are not cached (`max_age=600`). This also means the module is dead code.
+In `reset_user_password`, the return value of `user_service.reset_password()` is assigned to `new_password` but never used or included in the response. The `PasswordResetResponse` only contains `user_id` and a static success message. If the service generates a temporary password, clients have no way to receive it.
 
-**Fix:** Replace the inline `CORSMiddleware` call in `main.py` with `configure_cors(app)` from the helper module.
-
----
-
-### 4.3 Medium Severity
-
----
-
-#### BUG-013 — Insecure JWT Secret Placeholder in `.env` File
-
-| Field | Value |
-|---|---|
-| **Severity** | 🟡 Medium |
-| **Category** | Security — Secrets Management |
-| **Affected Files** | `.env:57` |
-
-**Description:**
-`.env` contains `JWT_SECRET_KEY=your-secret-key-change-in-production-min-32-chars`. The config validation checks for known insecure defaults (e.g., `"your-secret-key-change-in-production"`) but the `.env` value has extra suffix `-min-32-chars` that bypasses the exact-match check. In development environments, this predictable key would allow token forgery. The `.env` file also lacks `CURSOR_SIGNING_KEY` and `WEBHOOK_SECRET_KEY` entries.
-
-**Fix:** Generate cryptographically random keys:
-```bash
-python -c "import secrets; print(secrets.token_urlsafe(48))"
-```
-Add `CURSOR_SIGNING_KEY` and `WEBHOOK_SECRET_KEY` to `.env`. Add all three to fuzzy-match detection in `config.py`.
-
----
-
-#### BUG-014 — No Rate Limiting on Authentication Endpoints (Brute Force Risk)
-
-| Field | Value |
-|---|---|
-| **Severity** | 🟡 Medium |
-| **Category** | Security — Rate Limiting |
-| **Affected Files** | `app/middleware/rate_limiting.py:118–135`, `app/routes/auth.py` |
-
-**Description:**
-Login (`POST /v1/auth/login`) and token refresh (`POST /v1/auth/refresh`) are public endpoints exempt from authentication middleware and fall under the global `"global"` rate limit of 60 req/min. While account lockout after 5 failures is implemented, the lockout is per-username, not per-IP. An attacker can rotate through many usernames at 60 req/min without hitting account lockout.
-
-**Fix:** Add a dedicated rate limit key for auth endpoints (e.g., 10 req/min per IP):
+**Affected Code:**
 ```python
-if path.startswith("/v1/auth"):
-    return "auth:attempt"
-```
-
----
-
-#### BUG-015 — `WEBHOOK_SECRET_KEY` Not Configured — Webhooks Delivered Without Signatures
-
-| Field | Value |
-|---|---|
-| **Severity** | 🟡 Medium |
-| **Category** | Security — Integrity |
-| **Affected Files** | `app/services/webhook_manager.py:220–227` |
-
-**Description:**
-When `settings.webhook_secret_key` is `None` (the default), `deliver_webhook()` logs a warning and sends webhook payloads without the `X-Signature-256` HMAC signature. Webhook consumers cannot verify payload authenticity, enabling payload spoofing by any party who learns the endpoint URL.
-
-**Fix:** Make `WEBHOOK_SECRET_KEY` required and fail startup if absent in production.
-
----
-
-#### BUG-016 — No Security Headers Middleware (Missing HSTS, X-Frame-Options, CSP)
-
-| Field | Value |
-|---|---|
-| **Severity** | 🟡 Medium |
-| **Category** | Security — Defense in Depth |
-| **CWE** | CWE-1021 (Improper Restriction of Rendered UI Layers) |
-
-**Description:**
-The middleware stack has no security headers middleware. Key headers absent from all responses:
-- `Strict-Transport-Security` (HSTS)
-- `X-Content-Type-Options: nosniff`
-- `X-Frame-Options: DENY`
-- `Content-Security-Policy`
-- `Referrer-Policy`
-- `Permissions-Policy`
-
-**Fix:** Add a `SecurityHeadersMiddleware` or use `starlette-exceptionhandlers` / `secure` library.
-
----
-
-#### BUG-017 — Exception Detail Leaked in Session List Endpoint
-
-| Field | Value |
-|---|---|
-| **Severity** | 🟡 Medium |
-| **Category** | Error Handling / Information Disclosure |
-| **Affected Files** | `app/routes/sessions.py:196–201` |
-| **CWE** | CWE-209 (Generation of Error Message Containing Sensitive Information) |
-
-**Description:**
-```python
-raise HTTPException(
-    status_code=500,
-    detail=f"Failed to list sessions: {str(e)}"
+new_password = user_service.reset_password(
+    user_id=user_id, new_password=request.new_password
 )
-```
-Internal exception messages (including stack-level details like SQL errors) are exposed to API consumers. Similar patterns appear in `templates.py:139` and `tasks.py` indirectly.
-
-**Fix:** Log the exception internally and return a generic client message:
-```python
-logger.error(f"Failed to list sessions: {e}")
-raise HTTPException(status_code=500, detail="Failed to list sessions")
+return PasswordResetResponse(user_id=user_id, message="Password reset successfully")
 ```
 
+**Fix:** Either remove the variable assignment if intentionally unused, or add the generated password to the response schema if admin-generated resets should return a temporary password.
+
 ---
 
-#### BUG-018 — `asyncio.create_task()` Called From Synchronous Context
+#### BUG-014 — Rate limiter trusts `X-Forwarded-For` without proxy allowlist
 
-| Field | Value |
-|---|---|
-| **Severity** | 🟡 Medium |
-| **Category** | Reliability / Concurrency |
-| **Affected Files** | `app/services/authorization.py:155`, `app/services/authorization.py:536` |
+- **Severity:** Medium
+- **Category:** Security
+- **Affected Files:** `app/middleware/rate_limiting.py:94–104`
 
 **Description:**
-`get_permissions_for_roles()` is a synchronous function called during request permission checks. It calls `asyncio.create_task(alert_manager.trigger_custom_alert(...))` when an invalid role is encountered. `asyncio.create_task()` requires a running event loop — while typically available in async FastAPI context, calling it from a sync function is an anti-pattern that will fail in background threads, CLI contexts, and unit tests.
+`_get_client_id()` reads `X-Forwarded-For` to identify clients for rate limiting. Without a trusted-proxy allowlist, any client can spoof this header to bypass per-IP rate limits by rotating IP addresses.
 
-**Fix:** Use `asyncio.get_event_loop().call_soon_threadsafe()` or restructure alerts to be fire-and-forget in a coroutine context.
-
----
-
-### 4.4 Low Severity
+**Fix:** Only trust `X-Forwarded-For` when the direct client IP is a known/trusted proxy. Alternatively, offload IP resolution to a reverse proxy (nginx, Caddy) that strips and re-writes this header before requests reach the application.
 
 ---
 
-#### BUG-019 — MD5 Used for Export Filename Hash
+#### BUG-015 — `GET /v1/client-docs` references non-existent `/v1/dashboard` endpoint
 
-| Field | Value |
-|---|---|
-| **Severity** | 🟢 Low |
-| **Category** | Code Quality |
-| **Affected Files** | `app/routes/export.py:142` |
+- **Severity:** Medium
+- **Category:** Functional Completeness
+- **Affected Files:** `app/routes/version.py:261–268`
 
 **Description:**
-`hashlib.md5(...)` is used to generate an 8-character filename uniqueness component. MD5 is cryptographically broken and its use, even in non-security contexts, triggers SAST tool warnings.
+The client docs endpoint returns an `endpoints` dictionary that includes `"dashboard": "/v1/dashboard"`, but no dashboard endpoint exists anywhere in the codebase. Clients following this reference will receive 404.
 
-**Fix:** Replace with `hashlib.sha256(...).hexdigest()[:8]`.
+**Fix:** Remove `"dashboard"` from the endpoints dictionary or implement the endpoint.
 
 ---
 
-#### BUG-020 — API Key Rotation Inherits Expired Expiry Date
+#### BUG-016 — MD5 used in export filename generation
 
-| Field | Value |
-|---|---|
-| **Severity** | 🟢 Low |
-| **Category** | Functional / User Experience |
-| **Affected Files** | `app/routes/api_keys.py:354–362` |
+- **Severity:** Medium
+- **Category:** Security
+- **Affected Files:** `app/routes/export.py:142`
 
 **Description:**
-`rotate_api_key()` creates a new key with `expires_at=existing_key.expires_at`. If the original key was close to or past expiration, the new rotated key will immediately expire, making it unusable.
+`hashlib.md5()` is used to generate part of export filenames for uniqueness. While not used for security purposes, MD5 is cryptographically broken and may trigger security scanners/audits. The existing combination of timestamp + sanitized session ID is sufficient for uniqueness.
 
-**Fix:** Default the new key's expiry to `datetime.now(utc) + timedelta(days=365)` or accept an `expires_at` override in the request.
+**Fix:** Replace with `hashlib.sha256(...).hexdigest()[:8]` or remove the hash component entirely.
 
 ---
 
-#### BUG-021 — f-strings in Logger Calls (No Lazy Evaluation)
+#### BUG-017 — `asyncio.create_task()` in `log_audit_event()` may fail outside async context
 
-| Field | Value |
-|---|---|
-| **Severity** | 🟢 Low |
-| **Category** | Performance / Code Quality |
-| **Affected Files** | Multiple — `auth_manager.py`, `users.py`, `sessions.py`, etc. |
+- **Severity:** Medium
+- **Category:** Implementation Quality
+- **Affected Files:** `app/services/authorization.py:536`
 
 **Description:**
-`logger.info(f"Session {session_id} created")` evaluates the f-string even when the log level is disabled. At high throughput, this causes unnecessary string allocations.
-
-**Fix:** Use `logger.info("Session %s created", session_id)` (lazy %-formatting).
+`log_audit_event()` is a synchronous function. In its exception handler it calls `asyncio.create_task()`. This will raise `RuntimeError` if called outside an async context (same root cause as BUG-010).
 
 ---
 
-#### BUG-022 — `pyproject.toml` References `python 3.14` (Not Yet Released)
+#### BUG-018 — Default `HOST=0.0.0.0` exposes API on all network interfaces
 
-| Field | Value |
-|---|---|
-| **Severity** | 🟢 Low |
-| **Category** | Configuration |
-| **Affected Files** | `TODO.md` (coverage report header) |
+- **Severity:** Medium
+- **Category:** Security
+- **Affected Files:** `app/config.py:45`
 
 **Description:**
-The coverage report in `TODO.md` shows `platform darwin, python 3.14.3-final-0`. Python 3.14 is a pre-release as of the audit date. Using pre-release Python in production introduces instability risk.
+`self.host = os.getenv("HOST", "0.0.0.0")` binds the API to all interfaces by default. In development environments or Docker containers without network isolation, this unnecessarily exposes the service. The `main.py` `__main__` block correctly defaults to `127.0.0.1`, but the `Settings` class default is misaligned.
 
-**Fix:** Pin to a stable Python release (3.11 or 3.12 LTS).
-
----
-
-## 5. Missing Features Log
-
-| ID | Feature | Status | Severity Impact | Notes |
-|---|---|---|---|---|
-| MF-001 | **API key management endpoints** (`/v1/api-keys/*`) | ❌ Unreachable | Critical | Router exists but not registered (BUG-001) |
-| MF-002 | **Webhook delivery management** (`/v1/webhooks/*`) | ❌ Unreachable | Critical | Router exists but not registered (BUG-001) |
-| MF-003 | **Email verification flow** | ⚠️ Partial | Medium | Token generated on registration, verification endpoint exists, but SMTP not configured in default `.env`; new users are created with `is_active=True` regardless of verification |
-| MF-004 | **MFA enrollment endpoint** | ❌ Missing | Medium | `AuthManager` has `generate_mfa_secret()` and `get_mfa_qr_url()`, MFA columns exist in DB, but no API endpoint to enable/disable MFA |
-| MF-005 | **Audit log query endpoint** | ❌ Missing | Medium | `AuditLog` model and `log_audit_event()` service exist, but no API endpoint to query audit logs |
-| MF-006 | **Password policy enforcement** | ⚠️ Partial | Medium | No minimum length, complexity, or breach-check validation on `POST /v1/users/register` |
-| MF-007 | **Session export ownership check** | ⚠️ Partial | High | `export_session_data` passes `user_id` to service but validation is inside `DataExportService` — not independently verified at route level |
-| MF-008 | **Pagination for webhook deliveries** | ⚠️ Partial | Low | `per_page` parameter exists but no server-side max cap; requesting `per_page=999` would dump entire table |
-| MF-009 | **Database sharding** | ❌ 0% coverage | Low | `sharding_service.py` and `sharded_connection.py` at 0% coverage; feature effectively untested |
-| MF-010 | **CLI tooling** | ❌ 0% coverage | Low | `app/cli.py` at 0% test coverage |
-| MF-011 | **OpenTelemetry tracing** | ⚠️ Partial | Low | Conditional import present; `tracing.py` at 26% coverage; not functional without OTLP endpoint |
-| MF-012 | **Admin-accessible session deletion** | ❌ Missing | Medium | Admins cannot delete sessions they don't own; `validate_session_ownership` has no admin bypass path |
+**Fix:** Change the default in `config.py` to `"127.0.0.1"` for development, or document the required override for Docker environments.
 
 ---
 
-## 6. Implementation Quality Assessment
+#### BUG-019 — `GET /v1/users/verify-email` contains inline DB logic, bypasses service layer
 
-### 6.1 Functional Completeness
+- **Severity:** Medium
+- **Category:** Implementation Quality
+- **Affected Files:** `app/routes/users.py:110–161`
 
-**Score: 52/100** 🔴
-
-**Strengths:**
-- Full session lifecycle (create → start → pause → stop → reset → delete) correctly implemented.
-- Complete task execution, status polling, and result retrieval flow.
-- Cursor-based pagination for time series data.
-- Template CRUD with ownership and uniqueness enforcement.
-- Data export in JSON and CSV formats with streaming.
-
-**Critical Gaps:**
-- 2 router groups completely unreachable (BUG-001).
-- User model missing `updated_at` causes 500 errors on all user profile endpoints (BUG-002).
-- Self-registered users receive no valid permissions (BUG-010).
-- No MFA enrollment API despite full model/service support.
+**Description:**
+The `verify_email` endpoint queries the `User` model directly from the route handler and updates fields inline rather than delegating to `UserManagementService`. This bypasses caching, event hooks, and audit logging that the service layer provides, and duplicates business logic that should live in the service.
 
 ---
 
-### 6.2 Security Architecture
-
-**Score: 61/100** 🟠
-
-**Strengths:**
-- ✅ bcrypt password hashing with salt rounds=12 and 72-byte truncation handling.
-- ✅ JWT with JTI-based access token revocation via Redis.
-- ✅ Refresh token rotation on every use.
-- ✅ Account lockout after 5 failed attempts (15-minute lockout).
-- ✅ SSRF protection in webhook delivery with private IP range blocking and cloud metadata endpoint blocking.
-- ✅ Request size limiting middleware.
-- ✅ Comprehensive RBAC with fine-grained permissions.
-- ✅ Audit logging infrastructure.
-- ✅ Token blocklist for immediate access token revocation.
-
-**Critical Weaknesses:**
-- ❌ CSRF token cryptographic weakness (BUG-003) — CSRF protection provides no actual security.
-- ❌ IDOR on session tasks endpoint (BUG-004) and task dependencies (BUG-008).
-- ❌ Authentication middleware deny-by-default not enforced (BUG-005).
-- ❌ API key lookup ignores prefix index — full table scan (BUG-006).
-- ❌ Rate limit bypass via X-Forwarded-For spoofing (BUG-007).
-- ❌ No security response headers (BUG-016).
-- ❌ Webhook signatures not enforced (BUG-015).
+### LOW Severity
 
 ---
 
-### 6.3 Error Handling & Resilience
+#### BUG-020 — `print()` statement in `version.py` triggers lint false-positive
 
-**Score: 75/100** 🟡
+- **Severity:** Low
+- **Category:** Implementation Quality
+- **Affected Files:** `app/routes/version.py:99`
 
-**Strengths:**
-- ✅ Global exception handlers registered for all exception types.
-- ✅ Structured error responses with `code`, `message`, `request_id`, `timestamp`.
-- ✅ Sensitive fields (password, token, key) redacted before logging request bodies.
-- ✅ Alert system triggers on unhandled exceptions.
-- ✅ Database transaction rollback in all error paths.
-- ✅ Redis failure handled — app continues with degraded rate limiting.
-
-**Weaknesses:**
-- ⚠️ Internal exception details leaked in session list handler (BUG-017).
-- ⚠️ `templates.py:create_template` — outer `try` block has no generic `except Exception` handler; non-HTTPException errors bubble up uncaught.
-- ⚠️ `asyncio.run()` in executor thread (BUG-009) — no timeout or cancellation fallback.
-- ⚠️ Webhook dead-letter queue is "fire and forget" — no admin notification path beyond alerting channel.
+**Description:**
+The Python client example template string in `get_client_documentation()` contains `print("API Health:", health)`. This is template/documentation content, not executed code, but grep-based linters flag it as a production `print()` statement.
 
 ---
 
-### 6.4 Performance & Scalability
+#### BUG-021 — `CURSOR_SIGNING_KEY` missing from `.env`
 
-**Score: 72/100** 🟡
+- **Severity:** Low
+- **Category:** Configuration
+- **Affected Files:** `.env`
 
-**Strengths:**
-- ✅ GZip compression middleware enabled.
-- ✅ Redis-backed caching service with TTL configuration.
-- ✅ Cursor-based pagination for time series (prevents large offset queries).
-- ✅ Database index coverage for all high-frequency query patterns.
-- ✅ Composite indexes on `(user_id, created_at)` for user-scoped listing.
-- ✅ Request size limiting (10MB default).
+**Description:**
+`CURSOR_SIGNING_KEY` is required by `config.py` (raises `ValueError` in production if missing or insecure) but is absent from the `.env` file. Pagination cursor signing is undefined in development.
 
-**Weaknesses:**
-- ⚠️ API key authentication requires full table scan per request (BUG-006) — O(N) on number of active keys.
-- ⚠️ `asyncio.run()` in thread executor creates new event loop per request (BUG-009) — high overhead.
-- ⚠️ `blocking_verify_token` in executor creates a new DB session per request outside of connection pool management.
-- ⚠️ `export.py` uses `hashlib.md5` inside a streaming response path (minor).
+**Fix:** Add `CURSOR_SIGNING_KEY=$(python -c "import secrets; print(secrets.token_urlsafe(32))")` to `.env`.
 
 ---
 
-### 6.5 Test Coverage
+#### BUG-022 — `app/routes/__init__.py` exports stale router list
 
-**Score: 47/100** 🔴
+- **Severity:** Low
+- **Category:** Implementation Quality
+- **Affected Files:** `app/routes/__init__.py`
 
-**Critical coverage gaps (modules with < 30% coverage):**
-
-| Module | Coverage | Risk Level |
-|---|:---:|---|
-| `app/routes/templates.py` | 16% | 🔴 High traffic endpoint, critical bugs likely |
-| `app/services/data_export.py` | 12% | 🔴 Complex export logic untested |
-| `app/middleware/schema_validation.py` | 11% | 🔴 Validation bypass risk |
-| `app/routes/export.py` | 28% | 🔴 Export endpoints uncovered |
-| `app/routes/sessions.py` | 28% | 🔴 Core session flow untested |
-| `app/middleware/csrf.py` | 25% | 🔴 CSRF middleware barely tested |
-| `app/services/rate_limiter.py` | 25% | 🔴 Rate limiting logic untested |
-| `app/middleware/tracing.py` | 26% | 🟠 Distributed tracing coverage |
-| `app/middleware/profiling.py` | 28% | 🟠 Profiling middleware untested |
-| `app/database/sharded_connection.py` | 0% | 🔴 Entirely untested |
-| `app/services/seeding_service.py` | 0% | 🔴 Entirely untested |
-| `app/cli.py` | 0% | 🔴 CLI entirely untested |
-| `app/tracing.py` | 0% | 🔴 Tracing entirely untested |
-
-**Coverage Comparison vs 80% Target:**
-
-| Module | Actual | Target | Gap |
-|---|:---:|:---:|:---:|
-| `app/services/auth_manager.py` | 38% | 80% | -42% |
-| `app/routes/tasks.py` | 46% | 80% | -34% |
-| `app/routes/state.py` | 35% | 80% | -45% |
-| `app/middleware/rate_limiting.py` | 37% | 80% | -43% |
-| `app/services/cache_service.py` | 37% | 80% | -43% |
-| `app/services/authorization.py` | 49% | 80% | -31% |
+**Description:**
+`__init__.py` exports only 9 routers (`auth`, `users`, `sessions`, `state`, `tasks`, `export`, `health`, `metrics`, `version`), while the application registers 11 routers and 4 additional router files exist. The `templates`, `payments`, `api_keys`, and `webhooks` routers are absent from `__all__`.
 
 ---
 
-## 7. Actionable Recommendations
+#### BUG-023 — API key `TokenPayload` has empty `username` and `roles` fields
 
-### P0 — Fix Immediately (Blocking Production)
+- **Severity:** Low
+- **Category:** Implementation Quality
+- **Affected Files:** `app/middleware/authentication.py:165–174`
+
+**Description:**
+When authenticating via API key, the constructed `TokenPayload` has `username=""` and `roles=[]`. API key users must rely entirely on explicit `permissions` on the key for authorization. The empty `username` reduces traceability in audit logs. This behavior is not documented in any user-facing API documentation.
+
+---
+
+#### BUG-024 — `profile_functions=True` hardcoded in profiling middleware initialization
+
+- **Severity:** Low
+- **Category:** Implementation Quality
+- **Affected Files:** `app/main.py:251`
+
+**Description:**
+When `PROFILING_ENABLED=true`, the `ProfilingMiddleware` is always initialized with `profile_functions=True` hardcoded and no corresponding environment variable. Detailed function profiling is expensive in high-throughput environments and should be separately configurable.
+
+---
+
+## Missing Features Log
+
+| ID | Feature | Expected | Status | Priority |
+|----|---------|----------|--------|----------|
+| MF-001 | **Webhook management endpoints** | Full CRUD via `webhooks.py` router | ❌ Router not registered (BUG-001) | P0 |
+| MF-002 | **API key management endpoints** | Full CRUD via `api_keys.py` router | ❌ Router not registered (BUG-001) | P0 |
+| MF-003 | **Dashboard endpoint** | `GET /v1/dashboard` (referenced in client docs) | ❌ Not implemented | P2 |
+| MF-004 | **Email delivery for verification tokens** | Registration creates a token; no email is sent | ❌ SMTP config exists; no send logic | P1 |
+| MF-005 | **Task dependency cycle detection** | Reject circular dependency graphs | ❌ Not implemented (BUG-011) | P1 |
+| MF-006 | **Audit log read endpoint** | `AuditLog` model is written to but no GET endpoint exists | ❌ No route defined | P2 |
+| MF-007 | **MFA setup/enable endpoint** | `generate_mfa_secret()` and `get_mfa_qr_url()` exist in `AuthManager` | ❌ No route defined | P1 |
+| MF-008 | **Extended pagination metadata** | `has_next`, `total_pages` in list responses | ⚠️ Partial — total count only | P2 |
+| MF-009 | **Payment amount server-side calculation** | Amount is hardcoded at $99.00; no item-based pricing | ❌ Stub implementation | P1 |
+| MF-010 | **User deactivation endpoint** | Soft delete (`is_active=False`) exists in model; no dedicated endpoint | ⚠️ Achievable via `PUT /users/{id}` by admin | P2 |
+
+---
+
+## Security Assessment Summary
+
+| Area | Finding | Risk |
+|------|---------|------|
+| JWT auth | Access + refresh token rotation ✅ | Low |
+| JWT auth | JTI-based access token revocation via Redis ✅ | Low |
+| JWT auth | `asyncio.run()` in thread breaks auth — BUG-002 | **Critical** |
+| API key auth | HMAC prefix + bcrypt verification ✅ | Low |
+| API key auth | Debug print exposes prefix state — BUG-003 | **Critical** |
+| RBAC | Role-based permissions with `require_permission()` ✅ | Low |
+| RBAC | Session task list missing ownership check — BUG-004 | High |
+| Payment | Unauthenticated payment intent creation — BUG-005 | High |
+| Secrets | Insecure default JWT key in `.env` — BUG-006 | High |
+| Secrets | Stripe test keys in `.env` — BUG-007 | High |
+| Input validation | Pydantic schemas on all requests ✅ | Low |
+| Input validation | UUID validation on session IDs ✅ | Low |
+| CSRF | Middleware present but broken token scheme — BUG-009 | High |
+| CORS | Specific allowed origins in `.env` ✅ | Low |
+| Rate limiting | Redis-backed sliding window ✅ | Low |
+| Rate limiting | `X-Forwarded-For` spoofing possible — BUG-014 | Medium |
+| Injection | ORM used throughout; no raw SQL ✅ | Low |
+| Error responses | Generic 500 messages; no stack traces in responses ✅ | Low |
+| Password security | bcrypt cost factor 12, 72-byte truncation handled ✅ | Low |
+| Account lockout | 5 attempts → 15-minute lockout ✅ | Low |
+| MFA | TOTP supported via pyotp ✅ | Low |
+| TLS | CSRF cookie `secure=True` enforces HTTPS ✅ | Low |
+
+---
+
+## Actionable Recommendations
+
+### Immediate — P0 (before production deployment)
 
 | # | Action | File(s) | Effort |
-|---|---|---|---|
-| R-01 | Register `api_keys.router` and `webhooks.router` in `create_app()` and `routes/__init__.py` | `main.py`, `routes/__init__.py` | 🟢 30 min |
-| R-02 | Add `updated_at` column to `User` ORM model; generate Alembic migration | `database/models.py` | 🟢 1h |
-| R-03 | Fix CSRF `_hash_token()` to use server-side secret instead of self-referential HMAC | `middleware/csrf.py` | 🟢 30 min |
-| R-04 | Add session ownership validation in `get_session_tasks` | `routes/sessions.py` | 🟢 15 min |
-| R-05 | Change default registration role from `"user"` to `"viewer"` or `"researcher"` | `routes/users.py` | 🟢 5 min |
+|---|--------|---------|--------|
+| R-001 | Register `webhooks` and `api_keys` routers in `main.py` | `app/main.py` | < 1 h |
+| R-002 | Fix `asyncio.run()` in auth middleware — use `new_event_loop()` | `app/middleware/authentication.py` | 2 h |
+| R-003 | Remove 5 debug `print()` statements from auth middleware | `app/middleware/authentication.py` | 30 min |
+| R-004 | Rotate all secrets; prevent `.env` commits via CI gate | `.env`, CI | 2 h |
+| R-005 | Add `Depends(get_current_user)` to payments endpoint | `app/routes/payments.py` | 30 min |
 
-### P1 — Fix Before Next Release (High Risk)
-
-| # | Action | File(s) | Effort |
-|---|---|---|---|
-| R-06 | Add `key_prefix` filter to API key lookup query | `middleware/authentication.py` | 🟢 15 min |
-| R-07 | Add X-Forwarded-For validation with trusted proxy whitelist | `middleware/rate_limiting.py` | 🟡 2h |
-| R-08 | Add ownership validation for task dependency endpoints | `routes/tasks.py` | 🟢 30 min |
-| R-09 | Refactor `_blocking_verify_token` to avoid `asyncio.run()` in executor | `middleware/authentication.py` | 🟡 3h |
-| R-10 | Add auth-specific rate limit (10 req/min) for login/refresh endpoints | `middleware/rate_limiting.py` | 🟢 1h |
-| R-11 | Add `Content-Disposition` filename quoting | `routes/export.py` | 🟢 5 min |
-| R-12 | Replace inline CORS setup with `configure_cors()` helper | `main.py` | 🟢 30 min |
-| R-13 | Fix exception message leakage in `list_sessions` (and similar handlers) | `routes/sessions.py`, `routes/templates.py` | 🟢 1h |
-
-### P2 — Short Term Improvements (Medium Risk)
+### Short Term — P1 (next sprint)
 
 | # | Action | File(s) | Effort |
-|---|---|---|---|
-| R-14 | Add security response headers middleware (HSTS, CSP, X-Frame-Options, etc.) | New middleware file | 🟡 3h |
-| R-15 | Configure `WEBHOOK_SECRET_KEY` and make it required in production | `config.py`, `.env` | 🟢 1h |
-| R-16 | Add MFA enrollment/disable API endpoints | New route file | 🟠 1 day |
-| R-17 | Add audit log query endpoint (`GET /v1/admin/audit-logs`) | New route file | 🟡 4h |
-| R-18 | Fix `asyncio.create_task()` calls in sync functions | `services/authorization.py` | 🟡 2h |
-| R-19 | Add password complexity validation on registration | `models/schemas.py`, `services/user_management.py` | 🟢 2h |
-| R-20 | Make email verification mandatory before account activation | `routes/users.py`, `services/user_management.py` | 🟡 3h |
-| R-21 | Add pagination max cap on webhook deliveries `per_page` | `routes/webhooks.py` | 🟢 15 min |
-| R-22 | Fix API key rotation to use fresh expiry, not inherited | `routes/api_keys.py` | 🟢 15 min |
-| R-23 | Add admin bypass to `validate_session_ownership` | `routes/sessions.py` | 🟢 30 min |
+|---|--------|---------|--------|
+| R-006 | Add ownership check to `GET /v1/sessions/{id}/tasks` | `app/routes/sessions.py` | 1 h |
+| R-007 | Replace `asyncio.get_event_loop()` with `asyncio.get_running_loop()` | `app/middleware/authentication.py` | 30 min |
+| R-008 | Fix CSRF double-submit pattern — expose raw token to client | `app/middleware/csrf.py` | 3 h |
+| R-009 | Fix `asyncio.create_task()` in synchronous functions | `app/services/authorization.py` | 2 h |
+| R-010 | Implement email sending for verification tokens (SMTP service) | `app/services/user_management.py` | 4 h |
+| R-011 | Implement MFA setup/enable/disable endpoints | `app/routes/auth.py` | 4 h |
+| R-012 | Add cycle detection for task dependencies (BFS/DFS) | `app/routes/tasks.py` | 4 h |
+| R-013 | Add trusted proxy allowlist for `X-Forwarded-For` | `app/middleware/rate_limiting.py` | 2 h |
+| R-014 | Implement server-side payment amount calculation | `app/routes/payments.py` | 6 h |
 
-### P3 — Technical Debt (Low Risk, Improve Quality)
+### Medium Term — P2 (future milestones)
 
 | # | Action | File(s) | Effort |
-|---|---|---|---|
-| R-24 | Replace `hashlib.md5` with `sha256` in export filename | `routes/export.py` | 🟢 5 min |
-| R-25 | Replace f-string logger calls with `%`-format (lazy evaluation) | Multiple files | 🟡 2h |
-| R-26 | Achieve ≥80% test coverage on `auth_manager`, `csrf`, `sessions`, `templates`, `rate_limiter` | `tests/` | 🔴 3–5 days |
-| R-27 | Strengthen insecure-default detection in `config.py` to use fuzzy/prefix matching | `config.py` | 🟢 1h |
-| R-28 | Pin Python version to 3.11 or 3.12 LTS in deployment artifacts | `Dockerfile`, `pyproject.toml` | 🟢 30 min |
-| R-29 | Add `CURSOR_SIGNING_KEY` and `WEBHOOK_SECRET_KEY` to `.env` template | `.env` | 🟢 15 min |
+|---|--------|---------|--------|
+| R-015 | Add audit log read/filter endpoints | New route file | 6 h |
+| R-016 | Quote `Content-Disposition` filename per RFC 6266 | `app/routes/export.py` | 30 min |
+| R-017 | Replace MD5 in filename hash with SHA-256 | `app/routes/export.py` | 30 min |
+| R-018 | Move `verify_email` logic into `UserManagementService` | `app/routes/users.py`, `app/services/user_management.py` | 2 h |
+| R-019 | Implement or remove `/v1/dashboard` endpoint | `app/routes/version.py` + new file | 4 h |
+| R-020 | Update `app/routes/__init__.py` exports to match actual routers | `app/routes/__init__.py` | 30 min |
+| R-021 | Add `has_next` and `total_pages` to pagination responses | `app/models/schemas.py` | 2 h |
+| R-022 | Change default `HOST` to `127.0.0.1` in `config.py` | `app/config.py` | 15 min |
 
 ---
 
-### Effort Legend
+## Detailed Component Assessment
 
-| Symbol | Effort |
-|---|---|
-| 🟢 | < 4 hours |
-| 🟡 | 4–16 hours |
-| 🟠 | 1–3 days |
-| 🔴 | > 3 days |
+### Authentication (`app/routes/auth.py`, `app/services/auth_manager.py`)
+
+**Strengths:**
+- Separate access (30 min) and refresh (7 d) token lifecycle with rotation on each refresh
+- Bcrypt at cost factor 12 for password hashing
+- Account lockout after 5 failed attempts (15-minute window)
+- JTI-based access token revocation via Redis blocklist
+- Dedicated `POST /v1/auth/logout-access` for immediate access token invalidation
+- MFA (TOTP via pyotp) validated on login
+
+**Issues:** BUG-002 (asyncio.run), BUG-008 (deprecated get_event_loop)
 
 ---
 
-*Generated by Claude Code audit agent. All findings verified through direct source code analysis. No automated scanning tools were used — all defects were identified through manual code review.*
+### Authorization (`app/services/authorization.py`)
+
+**Strengths:**
+- Clean RBAC with `Role` and `Permission` enums; role-to-permission mapping table
+- `require_permission()` / `require_role()` FastAPI dependency pattern is DRY
+- Audit logging on every authorization decision (success and failure)
+- Resource ownership utility (`check_resource_ownership()`)
+
+**Issues:** BUG-004 (missing task list ownership check), BUG-010, BUG-017 (asyncio.create_task in sync)
+
+---
+
+### Session Management (`app/routes/sessions.py`, `app/services/session_manager.py`)
+
+**Strengths:**
+- State machine transitions enforced via `ALLOWED_TRANSITIONS` table
+- Session ID validated as UUID format
+- Redis caching + PostgreSQL persistence
+- Ownership validation on all lifecycle endpoints (start, pause, stop, reset, delete, step, get)
+
+**Issues:** BUG-004 — `get_session_tasks` is the only session-scoped endpoint lacking the ownership check
+
+---
+
+### Task Execution (`app/routes/tasks.py`)
+
+**Strengths:**
+- Task dependency model with unique constraint and self-dependency prevention
+- Celery-backed async execution with status polling
+- Webhook delivery on completion
+- Session ownership verified before task cancellation
+
+**Issues:** BUG-011 — no cycle detection in dependency graph
+
+---
+
+### Data Export (`app/routes/export.py`)
+
+**Strengths:**
+- Streaming responses for large file exports
+- Configurable size limits (`MAX_EXPORT_MB`, `MAX_EXPORT_POINTS`)
+- Variable name sanitization (regex whitelist)
+- Session ID sanitized for safe filenames
+- Cursor-based pagination for time series data
+
+**Issues:** BUG-012 (unquoted filename), BUG-016 (MD5 usage)
+
+---
+
+### Payments (`app/routes/payments.py`)
+
+**Critical Issues:**
+- BUG-005 — No authentication required
+- Hardcoded amount ($99.00) with no real server-side calculation
+- Mock response triggered by hardcoded Stripe key prefix string comparison — fragile
+
+---
+
+### Webhooks & API Keys
+
+- BUG-001 — Both router files are fully implemented but completely unreachable
+
+---
+
+### Middleware Stack
+
+**Strengths:**
+- Layered defense: `RequestSizeLimit → GZip → Prometheus → Logging → APIVersioning → ResponseValidation → CSRF → Auth → Deprecation → RateLimit → CORS`
+- Prometheus metrics middleware collects per-endpoint stats
+- Structured JSON logging with sensitive field redaction
+- Configurable OpenTelemetry distributed tracing
+- Alerting system with rate limiting and cooldown periods
+- Request size limiting with configurable threshold
+
+**Issues:** BUG-002, BUG-003, BUG-008 (auth middleware), BUG-009 (CSRF), BUG-014 (rate limiter IP spoofing)
+
+---
+
+### Configuration (`app/config.py`)
+
+**Strengths:**
+- Production validation: `ValueError` raised on insecure/missing secrets
+- URL format validation for database, Redis, Celery
+- Known insecure key list (`insecure_defaults`) with exact-match checks
+- Environment-specific CORS origin defaults
+- Comprehensive logging level validation
+
+**Issues:** BUG-006, BUG-007 (secrets in `.env`), BUG-021 (missing cursor key), BUG-018 (host default)
+
+---
+
+### Error Handling (`app/exception_handlers.py`)
+
+**Strengths:**
+- Centralized handlers for custom `APIError`, `RequestValidationError`, `HTTPException`, and catch-all
+- Request body redaction of sensitive fields before logging
+- Generic 500 responses (no internal details or stack traces to clients)
+- Unique error IDs (`err_<hex>`) for correlation across logs and alerts
+- Alert triggering on unhandled exceptions with request metadata
+
+**Issues:** None identified
+
+---
+
+### Database Models (`app/database/models.py`)
+
+**Strengths:**
+- Comprehensive composite indexing for all common query patterns
+- Soft delete pattern on `User` and `Session`
+- Cascade delete configured correctly throughout
+- `AuditLog` model with full metadata (user, action, resource, IP, user-agent, status)
+- Separate `RefreshToken` table with revocation flag and expiry
+- `APIKey` model with HMAC prefix for O(1) candidate reduction + bcrypt verification
+- `TaskDependency` model with unique constraint
+
+**Issues:** None identified
+
+---
+
+## Test Coverage Assessment
+
+| Suite | Location | Quality Notes |
+|-------|----------|---------------|
+| Unit tests | `tests/unit/` | Present; coverage report generated |
+| Integration tests | `tests/integration/` | Present (smoke, state, task, user, monitoring) |
+| Property-based tests | `tests/property/` | Hypothesis configured with dev/ci/thorough profiles |
+| E2E tests | `tests/e2e/` | Skeleton + DB utils present |
+| Load tests | `tests/load/` | Present (performance, validation) |
+| API contract tests | `tests/api_contract_tests.py` | Present; runs against live server |
+
+**Gaps:**
+- No test covering BUG-002 (`asyncio.run` in thread causes RuntimeError)
+- No test validating that `GET /sessions/{id}/tasks` rejects non-owners (BUG-004)
+- No test for unauthenticated payment intent creation (BUG-005)
+- No test verifying webhook or api-key endpoints return 404 (symptom of BUG-001)
+- No test for circular task dependency detection (BUG-011)
+
+---
+
+## Appendix: File Reference Map
+
+| Component | File |
+|-----------|------|
+| App factory | `app/main.py` |
+| Configuration | `app/config.py` |
+| Auth routes | `app/routes/auth.py` |
+| User routes | `app/routes/users.py` |
+| Session routes | `app/routes/sessions.py` |
+| Task routes | `app/routes/tasks.py` |
+| Export routes | `app/routes/export.py` |
+| Payment routes | `app/routes/payments.py` |
+| Webhook routes | `app/routes/webhooks.py` ⚠️ **unregistered** |
+| API key routes | `app/routes/api_keys.py` ⚠️ **unregistered** |
+| Health routes | `app/routes/health.py` |
+| Version routes | `app/routes/version.py` |
+| Auth middleware | `app/middleware/authentication.py` |
+| CSRF middleware | `app/middleware/csrf.py` |
+| Rate limiter | `app/middleware/rate_limiting.py` |
+| Auth manager | `app/services/auth_manager.py` |
+| Authorization | `app/services/authorization.py` |
+| Session manager | `app/services/session_manager.py` |
+| DB models | `app/database/models.py` |
+| Schemas | `app/models/schemas.py` |
+| Exception handlers | `app/exception_handlers.py` |
+
+---
+
+*Report generated by automated code audit. All findings are based on static analysis of source code as of commit `6c183d6` on branch `claude/app-audit-security-gVXx4`.*
