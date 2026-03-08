@@ -250,7 +250,7 @@ ESSENTIAL_DIRS = {
     "memcached",
 }
 
-# Temporary and cache directories to remove - API focused
+# Temporary and cache directories to remove - comprehensive list for all platforms
 TEMP_DIR_NAMES = {
     # Python cache directories
     "__pycache__",
@@ -261,7 +261,7 @@ TEMP_DIR_NAMES = {
     # Testing and coverage
     ".pytest_cache",
     ".mypy_cache",
-    "mypy_cache",  # Added for deletion
+    "mypy_cache",
     ".hypothesis",
     "htmlcov",
     ".coverage",
@@ -336,7 +336,7 @@ TEMP_DIR_NAMES = {
     ".emacs.d",
     ".c9",
     ".cloud9",
-    # Cache and temporary
+    # Cache and temporary directories
     ".cache",
     "cache",
     "caches",
@@ -346,29 +346,40 @@ TEMP_DIR_NAMES = {
     "tempfiles",
     ".tmp",
     ".temp",
-    # Platform specific
+    # macOS specific
     ".DS_Store",
+    "__MACOSX",
+    ".DocumentRevisions-V100",
+    ".TemporaryItems",
+    ".VolumeIcon.icns",
+    ".AppleDouble",
+    ".LSOverride",
+    "Icon",
+    ".Spotlight-V100",
+    ".Trashes",
+    ".fseventsd",
+    # Windows specific
     "Thumbs.db",
     "desktop.ini",
-    ".sass-cache",
-    ".node_repl_history",
-    ".python-version",
-    ".ruby-version",
-    ".nyc_output",
-    # Java/C# build artifacts
-    ".gradle",
-    ".maven",
-    # PlatformIO (if embedded systems)
-    ".platformio",
-    ".pio",
-    # Lock and backup files
-    ".gitkeep",
-    ".gitignore",
-    ".backup",
-    ".old",
-    ".orig",
-    ".bak",
-    ".save",
+    "$RECYCLE.BIN",
+    "System Volume Information",
+    "RECYCLER",
+    # Linux specific
+    ".fuse_hidden*",
+    ".Trash-*",
+    ".local",
+    ".config",
+    ".gnome",
+    ".kde",
+    ".mozilla",
+    ".thunderbird",
+    ".cache",
+    ".dbus",
+    ".gvfs",
+    # Platform agnostic temp directories
+    "temp",
+    "tmp",
+    "cache",
     "backup",
     "backups",
     "old",
@@ -395,9 +406,44 @@ TEMP_DIR_NAMES = {
     "log",
     "tmp_logs",
     "temp_logs",
+    # Additional common temp/cache directories
+    ".sass-cache",
+    ".node_repl_history",
+    ".python-version",
+    ".ruby-version",
+    ".nyc_output",
+    ".gradle",
+    ".maven",
+    ".platformio",
+    ".pio",
+    ".gitkeep",
+    ".gitignore",
+    ".backup",
+    ".old",
+    ".orig",
+    ".bak",
+    ".save",
+    "backup",
+    "backups",
+    "old",
+    "archive",
+    "archives",
+    "staging",
+    "testing",
+    "test-output",
+    "test-results",
+    "artifacts",
+    "build-artifacts",
+    "ci-artifacts",
+    "deployment",
+    "deploy",
+    "release",
+    "releases",
+    "packages",
+    "bundle",
 }
 
-# Temporary file patterns to remove - API focused
+# Temporary file patterns to remove - comprehensive list for all platforms
 TEMP_FILE_PATTERNS = [
     # Python compiled files
     "*.pyc",
@@ -623,19 +669,29 @@ TEMP_FILE_PATTERNS = [
     "*.lib.*",
     "*.pdb.*",
     # macOS specific
-    ".DS_Store*",
+    ".DS_Store?",
+    ".DS_Store??",
+    ".DS_Store???",
+    ".DS_Store????",
     "._*",
     ".Spotlight-V100",
     ".Trashes",
     ".fseventsd",
     # Windows specific
-    "Thumbs.db*",
-    "desktop.ini*",
+    "Thumbs.db?",
+    "desktop.ini?",
     "*.lnk",
+    "*.stackdump",
+    "*.mdmp",
+    "pagefile.sys",
+    "hiberfil.sys",
+    "swapfile.sys",
     # Linux specific
-    ".nfs*",
-    ".Xauthority*",
-    ".ICEauthority*",
+    ".fuse_hidden*",
+    ".directory",
+    ".hidden",
+    # Emacs lock files
+    ".#*",
     # Version control temporary files
     "*.orig",
     "*.rej",
