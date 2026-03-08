@@ -276,6 +276,7 @@ class ResponseSchemaValidationMiddleware(BaseHTTPMiddleware):
     async def _get_response_body(self, response: Response) -> Optional[str]:
         """
         Extract response body as string.
+        Handles both regular responses and streaming responses from BaseHTTPMiddleware.
 
         Args:
             response: The response object
@@ -283,13 +284,27 @@ class ResponseSchemaValidationMiddleware(BaseHTTPMiddleware):
         Returns:
             Response body as string or None
         """
-        # Check if response has body
-        if not hasattr(response, "body"):
+        # Check if response has body (cached in regular responses)
+        if hasattr(response, "body") and response.body:
+            body = response.body
+        elif hasattr(response, "body_iterator"):
+            # It's a StreamingResponse (e.g., from another BaseHTTPMiddleware)
+            # We need to consume the body and replace the iterator to keep it available
+            chunks = []
+            async for chunk in response.body_iterator:
+                chunks.append(chunk)
+
+            # Re-create the iterator so it can still be sent to the client
+            async def new_iterator():
+                for chunk in chunks:
+                    yield chunk
+
+            response.body_iterator = new_iterator()
+            body = b"".join(chunks)
+        else:
             return None
 
-        body = response.body
-
-        if len(body) == 0 or body is None:
+        if len(body) == 0:
             return None
 
         # Decode bytes to string

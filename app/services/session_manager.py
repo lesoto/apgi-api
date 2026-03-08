@@ -812,7 +812,7 @@ class SessionManager:
                 db_session.scalar(
                     select(func.count(SessionModel.session_id)).where(stmt.whereclause)
                 )
-                if stmt.whereclause
+                if stmt.whereclause is not None
                 else db_session.scalar(select(func.count(SessionModel.session_id)))
             )
 

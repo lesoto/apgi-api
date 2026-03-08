@@ -268,7 +268,7 @@ class AuthenticationMiddleware(BaseHTTPMiddleware):
                 raise ValueError("Secret key not configured")
             prefix = hmac.new(
                 auth_manager.secret_key.encode(), api_key.encode(), hashlib.sha256
-            ).hexdigest()[:32]
+            ).hexdigest()[:16]
 
             # Query API keys by prefix (should significantly reduce the number of candidates)
             active_keys = db.query(APIKey).filter(APIKey.is_active.is_(True)).all()
@@ -279,16 +279,21 @@ class AuthenticationMiddleware(BaseHTTPMiddleware):
 
             # Find the specific key by prefix and bcrypt check
             db_api_key = None
+            print(f"DEBUG: prefix={prefix}")
+            print(f"DEBUG: active_keys count={len(active_keys)}")
             for candidate_key in active_keys:
+                print(f"DEBUG: candidate prefix={candidate_key.key_prefix}")
                 if hmac.compare_digest(
                     str(candidate_key.key_prefix), prefix
                 ) and auth_manager.verify_password(
                     api_key, candidate_key.key_hash
                 ):  # type: ignore[arg-type]
                     db_api_key = candidate_key
+                    print("DEBUG: found match!")
                     break
 
             if not db_api_key:
+                print("DEBUG: no match found")
                 raise ValueError("Invalid API key")
 
             # Check expiration

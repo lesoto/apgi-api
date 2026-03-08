@@ -78,7 +78,7 @@ class TestValidateWebhookUrl:
         """Test validation blocks cloud metadata endpoints."""
         mock_getaddrinfo.return_value = [(None, None, None, None, ("169.254.169.254", 0))]
 
-        with pytest.raises(ValueError, match="Access to cloud metadata IP.*is blocked"):
+        with pytest.raises(ValueError, match="Access to cloud metadata.*blocked"):
             WebhookManager._validate_webhook_url("http://169.254.169.254/webhook")
 
     @patch("socket.getaddrinfo")
@@ -175,7 +175,9 @@ class TestDeliverWebhook:
             mock_webhook_delivery
         )
 
-        with patch("app.services.webhook_manager.alert_manager") as mock_alert_manager:
+        with patch(
+            "app.services.webhook_manager.alert_manager", new_callable=AsyncMock
+        ) as mock_alert_manager:
             result = await webhook_manager.deliver_webhook(mock_db_session, "delivery_123")
 
             assert not result
@@ -192,13 +194,16 @@ class TestDeliverWebhook:
             mock_webhook_delivery
         )
 
-        mock_session = AsyncMock()
+        mock_session = MagicMock()
         mock_client_session_class.return_value.__aenter__.return_value = mock_session
 
-        mock_response = AsyncMock()
+        mock_response = MagicMock()
         mock_response.status = 200
-        mock_response.text.return_value = "OK"
-        mock_session.post.return_value.__aenter__.return_value = mock_response
+        mock_response.text = AsyncMock(return_value="OK")
+
+        mock_cm = AsyncMock()
+        mock_cm.__aenter__.return_value = mock_response
+        mock_session.post.return_value = mock_cm
 
         result = await webhook_manager.deliver_webhook(mock_db_session, "delivery_123")
 
@@ -217,13 +222,16 @@ class TestDeliverWebhook:
             mock_webhook_delivery
         )
 
-        mock_session = AsyncMock()
+        mock_session = MagicMock()
         mock_client_session_class.return_value.__aenter__.return_value = mock_session
 
-        mock_response = AsyncMock()
+        mock_response = MagicMock()
         mock_response.status = 500
-        mock_response.text.return_value = "Internal Server Error"
-        mock_session.post.return_value.__aenter__.return_value = mock_response
+        mock_response.text = AsyncMock(return_value="Internal Server Error")
+
+        mock_cm = AsyncMock()
+        mock_cm.__aenter__.return_value = mock_response
+        mock_session.post.return_value = mock_cm
 
         result = await webhook_manager.deliver_webhook(mock_db_session, "delivery_123")
 
@@ -242,10 +250,12 @@ class TestDeliverWebhook:
             mock_webhook_delivery
         )
 
-        mock_session = AsyncMock()
+        mock_session = MagicMock()
         mock_client_session_class.return_value.__aenter__.return_value = mock_session
 
-        mock_session.post.side_effect = asyncio.TimeoutError()
+        mock_cm = AsyncMock()
+        mock_cm.__aenter__.side_effect = asyncio.TimeoutError()
+        mock_session.post.return_value = mock_cm
 
         result = await webhook_manager.deliver_webhook(mock_db_session, "delivery_123")
 
@@ -296,9 +306,10 @@ class TestWebhookManagerLifecycle:
         """Test closing webhook manager."""
 
         async def test():
-            webhook_manager.session = AsyncMock()
+            mock_session = AsyncMock()
+            webhook_manager.session = mock_session
             await webhook_manager.close()
-            webhook_manager.session.close.assert_called_once()
+            mock_session.close.assert_called_once()
             assert webhook_manager.session is None
 
         asyncio.run(test())

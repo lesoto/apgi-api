@@ -101,6 +101,13 @@ class User(Base):  # type: ignore[misc, valid-type]
         server_default=func.now(),
         comment="Account creation timestamp",
     )
+    updated_at = Column(
+        DateTime(timezone=True),
+        nullable=False,
+        server_default=func.now(),
+        onupdate=func.now(),
+        comment="Last update timestamp",
+    )
     last_login = Column(DateTime(timezone=True), nullable=True, comment="Last login timestamp")
 
     # Relationships

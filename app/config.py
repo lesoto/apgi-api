@@ -205,6 +205,12 @@ class Settings:
             if shard_url:
                 self.database_shard_urls[i] = shard_url
 
+        # Stripe Settings
+        self.stripe_secret_key: str = os.getenv("STRIPE_SECRET_KEY", "sk_test_placeholder")
+        self.stripe_publishable_key: str = os.getenv(
+            "STRIPE_PUBLISHABLE_KEY", "pk_test_placeholder"
+        )
+
         # Validate security settings after initialization
         self.__post_init__()
 

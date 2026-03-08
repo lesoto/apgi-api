@@ -169,7 +169,7 @@ class TestAuthenticationMiddleware:
         """Test blocking token verification."""
         with patch("app.middleware.authentication.AuthManager") as mock_auth_manager_class:
             mock_auth_manager = MagicMock()
-            mock_auth_manager.verify_token.return_value = mock_user_payload
+            mock_auth_manager.verify_token = AsyncMock(return_value=mock_user_payload)
             mock_auth_manager_class.return_value = mock_auth_manager
 
             result = auth_middleware._blocking_verify_token("test_token")
@@ -195,16 +195,15 @@ class TestAuthenticationMiddleware:
         mock_api_key.permissions = ["read", "write"]
         mock_api_key.created_at = datetime.now(timezone.utc)
         mock_api_key.expires_at = datetime.now(timezone.utc) + timedelta(days=365)
-        mock_api_key.key_prefix = "prefix123"
+        mock_api_key.key_prefix = "prefix1230000000"
         mock_api_key.key_hash = "hashed_key"
+        mock_api_key.is_active = True
 
         with patch("app.middleware.authentication.AuthManager") as mock_auth_manager_class:
-            with patch("app.database.connection.SessionLocal") as mock_session_class:
+            with patch("app.middleware.authentication.SessionLocal") as mock_session_class:
                 with patch("hmac.new") as mock_hmac:
                     mock_digest = MagicMock()
-                    mock_digest.hexdigest.return_value = (
-                        "prefix123" + "0" * 32
-                    )  # Make it long enough for [:32]
+                    mock_digest.hexdigest.return_value = "prefix1230000000"
                     mock_hmac.return_value = mock_digest
 
                     mock_session = MagicMock()
@@ -212,6 +211,8 @@ class TestAuthenticationMiddleware:
                     mock_session.query.return_value.filter.return_value.all.return_value = [
                         mock_api_key
                     ]
+                    # Ensure prefix matches what was mocked in hexdigest above
+                    mock_api_key.key_prefix = "prefix1230000000"
 
                     mock_auth_manager = MagicMock()
                     mock_auth_manager.secret_key = "secret"
@@ -224,7 +225,7 @@ class TestAuthenticationMiddleware:
 
     def test_blocking_verify_api_key_invalid(self, auth_middleware):
         """Test blocking API key verification with invalid key."""
-        with patch("app.database.connection.SessionLocal") as mock_session_class:
+        with patch("app.middleware.authentication.SessionLocal") as mock_session_class:
             mock_session = MagicMock()
             mock_session_class.return_value = mock_session
             mock_session.query.return_value.filter.return_value.all.return_value = []
@@ -236,14 +237,15 @@ class TestAuthenticationMiddleware:
         """Test blocking API key verification with expired key."""
         mock_api_key = MagicMock()
         mock_api_key.expires_at = datetime.now(timezone.utc) - timedelta(days=1)  # Expired
-        mock_api_key.key_prefix = "prefix123"
+        mock_api_key.key_prefix = "prefix1230000000"
         mock_api_key.key_hash = "hashed_key"
+        mock_api_key.is_active = True
 
         with patch("app.middleware.authentication.AuthManager") as mock_auth_manager_class:
-            with patch("app.database.connection.SessionLocal") as mock_session_class:
+            with patch("app.middleware.authentication.SessionLocal") as mock_session_class:
                 with patch("hmac.new") as mock_hmac:
                     mock_digest = MagicMock()
-                    mock_digest.hexdigest.return_value = "prefix123" + "0" * 32
+                    mock_digest.hexdigest.return_value = "prefix1230000000"
                     mock_hmac.return_value = mock_digest
 
                     mock_session = MagicMock()

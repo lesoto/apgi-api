@@ -63,7 +63,9 @@ from app.routes import (
     templates,
     users,
     version,
+    payments,
 )
+from app.schemas.root import RootResponse
 from app.services.cache_service import init_cache_service
 
 from app.middleware.logging import StructuredLogger
@@ -301,7 +303,7 @@ All endpoints except `/health`, `/docs`, and `/openapi.json` require authenticat
     register_exception_handlers(app)
 
     # Root endpoint
-    @app.get("/", tags=["Root"])
+    @app.get("/", tags=["Root"], response_model=RootResponse)
     async def root():
         """API root endpoint with basic information."""
         return {
@@ -323,6 +325,7 @@ All endpoints except `/health`, `/docs`, and `/openapi.json` require authenticat
     app.include_router(metrics.router)
     app.include_router(health.router)
     app.include_router(version.router)
+    app.include_router(payments.router)
 
     # Configure deprecated endpoints
     version.configure_deprecated_endpoints({})

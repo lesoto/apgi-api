@@ -105,7 +105,8 @@ class AuthManager:
     # Password Hashing
     # ========================================================================
 
-    def hash_password(self, password: str) -> str:
+    @staticmethod
+    def hash_password(password: str) -> str:
         """
         Hash a password using bcrypt.
 

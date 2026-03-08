@@ -1679,7 +1679,7 @@ class WebhookRetryResponse(BaseModel):
     success: bool = Field(..., description="Whether the retry was successful")
     status: str = Field(..., description="Updated delivery status")
     attempts: int = Field(..., description="Updated number of attempts")
-    last_attempt_at: datetime = Field(..., description="Last attempt timestamp")
+    last_attempt_at: Optional[datetime] = Field(None, description="Last attempt timestamp")
 
     model_config = ConfigDict(
         json_schema_extra={

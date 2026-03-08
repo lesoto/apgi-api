@@ -1,0 +1,600 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>APGI Checkout Workflow</title>
+    <!-- Add SEO Best Practices -->
+    <meta name="description" content="Secure payment gateway for the APGI Cognitive Engine featuring prediction loop verifications.">
+    <script src="https://js.stripe.com/v3/"></script>
+    <style>
+        :root {
+            --threshold-blue: #00B4FF;
+            --interoceptive-red: #FF3366;
+            --error-yellow: #FFCC00;
+            --modulator-green: #00CC99;
+            --workspace-purple: #9966FF;
+            --precision-red: #FF3366;
+            
+            --bg-dark: #0B0E14;
+            --panel-bg: rgba(20, 25, 35, 0.7);
+            --text-primary: #FFFFFF;
+            --text-secondary: #9BA3B5;
+            --border-glow: rgba(0, 180, 255, 0.2);
+        }
+
+        body {
+            margin: 0;
+            padding: 0;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            background-color: var(--bg-dark);
+            color: var(--text-primary);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            overflow: hidden;
+            position: relative;
+        }
+
+        h1 {
+            display: none; /* Screen reader only / SEO */
+        }
+
+        /* Abstract Brain Background Pattern */
+        .brain-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 0;
+            opacity: 0.6;
+            pointer-events: none;
+            background-image: 
+                radial-gradient(circle at 30% 40%, rgba(153, 102, 255, 0.15) 0%, transparent 40%),
+                radial-gradient(circle at 70% 60%, rgba(0, 180, 255, 0.15) 0%, transparent 40%),
+                radial-gradient(circle at 50% 50%, rgba(0, 204, 153, 0.08) 0%, transparent 50%);
+        }
+
+        .nodes-container {
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            z-index: 0;
+        }
+
+        /* Connecting lines for the brain abstract */
+        .node-path {
+            stroke: rgba(255,255,255,0.08);
+            stroke-width: 1.5;
+            fill: none;
+            stroke-dasharray: 4 4;
+            animation: dash 30s linear infinite;
+        }
+
+        @keyframes dash {
+            to {
+                stroke-dashoffset: 1000;
+            }
+        }
+
+        .checkout-container {
+            position: relative;
+            z-index: 10;
+            width: 100%;
+            max-width: 550px;
+            background: var(--panel-bg);
+            backdrop-filter: blur(25px);
+            -webkit-backdrop-filter: blur(25px);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            border-radius: 24px;
+            padding: 40px;
+            box-shadow: 0 40px 80px rgba(0,0,0,0.5), inset 0 0 0 1px rgba(255,255,255,0.05);
+            transition: all 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        .checkout-container:hover {
+            box-shadow: 0 40px 80px rgba(0,0,0,0.6), inset 0 0 0 1px var(--border-glow);
+        }
+
+        .step {
+            display: none;
+            animation: fadeIn 0.4s ease-out forwards;
+        }
+
+        .step.active {
+            display: block;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(15px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        h2 {
+            margin: 0 0 8px 0;
+            font-size: 28px;
+            font-weight: 700;
+            letter-spacing: -0.5px;
+        }
+
+        p.subtitle {
+            color: var(--text-secondary);
+            margin: 0 0 32px 0;
+            font-size: 16px;
+        }
+
+        /* Conceptual Icons Layout */
+        .conceptual-icon-box {
+            display: flex;
+            align-items: center;
+            background: rgba(0,0,0,0.25);
+            border: 1px solid rgba(255,255,255,0.05);
+            border-radius: 16px;
+            padding: 16px;
+            margin-bottom: 24px;
+            transition: transform 0.3s, border-color 0.3s, box-shadow 0.3s;
+        }
+
+        .conceptual-icon-box:hover {
+            transform: translateY(-2px) scale(1.01);
+            border-color: rgba(255,255,255,0.15);
+            box-shadow: 0 10px 20px rgba(0,0,0,0.2);
+        }
+
+        .icon-container {
+            width: 72px;
+            height: 72px;
+            min-width: 72px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin-right: 20px;
+            background: rgba(255,255,255,0.03);
+            border-radius: 12px;
+        }
+
+        /* Minimum 64px Requirement exactly matched */
+        .icon-container svg {
+            width: 64px;
+            height: 64px;
+        }
+
+        .icon-text h4 {
+            margin: 0 0 6px 0;
+            font-size: 17px;
+            font-weight: 600;
+        }
+
+        .icon-text p {
+            margin: 0;
+            font-size: 14px;
+            color: var(--text-secondary);
+            line-height: 1.5;
+        }
+
+        /* Stripe Form Mock Forms */
+        .form-group {
+            margin-bottom: 20px;
+        }
+
+        .form-label {
+            display: block;
+            margin-bottom: 10px;
+            font-size: 13px;
+            color: var(--text-secondary);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            font-weight: 600;
+        }
+
+        .form-input {
+            width: 100%;
+            background: rgba(0,0,0,0.3);
+            border: 1px solid rgba(255,255,255,0.1);
+            color: white;
+            padding: 16px;
+            border-radius: 12px;
+            font-size: 16px;
+            box-sizing: border-box;
+            transition: all 0.3s ease;
+        }
+
+        .form-input:focus {
+            outline: none;
+            border-color: var(--workspace-purple);
+            background: rgba(153, 102, 255, 0.08);
+            box-shadow: 0 0 0 4px rgba(153, 102, 255, 0.1);
+        }
+
+        .form-row {
+            display: flex;
+            gap: 16px;
+        }
+
+        .form-row .form-group {
+            flex: 1;
+        }
+
+        /* Buttons */
+        .btn-primary {
+            width: 100%;
+            background: linear-gradient(135deg, var(--workspace-purple), var(--threshold-blue));
+            color: white;
+            border: none;
+            padding: 18px;
+            border-radius: 12px;
+            font-size: 17px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s;
+            box-shadow: 0 8px 20px rgba(153, 102, 255, 0.25);
+            margin-top: 10px;
+        }
+
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 12px 25px rgba(153, 102, 255, 0.4);
+            background: linear-gradient(135deg, #a67bff, #1abfff);
+        }
+
+        .btn-primary:active {
+            transform: translateY(0);
+        }
+
+        .product-summary {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 24px;
+            background: rgba(255, 255, 255, 0.03);
+            border-radius: 16px;
+            margin-bottom: 24px;
+            border: 1px solid rgba(255,255,255,0.05);
+        }
+
+        .product-info h3 {
+            margin: 0 0 6px 0;
+            font-size: 19px;
+            font-weight: 600;
+        }
+
+        .product-price {
+            font-size: 28px;
+            font-weight: 700;
+            color: transparent;
+            background: linear-gradient(90deg, #fff, var(--text-secondary));
+            -webkit-background-clip: text;
+            background-clip: text;
+        }
+
+        /* Processing Spinner */
+        .processing-wrapper {
+            text-align: center;
+            padding: 40px 0;
+        }
+
+        .spinner {
+            width: 72px;
+            height: 72px;
+            margin: 0 auto 30px auto;
+            border: 4px solid rgba(255,255,255,0.05);
+            border-radius: 50%;
+            border-top-color: var(--threshold-blue);
+            border-right-color: var(--modulator-green);
+            animation: spin 1s cubic-bezier(0.68, -0.55, 0.265, 1.55) infinite;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        /* Success State Elements */
+        .state-icon-large {
+            width: 100px;
+            height: 100px;
+            margin: 0 auto 30px auto;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: rgba(0, 180, 255, 0.1);
+            border: 2px solid var(--threshold-blue);
+            box-shadow: 0 0 40px rgba(0, 180, 255, 0.3);
+            animation: popIn 0.6s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+        }
+
+        @keyframes popIn {
+            0% { transform: scale(0.5); opacity: 0; }
+            100% { transform: scale(1); opacity: 1; }
+        }
+
+        .state-icon-large svg {
+            width: 64px;
+            height: 64px;
+        }
+    </style>
+</head>
+<body>
+    <h1>APGI Secure Checkout</h1>
+
+    <!-- Flat Design: Brain Abstract Background SVG -->
+    <div class="nodes-container">
+        <svg width="100%" height="100%">
+            <defs>
+                <filter id="glow">
+                    <feGaussianBlur stdDeviation="6" result="coloredBlur"/>
+                    <feMerge>
+                        <feMergeNode in="coloredBlur"/>
+                        <feMergeNode in="SourceGraphic"/>
+                    </feMerge>
+                </filter>
+            </defs>
+            <!-- Neural networking pathways representing global workspace -->
+            <path class="node-path" d="M10%,60% Q30%,30% 50%,50% T90%,20%" style="filter: url(#glow);" />
+            <path class="node-path" d="M0,20% Q40%,10% 60%,40% T100%,30%" />
+            <path class="node-path" d="M20%,80% Q50%,60% 80%,80% T120%,60%" />
+            <path class="node-path" d="M40%,90% Q60%,50% 70%,10%" />
+            
+            <!-- Specific feature nodes matching icon aesthetics -->
+            <circle cx="50%" cy="50%" r="6" fill="#9966FF" filter="url(#glow)"></circle>
+            <circle cx="60%" cy="40%" r="5" fill="#00B4FF" filter="url(#glow)"></circle>
+            <circle cx="80%" cy="80%" r="8" fill="#00CC99" filter="url(#glow)"></circle>
+            <circle cx="30%" cy="30%" r="6" fill="#FF3366" filter="url(#glow)"></circle>
+            <circle cx="70%" cy="10%" r="4" fill="#FFCC00" filter="url(#glow)"></circle>
+        </svg>
+    </div>
+    <div class="brain-overlay"></div>
+
+    <div class="checkout-container" id="main-card">
+        
+        <!-- STEP 1: CART / START CHECKOUT -->
+        <div id="step-cart" class="step active">
+            <h2>Complete Purchase</h2>
+            <p class="subtitle">Review your Advanced Cognitive Module subscription.</p>
+
+            <div class="product-summary">
+                <div class="product-info">
+                    <h3>Cognitive Engine V2</h3>
+                    <p style="color: var(--text-secondary); margin: 0; font-size: 15px;">Billed Monthly</p>
+                </div>
+                <div class="product-price">$99.00</div>
+            </div>
+
+            <!-- Conceptual Icon 1/2: Target/Focus -->
+            <div class="conceptual-icon-box" style="border-left: 4px solid var(--precision-red);">
+                <div class="icon-container">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="var(--precision-red)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-label="Target Icon" role="img">
+                        <circle cx="12" cy="12" r="10"></circle>
+                        <circle cx="12" cy="12" r="6"></circle>
+                        <circle cx="12" cy="12" r="2"></circle>
+                    </svg>
+                </div>
+                <div class="icon-text">
+                    <h4>Precision Targeted</h4>
+                    <p>Accuracy confirmed. Confidence in signal routing is optimal for your connection.</p>
+                </div>
+            </div>
+
+            <button id="btn-proceed" class="btn-primary" onclick="nextStep('step-payment')">Proceed to Checkout</button>
+        </div>
+
+        <!-- STEP 2: PAYMENT DETAILS -->
+        <div id="step-payment" class="step">
+            <h2>Payment Details</h2>
+            <p class="subtitle">Synchronize via our secure payment gateway.</p>
+
+            <!-- Conceptual Icon 1/3: Broadcast Tower -->
+            <div class="conceptual-icon-box" style="border-left: 4px solid var(--workspace-purple);">
+                <div class="icon-container">
+                    <svg viewBox="0 0 24 24" stroke="var(--workspace-purple)" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round" aria-label="Broadcast Tower" role="img">
+                        <path d="M12 12v11"></path><path d="M8 23h8"></path><circle cx="12" cy="9" r="3"></circle>
+                        <path d="M5.5 12A8.5 8.5 0 0112 3.5 8.5 8.5 0 0118.5 12"></path>
+                        <path d="M2 13a11.5 11.5 0 0110-11.5 11.5 11.5 0 0110 11.5"></path>
+                    </svg>
+                </div>
+                <div class="icon-text">
+                    <h4 style="color: var(--workspace-purple)">Global Workspace Integrated</h4>
+                    <p>Conscious access initiated for comprehensive tokenization.</p>
+                </div>
+            </div>
+
+            <!-- Conceptual Icon 2/3: Chemical Flask -->
+            <div class="conceptual-icon-box" style="border-left: 4px solid var(--modulator-green);">
+                <div class="icon-container">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="var(--modulator-green)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-label="Chemical Flask" role="img">
+                        <path d="M10 2v7.31"></path><path d="M14 9.3V2"></path><path d="M8.5 2h7"></path>
+                        <path d="M14 9.3a6.5 6.5 0 1 1-4 0"></path><line x1="5.52" y1="16h12.96"></line>
+                    </svg>
+                </div>
+                <div class="icon-text">
+                    <h4 style="color: var(--modulator-green)">Neuromodulators Active</h4>
+                    <p>Chemical balance maintained; gateway arousal limits stabilized.</p>
+                </div>
+            </div>
+
+            <!-- Stripe Real Form -->
+            <div class="form-group">
+                <label id="card-label" class="form-label">Secure Payment Gateway</label>
+                <!-- Stripe Payment Element will be mounted here -->
+                <div id="payment-element" class="form-input" style="padding: 16px; background: rgba(0,0,0,0.5); min-height: 200px;"></div>
+                <div id="payment-message" class="error-message" style="color: var(--error-yellow); font-size: 13px; margin-top: 10px; display: none;"></div>
+            </div>
+
+            <button id="btn-pay" class="btn-primary" onclick="handleStripeSubmit(event)">Pay $99.00</button>
+            <button id="btn-back" class="btn-primary" style="background: transparent; border: 1px solid rgba(255,255,255,0.1); margin-top: 12px; box-shadow: none;" onclick="nextStep('step-cart')">Back</button>
+        </div>
+
+        <!-- STEP 3: PROCESSING -->
+        <div id="step-processing" class="step text-center">
+            <div class="processing-wrapper">
+                <div class="spinner"></div>
+                <h2>Processing Transaction</h2>
+                <p class="subtitle" style="margin-bottom: 40px;">Encrypting payload and waiting for gateway response...</p>
+
+                <!-- Conceptual Icon 1/2: Circular Arrows -->
+                <div class="conceptual-icon-box" style="border-left: 4px solid var(--threshold-blue); text-align: left;">
+                    <div class="icon-container">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="url(#multi-gradient)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-label="Circular Arrows" role="img">
+                            <defs>
+                                <linearGradient id="multi-gradient" x1="0%" y1="0%" x2="100%" y2="100%">
+                                    <stop offset="0%" stop-color="#00B4FF" />
+                                    <stop offset="50%" stop-color="#9966FF" />
+                                    <stop offset="100%" stop-color="#00CC99" />
+                                </linearGradient>
+                            </defs>
+                            <polyline points="21.5 2 21.5 8.5 15 8.5"></polyline>
+                            <polyline points="2.5 22 2.5 15.5 9 15.5"></polyline>
+                            <path d="M21.5 8.5A10 10 0 1 0 5.4 17"></path>
+                            <path d="M2.5 15.5A10 10 0 1 0 18.6 7"></path>
+                        </svg>
+                    </div>
+                    <div class="icon-text">
+                        <h4>Prediction Loop Active</h4>
+                        <p>Cycling recursive predictions against actual gateway responses.</p>
+                    </div>
+                </div>
+
+                <!-- Conceptual Icon 2/2: Gauge/Meter -->
+                <div class="conceptual-icon-box" style="border-left: 4px solid var(--threshold-blue); text-align: left; margin-bottom: 0;">
+                    <div class="icon-container">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="#00B4FF" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-label="Gauge Menu" role="img">
+                            <path d="M2 12A10 10 0 0 1 22 12"></path>
+                            <path d="M12 12 L16 8"></path>
+                            <circle cx="12" cy="12" r="2"></circle>
+                        </svg>
+                    </div>
+                    <div class="icon-text">
+                        <h4>Parameter Levels</h4>
+                        <p>Monitoring variance thresholds for transaction boundaries.</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- STEP 4: SUCCESS -->
+        <div id="step-success" class="step" style="text-align: center;">
+            <div class="processing-wrapper" style="padding-top: 20px;">
+                <!-- Conceptual Icon 1/2: Lightning Bolt -->
+                <div class="state-icon-large success-bg">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="var(--threshold-blue)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-label="Lightning Bolt" role="img">
+                        <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon>
+                    </svg>
+                </div>
+                <h2>Aha Moment!</h2>
+                <p class="subtitle" style="margin-bottom: 30px; color: var(--threshold-blue);">Threshold Crossing Achieved</p>
+
+                <!-- Conceptual Icon 2/2: Heartbeat/Pulse -->
+                <div class="conceptual-icon-box" style="border-left: 4px solid var(--interoceptive-red); text-align: left; background: rgba(255, 51, 102, 0.08); border-color: rgba(255, 51, 102, 0.2);">
+                    <div class="icon-container" style="background: rgba(255, 51, 102, 0.15);">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="var(--interoceptive-red)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-label="Heartbeat" role="img">
+                            <path d="M22 12h-4l-3 9L9 3l-3 9H2"></path>
+                        </svg>
+                    </div>
+                    <div class="icon-text">
+                        <h4 style="color: var(--interoceptive-red)">Interoceptive Signals Optimal</h4>
+                        <p>Favorable somatic bias registered. Payment has been securely finalized.</p>
+                    </div>
+                </div>
+
+                <button id="btn-return" class="btn-primary" onclick="window.location.reload()">Return to Dashboard</button>
+            </div>
+        </div>
+
+    </div>
+
+    <script>
+        let stripe;
+        let elements;
+
+        // Initialize Stripe right away
+        async function initStripe() {
+            try {
+                const response = await fetch("http://127.0.0.1:8000/v1/payments/create-intent", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ items: [{ id: "cognitive-engine-v2" }] }),
+                });
+                const { clientSecret } = await response.json();
+                
+                // Note: The UI looks great, but requires a valid publishable key.
+                // Using a default test key to ensure parsing works.
+                stripe = Stripe("pk_test_TYooMQauvdEDq54NiTphI7jx");
+                
+                const appearance = {
+                    theme: 'night',
+                    variables: {
+                        colorBackground: '#1a1f2b',
+                        colorText: '#ffffff',
+                        colorPrimary: '#9966ff',
+                        colorDanger: '#ff3366',
+                        fontFamily: '-apple-system, system-ui, sans-serif'
+                    }
+                };
+                
+                elements = stripe.elements({ appearance, clientSecret });
+                const paymentElement = elements.create("payment");
+                paymentElement.mount("#payment-element");
+            } catch (err) {
+                console.warn("Stripe init failed (Is API Server running?): ", err);
+            }
+        }
+
+        document.addEventListener('DOMContentLoaded', initStripe);
+
+        function nextStep(stepId) {
+            // Hide all steps
+            document.querySelectorAll('.step').forEach(el => {
+                el.classList.remove('active');
+            });
+            // Show target step
+            document.getElementById(stepId).classList.add('active');
+        }
+
+        async function handleStripeSubmit(e) {
+            e.preventDefault();
+            if (!stripe || !elements) {
+                alert("Stripe is not initialized. Make sure the backend API is running.");
+                return;
+            }
+
+            nextStep('step-processing');
+            
+            try {
+                const { error, paymentIntent } = await stripe.confirmPayment({
+                    elements,
+                    redirect: 'if_required' // Avoid full page redirect if possible
+                });
+                
+                if (error) {
+                    const messageContainer = document.querySelector("#payment-message");
+                    messageContainer.textContent = error.message;
+                    messageContainer.style.display = "block";
+                    nextStep('step-payment'); // go back if error
+                } else {
+                    nextStep('step-success'); // 100% successful
+                }
+            } catch(e) {
+                const messageContainer = document.querySelector("#payment-message");
+                messageContainer.textContent = "Fatal gateway error occurred.";
+                messageContainer.style.display = "block";
+                nextStep('step-payment');
+            }
+        }
+
+        // Add 3D card tilt effect based on mouse movement
+        document.addEventListener('mousemove', (e) => {
+            const x = e.clientX / window.innerWidth;
+            const y = e.clientY / window.innerHeight;
+            
+            const checkoutContainer = document.getElementById('main-card');
+            if (checkoutContainer) {
+                // Subtle 3D tilt effect on the card
+                checkoutContainer.style.transform = `perspective(1200px) rotateX(${(y - 0.5) * -6}deg) rotateY(${(x - 0.5) * 6}deg)`;
+            }
+        });
+    </script>
+</body>
+</html>

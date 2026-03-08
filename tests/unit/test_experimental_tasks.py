@@ -130,37 +130,44 @@ class TestExecuteIowaGamblingTask:
             "results": {"score": 100},
         }
 
-        with patch(
-            "app.tasks.experimental_tasks.execute_iowa_gambling_task", return_value=mock_result
-        ) as mock_task:
-            mock_celery_task = MagicMock()
-            mock_celery_task.request.id = "task_123"
+        with patch("app.tasks.experimental_tasks.IowaGamblingTask") as mock_task_class:
+            with patch(
+                "app.tasks.experimental_tasks.trigger_webhook_on_completion"
+            ) as mock_webhook:
+                mock_task_instance = MagicMock()
+                mock_task_instance.run_all_trials.return_value = {"score": 100}
+                mock_task_class.return_value = mock_task_instance
+                mock_webhook.return_value = AsyncMock()
 
-            result = execute_iowa_gambling_task(mock_celery_task, session_id, parameters)
+                mock_celery_task = MagicMock()
+                mock_celery_task.request.id = "task_123"
+                mock_celery_task.apgi_system = MagicMock()
 
-            assert result["status"] == "completed"
-            assert result["task_type"] == "iowa_gambling"
-            mock_task.assert_called_once_with(mock_celery_task, session_id, parameters)
+                result = execute_iowa_gambling_task.__class__.run(
+                    mock_celery_task, session_id, parameters
+                )
+
+                assert result["status"] == "completed"
+                assert result["task_type"] == "iowa_gambling"
+                mock_task_class.assert_called_once()
 
     def test_execute_iowa_gambling_task_failure(self):
         """Test Iowa Gambling task execution failure."""
         session_id = "session_123"
         parameters = {}
 
-        mock_result = {
-            "task_type": "iowa_gambling",
-            "session_id": session_id,
-            "status": "failed",
-            "error": "Task failed",
-        }
+        with patch("app.tasks.experimental_tasks.IowaGamblingTask") as mock_task_class:
+            mock_task_instance = MagicMock()
+            mock_task_instance.run_all_trials.side_effect = Exception("Task failed")
+            mock_task_class.return_value = mock_task_instance
 
-        with patch(
-            "app.tasks.experimental_tasks.execute_iowa_gambling_task", return_value=mock_result
-        ) as mock_task:
             mock_celery_task = MagicMock()
             mock_celery_task.request.id = "task_123"
+            mock_celery_task.apgi_system = MagicMock()
 
-            result = execute_iowa_gambling_task(mock_celery_task, session_id, parameters)
+            result = execute_iowa_gambling_task.__class__.run(
+                mock_celery_task, session_id, parameters
+            )
 
             assert result["status"] == "failed"
             assert "Task failed" in result["error"]
@@ -184,16 +191,25 @@ class TestExecuteMaskingParadigmTask:
             "results": {"accuracy": 0.8},
         }
 
-        with patch(
-            "app.tasks.experimental_tasks.execute_masking_paradigm_task", return_value=mock_result
-        ) as mock_task:
-            mock_celery_task = MagicMock()
-            mock_celery_task.request.id = "task_123"
+        with patch("app.tasks.experimental_tasks.MaskingParadigmTask") as mock_task_class:
+            with patch(
+                "app.tasks.experimental_tasks.trigger_webhook_on_completion"
+            ) as mock_webhook:
+                mock_task_instance = MagicMock()
+                mock_task_instance.run_all_trials.return_value = {"accuracy": 0.8}
+                mock_task_class.return_value = mock_task_instance
+                mock_webhook.return_value = AsyncMock()
 
-            result = execute_masking_paradigm_task(mock_celery_task, session_id, parameters)
+                mock_celery_task = MagicMock()
+                mock_celery_task.request.id = "task_123"
+                mock_celery_task.apgi_system = MagicMock()
 
-            assert result["status"] == "completed"
-            assert result["task_type"] == "masking_paradigm"
+                result = execute_masking_paradigm_task.__class__.run(
+                    mock_celery_task, session_id, parameters
+                )
+
+                assert result["status"] == "completed"
+                assert result["task_type"] == "masking_paradigm"
 
 
 class TestExecuteAttentionalBlinkTask:
@@ -214,16 +230,25 @@ class TestExecuteAttentionalBlinkTask:
             "results": {"blink_effect": True},
         }
 
-        with patch(
-            "app.tasks.experimental_tasks.execute_attentional_blink_task", return_value=mock_result
-        ) as mock_task:
-            mock_celery_task = MagicMock()
-            mock_celery_task.request.id = "task_123"
+        with patch("app.tasks.experimental_tasks.AttentionalBlinkTask") as mock_task_class:
+            with patch(
+                "app.tasks.experimental_tasks.trigger_webhook_on_completion"
+            ) as mock_webhook:
+                mock_task_instance = MagicMock()
+                mock_task_instance.run_all_trials.return_value = {"blink_effect": True}
+                mock_task_class.return_value = mock_task_instance
+                mock_webhook.return_value = AsyncMock()
 
-            result = execute_attentional_blink_task(mock_celery_task, session_id, parameters)
+                mock_celery_task = MagicMock()
+                mock_celery_task.request.id = "task_123"
+                mock_celery_task.apgi_system = MagicMock()
 
-            assert result["status"] == "completed"
-            assert result["task_type"] == "attentional_blink"
+                result = execute_attentional_blink_task.__class__.run(
+                    mock_celery_task, session_id, parameters
+                )
+
+                assert result["status"] == "completed"
+                assert result["task_type"] == "attentional_blink"
 
 
 class TestExecuteChangeBlindnessTask:
@@ -244,16 +269,25 @@ class TestExecuteChangeBlindnessTask:
             "results": {"detection_rate": 0.6},
         }
 
-        with patch(
-            "app.tasks.experimental_tasks.execute_change_blindness_task", return_value=mock_result
-        ) as mock_task:
-            mock_celery_task = MagicMock()
-            mock_celery_task.request.id = "task_123"
+        with patch("app.tasks.experimental_tasks.ChangeBlindnessTask") as mock_task_class:
+            with patch(
+                "app.tasks.experimental_tasks.trigger_webhook_on_completion"
+            ) as mock_webhook:
+                mock_task_instance = MagicMock()
+                mock_task_instance.run_all_trials.return_value = {"detection_rate": 0.6}
+                mock_task_class.return_value = mock_task_instance
+                mock_webhook.return_value = AsyncMock()
 
-            result = execute_change_blindness_task(mock_celery_task, session_id, parameters)
+                mock_celery_task = MagicMock()
+                mock_celery_task.request.id = "task_123"
+                mock_celery_task.apgi_system = MagicMock()
 
-            assert result["status"] == "completed"
-            assert result["task_type"] == "change_blindness"
+                result = execute_change_blindness_task.__class__.run(
+                    mock_celery_task, session_id, parameters
+                )
+
+                assert result["status"] == "completed"
+                assert result["task_type"] == "change_blindness"
 
 
 class TestExecuteBinocularRivalryTask:
@@ -274,13 +308,22 @@ class TestExecuteBinocularRivalryTask:
             "results": {"rivalry_data": []},
         }
 
-        with patch(
-            "app.tasks.experimental_tasks.execute_binocular_rivalry_task", return_value=mock_result
-        ) as mock_task:
-            mock_celery_task = MagicMock()
-            mock_celery_task.request.id = "task_123"
+        with patch("app.tasks.experimental_tasks.BinocularRivalryTask") as mock_task_class:
+            with patch(
+                "app.tasks.experimental_tasks.trigger_webhook_on_completion"
+            ) as mock_webhook:
+                mock_task_instance = MagicMock()
+                mock_task_instance.run_all_trials.return_value = {"rivalry_data": []}
+                mock_task_class.return_value = mock_task_instance
+                mock_webhook.return_value = AsyncMock()
 
-            result = execute_binocular_rivalry_task(mock_celery_task, session_id, parameters)
+                mock_celery_task = MagicMock()
+                mock_celery_task.request.id = "task_123"
+                mock_celery_task.apgi_system = MagicMock()
 
-            assert result["status"] == "completed"
-            assert result["task_type"] == "binocular_rivalry"
+                result = execute_binocular_rivalry_task.__class__.run(
+                    mock_celery_task, session_id, parameters
+                )
+
+                assert result["status"] == "completed"
+                assert result["task_type"] == "binocular_rivalry"

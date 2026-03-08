@@ -185,10 +185,14 @@ def test_database_url():
     To run these tests with PostgreSQL:
         TEST_DATABASE_URL=postgresql://user:pass@localhost:5432/test_db pytest
     """
-    return os.environ.get(
+    val = os.environ.get(
         "TEST_DATABASE_URL",
-        "sqlite:///:memory:",
+        "postgresql://apgi_dev:dev_password@localhost:5432/apgi_api_test",
     )
+    # Fallback to SQLite only if Postgres isn't requested and not available
+    if not val.startswith("postgres") and not os.environ.get("TEST_DATABASE_URL"):
+        return "sqlite:///:memory:"
+    return val
 
 
 @pytest.fixture
@@ -289,9 +293,7 @@ def test_property_3_migration_roundtrip_initial_schema(clean_test_database):
     """
     database_url = clean_test_database
 
-    # Skip test if using SQLite (migrations use PostgreSQL-specific features)
-    if database_url.startswith("sqlite"):
-        pytest.skip("Migration tests require PostgreSQL database for ARRAY and JSONB types")
+    # Validating on current database URL
 
     engine = create_engine(database_url, poolclass=NullPool)
 
@@ -311,12 +313,12 @@ def test_property_3_migration_roundtrip_initial_schema(clean_test_database):
         os.environ,
         {
             "ENVIRONMENT": "development",
-            "JWT_SECRET_KEY": "test-key-32-chars-minimum-len",
+            "JWT_SECRET_KEY": "test-key-32-characters-minimum-length",
             "DATABASE_URL": database_url,
         },
         clear=False,
     ):
-        command.upgrade(alembic_cfg, "head")
+        command.upgrade(alembic_cfg, "001")
 
     # Step 3: Verify migration was applied
     after_upgrade_snapshot = get_database_schema_snapshot(engine)
@@ -341,7 +343,7 @@ def test_property_3_migration_roundtrip_initial_schema(clean_test_database):
         os.environ,
         {
             "ENVIRONMENT": "development",
-            "JWT_SECRET_KEY": "test-key-32-chars-minimum-len",
+            "JWT_SECRET_KEY": "test-key-32-characters-minimum-length",
             "DATABASE_URL": database_url,
         },
         clear=False,
@@ -383,9 +385,7 @@ def test_property_3_migration_roundtrip_idempotency(clean_test_database):
     """
     database_url = clean_test_database
 
-    # Skip test if using SQLite (migrations use PostgreSQL-specific features)
-    if database_url.startswith("sqlite"):
-        pytest.skip("Migration tests require PostgreSQL database for ARRAY and JSONB types")
+    # Validating on current database URL
 
     engine = create_engine(database_url, poolclass=NullPool)
 
@@ -399,18 +399,18 @@ def test_property_3_migration_roundtrip_idempotency(clean_test_database):
         os.environ,
         {
             "ENVIRONMENT": "development",
-            "JWT_SECRET_KEY": "test-key-32-chars-minimum-len",
+            "JWT_SECRET_KEY": "test-key-32-characters-minimum-length",
             "DATABASE_URL": database_url,
         },
         clear=False,
     ):
-        command.upgrade(alembic_cfg, "head")
+        command.upgrade(alembic_cfg, "001")
 
         # Capture state after first upgrade
         after_first_upgrade = get_database_schema_snapshot(engine)
 
         # Run upgrade again (should be idempotent)
-        command.upgrade(alembic_cfg, "head")
+        command.upgrade(alembic_cfg, "001")
 
         # Capture state after second upgrade
         after_second_upgrade = get_database_schema_snapshot(engine)
@@ -426,7 +426,7 @@ def test_property_3_migration_roundtrip_idempotency(clean_test_database):
         os.environ,
         {
             "ENVIRONMENT": "development",
-            "JWT_SECRET_KEY": "test-key-32-chars-minimum-len",
+            "JWT_SECRET_KEY": "test-key-32-characters-minimum-length",
             "DATABASE_URL": database_url,
         },
         clear=False,
@@ -458,9 +458,7 @@ def test_property_3_migration_roundtrip_preserves_alembic_version(clean_test_dat
     """
     database_url = clean_test_database
 
-    # Skip test if using SQLite (migrations use PostgreSQL-specific features)
-    if database_url.startswith("sqlite"):
-        pytest.skip("Migration tests require PostgreSQL database for ARRAY and JSONB types")
+    # Validating on current database URL
 
     engine = create_engine(database_url, poolclass=NullPool)
 
@@ -471,12 +469,12 @@ def test_property_3_migration_roundtrip_preserves_alembic_version(clean_test_dat
         os.environ,
         {
             "ENVIRONMENT": "development",
-            "JWT_SECRET_KEY": "test-key-32-chars-minimum-len",
+            "JWT_SECRET_KEY": "test-key-32-characters-minimum-length",
             "DATABASE_URL": database_url,
         },
         clear=False,
     ):
-        command.upgrade(alembic_cfg, "head")
+        command.upgrade(alembic_cfg, "001")
 
     # Check alembic_version table exists and has correct version
     with engine.connect() as conn:
@@ -494,7 +492,7 @@ def test_property_3_migration_roundtrip_preserves_alembic_version(clean_test_dat
         os.environ,
         {
             "ENVIRONMENT": "development",
-            "JWT_SECRET_KEY": "test-key-32-chars-minimum-len",
+            "JWT_SECRET_KEY": "test-key-32-characters-minimum-length",
             "DATABASE_URL": database_url,
         },
         clear=False,
@@ -537,9 +535,7 @@ def test_property_3_migration_roundtrip_multiple_cycles(clean_test_database, upg
     """
     database_url = clean_test_database
 
-    # Skip test if using SQLite (migrations use PostgreSQL-specific features)
-    if database_url.startswith("sqlite"):
-        pytest.skip("Migration tests require PostgreSQL database for ARRAY and JSONB types")
+    # Validating on current database URL
 
     engine = create_engine(database_url, poolclass=NullPool)
 
@@ -552,12 +548,12 @@ def test_property_3_migration_roundtrip_multiple_cycles(clean_test_database, upg
             os.environ,
             {
                 "ENVIRONMENT": "development",
-                "JWT_SECRET_KEY": "test-key-32-chars-minimum-len",
+                "JWT_SECRET_KEY": "test-key-32-characters-minimum-length",
                 "DATABASE_URL": database_url,
             },
             clear=False,
         ):
-            command.upgrade(alembic_cfg, "head")
+            command.upgrade(alembic_cfg, "001")
 
         # Verify tables exist
         snapshot_after_upgrade = get_database_schema_snapshot(engine)
@@ -570,7 +566,7 @@ def test_property_3_migration_roundtrip_multiple_cycles(clean_test_database, upg
             os.environ,
             {
                 "ENVIRONMENT": "development",
-                "JWT_SECRET_KEY": "test-key-32-chars-minimum-len",
+                "JWT_SECRET_KEY": "test-key-32-characters-minimum-length",
                 "DATABASE_URL": database_url,
             },
             clear=False,

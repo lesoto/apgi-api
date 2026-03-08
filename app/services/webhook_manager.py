@@ -97,7 +97,7 @@ class WebhookManager:
                     for private_net in WebhookManager.PRIVATE_NETWORKS:
                         if ip in private_net:
                             raise ValueError(f"URL points to private/internal IP address: {ip_str}")
-                except ValueError:
+                except (ipaddress.AddressValueError, ipaddress.NetmaskValueError):
                     # Invalid IP format, skip
                     continue
 

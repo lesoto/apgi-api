@@ -87,7 +87,7 @@ async def authenticated_client(test_environment, mock_database_connection):
     # Set the global session manager
     from app.routes import sessions
 
-    sessions._session_manager = mock_session_mgr
+    sessions._state.session_manager = mock_session_mgr
 
     # Mock User for authentication
     mock_user = MagicMock()

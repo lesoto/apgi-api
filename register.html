@@ -1,0 +1,565 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>APGI System - User Registration</title>
+    <meta name="description" content="Register for access to the APGI Cognitive Engine framework and API.">
+    <style>
+        :root {
+            /* APGI Semantic Color System */
+            --threshold-blue: #00B4FF;
+            --interoceptive-red: #FF3366;
+            --error-yellow: #FFCC00;
+            --modulator-green: #00CC99;
+            --workspace-purple: #9966FF;
+            --precision-red: #FF3366;
+            
+            --bg-dark: #0B0E14;
+            --panel-bg: rgba(20, 25, 35, 0.7);
+            --text-primary: #FFFFFF;
+            --text-secondary: #9BA3B5;
+            --border-glow: rgba(0, 180, 255, 0.2);
+            --input-bg: rgba(0, 0, 0, 0.3);
+            --input-border: rgba(255, 255, 255, 0.1);
+        }
+
+        body {
+            margin: 0;
+            padding: 0;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            background-color: var(--bg-dark);
+            color: var(--text-primary);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            overflow: hidden;
+            position: relative;
+        }
+
+        h1 {
+            display: none; /* Screen reader only / SEO */
+        }
+
+        /* Abstract Brain Background Pattern */
+        .brain-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 0;
+            opacity: 0.6;
+            pointer-events: none;
+            background-image: 
+                radial-gradient(circle at 70% 30%, rgba(153, 102, 255, 0.15) 0%, transparent 45%),
+                radial-gradient(circle at 30% 70%, rgba(0, 204, 153, 0.12) 0%, transparent 45%),
+                radial-gradient(circle at 50% 50%, rgba(0, 180, 255, 0.08) 0%, transparent 50%);
+        }
+
+        .nodes-container {
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            z-index: 0;
+        }
+
+        .node-path {
+            stroke: rgba(255,255,255,0.08);
+            stroke-width: 1.5;
+            fill: none;
+            stroke-dasharray: 4 4;
+            animation: dash 40s linear infinite;
+        }
+
+        @keyframes dash {
+            to {
+                stroke-dashoffset: 1000;
+            }
+        }
+
+        /* Branding Top Left */
+        .brand-logo {
+            position: absolute;
+            top: 40px;
+            left: 40px;
+            z-index: 20;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            text-decoration: none;
+        }
+
+        .brand-text {
+            font-size: 1.5rem;
+            font-weight: 700;
+            background: linear-gradient(90deg, var(--threshold-blue), var(--workspace-purple));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            letter-spacing: -0.5px;
+        }
+
+        /* Main Registration Container */
+        .registration-container {
+            position: relative;
+            z-index: 10;
+            width: 100%;
+            max-width: 500px;
+            background: var(--panel-bg);
+            backdrop-filter: blur(25px);
+            -webkit-backdrop-filter: blur(25px);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            border-radius: 24px;
+            padding: 40px;
+            box-shadow: 0 40px 80px rgba(0,0,0,0.5), inset 0 0 0 1px rgba(255,255,255,0.05);
+            transition: all 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        .registration-container:hover {
+            box-shadow: 0 40px 80px rgba(0,0,0,0.6), inset 0 0 0 1px var(--border-glow);
+            transform: translateY(-2px);
+        }
+
+        .step {
+            display: none;
+            animation: fadeIn 0.4s ease-out forwards;
+        }
+
+        .step.active {
+            display: block;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(15px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        h2 {
+            margin: 0 0 8px 0;
+            font-size: 28px;
+            font-weight: 700;
+            letter-spacing: -0.5px;
+        }
+
+        p.subtitle {
+            color: var(--text-secondary);
+            margin: 0 0 32px 0;
+            font-size: 16px;
+            line-height: 1.5;
+        }
+
+        /* Form Controls */
+        .form-group {
+            margin-bottom: 20px;
+        }
+
+        .form-label {
+            display: block;
+            margin-bottom: 8px;
+            font-size: 13px;
+            color: var(--text-secondary);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            font-weight: 600;
+        }
+
+        .form-input {
+            width: 100%;
+            background: var(--input-bg);
+            border: 1px solid var(--input-border);
+            color: white;
+            padding: 16px;
+            border-radius: 12px;
+            font-size: 16px;
+            box-sizing: border-box;
+            transition: all 0.3s ease;
+        }
+
+        .form-input:focus {
+            outline: none;
+            border-color: var(--workspace-purple);
+            background: rgba(153, 102, 255, 0.08);
+            box-shadow: 0 0 0 4px rgba(153, 102, 255, 0.1);
+        }
+
+        .form-input::placeholder {
+            color: rgba(255, 255, 255, 0.2);
+        }
+
+        .error-message {
+            color: var(--error-yellow);
+            font-size: 13px;
+            margin-top: 8px;
+            display: none;
+            align-items: center;
+            gap: 6px;
+        }
+
+        /* Buttons */
+        .btn-primary {
+            width: 100%;
+            background: linear-gradient(135deg, var(--workspace-purple), var(--threshold-blue));
+            color: white;
+            border: none;
+            padding: 18px;
+            border-radius: 12px;
+            font-size: 17px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s;
+            box-shadow: 0 8px 20px rgba(153, 102, 255, 0.25);
+            margin-top: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+        }
+
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 12px 25px rgba(153, 102, 255, 0.4);
+            background: linear-gradient(135deg, #a67bff, #1abfff);
+        }
+
+        .btn-primary:active {
+            transform: translateY(0);
+        }
+
+        /* Conceptual Icons Customizations */
+        .conceptual-icon-box {
+            display: flex;
+            align-items: center;
+            background: rgba(0,0,0,0.25);
+            border: 1px solid rgba(255,255,255,0.05);
+            border-radius: 16px;
+            padding: 16px;
+            margin-bottom: 24px;
+            transition: transform 0.3s, border-color 0.3s, box-shadow 0.3s;
+        }
+
+        .icon-container {
+            width: 72px;
+            height: 72px;
+            min-width: 72px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin-right: 20px;
+            background: rgba(255,255,255,0.03);
+            border-radius: 12px;
+        }
+
+        .icon-container svg {
+            width: 64px;
+            height: 64px;
+        }
+
+        .icon-text h4 {
+            margin: 0 0 6px 0;
+            font-size: 17px;
+            font-weight: 600;
+        }
+
+        .icon-text p {
+            margin: 0;
+            font-size: 14px;
+            color: var(--text-secondary);
+            line-height: 1.5;
+        }
+
+        /* Links */
+        .form-footer {
+            margin-top: 24px;
+            text-align: center;
+            font-size: 14px;
+            color: var(--text-secondary);
+        }
+
+        .text-link {
+            color: var(--threshold-blue);
+            text-decoration: none;
+            font-weight: 500;
+            transition: color 0.2s;
+        }
+
+        .text-link:hover {
+            color: #fff;
+            text-decoration: underline;
+        }
+
+        /* Processing Spinner */
+        .processing-wrapper {
+            text-align: center;
+            padding: 20px 0;
+        }
+
+        .spinner {
+            width: 72px;
+            height: 72px;
+            margin: 0 auto 30px auto;
+            border: 4px solid rgba(255,255,255,0.05);
+            border-radius: 50%;
+            border-top-color: var(--modulator-green);
+            border-right-color: var(--workspace-purple);
+            animation: spin 1s cubic-bezier(0.68, -0.55, 0.265, 1.55) infinite;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        /* Success State Elements */
+        .state-icon-large {
+            width: 100px;
+            height: 100px;
+            margin: 0 auto 30px auto;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: rgba(0, 204, 153, 0.1);
+            border: 2px solid var(--modulator-green);
+            box-shadow: 0 0 40px rgba(0, 204, 153, 0.3);
+            animation: popIn 0.6s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+        }
+
+        .state-icon-large svg {
+            width: 64px;
+            height: 64px;
+        }
+
+        @keyframes popIn {
+            0% { transform: scale(0.5); opacity: 0; }
+            100% { transform: scale(1); opacity: 1; }
+        }
+
+    </style>
+</head>
+<body>
+    <h1>APGI Framework Registration</h1>
+
+    <a href="API.html" class="brand-logo">
+        <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="url(#logo-gradient)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <defs>
+                <linearGradient id="logo-gradient" x1="0%" y1="0%" x2="100%" y2="100%">
+                    <stop offset="0%" stop-color="#00B4FF" />
+                    <stop offset="100%" stop-color="#9966FF" />
+                </linearGradient>
+            </defs>
+            <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/>
+        </svg>
+        <span class="brand-text">APGI System</span>
+    </a>
+
+    <!-- Flat Design: Brain Abstract Background SVG -->
+    <div class="nodes-container">
+        <svg width="100%" height="100%">
+            <defs>
+                <filter id="glow">
+                    <feGaussianBlur stdDeviation="6" result="coloredBlur"/>
+                    <feMerge>
+                        <feMergeNode in="coloredBlur"/>
+                        <feMergeNode in="SourceGraphic"/>
+                    </feMerge>
+                </filter>
+            </defs>
+            <path class="node-path" d="M10%,20% Q30%,50% 50%,30% T90%,60%" style="filter: url(#glow);" />
+            <path class="node-path" d="M0,80% Q40%,90% 60%,60% T100%,70%" />
+            <path class="node-path" d="M20%,20% Q50%,40% 80%,20% T120%,40%" />
+            
+            <circle cx="50%" cy="30%" r="6" fill="#9966FF" filter="url(#glow)"></circle>
+            <circle cx="60%" cy="60%" r="5" fill="#00B4FF" filter="url(#glow)"></circle>
+            <circle cx="80%" cy="20%" r="8" fill="#00CC99" filter="url(#glow)"></circle>
+            <circle cx="30%" cy="50%" r="6" fill="#FF3366" filter="url(#glow)"></circle>
+        </svg>
+    </div>
+    <div class="brain-overlay"></div>
+
+    <div class="registration-container" id="main-card">
+        
+        <!-- STEP 1: REGISTRATION FORM -->
+        <div id="step-form" class="step active">
+            <h2>Initialize Node</h2>
+            <p class="subtitle">Join the Global Workspace and participate in cognitive distributed networks.</p>
+
+            <form id="registration-form" onsubmit="event.preventDefault(); validateAndProceed();">
+                <div class="form-group">
+                    <label class="form-label" for="username">Username (Node Alias)</label>
+                    <input id="username" type="text" class="form-input" placeholder="e.g. Architect_01" required>
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label" for="email">Email Address</label>
+                    <input id="email" type="email" class="form-input" placeholder="you@example.com" required>
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label" for="password">Encryption Key (Password)</label>
+                    <input id="password" type="password" class="form-input" placeholder="••••••••" required minlength="8">
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label" for="confirm-password">Verify Key</label>
+                    <input id="confirm-password" type="password" class="form-input" placeholder="••••••••" required>
+                    <div id="password-error" class="error-message">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="12"></line><line x1="12" y1="16" x2="12.01" y2="16"></line></svg>
+                        Keys do not match or are insufficient.
+                    </div>
+                </div>
+
+                <button type="submit" class="btn-primary">
+                    Establish Connection
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="5" y1="12" x2="19" y2="12"></line><polyline points="12 5 19 12 12 19"></polyline></svg>
+                </button>
+            </form>
+
+            <div class="form-footer">
+                Already part of the workspace? <a href="#" class="text-link">Sync Here</a>
+            </div>
+        </div>
+
+        <!-- STEP 2: PROCESSING / VALIDATION -->
+        <div id="step-processing" class="step text-center">
+            <div class="processing-wrapper">
+                <div class="spinner"></div>
+                <h2>Synchronizing Arrays</h2>
+                <p class="subtitle" style="margin-bottom: 40px;">Validating identity across cognitive subnetworks...</p>
+
+                <!-- Conceptual Icon 1/2: Workspace Purple Broadcast Tower -->
+                <div class="conceptual-icon-box" style="border-left: 4px solid var(--workspace-purple); text-align: left;">
+                    <div class="icon-container">
+                        <svg viewBox="0 0 24 24" stroke="var(--workspace-purple)" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round" aria-label="Broadcast Tower" role="img">
+                            <path d="M12 12v11"></path><path d="M8 23h8"></path><circle cx="12" cy="9" r="3"></circle>
+                            <path d="M5.5 12A8.5 8.5 0 0112 3.5 8.5 8.5 0 0118.5 12"></path>
+                            <path d="M2 13a11.5 11.5 0 0110-11.5 11.5 11.5 0 0110 11.5"></path>
+                        </svg>
+                    </div>
+                    <div class="icon-text">
+                        <h4 style="color: var(--workspace-purple)">Global Workspace Uplink</h4>
+                        <p>Injecting profile into conscious access stream.</p>
+                    </div>
+                </div>
+
+                <!-- Conceptual Icon 2/2: Gauge/Meter -->
+                <div class="conceptual-icon-box" style="border-left: 4px solid var(--threshold-blue); text-align: left; margin-bottom: 0;">
+                    <div class="icon-container">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="var(--threshold-blue)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-label="Gauge" role="img">
+                            <path d="M2 12A10 10 0 0 1 22 12"></path>
+                            <path d="M12 12 L16 8"></path>
+                            <circle cx="12" cy="12" r="2"></circle>
+                        </svg>
+                    </div>
+                    <div class="icon-text">
+                        <h4 style="color: var(--threshold-blue)">Calibrating Parameters</h4>
+                        <p>Adjusting baseline arousal configurations for your node.</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- STEP 3: SUCCESS -->
+        <div id="step-success" class="step" style="text-align: center;">
+            <div class="processing-wrapper" style="padding-top: 20px;">
+                <!-- Concept Icon: Neuromodulator Green Flask / Success -->
+                <div class="state-icon-large">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="var(--modulator-green)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-label="Chemical Flask" role="img">
+                        <path d="M10 2v7.31"></path><path d="M14 9.3V2"></path><path d="M8.5 2h7"></path>
+                        <path d="M14 9.3a6.5 6.5 0 1 1-4 0"></path><line x1="5.52" y1="16h12.96"></line>
+                    </svg>
+                </div>
+                <h2>Equilibrium Reached</h2>
+                <p class="subtitle" style="margin-bottom: 30px; color: var(--modulator-green);">Node Successfully Initialized</p>
+
+                <div class="conceptual-icon-box" style="border-left: 4px solid var(--threshold-blue); text-align: left; background: rgba(0, 180, 255, 0.08); border-color: rgba(0, 180, 255, 0.2);">
+                    <div class="icon-container" style="background: rgba(0, 180, 255, 0.15);">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="var(--threshold-blue)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-label="Lightning Bolt" role="img">
+                            <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon>
+                        </svg>
+                    </div>
+                    <div class="icon-text">
+                        <h4 style="color: var(--threshold-blue)">Aha Moment!</h4>
+                        <p>Threshold crossed. Welcome to the APGI Cognitive Network.</p>
+                    </div>
+                </div>
+
+                <a href="checkout.html" class="btn-primary" style="text-decoration: none;">Proceed to Dashboard</a>
+            </div>
+        </div>
+
+    </div>
+
+    <script>
+        function nextStep(stepId) {
+            document.querySelectorAll('.step').forEach(el => {
+                el.classList.remove('active');
+            });
+            document.getElementById(stepId).classList.add('active');
+        }
+
+        async function validateAndProceed() {
+            const username = document.getElementById('username').value;
+            const email = document.getElementById('email').value;
+            const pwd = document.getElementById('password').value;
+            const confirmPwd = document.getElementById('confirm-password').value;
+            const errorElement = document.getElementById('password-error');
+
+            if (pwd !== confirmPwd || pwd.length < 8) {
+                errorElement.innerHTML = `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="12"></line><line x1="12" y1="16" x2="12.01" y2="16"></line></svg> Keys do not match or are insufficient.`;
+                errorElement.style.display = 'flex';
+                document.getElementById('confirm-password').style.borderColor = 'var(--precision-red)';
+                return;
+            }
+
+            errorElement.style.display = 'none';
+            document.getElementById('confirm-password').style.borderColor = 'var(--input-border)';
+
+            // Proceed to processing simulation
+            nextStep('step-processing');
+            
+            try {
+                const payload = { 
+                    username: username, 
+                    email: email, 
+                    password: pwd 
+                };
+                
+                const response = await fetch('http://127.0.0.1:8000/v1/users/register', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+                
+                if (!response.ok) {
+                    const data = await response.json();
+                    throw new Error(data.detail || "Registration integration failed.");
+                }
+                
+                // Allow a slight intentional delay for UI aesthetics
+                setTimeout(() => {
+                    nextStep('step-success');
+                }, 1500);
+                
+            } catch (err) {
+                // If API fails, surface the error and go back
+                errorElement.innerHTML = `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="12"></line><line x1="12" y1="16" x2="12.01" y2="16"></line></svg> Backend Connection Error: ${err.message}`;
+                errorElement.style.display = 'flex';
+                nextStep('step-form');
+            }
+        }
+
+        // Add 3D card tilt effect based on mouse movement
+        document.addEventListener('mousemove', (e) => {
+            const x = e.clientX / window.innerWidth;
+            const y = e.clientY / window.innerHeight;
+            
+            const card = document.getElementById('main-card');
+            if (card) {
+                card.style.transform = `perspective(1200px) rotateX(${(y - 0.5) * -4}deg) rotateY(${(x - 0.5) * 4}deg)`;
+            }
+        });
+    </script>
+</body>
+</html>

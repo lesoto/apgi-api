@@ -72,6 +72,20 @@ def run_migrations_online() -> None:
     )
 
     with connectable.connect() as connection:
+        # Ensure alembic_version table has a large enough column for long revision IDs
+        if connection.dialect.name == "postgresql":
+            import sqlalchemy as sa
+
+            connection.execute(
+                sa.text(
+                    "CREATE TABLE IF NOT EXISTS alembic_version (version_num VARCHAR(255) PRIMARY KEY)"
+                )
+            )
+            connection.execute(
+                sa.text("ALTER TABLE alembic_version ALTER COLUMN version_num TYPE VARCHAR(255)")
+            )
+            connection.commit()
+
         context.configure(connection=connection, target_metadata=target_metadata)
 
         with context.begin_transaction():
