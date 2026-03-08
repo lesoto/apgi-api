@@ -37,7 +37,7 @@ For detailed options, run: python delete_pycache.py --help
 
 # Essential files and directories to NEVER remove - APGI API Specific
 ESSENTIAL_FILES = {
-    # Project documentation
+    ".gitignore",
     "README.md",
     "README.txt",
     "README.rst",
