@@ -1,742 +1,829 @@
 # APGI System API — End-to-End Audit Report
 
-**Report Version:** 5.0
-**Audit Date:** 2026-03-08
-**Auditor:** Claude Code (claude-sonnet-4-6)
-**Repository:** lesoto/apgi-api
-**Branch:** `claude/app-audit-security-gVXx4`
-**Stack:** FastAPI + PostgreSQL + Redis + Celery, Python 3.x
+**Project:** APGI System API (Allostatic Precision-Gated Ignition)
+**Branch:** `claude/app-audit-security-PtO9y`
+**Audit Date:** 2026-03-09
+**Auditor:** Claude Code (automated, full-codebase inspection)
+**Report Version:** 6.0
 
 ---
 
-## Executive Summary
+## Table of Contents
 
-This report documents the results of a rigorous end-to-end audit of the APGI System API — a REST API for Allostatic Precision-Gated Ignition consciousness modeling. The audit covered all route handlers, middleware, authentication/authorization services, database models, configuration management, error handling, and test infrastructure.
-
-**Overall Assessment:** The codebase demonstrates a mature, well-structured architecture with strong security foundations (JWT with rotation, bcrypt, RBAC, CSRF, rate limiting, structured logging, alerting). However, several critical defects — including unreachable API routes, a broken async pattern causing `RuntimeError` in auth middleware, and debug `print()` statements leaking internals — significantly undermine production readiness.
-
-**Immediate action required on 3 Critical items before any production deployment.**
-
----
-
-## KPI Scores
-
-| Dimension | Score | Threshold | Status |
-|-----------|-------|-----------|--------|
-| Functional Completeness | **52 / 100** | ≥ 75 | 🔴 FAIL |
-| Security | **68 / 100** | ≥ 80 | 🔴 FAIL |
-| Error Handling & Resilience | **74 / 100** | ≥ 75 | 🟡 WARN |
-| Implementation Quality | **71 / 100** | ≥ 75 | 🟡 WARN |
-| API Design Consistency | **78 / 100** | ≥ 75 | 🟢 PASS |
-
-**Legend:** 🔴 < 70 · 🟡 70–79 · 🟢 ≥ 80
-
-**Overall Health Score: 69 / 100** 🔴
+1. [Executive Summary](#1-executive-summary)
+2. [KPI Scores](#2-kpi-scores)
+3. [Bug Inventory](#3-bug-inventory)
+4. [Missing Features Log](#4-missing-features-log)
+5. [Recommendations](#5-recommendations)
+6. [Appendix — Positive Findings](#6-appendix--positive-findings)
 
 ---
 
-## Bug Inventory
+## 1. Executive Summary
 
-### CRITICAL Severity
+The APGI System API is a FastAPI + PostgreSQL + Redis application that models consciousness systems via a REST interface. The stack is architecturally sound: proper middleware layering, structured logging, JWT with refresh-token rotation, account lockout, TOTP/MFA, Celery task queues, Prometheus metrics, and OpenTelemetry tracing stubs.
+
+However, the audit uncovered **6 critical bugs** and **13 high-severity issues** that require remediation before this application can be considered production-ready. The most severe problems are:
+
+- **The `.env` file is committed to version control** despite being listed in `.gitignore`, exposing placeholder secret keys and a real Stripe test API key.
+- **A debug `print()` statement** is left in production authentication code (`_blocking_verify_api_key`), leaking information on every failed API key lookup.
+- **Duplicate module imports** in `main.py` are a sign of an unreviewed merge artefact.
+- **`/v1/users/create-default`** is simultaneously declared as a `PUBLIC_PATH` in the auth middleware and decorated with `require_permission(Permission.USER_CREATE)`, making it permanently unreachable (always returns 401/403).
+- **CIDR notation in the trusted-proxy allowlist** uses a naïve string-prefix match that can be bypassed (e.g., `10.0.0.0/8` collapses to prefix `"10."`, matching `100.x.x.x`).
+- **Payment amount is hardcoded** at $99.00 regardless of cart contents; the mock detection branch key-matches a specific Stripe test key prefix embedded in source code.
+
+Overall application health is **67 / 100**. The codebase shows mature patterns in many areas, but the items above must be fixed before a production deployment.
 
 ---
 
-#### BUG-001 — Webhooks and API-Key endpoints are entirely unreachable
+## 2. KPI Scores
 
-- **Severity:** Critical
-- **Category:** Functional Completeness
-- **Affected Files:** `app/main.py`, `app/routes/__init__.py`
+| Dimension | Score | Status | Notes |
+|-----------|------:|--------|-------|
+| **Functional Completeness** | 70 / 100 | 🟡 WARN | Core CRUD functional; create-default endpoint broken; password reset incomplete; payment amount hardcoded |
+| **UI/UX Consistency** | 65 / 100 | 🟡 WARN | Error formats vary across routes; some responses lack standard envelope; docs partly inconsistent |
+| **Responsiveness & Performance** | 74 / 100 | 🟡 WARN | Good pooling/caching; sync SQLAlchemy in async context; no N+1 guard on task dependencies |
+| **Error Handling & Resilience** | 68 / 100 | 🟡 WARN | Logout hard-fails when Redis unavailable; no circuit breaker; webhook TOCTOU; missing jitter on retries |
+| **Implementation Quality** | 58 / 100 | 🔴 FAIL | .env committed; debug print in prod auth; duplicate imports; CIDR bypass; broken endpoint; CSP weakened |
+| | | | |
+| **Overall** | **67 / 100** | 🟡 WARN | |
 
-**Description:**
-`app/routes/webhooks.py` and `app/routes/api_keys.py` both define complete, fully-implemented `APIRouter` instances, but neither router is imported or registered in `app/main.py`. As a result, every endpoint in these two files — webhook delivery management and API key CRUD — returns `404 Not Found` for all clients.
+**Score Legend**
 
-**Reproduction Steps:**
-1. `GET /v1/webhooks/deliveries` → `404 Not Found`
-2. `POST /v1/api-keys` → `404 Not Found`
-3. `GET /v1/api-keys` → `404 Not Found`
+| Range | Status | Label |
+|-------|--------|-------|
+| 90–100 | 🟢 | PASS — production ready |
+| 75–89 | 🟢 | PASS — minor fixes needed |
+| 60–74 | 🟡 | WARN — release-blocking issues present |
+| 0–59 | 🔴 | FAIL — significant remediation required |
 
-**Expected:** HTTP 200/201 responses from properly registered routes.
-**Actual:** HTTP 404 — routes not registered with the FastAPI application.
+---
 
-**Root Cause:**
-`app/main.py` imports and includes: `auth`, `export`, `health`, `metrics`, `sessions`, `state`, `tasks`, `templates`, `users`, `version`, `payments`.
-Missing: `webhooks`, `api_keys`.
+## 3. Bug Inventory
+
+Bugs are ordered by severity (Critical → High → Medium → Low) then by impact within each tier.
+
+---
+
+### 3.1 Critical Severity
+
+---
+
+#### BUG-C01 — `.env` committed to git with placeholder and real API keys
+
+| Field | Detail |
+|-------|--------|
+| **Severity** | Critical |
+| **File** | `.env` (repo root) |
+| **Lines** | 9–11, 29–30 |
+| **Status** | `.env` is listed in `.gitignore` but is tracked by git (`git ls-files .env` returns a match) |
+
+**Expected:** `.env` should never appear in git history.
+
+**Actual:** The file is tracked. It contains:
+- `JWT_SECRET_KEY=your-secret-key-change-in-production-min-32-chars` — insecure placeholder, rejects in production but accepted in development
+- `CURSOR_SIGNING_KEY=your-cursor-signing-key-change-in-production-min-32-chars` — same
+- `WEBHOOK_SECRET_KEY=your-webhook-secret-key-change-in-production-min-32-chars` — same
+- `STRIPE_SECRET_KEY=sk_test_4eC39HqLyjWDarjtT1zdp7dc` — **an actual Stripe test-mode secret key**
+- `STRIPE_PUBLISHABLE_KEY=pk_test_TYooMQauvdEDq54NiTphI7jx` — Stripe publishable key
+
+**Impact:** Any developer or CI runner with repo access has the Stripe test key. The key can be used to create test charges, list test customers, and enumerate test payment methods.
+
+**Reproduction:**
+```bash
+git ls-files .env          # confirms it is tracked
+git log --all -- .env      # shows full commit history
+cat .env | grep STRIPE     # reveals key
+```
 
 **Fix:**
-```python
-# app/main.py — add to imports:
-from app.routes import api_keys, webhooks
-
-# app/main.py — add to router registrations:
-app.include_router(api_keys.router)
-app.include_router(webhooks.router)
+```bash
+git rm --cached .env
+git commit -m "chore: untrack .env — was erroneously committed"
+# Rotate the Stripe test key immediately via dashboard.stripe.com
+# Use a secrets manager (AWS Secrets Manager, HashiCorp Vault) for all keys going forward
 ```
 
 ---
 
-#### BUG-002 — `asyncio.run()` nested inside async event loop causes `RuntimeError` in authentication middleware
+#### BUG-C02 — Debug `print()` in production authentication code
 
-- **Severity:** Critical
-- **Category:** Error Handling & Resilience / Security
-- **Affected Files:** `app/middleware/authentication.py:232`
+| Field | Detail |
+|-------|--------|
+| **Severity** | Critical |
+| **File** | `app/middleware/authentication.py` |
+| **Line** | 339 |
 
-**Description:**
-`AuthenticationMiddleware._blocking_verify_token()` is called via `loop.run_in_executor()`, making it run in a thread pool. Inside that thread, it calls `asyncio.run(auth_manager.verify_token(...))`. In Python ≥ 3.10 (and on many asyncio implementations), calling `asyncio.run()` when an event loop is already active raises `RuntimeError: This event loop is already running`, causing all JWT-authenticated requests to fail with 500 Internal Server Error.
+**Expected:** No debug output in production code.
 
-**Affected Code (`app/middleware/authentication.py:222–235`):**
+**Actual:**
 ```python
-def _blocking_verify_token(self, token: str) -> TokenPayload:
-    import asyncio
+if not db_api_key:
+    print("DEBUG: no match found")   # ← committed to production code path
+    raise ValueError("Invalid API key")
+```
+
+**Impact:** Every failed API key lookup writes `"DEBUG: no match found"` to stdout. In containerised environments this floods logs. It can also be used for timing-based enumeration to confirm which API keys are near-matches versus completely unknown (information disclosure).
+
+**Fix:** Remove the `print` statement entirely. The `raise ValueError` below it is sufficient; the caller already logs the failure at WARNING level.
+
+---
+
+#### BUG-C03 — `/v1/users/create-default` endpoint is permanently unreachable
+
+| Field | Detail |
+|-------|--------|
+| **Severity** | Critical |
+| **File** | `app/middleware/authentication.py:55–70`, `app/routes/users.py:171–214` |
+
+**Expected:** `POST /v1/users/create-default` creates the initial admin user for bootstrapping a fresh deployment.
+
+**Actual:** The path `/v1/users/create-default` appears in **both** `PUBLIC_PATHS` (authentication middleware skips auth for it) **and** the route is decorated with `dependencies=[Depends(require_permission(Permission.USER_CREATE))]`.
+
+Flow for any request, authenticated or not:
+1. Auth middleware sees the path in `PUBLIC_PATHS` → skips authentication → `request.state.user` is never set.
+2. FastAPI resolves `require_permission(Permission.USER_CREATE)` → calls `get_current_user(request)`.
+3. `get_current_user` finds no user in `request.state` → raises HTTP 401 or 403.
+
+The endpoint is unreachable under every possible authentication state.
+
+**Fix (preferred):** Remove `/v1/users/create-default` from `PUBLIC_PATHS`. Require a valid admin JWT to call it, or protect it with a first-run check (refuse if any admin user already exists in the DB).
+
+---
+
+#### BUG-C04 — Duplicate module imports in `main.py` (merge artefact)
+
+| Field | Detail |
+|-------|--------|
+| **Severity** | Critical (code quality) |
+| **File** | `app/main.py` |
+| **Lines** | 48–63 and 72–86 |
+
+**Expected:** Each module imported once.
+
+**Actual:** All route modules are imported in two separate `from app.routes import (...)` blocks. The second block (lines 72–86) is a subset of the first (lines 48–63). Python silently deduplicates module references, so routes are not double-registered, but this:
+- Is an unreviewed merge conflict artefact (`git log` confirms it appeared after a merge commit)
+- Creates a maintenance hazard (changes made to one block may not be reflected in the other)
+- Signals that the codebase contains at least one partially-resolved merge conflict
+
+**Fix:** Delete lines 72–86 (the duplicate `from app.routes import (...)` block) and keep only the first block.
+
+---
+
+#### BUG-C05 — CIDR proxy allowlist check is bypassable via string-prefix match
+
+| Field | Detail |
+|-------|--------|
+| **Severity** | Critical |
+| **File** | `app/middleware/rate_limiting.py` |
+| **Lines** | 107–115 |
+
+**Expected:** Rate limiter identifies the real client IP by trusting `X-Forwarded-For` only from legitimate reverse proxies in configured private CIDR ranges.
+
+**Actual:**
+```python
+def is_trusted_proxy(ip: str) -> bool:
+    for trusted in trusted_proxies:
+        if "/" in trusted:  # CIDR notation (simplified check)
+            network, prefix = trusted.split("/")
+            if ip.startswith(network.rstrip("0").rstrip(".")):  # ← broken logic
+                return True
+```
+
+The `rstrip("0").rstrip(".")` transformation produces:
+- `10.0.0.0/8` → `"10."` → correctly matches `10.x.x.x` but **also matches** `100.x.x.x`, `101.x.x.x` … `109.x.x.x`
+- `172.16.0.0/12` → `"172.16."` → matches `172.16.x.x` but **misses** `172.17.x.x` through `172.31.x.x`
+
+An attacker on `100.64.x.x` (CGNAT space, public internet) can spoof `X-Forwarded-For` to bypass per-IP rate limiting entirely.
+
+**Fix:** Use the Python standard library:
+```python
+import ipaddress
+
+TRUSTED_PROXY_NETS = [
+    ipaddress.ip_network("127.0.0.1/32"),
+    ipaddress.ip_network("10.0.0.0/8"),
+    ipaddress.ip_network("172.16.0.0/12"),
+    ipaddress.ip_network("192.168.0.0/16"),
+    ipaddress.ip_network("::1/128"),
+]
+
+def is_trusted_proxy(ip: str) -> bool:
+    try:
+        addr = ipaddress.ip_address(ip)
+        return any(addr in net for net in TRUSTED_PROXY_NETS)
+    except ValueError:
+        return False
+```
+
+---
+
+#### BUG-C06 — Payment amount hardcoded; mock detection embeds a specific Stripe key prefix
+
+| Field | Detail |
+|-------|--------|
+| **Severity** | Critical |
+| **File** | `app/routes/payments.py` |
+| **Lines** | 53–59 |
+
+**Expected:** Payment amount calculated from the request `items`; mock vs. live mode determined by environment variable, not by source-code key matching.
+
+**Actual:**
+```python
+amount = 9900  # $99.00 in cents — hardcoded regardless of items
+
+if settings.stripe_secret_key.startswith("sk_test_4eC39H"):
+    return PaymentIntentCreateResponse(
+        clientSecret="pi_3MtwBwLkdIwHu7ix28a3tqPa_secret_a1b2c3d4e5f6g7h8i9j0"
+    )
+```
+
+Problems:
+1. The `items` parameter is accepted but **never used** to calculate the amount.
+2. The mock detection string `"sk_test_4eC39H"` is the prefix of the **specific Stripe key committed to `.env`** — a coupling between source code and a credential.
+3. The mock `clientSecret` is a hardcoded literal string. A frontend using this will attempt to confirm a non-existent PaymentIntent and fail silently or produce confusing Stripe errors.
+4. Any future Stripe key rotation that keeps the same prefix silently activates mock mode in production.
+
+**Fix:** Calculate amount server-side from a product catalogue. Use `ENVIRONMENT != "production"` (or a dedicated `STRIPE_MOCK_ENABLED` flag) for mock detection. Use Stripe's official test mode for integration testing.
+
+---
+
+### 3.2 High Severity
+
+---
+
+#### BUG-H01 — `logout-access` hard-fails when Redis is unavailable
+
+| Field | Detail |
+|-------|--------|
+| **Severity** | High |
+| **File** | `app/routes/auth.py:243–246`, `app/services/auth_manager.py:307–312` |
+
+**Expected:** Logout always succeeds or degrades gracefully.
+
+**Actual:**
+```python
+revoked = await auth_manager.revoke_access_token(access_token)
+if not revoked:
+    raise InvalidTokenError("Access token could not be revoked")
+```
+
+`revoke_access_token` returns `False` when `self.redis is None` (Redis unavailable). The route converts `False` into HTTP 400/401. Users cannot log out during a Redis outage.
+
+**Fix:** Accept `False` from `revoke_access_token` when Redis is unavailable and return HTTP 204 with a logged warning. Short-lived access tokens (30 min) provide the fallback guarantee. Logout must never be harder than login.
+
+---
+
+#### BUG-H02 — Token revocation not checked in authentication middleware
+
+| Field | Detail |
+|-------|--------|
+| **Severity** | High |
+| **File** | `app/middleware/authentication.py:266` |
+
+**Actual:** The comment explicitly documents the omission:
+```python
+# Note: Redis revocation check is skipped in middleware for performance
+# Access tokens are short-lived, so revocation is less critical
+```
+
+The full-service `AuthManager.verify_token()` checks Redis for revoked JTIs. The middleware's `_blocking_verify_token()` skips this check. A token explicitly revoked via `POST /v1/auth/logout-access` continues to authenticate requests for up to 30 minutes.
+
+**Fix:** Accept the documented risk in a security design document (ADR), or perform the async Redis JTI check inside the existing `run_in_executor` call in `_verify_token`. The infrastructure is already in place.
+
+---
+
+#### BUG-H03 — CSRF protection inconsistency: DELETE always protected, JWT POST is not
+
+| Field | Detail |
+|-------|--------|
+| **Severity** | High |
+| **File** | `app/middleware/csrf.py:92–111` |
+
+**Actual:**
+```python
+if request.method == "DELETE":
+    return True   # always require CSRF for DELETE
+
+if request.headers.get("authorization", "").startswith("Bearer "):
+    return False  # skip CSRF for Bearer-authenticated POST/PUT/PATCH
+```
+
+`DELETE /v1/sessions/{id}` from a JavaScript client that sends `Authorization: Bearer ...` receives HTTP 403 `CSRF_TOKEN_MISSING` because the `method == "DELETE"` carve-out fires before the Bearer-token exemption. This breaks all `DELETE` endpoints for standard API clients, requiring them to also manage CSRF cookies.
+
+**Fix:** Reorder the checks — exempt all requests with a valid `Bearer` token from CSRF validation (REST APIs using JWT are not CSRF-vulnerable since cross-origin JavaScript cannot read HTTP-only cookies):
+```python
+if request.headers.get("authorization", "").startswith("Bearer "):
+    return False  # JWT-authenticated REST calls: no CSRF needed
+if request.method == "DELETE":
+    return True   # form-based DELETE: protect
+```
+
+---
+
+#### BUG-H04 — Webhook SSRF: DNS rebinding (TOCTOU between validation and delivery)
+
+| Field | Detail |
+|-------|--------|
+| **Severity** | High |
+| **File** | `app/services/webhook_manager.py:82–102` |
+
+**Actual:** `_validate_webhook_url` resolves the hostname via `socket.getaddrinfo()` at request time and checks the resulting IPs against private ranges. The actual HTTP delivery via `aiohttp` resolves the hostname again (seconds or minutes later, especially after Celery retry delays). A DNS rebinding attack changes the DNS record between validation and delivery.
+
+**Fix:** Pin the resolved IP at validation time and pass it to `aiohttp` via a custom resolver (`aiohttp.TCPConnector` with a pre-resolved address), or route all outbound webhook traffic through a dedicated egress proxy with an IP allowlist.
+
+---
+
+#### BUG-H05 — Expired API keys fetched from DB before expiry check
+
+| Field | Detail |
+|-------|--------|
+| **Severity** | High |
+| **File** | `app/middleware/authentication.py:317–344` |
+
+**Actual:** The DB query filters only `is_active=True` but not `expires_at > now`. Expired keys (that were not explicitly deactivated) are fetched and put through a bcrypt comparison before being rejected. This wastes CPU time (bcrypt is intentionally slow) and increases timing-attack surface.
+
+**Fix:** Add expiry filter at the query level:
+```python
+from sqlalchemy import or_
+from datetime import datetime, timezone
+
+now = datetime.now(timezone.utc)
+active_keys = (
+    db.query(APIKey)
+    .filter(
+        APIKey.is_active.is_(True),
+        APIKey.key_prefix == prefix,
+        or_(APIKey.expires_at.is_(None), APIKey.expires_at > now),
+    )
+    .all()
+)
+```
+
+---
+
+#### BUG-H06 — Default user credentials printed to stdout
+
+| Field | Detail |
+|-------|--------|
+| **Severity** | High |
+| **File** | `app/database/connection.py:122–128` |
+
+**Actual:**
+```python
+if sys.stdout.isatty():
+    print(f"Username: {secure_username}")
+    print(f"Password: {secure_password}")
+```
+
+In Docker deployments with a pseudo-TTY (`docker run -it`), the password prints in plain text. CI pipelines that attach a TTY to capture stdout also log it. The `isatty()` guard is not a reliable security control.
+
+**Fix:** Remove the `print` block. Write credentials to a secure file (`pathlib.Path("/run/secrets/default_user").write_text(...)` with mode 0600), or log via the structured logger at WARNING level without the plain-text password.
+
+---
+
+#### BUG-H07 — Payment route exposes raw Stripe exception messages to clients
+
+| Field | Detail |
+|-------|--------|
+| **Severity** | High |
+| **File** | `app/routes/payments.py:73–78` |
+
+**Actual:**
+```python
+except Exception as e:
+    raise HTTPException(
+        status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+        detail=str(e),   # ← raw Stripe exception, may contain internal URLs/IDs
+    )
+```
+
+Stripe exceptions include internal request IDs, partial API key fragments, and endpoint URLs in their string representations.
+
+**Fix:** Return a generic message and log the full exception internally:
+```python
+logger.error("Stripe PaymentIntent creation failed", exc_info=True)
+raise HTTPException(status_code=500, detail="Payment service temporarily unavailable")
+```
+
+---
+
+#### BUG-H08 — Exponential retry backoff has no jitter (thundering herd risk)
+
+| Field | Detail |
+|-------|--------|
+| **Severity** | High |
+| **File** | `app/services/task_executor.py` (retry logic), `app/services/webhook_manager.py:150` |
+
+**Actual:** Webhook retry delays `[5, 30, 300, 1800, 3600]` are deterministic. When many tasks fail simultaneously (downstream outage), all retries fire at identical timestamps, producing correlated load spikes on recovery.
+
+**Fix:** Add ±20 % random jitter:
+```python
+import random
+delay = delay * random.uniform(0.8, 1.2)
+```
+
+---
+
+#### BUG-H09 — Task dependency cycle not prevented at insertion time
+
+| Field | Detail |
+|-------|--------|
+| **Severity** | High |
+| **File** | `app/database/models.py` (`TaskDependency`), `app/routes/tasks.py` |
+
+**Actual:** The `TaskDependency` model allows any two task IDs to be linked. No cycle-detection query is performed when a new dependency is inserted. A cycle (A → B → A) causes the task executor to loop indefinitely when resolving dependencies.
+
+**Fix:** On dependency creation, perform a depth-first search from the proposed dependency target back to the source using existing `TaskDependency` records. Reject with HTTP 409 if a cycle would be introduced.
+
+---
+
+#### BUG-H10 — Successful logins not written to `AuditLog`
+
+| Field | Detail |
+|-------|--------|
+| **Severity** | High |
+| **File** | `app/routes/auth.py:76–93` |
+
+**Actual:** Only failed logins trigger a structured log entry. Successful logins call `create_tokens_for_user` immediately without recording to the `AuditLog` table. The `AuditLog` model exists and is used elsewhere but is not used in the auth path. This prevents SIEM/anomaly detection (impossible travel, credential stuffing success rate).
+
+**Fix:** Insert an `AuditLog` record for every authentication event (success and failure) including `user_id`, source IP, user-agent, and timestamp.
+
+---
+
+#### BUG-H11 — `logout-access` rejects tokens that lack a JTI
+
+| Field | Detail |
+|-------|--------|
+| **Severity** | High |
+| **File** | `app/services/auth_manager.py:325–327`, `app/routes/auth.py:245–246` |
+
+**Actual:**
+```python
+if not jti:
+    logger.warning("Access token has no JTI, cannot revoke")
+    return False   # → route raises InvalidTokenError → HTTP 400
+```
+
+A user attempting to log out with a pre-JTI token (issued before the JTI feature was added) receives an error instead of a successful logout. Their session cannot be terminated via this endpoint.
+
+**Fix:** Return `True` (success) when no JTI is present — if the token cannot be individually tracked, the logout intent is satisfied by informing the client to discard it. The token will expire naturally within the TTL.
+
+---
+
+#### BUG-H12 — CSP allows `unsafe-inline` and `unsafe-eval`
+
+| Field | Detail |
+|-------|--------|
+| **Severity** | High |
+| **File** | `app/middleware/security_headers.py:67–70` |
+
+**Actual:**
+```python
+"script-src 'self' 'unsafe-inline' 'unsafe-eval'; "  # Allow for admin interfaces
+"style-src 'self' 'unsafe-inline'; "
+```
+
+`'unsafe-inline'` and `'unsafe-eval'` disable CSP's primary XSS mitigation. Any injected inline `<script>` or `eval()` call will execute in the page context.
+
+**Fix:** Use nonces or SHA-256 hashes instead of `unsafe-inline`. Remove `unsafe-eval`. If the admin interface genuinely requires `eval`, apply a separate, stricter CSP header only on `/docs` and `/redoc` paths.
+
+---
+
+#### BUG-H13 — Default `HOST=0.0.0.0` binds to all network interfaces
+
+| Field | Detail |
+|-------|--------|
+| **Severity** | High |
+| **File** | `app/config.py:45`, `.env:2` |
+
+**Actual:** `HOST=0.0.0.0` is set in `.env` and as the `config.py` default. Running locally exposes the API on all LAN interfaces. `app/main.py:375` correctly defaults `__main__` execution to `127.0.0.1`, but this is overridden by the `HOST` env var when run via `uvicorn app.main:app` directly (the standard Docker entrypoint).
+
+**Fix:** Set `HOST=127.0.0.1` in `.env.development`. Set `HOST=0.0.0.0` only in the Docker/production environment file. Update `config.py` default to `127.0.0.1`.
+
+---
+
+### 3.3 Medium Severity
+
+---
+
+#### BUG-M01 — Passwords silently truncated at 72 bytes (bcrypt limit)
+
+| Field | Detail |
+|-------|--------|
+| **Severity** | Medium |
+| **File** | `app/services/auth_manager.py:125–131` |
+
+**Actual:** Passwords longer than 72 UTF-8 bytes are silently truncated before hashing. Two passwords that share the same first 72 bytes are treated as identical. Users setting long passphrases receive no warning.
+
+**Fix:** Either pre-hash with SHA-256 before bcrypt (full entropy preserved), switch to Argon2 (`argon2-cffi`), or reject passwords longer than 72 bytes with a clear validation error.
+
+---
+
+#### BUG-M02 — `WEBHOOK_SECRET_KEY` not required in non-production environments
+
+| Field | Detail |
+|-------|--------|
+| **Severity** | Medium |
+| **File** | `app/config.py:313–318`, `app/services/webhook_manager.py:220–227` |
+
+**Actual:** When the webhook secret is absent in development/staging, webhook deliveries are sent **without an HMAC signature** (`X-Signature-256` header is omitted). Webhook consumers cannot verify authenticity in any non-production environment.
+
+**Fix:** Require `WEBHOOK_SECRET_KEY` in all environments, or refuse to queue deliveries when the key is absent (fail-closed).
+
+---
+
+#### BUG-M03 — No per-user session count cap
+
+| Field | Detail |
+|-------|--------|
+| **Severity** | Medium |
+| **File** | `app/middleware/rate_limiting.py:48–56` |
+
+**Actual:** Rate limits constrain the *rate* of session creation (10/min per user) but not the *total count*. A single authenticated user can create an unbounded number of sessions over time, exhausting the database.
+
+**Fix:** Add a configurable per-user session cap enforced at session creation time. Recommended default: `MAX_SESSIONS_PER_USER=50`.
+
+---
+
+#### BUG-M04 — `get_db()` dependency does not explicitly rollback on exception
+
+| Field | Detail |
+|-------|--------|
+| **Severity** | Medium |
+| **File** | `app/database/connection.py:156–173` |
+
+**Actual:**
+```python
+def get_db():
     db = SessionLocal()
     try:
-        auth_manager = AuthManager(db)
-        payload = asyncio.run(auth_manager.verify_token(token, expected_type="access"))  # BUG
-        return payload
+        yield db
     finally:
         db.close()
 ```
 
-**Reproduction Steps:**
-1. Send any authenticated request with a valid JWT Bearer token.
-2. Observe `RuntimeError: This event loop is already running` in logs; endpoint returns 500.
-
-**Expected:** Token verified successfully, request proceeds.
-**Actual:** `RuntimeError` raised, authentication fails.
-
-**Fix:** Use a dedicated new event loop in the blocking wrapper:
-```python
-loop = asyncio.new_event_loop()
-try:
-    payload = loop.run_until_complete(auth_manager.verify_token(token, expected_type="access"))
-finally:
-    loop.close()
-```
-
----
-
-#### BUG-003 — Debug `print()` statements leak API key internals to stdout in production
-
-- **Severity:** Critical
-- **Category:** Security
-- **Affected Files:** `app/middleware/authentication.py:282–296`
-
-**Description:**
-The `_blocking_verify_api_key()` method contains five `print()` statements that dump internal API key validation state to stdout: the HMAC prefix computed from each incoming API key, total count of active keys, candidate key prefixes, and match results. In production deployments with log aggregation (CloudWatch, Datadog, Splunk, etc.), this output can be captured and used to enumerate the key prefix space or monitor authentication patterns.
-
-**Affected Lines:**
-```python
-print(f"DEBUG: prefix={prefix}")                         # Line 282
-print(f"DEBUG: active_keys count={len(active_keys)}")    # Line 283
-print(f"DEBUG: candidate prefix={candidate_key.key_prefix}")  # Line 285
-print("DEBUG: found match!")                             # Line 292
-print("DEBUG: no match found")                           # Line 296
-```
-
-**Fix:** Remove all five `print()` statements. Replace with `logger.debug()` calls if needed during local development, gated by log level.
-
----
-
-### HIGH Severity
-
----
-
-#### BUG-004 — `GET /v1/sessions/{session_id}/tasks` missing session ownership check
-
-- **Severity:** High
-- **Category:** Security / Authorization
-- **Affected Files:** `app/routes/sessions.py:357–410`
-
-**Description:**
-The endpoint `GET /v1/sessions/{session_id}/tasks` verifies that the session *exists* but does not verify that the requesting user *owns* the session. Any authenticated user with the `TASK_READ` permission (all roles including `viewer`) can enumerate tasks from any other user's session if they know the session ID.
-
-All other session-scoped endpoints (`GET /{id}`, `POST /{id}/start`, `POST /{id}/pause`, `POST /{id}/stop`, `POST /{id}/reset`, `DELETE /{id}`, `POST /{id}/step`) correctly call `validate_session_ownership()`.
-
-**Reproduction Steps:**
-1. Authenticate as User A. Create a session; note its `session_id`.
-2. Authenticate as User B (different account).
-3. `GET /v1/sessions/{user_a_session_id}/tasks` → Returns User A's tasks (should be 403).
-
-**Expected:** HTTP 403 Forbidden.
-**Actual:** HTTP 200 with tasks from another user's session.
-
-**Fix:** Add an ownership check immediately after the session existence check in `get_session_tasks()`:
-```python
-if session.user_id != current_user.user_id:
-    raise HTTPException(status_code=403, detail="Access denied: you do not own this session")
-```
-
----
-
-#### BUG-005 — `POST /v1/payments/create-intent` has no authentication requirement
-
-- **Severity:** High
-- **Category:** Security
-- **Affected Files:** `app/routes/payments.py:39–78`
-
-**Description:**
-The payment intent creation endpoint has no `Depends(get_current_user)` or `Depends(require_permission(...))` dependency. Any unauthenticated party can call `POST /v1/payments/create-intent` and receive a Stripe `clientSecret`. The `AuthenticationMiddleware` passes unauthenticated requests through when no `Authorization` header is present (line 107 of `authentication.py`), so middleware does not compensate for the missing dependency.
-
-**Reproduction Steps:**
-1. `POST /v1/payments/create-intent` with no `Authorization` header, body `{"items": []}`.
-2. Observe HTTP 200 with `clientSecret`.
+SQLAlchemy rolls back on `db.close()` with `autocommit=False`, so this is safe — but partial writes can remain pending until close, masking bugs. Explicit rollback on exception is a clearer, safer pattern.
 
 **Fix:**
 ```python
-async def create_payment_intent(
-    request: PaymentIntentCreateRequest,
-    current_user: TokenPayload = Depends(get_current_user),  # Add this
-):
+def get_db():
+    db = SessionLocal()
+    try:
+        yield db
+    except Exception:
+        db.rollback()
+        raise
+    finally:
+        db.close()
 ```
 
 ---
 
-#### BUG-006 — Insecure default `JWT_SECRET_KEY` committed in `.env`
+#### BUG-M05 — Synchronous SQLAlchemy ORM called in `async def` route handlers
 
-- **Severity:** High
-- **Category:** Security
-- **Affected Files:** `.env:9`
+| Field | Detail |
+|-------|--------|
+| **Severity** | Medium |
+| **File** | All route files (`app/routes/*.py`) |
 
-**Description:**
-The `.env` file contains `JWT_SECRET_KEY=your-secret-key-change-in-production-min-32-chars`. This exact string is in `config.py`'s `insecure_defaults` list and will trigger a config error only in production. In development the key is loaded and used, allowing trivial JWT token forgery by anyone who knows the key value (it's now public via the repository).
+**Actual:** Routes are declared `async def` but call synchronous SQLAlchemy ORM methods (`db.query(...).first()`, `db.commit()`, etc.) directly, blocking the asyncio event loop. Under concurrent load the thread pool can become saturated.
 
-**Fix:** Rotate all secrets. Generate a new key: `python -c "import secrets; print(secrets.token_urlsafe(32))"`. Ensure `.env` is never committed (enforce via pre-commit or CI).
-
----
-
-#### BUG-007 — Stripe API keys committed in `.env`
-
-- **Severity:** High
-- **Category:** Security
-- **Affected Files:** `.env:27–28`
-
-**Description:**
-The `.env` file contains real Stripe test API keys:
-- `STRIPE_SECRET_KEY=sk_test_4eC39HqLyjWDarjtT1zdp7dc`
-- `STRIPE_PUBLISHABLE_KEY=pk_test_TYooMQauvdEDq54NiTphI7jx`
-
-Even test keys should not be committed to version control. This establishes practices that may be replicated with live keys and may violate Stripe's terms of service.
-
-**Fix:** Rotate keys in the Stripe dashboard. Remove from `.env`. Use environment injection at runtime or a secrets manager.
+**Fix:** Either migrate to `sqlalchemy.ext.asyncio` (`AsyncSession`), or wrap all DB calls with `await run_in_executor(None, sync_func)`. The middleware already demonstrates this pattern for token verification.
 
 ---
 
-#### BUG-008 — `asyncio.get_event_loop()` deprecated; raises `RuntimeError` in Python 3.12+
+#### BUG-M06 — Session `custom_config` accepted without schema validation
 
-- **Severity:** High
-- **Category:** Implementation Quality
-- **Affected Files:** `app/middleware/authentication.py:218, 250`
+| Field | Detail |
+|-------|--------|
+| **Severity** | Medium |
+| **File** | `app/services/session_manager.py` |
 
-**Description:**
-Both `_verify_token()` and `_verify_api_key()` call `asyncio.get_event_loop()`. This is deprecated since Python 3.10 and emits `DeprecationWarning`. In Python 3.12+ it raises `RuntimeError` if there is no current event loop in the calling context. The correct API inside an `async` method is `asyncio.get_running_loop()`.
+**Actual:** Session creation accepts a `custom_config` dict that is deep-merged into the APGI system config without schema validation. Arbitrary keys and deeply nested values can be injected.
 
-**Fix:** Replace both occurrences:
+**Fix:** Define a Pydantic model for `custom_config` with `extra="forbid"` and validate before merging.
+
+---
+
+#### BUG-M07 — No idempotency key support on mutating endpoints
+
+| Field | Detail |
+|-------|--------|
+| **Severity** | Medium |
+| **File** | All POST/PUT routes |
+
+**Actual:** Network retries create duplicate resources (sessions, tasks, API keys, webhook deliveries). There is no `Idempotency-Key` mechanism.
+
+**Fix:** Accept an `Idempotency-Key` header on all mutating endpoints. Cache the response keyed by `(user_id, idempotency_key)` in Redis with a 24-hour TTL. Return the cached response on duplicate requests.
+
+---
+
+#### BUG-M08 — `instrument_application()` is a dead no-op in `main.py`
+
+| Field | Detail |
+|-------|--------|
+| **Severity** | Medium |
+| **File** | `app/main.py:355–362` |
+
+**Actual:**
 ```python
-loop = asyncio.get_running_loop()  # was: asyncio.get_event_loop()
+def instrument_application():
+    """Placeholder - instrumentation now happens in lifespan."""
+    pass
 ```
 
----
+This function is defined, called, and wrapped in a `try/except ImportError` block that implies a dependency. All three are dead code left from a refactor. The misleading docstring suggests instrumentation happens elsewhere, but it does not.
 
-#### BUG-009 — CSRF token scheme is broken for non-JWT form submissions
-
-- **Severity:** High
-- **Category:** Security
-- **Affected Files:** `app/middleware/csrf.py:54–115`
-
-**Description:**
-The CSRF middleware generates a random token on GET requests, stores its HMAC hash in the cookie, but **never returns the raw token to the client**. When validating POST/DELETE requests, it expects the client to send the raw token in `X-CSRF-Token`, then re-hashes it and compares with the cookie value. Since clients only possess `hash(token)` and not `token`, no value they send will pass validation.
-
-The middleware is effectively short-circuited for JWT-authenticated requests (the common API use case), but for any form-based or cookie-authenticated client, CSRF protection is non-functional.
-
-**Flow breakdown:**
-1. GET: `token = random()` → cookie = `hash(token)` → raw `token` is **discarded**
-2. POST: receives header value `H` → validates `hash(H) == cookie` → `hash(H) == hash(token)` requires `H == token`, but client never received `token`
-
-**Fix:** Implement the double-submit cookie pattern correctly by storing the raw token in the cookie and validating the header against it directly, or return the raw token in a response header for AJAX clients.
+**Fix:** Delete the function, its call site, and the surrounding `try/except`.
 
 ---
 
-#### BUG-010 — `asyncio.create_task()` called in synchronous authorization function
+### 3.4 Low Severity
 
-- **Severity:** High
-- **Category:** Implementation Quality
-- **Affected Files:** `app/services/authorization.py:155`
+---
 
-**Description:**
-`get_permissions_for_roles()` is a synchronous function that calls `asyncio.create_task()` in the exception handler for invalid role strings. `asyncio.create_task()` requires an active running event loop; calling it in a synchronous context (e.g., during startup, testing, or from a non-async call path) raises `RuntimeError: no running event loop`.
+#### BUG-L01 — `Strict-Transport-Security` header sent over plaintext HTTP
 
-**Affected Code:**
+| Field | Detail |
+|-------|--------|
+| **Severity** | Low |
+| **File** | `app/middleware/security_headers.py:42` |
+
+`Strict-Transport-Security: max-age=31536000; includeSubDomains; preload` is unconditionally added to every response, including development HTTP responses. Browsers that honour HSTS preload will refuse subsequent HTTP connections to the domain for one year.
+
+**Fix:** Omit the HSTS header (or set `max-age=0`) when `ENVIRONMENT != "production"` or when the request was not received over TLS.
+
+---
+
+#### BUG-L02 — `RateLimitingMiddleware._instance` singleton is not thread-safe
+
+| Field | Detail |
+|-------|--------|
+| **Severity** | Low |
+| **File** | `app/middleware/rate_limiting.py:31,63` |
+
+The class-level `_instance` attribute is set during `__init__` and read from a class method without a lock. Under test parallelism or multi-threaded scenarios the assignment is a race condition.
+
+**Fix:** Use `threading.Lock` around the assignment, or replace the singleton pattern with dependency injection via FastAPI `Depends`.
+
+---
+
+#### BUG-L03 — `pool_size` / `max_overflow` not formally declared in `Settings`
+
+| Field | Detail |
+|-------|--------|
+| **Severity** | Low |
+| **File** | `app/database/connection.py:36–41` |
+
 ```python
-def get_permissions_for_roles(roles: List[str]) -> Set[Permission]:
-    ...
-    except ValueError:
-        asyncio.create_task(alert_manager.trigger_custom_alert(...))  # BUG
+pool_size=getattr(settings, "pool_size", 20),
 ```
 
-**Fix:** Guard with a try/except for `RuntimeError`, use `asyncio.ensure_future()`, or replace with a synchronous log call for the non-async context.
+These use `getattr` with fallback defaults, meaning they cannot be configured via environment variable in any discoverable way — operators setting `POOL_SIZE=10` in the environment have no effect.
+
+**Fix:** Add `pool_size`, `max_overflow`, `pool_timeout`, `pool_recycle` as proper `Settings` attributes with `os.getenv(...)`.
 
 ---
 
-### MEDIUM Severity
+#### BUG-L04 — Inconsistent error response envelope across routes
+
+| Field | Detail |
+|-------|--------|
+| **Severity** | Low |
+| **File** | Multiple route files |
+
+Three different error shapes are returned:
+- Middleware: `{"error": {"code": ..., "message": ..., "timestamp": ...}}`
+- FastAPI default: `{"detail": "..."}`
+- Some custom exceptions: `{"error": "...", "detail": "..."}`
+
+API clients must handle all three shapes.
+
+**Fix:** Standardise all error responses through `app/exception_handlers.py` using a single envelope schema. Register handlers for `HTTPException`, `RequestValidationError`, and all custom exception types.
 
 ---
 
-#### BUG-011 — Task dependency creation lacks cycle detection
+#### BUG-L05 — Request ID not propagated to downstream log records
 
-- **Severity:** Medium
-- **Category:** Functional Completeness
-- **Affected Files:** `app/routes/tasks.py:449–503`
+| Field | Detail |
+|-------|--------|
+| **Severity** | Low |
+| **File** | `app/middleware/logging.py` |
 
-**Description:**
-`POST /v1/tasks/{task_id}/dependencies` checks for self-dependencies and duplicate dependencies but does not detect circular chains (e.g., A→B, B→C, C→A). A circular dependency graph could cause Celery task execution to deadlock or loop indefinitely, consuming worker processes.
+The logging middleware generates per-request IDs but does not inject them into the `StructuredLogger` context for log records emitted by service or database layers within that request's lifetime.
 
-**Fix:** Before inserting the new dependency, perform a BFS/DFS traversal of existing dependencies starting from `prerequisite_task_id` to verify that `dependent_task_id` is not already reachable.
-
----
-
-#### BUG-012 — `Content-Disposition` filename not quoted per RFC 6266
-
-- **Severity:** Medium
-- **Category:** Security
-- **Affected Files:** `app/routes/export.py:154–156`
-
-**Description:**
-The export endpoint builds the `Content-Disposition` header without quoting the filename:
-```python
-headers={"Content-Disposition": f"attachment; filename={filename}"},
-```
-While the filename is regex-sanitized (only `[a-zA-Z0-9_-]` characters plus the extension and dots), RFC 6266 requires filename values to be quoted strings. Some HTTP clients and middleware may parse unquoted filenames incorrectly or reject the header.
-
-**Fix:**
-```python
-headers={"Content-Disposition": f'attachment; filename="{filename}"'},
-```
+**Fix:** Use `contextvars.ContextVar` to store the request ID at middleware entry, then include it automatically in all `StructuredLogger` records emitted within that context.
 
 ---
 
-#### BUG-013 — `new_password` return value silently discarded in password reset
+## 4. Missing Features Log
 
-- **Severity:** Medium
-- **Category:** Functional Completeness
-- **Affected Files:** `app/routes/users.py:494–498`
-
-**Description:**
-In `reset_user_password`, the return value of `user_service.reset_password()` is assigned to `new_password` but never used or included in the response. The `PasswordResetResponse` only contains `user_id` and a static success message. If the service generates a temporary password, clients have no way to receive it.
-
-**Affected Code:**
-```python
-new_password = user_service.reset_password(
-    user_id=user_id, new_password=request.new_password
-)
-return PasswordResetResponse(user_id=user_id, message="Password reset successfully")
-```
-
-**Fix:** Either remove the variable assignment if intentionally unused, or add the generated password to the response schema if admin-generated resets should return a temporary password.
+| ID | Feature | Expected Behaviour | Current State | Priority |
+|----|---------|-------------------|---------------|----------|
+| MF-01 | **Password reset flow** | `POST /v1/users/reset-password` accepts email and sends a time-limited token; `POST /v1/users/reset-password/confirm` accepts token + new password | Email verification exists; no password reset endpoints implemented | High |
+| MF-02 | **API key rotation** | `POST /v1/api-keys/{id}/rotate` generates a new secret, returns it once, invalidates the old one atomically | Keys can only be created or deleted; no rotation endpoint | High |
+| MF-03 | **Webhook dead-letter management** | Admin endpoint to list, retry, and purge dead-letter webhook deliveries | `WebhookDelivery.status = "dead_letter"` is set in code but no admin endpoint exposes or reprocesses them | Medium |
+| MF-04 | **Server-side payment amount calculation** | Amount derived from a product catalogue keyed by `items`; not client-supplied | `amount` hardcoded at `9900` cents; `items` list ignored | High |
+| MF-05 | **Stripe webhook handler** | `POST /v1/payments/webhook` validates `Stripe-Signature` HMAC and processes events (refunds, disputes, subscriptions) | No Stripe webhook endpoint exists | High |
+| MF-06 | **Atomic session state transitions** | Concurrent `STOP` calls on the same session produce exactly one state change | State check and update are separate ORM operations with no `SELECT FOR UPDATE` or optimistic locking | Medium |
+| MF-07 | **MFA recovery codes** | On TOTP enrolment, generate a set of one-time backup codes in case device is lost | MFA enrolment exists (`/v1/users/mfa/enroll`) but no backup/recovery code mechanism | Medium |
+| MF-08 | **OpenTelemetry trace export** | Distributed traces propagated to Celery tasks and outbound HTTP calls, exported to a collector | `configure_distributed_tracing()` called but `instrument_application()` is a no-op; no actual spans exported | Low |
+| MF-09 | **Operations runbook** | `DEPLOYMENT.md` with pre-flight checklist, secrets rotation SOP, rollback steps, backup/restore procedure | No deployment documentation exists beyond inline README | Medium |
+| MF-10 | **Database backup strategy** | Documented automated backup + point-in-time restore procedure | Not documented | Low |
 
 ---
 
-#### BUG-014 — Rate limiter trusts `X-Forwarded-For` without proxy allowlist
+## 5. Recommendations
 
-- **Severity:** Medium
-- **Category:** Security
-- **Affected Files:** `app/middleware/rate_limiting.py:94–104`
+Recommendations are grouped by effort and ordered by priority within each group. Effort labels: **XS** < 1h, **S** = 2–8h, **M** = 1–3 days, **L** = 1+ weeks.
 
-**Description:**
-`_get_client_id()` reads `X-Forwarded-For` to identify clients for rate limiting. Without a trusted-proxy allowlist, any client can spoof this header to bypass per-IP rate limits by rotating IP addresses.
+### 5.1 Immediate (Day 0–1) — Do Before Any Further Commits
 
-**Fix:** Only trust `X-Forwarded-For` when the direct client IP is a known/trusted proxy. Alternatively, offload IP resolution to a reverse proxy (nginx, Caddy) that strips and re-writes this header before requests reach the application.
+| # | Recommendation | Bugs / Features | Effort |
+|---|---------------|-----------------|--------|
+| R-01 | Untrack `.env` from git (`git rm --cached .env`), rotate the Stripe test key via dashboard.stripe.com | BUG-C01 | XS |
+| R-02 | Remove `print("DEBUG: no match found")` from `authentication.py:339` | BUG-C02 | XS |
+| R-03 | Delete duplicate `from app.routes import (...)` block at `main.py:72–86` | BUG-C04 | XS |
+| R-04 | Fix `/v1/users/create-default` — remove from `PUBLIC_PATHS` and enforce auth, or redesign as a one-time bootstrap endpoint | BUG-C03 | S |
+| R-05 | Replace naïve CIDR check in `is_trusted_proxy` with `ipaddress` module | BUG-C05 | S |
 
----
+### 5.2 Sprint 1 (Week 1) — Release-Blocking
 
-#### BUG-015 — `GET /v1/client-docs` references non-existent `/v1/dashboard` endpoint
+| # | Recommendation | Bugs / Features | Effort |
+|---|---------------|-----------------|--------|
+| R-06 | Implement password reset endpoints (`/reset-password`, `/reset-password/confirm`) | MF-01 | M |
+| R-07 | Add API key rotation endpoint | MF-02 | S |
+| R-08 | Implement Stripe webhook handler with `Stripe-Signature` validation | MF-05 | M |
+| R-09 | Fix CSRF inconsistency — exempt all Bearer-token requests uniformly, including DELETE | BUG-H03 | S |
+| R-10 | Write `AuditLog` entries for successful logins and lockout events | BUG-H10 | S |
+| R-11 | Fix `logout-access` to return 204 (not error) when Redis is unavailable | BUG-H01 | S |
+| R-12 | Replace `unsafe-inline`/`unsafe-eval` in CSP with nonces | BUG-H12 | M |
+| R-13 | Return generic message from Stripe error handler; log internally | BUG-H07 | XS |
+| R-14 | Fix payment mock detection — use `ENVIRONMENT` flag, not key prefix matching | BUG-C06 | S |
+| R-15 | Implement server-side payment amount calculation from product catalogue | MF-04 | M |
 
-- **Severity:** Medium
-- **Category:** Functional Completeness
-- **Affected Files:** `app/routes/version.py:261–268`
+### 5.3 Sprint 2 (Weeks 2–3) — Quality and Resilience
 
-**Description:**
-The client docs endpoint returns an `endpoints` dictionary that includes `"dashboard": "/v1/dashboard"`, but no dashboard endpoint exists anywhere in the codebase. Clients following this reference will receive 404.
+| # | Recommendation | Bugs / Features | Effort |
+|---|---------------|-----------------|--------|
+| R-16 | Add ±20 % jitter to retry backoff in task executor and webhook manager | BUG-H08 | XS |
+| R-17 | Add cycle-detection query before inserting `TaskDependency` records | BUG-H09 | M |
+| R-18 | Validate `custom_config` in session creation via Pydantic with `extra="forbid"` | BUG-M06 | S |
+| R-19 | Implement `Idempotency-Key` support on all mutating POST/PUT endpoints | BUG-M07 | M |
+| R-20 | Pre-hash passwords with SHA-256 before bcrypt, or enforce ≤72-byte limit explicitly | BUG-M01 | S |
+| R-21 | Add `MAX_SESSIONS_PER_USER` cap enforced at session creation | BUG-M03 | S |
+| R-22 | Fix webhook TOCTOU — pin resolved IP at validation and use it at delivery time | BUG-H04 | M |
+| R-23 | Declare `pool_size`/`max_overflow` etc. as proper `Settings` attributes | BUG-L03 | XS |
+| R-24 | Propagate request IDs via `contextvars.ContextVar` in structured logger | BUG-L05 | S |
+| R-25 | Add expiry filter to API key DB query | BUG-H05 | XS |
+| R-26 | Delete `instrument_application()` no-op | BUG-M08 | XS |
+| R-27 | Add explicit `db.rollback()` on exception in `get_db()` | BUG-M04 | XS |
 
-**Fix:** Remove `"dashboard"` from the endpoints dictionary or implement the endpoint.
+### 5.4 Backlog
 
----
-
-#### BUG-016 — MD5 used in export filename generation
-
-- **Severity:** Medium
-- **Category:** Security
-- **Affected Files:** `app/routes/export.py:142`
-
-**Description:**
-`hashlib.md5()` is used to generate part of export filenames for uniqueness. While not used for security purposes, MD5 is cryptographically broken and may trigger security scanners/audits. The existing combination of timestamp + sanitized session ID is sufficient for uniqueness.
-
-**Fix:** Replace with `hashlib.sha256(...).hexdigest()[:8]` or remove the hash component entirely.
-
----
-
-#### BUG-017 — `asyncio.create_task()` in `log_audit_event()` may fail outside async context
-
-- **Severity:** Medium
-- **Category:** Implementation Quality
-- **Affected Files:** `app/services/authorization.py:536`
-
-**Description:**
-`log_audit_event()` is a synchronous function. In its exception handler it calls `asyncio.create_task()`. This will raise `RuntimeError` if called outside an async context (same root cause as BUG-010).
-
----
-
-#### BUG-018 — Default `HOST=0.0.0.0` exposes API on all network interfaces
-
-- **Severity:** Medium
-- **Category:** Security
-- **Affected Files:** `app/config.py:45`
-
-**Description:**
-`self.host = os.getenv("HOST", "0.0.0.0")` binds the API to all interfaces by default. In development environments or Docker containers without network isolation, this unnecessarily exposes the service. The `main.py` `__main__` block correctly defaults to `127.0.0.1`, but the `Settings` class default is misaligned.
-
-**Fix:** Change the default in `config.py` to `"127.0.0.1"` for development, or document the required override for Docker environments.
-
----
-
-#### BUG-019 — `GET /v1/users/verify-email` contains inline DB logic, bypasses service layer
-
-- **Severity:** Medium
-- **Category:** Implementation Quality
-- **Affected Files:** `app/routes/users.py:110–161`
-
-**Description:**
-The `verify_email` endpoint queries the `User` model directly from the route handler and updates fields inline rather than delegating to `UserManagementService`. This bypasses caching, event hooks, and audit logging that the service layer provides, and duplicates business logic that should live in the service.
+| # | Recommendation | Bugs / Features | Effort |
+|---|---------------|-----------------|--------|
+| R-28 | Migrate to `sqlalchemy.ext.asyncio` (`AsyncSession`) across all routes | BUG-M05 | L |
+| R-29 | Implement MFA recovery codes on enrolment | MF-07 | M |
+| R-30 | Wire OpenTelemetry — instrument FastAPI, SQLAlchemy, Redis, aiohttp | MF-08 | M |
+| R-31 | Write `DEPLOYMENT.md` with pre-flight checklist and secrets rotation SOP | MF-09 | S |
+| R-32 | Standardise error response envelope across all exception handlers | BUG-L04 | M |
+| R-33 | Implement atomic session state transitions (SELECT FOR UPDATE or optimistic lock) | MF-06 | M |
+| R-34 | Omit HSTS header when serving over plaintext HTTP | BUG-L01 | XS |
+| R-35 | Implement dead-letter webhook admin endpoint (list / retry / purge) | MF-03 | M |
+| R-36 | Change `HOST` default to `127.0.0.1` in development config | BUG-H13 | XS |
+| R-37 | Remove or secure `create_default_user()` credential print block | BUG-H06 | S |
 
 ---
 
-### LOW Severity
+## 6. Appendix — Positive Findings
+
+The following security and quality controls were found to be correctly implemented and should be preserved in any refactor:
+
+| Area | What Is Done Well | File / Lines |
+|------|------------------|--------------|
+| Password hashing | bcrypt with cost factor 12 and per-hash salt | `auth_manager.py:130` |
+| JWT algorithm allowlist | Explicit `algorithms=["HS256"]` prevents `alg:none` downgrade attacks | `auth_manager.py:258` |
+| Refresh token rotation | Old token revoked on every refresh; only one valid refresh token per user at a time | `auth_manager.py:544–561` |
+| Account lockout | 5 failed attempts → 15-minute lockout; atomic DB update with proper rollback | `auth_manager.py:389–400` |
+| MFA / TOTP | `pyotp` with window verification; secret stored per-user; QR provisioning URI generated | `auth_manager.py:158–172` |
+| Access token revocation | JTI-based blocklist in Redis with TTL equal to remaining token lifetime | `auth_manager.py:296–348` |
+| Webhook SSRF blocklist | RFC 1918, loopback, link-local, IPv6 private ranges, and cloud metadata endpoints all blocked | `webhook_manager.py:35–44` |
+| HMAC webhook signature | `X-Signature-256` header generated; constant-time `hmac.compare_digest` used in delivery | `webhook_manager.py:221–225` |
+| API key prefix lookup | HMAC prefix for fast DB lookup reduces bcrypt calls to near O(1) | `authentication.py:308–334` |
+| Connection pooling | `pool_pre_ping=True`, configurable pool size, `pool_recycle`, and overflow management | `connection.py:36–41` |
+| Security headers | HSTS, X-Frame-Options DENY, X-Content-Type-Options nosniff, Referrer-Policy, Permissions-Policy, CORP/COOP/COEP | `security_headers.py:40–64` |
+| Request size limiting | Configurable hard cap (default 10 MB) as first middleware in the stack | `request_size_limit.py` |
+| Redis-backed rate limiting | Per-endpoint limits, per-user keying, authenticated users separate from anonymous | `rate_limiting.py` |
+| CORS wildcard + credentials guard | `Settings.__post_init__` raises `ValueError` in production if wildcard origins and credentials both enabled | `config.py:337–343` |
+| Docker non-root user | Container runs as `appuser`, not `root` | `deployment/Dockerfile` |
+| Soft deletes | `User.is_deleted` flag prevents accidental data loss | `models.py:97` |
+| Structured logging | JSON-compatible structured logger with component/context fields throughout | `middleware/logging.py` |
+| Dependency injection | Services injected via FastAPI `Depends`; no hidden global singletons in route handlers | Throughout |
+| Property-based tests | Hypothesis with `dev` / `ci` / `thorough` profiles; integration and load tests present | `tests/` |
+| Insecure key detection | `Settings.__post_init__` detects known-bad JWT/cursor/webhook keys and raises on startup | `config.py:251–334` |
 
 ---
 
-#### BUG-020 — `print()` statement in `version.py` triggers lint false-positive
-
-- **Severity:** Low
-- **Category:** Implementation Quality
-- **Affected Files:** `app/routes/version.py:99`
-
-**Description:**
-The Python client example template string in `get_client_documentation()` contains `print("API Health:", health)`. This is template/documentation content, not executed code, but grep-based linters flag it as a production `print()` statement.
-
----
-
-#### BUG-021 — `CURSOR_SIGNING_KEY` missing from `.env`
-
-- **Severity:** Low
-- **Category:** Configuration
-- **Affected Files:** `.env`
-
-**Description:**
-`CURSOR_SIGNING_KEY` is required by `config.py` (raises `ValueError` in production if missing or insecure) but is absent from the `.env` file. Pagination cursor signing is undefined in development.
-
-**Fix:** Add `CURSOR_SIGNING_KEY=$(python -c "import secrets; print(secrets.token_urlsafe(32))")` to `.env`.
-
----
-
-#### BUG-022 — `app/routes/__init__.py` exports stale router list
-
-- **Severity:** Low
-- **Category:** Implementation Quality
-- **Affected Files:** `app/routes/__init__.py`
-
-**Description:**
-`__init__.py` exports only 9 routers (`auth`, `users`, `sessions`, `state`, `tasks`, `export`, `health`, `metrics`, `version`), while the application registers 11 routers and 4 additional router files exist. The `templates`, `payments`, `api_keys`, and `webhooks` routers are absent from `__all__`.
-
----
-
-#### BUG-023 — API key `TokenPayload` has empty `username` and `roles` fields
-
-- **Severity:** Low
-- **Category:** Implementation Quality
-- **Affected Files:** `app/middleware/authentication.py:165–174`
-
-**Description:**
-When authenticating via API key, the constructed `TokenPayload` has `username=""` and `roles=[]`. API key users must rely entirely on explicit `permissions` on the key for authorization. The empty `username` reduces traceability in audit logs. This behavior is not documented in any user-facing API documentation.
-
----
-
-#### BUG-024 — `profile_functions=True` hardcoded in profiling middleware initialization
-
-- **Severity:** Low
-- **Category:** Implementation Quality
-- **Affected Files:** `app/main.py:251`
-
-**Description:**
-When `PROFILING_ENABLED=true`, the `ProfilingMiddleware` is always initialized with `profile_functions=True` hardcoded and no corresponding environment variable. Detailed function profiling is expensive in high-throughput environments and should be separately configurable.
-
----
-
-## Missing Features Log
-
-| ID | Feature | Expected | Status | Priority |
-|----|---------|----------|--------|----------|
-| MF-001 | **Webhook management endpoints** | Full CRUD via `webhooks.py` router | ❌ Router not registered (BUG-001) | P0 |
-| MF-002 | **API key management endpoints** | Full CRUD via `api_keys.py` router | ❌ Router not registered (BUG-001) | P0 |
-| MF-003 | **Dashboard endpoint** | `GET /v1/dashboard` (referenced in client docs) | ❌ Not implemented | P2 |
-| MF-004 | **Email delivery for verification tokens** | Registration creates a token; no email is sent | ❌ SMTP config exists; no send logic | P1 |
-| MF-005 | **Task dependency cycle detection** | Reject circular dependency graphs | ❌ Not implemented (BUG-011) | P1 |
-| MF-006 | **Audit log read endpoint** | `AuditLog` model is written to but no GET endpoint exists | ❌ No route defined | P2 |
-| MF-007 | **MFA setup/enable endpoint** | `generate_mfa_secret()` and `get_mfa_qr_url()` exist in `AuthManager` | ❌ No route defined | P1 |
-| MF-008 | **Extended pagination metadata** | `has_next`, `total_pages` in list responses | ⚠️ Partial — total count only | P2 |
-| MF-009 | **Payment amount server-side calculation** | Amount is hardcoded at $99.00; no item-based pricing | ❌ Stub implementation | P1 |
-| MF-010 | **User deactivation endpoint** | Soft delete (`is_active=False`) exists in model; no dedicated endpoint | ⚠️ Achievable via `PUT /users/{id}` by admin | P2 |
-
----
-
-## Security Assessment Summary
-
-| Area | Finding | Risk |
-|------|---------|------|
-| JWT auth | Access + refresh token rotation ✅ | Low |
-| JWT auth | JTI-based access token revocation via Redis ✅ | Low |
-| JWT auth | `asyncio.run()` in thread breaks auth — BUG-002 | **Critical** |
-| API key auth | HMAC prefix + bcrypt verification ✅ | Low |
-| API key auth | Debug print exposes prefix state — BUG-003 | **Critical** |
-| RBAC | Role-based permissions with `require_permission()` ✅ | Low |
-| RBAC | Session task list missing ownership check — BUG-004 | High |
-| Payment | Unauthenticated payment intent creation — BUG-005 | High |
-| Secrets | Insecure default JWT key in `.env` — BUG-006 | High |
-| Secrets | Stripe test keys in `.env` — BUG-007 | High |
-| Input validation | Pydantic schemas on all requests ✅ | Low |
-| Input validation | UUID validation on session IDs ✅ | Low |
-| CSRF | Middleware present but broken token scheme — BUG-009 | High |
-| CORS | Specific allowed origins in `.env` ✅ | Low |
-| Rate limiting | Redis-backed sliding window ✅ | Low |
-| Rate limiting | `X-Forwarded-For` spoofing possible — BUG-014 | Medium |
-| Injection | ORM used throughout; no raw SQL ✅ | Low |
-| Error responses | Generic 500 messages; no stack traces in responses ✅ | Low |
-| Password security | bcrypt cost factor 12, 72-byte truncation handled ✅ | Low |
-| Account lockout | 5 attempts → 15-minute lockout ✅ | Low |
-| MFA | TOTP supported via pyotp ✅ | Low |
-| TLS | CSRF cookie `secure=True` enforces HTTPS ✅ | Low |
-
----
-
-## Actionable Recommendations
-
-### Immediate — P0 (before production deployment)
-
-| # | Action | File(s) | Effort |
-|---|--------|---------|--------|
-| R-001 | Register `webhooks` and `api_keys` routers in `main.py` | `app/main.py` | < 1 h |
-| R-002 | Fix `asyncio.run()` in auth middleware — use `new_event_loop()` | `app/middleware/authentication.py` | 2 h |
-| R-003 | Remove 5 debug `print()` statements from auth middleware | `app/middleware/authentication.py` | 30 min |
-| R-004 | Rotate all secrets; prevent `.env` commits via CI gate | `.env`, CI | 2 h |
-| R-005 | Add `Depends(get_current_user)` to payments endpoint | `app/routes/payments.py` | 30 min |
-
-### Short Term — P1 (next sprint)
-
-| # | Action | File(s) | Effort |
-|---|--------|---------|--------|
-| R-006 | Add ownership check to `GET /v1/sessions/{id}/tasks` | `app/routes/sessions.py` | 1 h |
-| R-007 | Replace `asyncio.get_event_loop()` with `asyncio.get_running_loop()` | `app/middleware/authentication.py` | 30 min |
-| R-008 | Fix CSRF double-submit pattern — expose raw token to client | `app/middleware/csrf.py` | 3 h |
-| R-009 | Fix `asyncio.create_task()` in synchronous functions | `app/services/authorization.py` | 2 h |
-| R-010 | Implement email sending for verification tokens (SMTP service) | `app/services/user_management.py` | 4 h |
-| R-011 | Implement MFA setup/enable/disable endpoints | `app/routes/auth.py` | 4 h |
-| R-012 | Add cycle detection for task dependencies (BFS/DFS) | `app/routes/tasks.py` | 4 h |
-| R-013 | Add trusted proxy allowlist for `X-Forwarded-For` | `app/middleware/rate_limiting.py` | 2 h |
-| R-014 | Implement server-side payment amount calculation | `app/routes/payments.py` | 6 h |
-
-### Medium Term — P2 (future milestones)
-
-| # | Action | File(s) | Effort |
-|---|--------|---------|--------|
-| R-015 | Add audit log read/filter endpoints | New route file | 6 h |
-| R-016 | Quote `Content-Disposition` filename per RFC 6266 | `app/routes/export.py` | 30 min |
-| R-017 | Replace MD5 in filename hash with SHA-256 | `app/routes/export.py` | 30 min |
-| R-018 | Move `verify_email` logic into `UserManagementService` | `app/routes/users.py`, `app/services/user_management.py` | 2 h |
-| R-019 | Implement or remove `/v1/dashboard` endpoint | `app/routes/version.py` + new file | 4 h |
-| R-020 | Update `app/routes/__init__.py` exports to match actual routers | `app/routes/__init__.py` | 30 min |
-| R-021 | Add `has_next` and `total_pages` to pagination responses | `app/models/schemas.py` | 2 h |
-| R-022 | Change default `HOST` to `127.0.0.1` in `config.py` | `app/config.py` | 15 min |
-
----
-
-## Detailed Component Assessment
-
-### Authentication (`app/routes/auth.py`, `app/services/auth_manager.py`)
-
-**Strengths:**
-- Separate access (30 min) and refresh (7 d) token lifecycle with rotation on each refresh
-- Bcrypt at cost factor 12 for password hashing
-- Account lockout after 5 failed attempts (15-minute window)
-- JTI-based access token revocation via Redis blocklist
-- Dedicated `POST /v1/auth/logout-access` for immediate access token invalidation
-- MFA (TOTP via pyotp) validated on login
-
-**Issues:** BUG-002 (asyncio.run), BUG-008 (deprecated get_event_loop)
-
----
-
-### Authorization (`app/services/authorization.py`)
-
-**Strengths:**
-- Clean RBAC with `Role` and `Permission` enums; role-to-permission mapping table
-- `require_permission()` / `require_role()` FastAPI dependency pattern is DRY
-- Audit logging on every authorization decision (success and failure)
-- Resource ownership utility (`check_resource_ownership()`)
-
-**Issues:** BUG-004 (missing task list ownership check), BUG-010, BUG-017 (asyncio.create_task in sync)
-
----
-
-### Session Management (`app/routes/sessions.py`, `app/services/session_manager.py`)
-
-**Strengths:**
-- State machine transitions enforced via `ALLOWED_TRANSITIONS` table
-- Session ID validated as UUID format
-- Redis caching + PostgreSQL persistence
-- Ownership validation on all lifecycle endpoints (start, pause, stop, reset, delete, step, get)
-
-**Issues:** BUG-004 — `get_session_tasks` is the only session-scoped endpoint lacking the ownership check
-
----
-
-### Task Execution (`app/routes/tasks.py`)
-
-**Strengths:**
-- Task dependency model with unique constraint and self-dependency prevention
-- Celery-backed async execution with status polling
-- Webhook delivery on completion
-- Session ownership verified before task cancellation
-
-**Issues:** BUG-011 — no cycle detection in dependency graph
-
----
-
-### Data Export (`app/routes/export.py`)
-
-**Strengths:**
-- Streaming responses for large file exports
-- Configurable size limits (`MAX_EXPORT_MB`, `MAX_EXPORT_POINTS`)
-- Variable name sanitization (regex whitelist)
-- Session ID sanitized for safe filenames
-- Cursor-based pagination for time series data
-
-**Issues:** BUG-012 (unquoted filename), BUG-016 (MD5 usage)
-
----
-
-### Payments (`app/routes/payments.py`)
-
-**Critical Issues:**
-- BUG-005 — No authentication required
-- Hardcoded amount ($99.00) with no real server-side calculation
-- Mock response triggered by hardcoded Stripe key prefix string comparison — fragile
-
----
-
-### Webhooks & API Keys
-
-- BUG-001 — Both router files are fully implemented but completely unreachable
-
----
-
-### Middleware Stack
-
-**Strengths:**
-- Layered defense: `RequestSizeLimit → GZip → Prometheus → Logging → APIVersioning → ResponseValidation → CSRF → Auth → Deprecation → RateLimit → CORS`
-- Prometheus metrics middleware collects per-endpoint stats
-- Structured JSON logging with sensitive field redaction
-- Configurable OpenTelemetry distributed tracing
-- Alerting system with rate limiting and cooldown periods
-- Request size limiting with configurable threshold
-
-**Issues:** BUG-002, BUG-003, BUG-008 (auth middleware), BUG-009 (CSRF), BUG-014 (rate limiter IP spoofing)
-
----
-
-### Configuration (`app/config.py`)
-
-**Strengths:**
-- Production validation: `ValueError` raised on insecure/missing secrets
-- URL format validation for database, Redis, Celery
-- Known insecure key list (`insecure_defaults`) with exact-match checks
-- Environment-specific CORS origin defaults
-- Comprehensive logging level validation
-
-**Issues:** BUG-006, BUG-007 (secrets in `.env`), BUG-021 (missing cursor key), BUG-018 (host default)
-
----
-
-### Error Handling (`app/exception_handlers.py`)
-
-**Strengths:**
-- Centralized handlers for custom `APIError`, `RequestValidationError`, `HTTPException`, and catch-all
-- Request body redaction of sensitive fields before logging
-- Generic 500 responses (no internal details or stack traces to clients)
-- Unique error IDs (`err_<hex>`) for correlation across logs and alerts
-- Alert triggering on unhandled exceptions with request metadata
-
-**Issues:** None identified
-
----
-
-### Database Models (`app/database/models.py`)
-
-**Strengths:**
-- Comprehensive composite indexing for all common query patterns
-- Soft delete pattern on `User` and `Session`
-- Cascade delete configured correctly throughout
-- `AuditLog` model with full metadata (user, action, resource, IP, user-agent, status)
-- Separate `RefreshToken` table with revocation flag and expiry
-- `APIKey` model with HMAC prefix for O(1) candidate reduction + bcrypt verification
-- `TaskDependency` model with unique constraint
-
-**Issues:** None identified
-
----
-
-## Test Coverage Assessment
-
-| Suite | Location | Quality Notes |
-|-------|----------|---------------|
-| Unit tests | `tests/unit/` | Present; coverage report generated |
-| Integration tests | `tests/integration/` | Present (smoke, state, task, user, monitoring) |
-| Property-based tests | `tests/property/` | Hypothesis configured with dev/ci/thorough profiles |
-| E2E tests | `tests/e2e/` | Skeleton + DB utils present |
-| Load tests | `tests/load/` | Present (performance, validation) |
-| API contract tests | `tests/api_contract_tests.py` | Present; runs against live server |
-
-**Gaps:**
-- No test covering BUG-002 (`asyncio.run` in thread causes RuntimeError)
-- No test validating that `GET /sessions/{id}/tasks` rejects non-owners (BUG-004)
-- No test for unauthenticated payment intent creation (BUG-005)
-- No test verifying webhook or api-key endpoints return 404 (symptom of BUG-001)
-- No test for circular task dependency detection (BUG-011)
-
----
-
-## Appendix: File Reference Map
-
-| Component | File |
-|-----------|------|
-| App factory | `app/main.py` |
-| Configuration | `app/config.py` |
-| Auth routes | `app/routes/auth.py` |
-| User routes | `app/routes/users.py` |
-| Session routes | `app/routes/sessions.py` |
-| Task routes | `app/routes/tasks.py` |
-| Export routes | `app/routes/export.py` |
-| Payment routes | `app/routes/payments.py` |
-| Webhook routes | `app/routes/webhooks.py` ⚠️ **unregistered** |
-| API key routes | `app/routes/api_keys.py` ⚠️ **unregistered** |
-| Health routes | `app/routes/health.py` |
-| Version routes | `app/routes/version.py` |
-| Auth middleware | `app/middleware/authentication.py` |
-| CSRF middleware | `app/middleware/csrf.py` |
-| Rate limiter | `app/middleware/rate_limiting.py` |
-| Auth manager | `app/services/auth_manager.py` |
-| Authorization | `app/services/authorization.py` |
-| Session manager | `app/services/session_manager.py` |
-| DB models | `app/database/models.py` |
-| Schemas | `app/models/schemas.py` |
-| Exception handlers | `app/exception_handlers.py` |
-
----
-
-*Report generated by automated code audit. All findings are based on static analysis of source code as of commit `6c183d6` on branch `claude/app-audit-security-gVXx4`.*
+*Report generated via automated full-codebase inspection. All line numbers reference the state of the codebase on 2026-03-09 (branch `claude/app-audit-security-PtO9y`). Verify against current HEAD before acting on specific line references.*
