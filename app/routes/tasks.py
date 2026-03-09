@@ -447,16 +447,27 @@ async def create_task_dependency(
         HTTPException: If dependency creation fails
     """
     try:
-        # Check if dependent task exists
-        dependent_task = db.query(TaskModel).filter(TaskModel.task_id == task_id).first()
+        # Check if dependent task exists and verify ownership
+        dependent_task = (
+            db.query(TaskModel)
+            .join(SessionModel, TaskModel.session_id == SessionModel.session_id)
+            .filter(TaskModel.task_id == task_id, SessionModel.user_id == current_user.user_id)
+            .first()
+        )
         if not dependent_task:
             raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND, detail=f"Dependent task {task_id} not found"
+                status_code=status.HTTP_404_NOT_FOUND, detail=f"Task {task_id} not found"
             )
 
-        # Check if prerequisite task exists
+        # Check if prerequisite task exists and verify ownership
         prerequisite_task = (
-            db.query(TaskModel).filter(TaskModel.task_id == request.prerequisite_task_id).first()
+            db.query(TaskModel)
+            .join(SessionModel, TaskModel.session_id == SessionModel.session_id)
+            .filter(
+                TaskModel.task_id == request.prerequisite_task_id,
+                SessionModel.user_id == current_user.user_id,
+            )
+            .first()
         )
         if not prerequisite_task:
             raise HTTPException(
@@ -550,8 +561,13 @@ async def list_task_dependencies(
         HTTPException: If task not found
     """
     try:
-        # Check if task exists
-        task = db.query(TaskModel).filter(TaskModel.task_id == task_id).first()
+        # Check if task exists and verify ownership
+        task = (
+            db.query(TaskModel)
+            .join(SessionModel, TaskModel.session_id == SessionModel.session_id)
+            .filter(TaskModel.task_id == task_id, SessionModel.user_id == current_user.user_id)
+            .first()
+        )
         if not task:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND, detail=f"Task {task_id} not found"
@@ -610,6 +626,18 @@ async def delete_task_dependency(
         HTTPException: If dependency not found or task doesn't match
     """
     try:
+        # First verify the dependent task exists and belongs to the user
+        dependent_task = (
+            db.query(TaskModel)
+            .join(SessionModel, TaskModel.session_id == SessionModel.session_id)
+            .filter(TaskModel.task_id == task_id, SessionModel.user_id == current_user.user_id)
+            .first()
+        )
+        if not dependent_task:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND, detail=f"Task {task_id} not found"
+            )
+
         # Find dependency
         dependency = (
             db.query(TaskDependencyModel)

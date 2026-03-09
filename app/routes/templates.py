@@ -133,10 +133,10 @@ async def list_templates(
         return SessionTemplateListResponse(templates=templates, pagination=pagination)
 
     except Exception as e:
-        logger.error(f"Failed to list templates: {e}")
+        logger.error("Failed to list templates: %s", e)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to list templates: {str(e)}",
+            detail="An internal error occurred",
         )
 
 
@@ -313,10 +313,10 @@ async def get_template(
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"Failed to get template {template_id}: {e}")
+        logger.error("Failed to get template %s: %s", template_id, e)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to get template: {str(e)}",
+            detail="An internal error occurred",
         )
 
 

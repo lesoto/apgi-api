@@ -13,6 +13,8 @@ from app.routes.export import router as export_router
 from app.routes.health import router as health_router
 from app.routes.metrics import router as metrics_router
 from app.routes.version import router as version_router
+from app.routes.api_keys import router as api_keys_router
+from app.routes.webhooks import router as webhooks_router
 
 __all__ = [
     "auth_router",
@@ -24,4 +26,6 @@ __all__ = [
     "health_router",
     "metrics_router",
     "version_router",
+    "api_keys_router",
+    "webhooks_router",
 ]

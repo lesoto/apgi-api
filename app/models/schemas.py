@@ -1176,11 +1176,50 @@ class UserCreateRequest(BaseModel):
         if not v or len(v) < 8:
             raise ValueError("Password must be at least 8 characters long")
 
-        # Check for at least one uppercase, one lowercase, one digit
-        if not (re.search(r"[A-Z]", v) and re.search(r"[a-z]", v) and re.search(r"\d", v)):
-            raise ValueError(
-                "Password must contain at least one uppercase letter, one lowercase letter, and one digit"
-            )
+        if len(v) > 128:
+            raise ValueError("Password must be no more than 128 characters long")
+
+        # Check for at least one uppercase, one lowercase, one digit, and one special character
+        if not re.search(r"[A-Z]", v):
+            raise ValueError("Password must contain at least one uppercase letter")
+        if not re.search(r"[a-z]", v):
+            raise ValueError("Password must contain at least one lowercase letter")
+        if not re.search(r"\d", v):
+            raise ValueError("Password must contain at least one digit")
+        if not re.search(r"[!@#$%^&*()_+\-=\[\]{};':\"\\|,.<>\/?]", v):
+            raise ValueError("Password must contain at least one special character")
+
+        # Check for common weak passwords
+        weak_passwords = [
+            "password",
+            "12345678",
+            "qwerty",
+            "abc123",
+            "password123",
+            "admin",
+            "root",
+            "user",
+            "guest",
+            "test",
+            "123456789",
+            "password1",
+            "admin123",
+            "root123",
+            "user123",
+        ]
+        if v.lower() in weak_passwords:
+            raise ValueError("Password is too common. Please choose a stronger password")
+
+        # Check for repeated characters (more than 3 in a row)
+        if re.search(r"(.)\1{3,}", v):
+            raise ValueError("Password cannot contain more than 3 consecutive identical characters")
+
+        # Check for sequential characters (like 123, abc)
+        if re.search(
+            r"(?:012|123|234|345|456|567|678|789|abc|bcd|cde|def|efg|fgh|ghi|hij|ijk|jkl|klm|mno|nop|opq|pqr|qrs|rst|stu|tuv|uvw|vwx|wxy|xyz)",
+            v.lower(),
+        ):
+            raise ValueError("Password cannot contain sequential characters")
 
         return v
 
@@ -1231,15 +1270,36 @@ class PasswordResetResponse(BaseModel):
     message: str = Field(..., description="Reset message")
 
 
-class UserStatsResponse(BaseModel):
-    """Response for user statistics."""
+class MFAEnrollResponse(BaseModel):
+    """Response for MFA enrollment."""
 
-    total_users: int = Field(..., description="Total number of users")
-    active_users: int = Field(..., description="Number of active users")
-    inactive_users: int = Field(..., description="Number of inactive users")
-    role_counts: dict = Field(..., description="Count of users by role")
-    total_sessions: int = Field(..., description="Total number of sessions")
-    active_sessions: int = Field(..., description="Number of active sessions")
+    secret: str = Field(..., description="MFA secret key")
+    qr_code_url: str = Field(..., description="QR code URL for MFA app")
+    message: str = Field(..., description="Enrollment instructions")
+
+
+class MFADisableRequest(BaseModel):
+    """Request to disable MFA."""
+
+    password: str = Field(..., description="Current password for verification")
+
+
+class MFADisableResponse(BaseModel):
+    """Response for MFA disable."""
+
+    message: str = Field(..., description="Disable confirmation message")
+
+
+class MFAEnableRequest(BaseModel):
+    """Request to enable MFA."""
+
+    code: str = Field(..., description="TOTP code from authenticator app")
+
+
+class MFAEnableResponse(BaseModel):
+    """Response for MFA enable."""
+
+    message: str = Field(..., description="Enable confirmation message")
 
 
 # State Schemas
@@ -1689,6 +1749,30 @@ class WebhookRetryResponse(BaseModel):
                 "status": "delivered",
                 "attempts": 2,
                 "last_attempt_at": "2024-01-15T10:40:00Z",
+            }
+        }
+    )
+
+
+class UserStatsResponse(BaseModel):
+    """Response for user statistics."""
+
+    total_users: int = Field(..., description="Total number of users")
+    active_users: int = Field(..., description="Number of active users")
+    inactive_users: int = Field(..., description="Number of inactive users")
+    role_counts: Dict[str, int] = Field(..., description="Count of users by role")
+    total_sessions: int = Field(..., description="Total number of sessions")
+    active_sessions: int = Field(..., description="Number of active sessions")
+
+    model_config = ConfigDict(
+        json_schema_extra={
+            "example": {
+                "total_users": 150,
+                "active_users": 120,
+                "inactive_users": 30,
+                "role_counts": {"admin": 5, "user": 145},
+                "total_sessions": 450,
+                "active_sessions": 45,
             }
         }
     )

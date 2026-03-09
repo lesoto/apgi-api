@@ -9,6 +9,7 @@ from typing import List
 
 import secrets
 import logging
+from datetime import datetime, timezone
 
 from fastapi import APIRouter, Depends, status, HTTPException
 from sqlalchemy.orm import Session
@@ -25,6 +26,11 @@ from app.models.schemas import (
     PasswordResetRequest,
     PasswordResetResponse,
     UserStatsResponse,
+    MFAEnrollResponse,
+    MFADisableRequest,
+    MFADisableResponse,
+    MFAEnableRequest,
+    MFAEnableResponse,
 )
 from app.services.authorization import (
     Permission,
@@ -33,6 +39,7 @@ from app.services.authorization import (
     TokenPayload,
     has_permission,
 )
+from app.services.auth_manager import AuthManager
 from app.services.user_management import get_user_management_service
 
 logger = logging.getLogger(__name__)
@@ -80,16 +87,16 @@ async def register_user(
             username=request.username,
             email=request.email,
             password=request.password,
-            roles=["user"],
+            roles=["viewer"],
         )
 
         return UserCreateResponse(
             user_id=str(user.user_id),
             username=str(user.username),
             email=str(user.email),
-            roles=list(user.roles) if user.roles else [],
+            roles=list(user.roles) if user.roles else [],  # type: ignore[arg-type]
             created_at=user.created_at,  # type: ignore[arg-type]
-            message="User created successfully",
+            message="User created successfully. Please check your email to verify your account.",
         )  # type: ignore[arg-type]
 
     except ValueError as e:
@@ -504,6 +511,180 @@ async def reset_user_password(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="An internal error occurred",
+        )
+
+
+@router.post(
+    "/mfa/enroll",
+    response_model=MFAEnrollResponse,
+    summary="Enroll MFA",
+    description="Generate MFA secret and QR code for the authenticated user",
+)
+async def enroll_mfa(
+    db: Session = Depends(get_db),
+    current_user: TokenPayload = Depends(get_current_user),
+):
+    """
+    Enroll MFA for the current user.
+
+    Returns MFA secret and QR code URL for setting up TOTP authentication.
+
+    Args:
+        db: Database session
+        current_user: Authenticated user
+
+    Returns:
+        MFAEnrollResponse with secret and QR code
+    """
+    user_service = get_user_management_service(db)
+
+    try:
+        # Generate MFA secret and QR code
+        auth_manager = AuthManager(db)
+        secret = auth_manager.generate_mfa_secret()
+        qr_url = auth_manager.get_mfa_qr_url(current_user.username, secret)
+
+        # Save MFA secret to user (but don't enable yet - user needs to verify first)
+        user = user_service.get_user(current_user.user_id)
+        user.mfa_secret = secret  # type: ignore[assignment]
+        user.mfa_enabled = False  # type: ignore[assignment]
+        user.updated_at = datetime.now(timezone.utc)  # type: ignore[assignment]
+
+        db.commit()
+
+        return MFAEnrollResponse(
+            secret=secret,
+            qr_code_url=qr_url,
+            message="Scan the QR code with your authenticator app, then use the generated code to complete setup.",
+        )
+
+    except Exception as e:
+        db.rollback()
+        logger.error(f"Failed to enroll MFA for user {current_user.user_id}: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="An internal error occurred during MFA enrollment",
+        )
+
+
+@router.post(
+    "/mfa/enable",
+    response_model=MFAEnableResponse,
+    summary="Enable MFA",
+    description="Enable MFA after verifying the provided TOTP code",
+)
+async def enable_mfa(
+    request: MFAEnableRequest,
+    db: Session = Depends(get_db),
+    current_user: TokenPayload = Depends(get_current_user),
+):
+    """
+    Enable MFA for the current user after verifying the code.
+
+    Args:
+        request: MFA enable request with TOTP code
+        db: Database session
+        current_user: Authenticated user
+
+    Returns:
+        MFAEnableResponse with success message
+    """
+    user_service = get_user_management_service(db)
+
+    try:
+        user = user_service.get_user(current_user.user_id)
+
+        if not user.mfa_secret:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="MFA not enrolled. Please enroll first.",
+            )
+
+        # Verify the code
+        auth_manager = AuthManager(db)
+        if not auth_manager.verify_mfa_code(user.mfa_secret, request.code):
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Invalid MFA code",
+            )
+
+        # Enable MFA
+        user.mfa_enabled = True  # type: ignore[assignment]
+        user.updated_at = datetime.now(timezone.utc)  # type: ignore[assignment]
+
+        db.commit()
+
+        return MFAEnableResponse(message="MFA enabled successfully")
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        db.rollback()
+        logger.error(f"Failed to enable MFA for user {current_user.user_id}: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="An internal error occurred during MFA enable",
+        )
+
+
+@router.post(
+    "/mfa/disable",
+    response_model=MFADisableResponse,
+    summary="Disable MFA",
+    description="Disable MFA for the authenticated user",
+)
+async def disable_mfa(
+    request: MFADisableRequest,
+    db: Session = Depends(get_db),
+    current_user: TokenPayload = Depends(get_current_user),
+):
+    """
+    Disable MFA for the current user.
+
+    Args:
+        request: MFA disable request with password verification
+        db: Database session
+        current_user: Authenticated user
+
+    Returns:
+        MFADisableResponse with confirmation
+    """
+    user_service = get_user_management_service(db)
+
+    try:
+        user = user_service.get_user(current_user.user_id)
+
+        if not user.mfa_enabled:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="MFA is not enabled",
+            )
+
+        # Verify password
+        auth_manager = AuthManager(db)
+        if not auth_manager.verify_password(request.password, user.password_hash):  # type: ignore[arg-type]
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Invalid password",
+            )
+
+        # Disable MFA
+        user.mfa_enabled = False  # type: ignore[assignment]
+        user.mfa_secret = None  # type: ignore[assignment]
+        user.updated_at = datetime.now(timezone.utc)  # type: ignore[assignment]
+
+        db.commit()
+
+        return MFADisableResponse(message="MFA disabled successfully")
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        db.rollback()
+        logger.error(f"Failed to disable MFA for user {current_user.user_id}: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="An internal error occurred during MFA disable",
         )
 
 

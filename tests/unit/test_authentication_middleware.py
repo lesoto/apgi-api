@@ -85,13 +85,15 @@ class TestAuthenticationMiddleware:
 
     @pytest.mark.asyncio
     async def test_dispatch_no_auth_headers(self, auth_middleware, mock_request):
-        """Test dispatch with no auth headers proceeds without authentication."""
+        """Test dispatch with no auth headers returns 401 (deny-by-default)."""
         call_next = AsyncMock(return_value=MagicMock())
 
         with patch.object(auth_middleware, "_extract_and_verify_credentials", return_value=None):
             result = await auth_middleware.dispatch(mock_request, call_next)
 
-            call_next.assert_called_once_with(mock_request)
+            assert isinstance(result, JSONResponse)
+            assert result.status_code == 401
+            call_next.assert_not_called()
             assert not hasattr(mock_request.state, "user")
 
     @pytest.mark.asyncio
@@ -167,12 +169,21 @@ class TestAuthenticationMiddleware:
 
     def test_blocking_verify_token(self, auth_middleware, mock_user_payload):
         """Test blocking token verification."""
-        with patch("app.middleware.authentication.AuthManager") as mock_auth_manager_class:
-            mock_auth_manager = MagicMock()
-            mock_auth_manager.verify_token = AsyncMock(return_value=mock_user_payload)
-            mock_auth_manager_class.return_value = mock_auth_manager
+        from unittest.mock import patch
 
-            result = auth_middleware._blocking_verify_token("test_token")
+        # Mock jwt.decode to return a valid payload dict
+        mock_payload = {
+            "user_id": "test_user",
+            "username": "testuser",
+            "roles": ["user"],
+            "exp": 2000000000,  # Future timestamp
+            "token_type": "access",
+        }
+
+        with patch("jwt.decode", return_value=mock_payload), patch(
+            "app.services.auth_manager.TokenPayload.from_dict", return_value=mock_user_payload
+        ):
+            result = auth_middleware._blocking_verify_token("valid.jwt.token")
 
             assert result == mock_user_payload
 

@@ -6,6 +6,7 @@ Cross-Site Request Forgery attacks.
 """
 
 import hashlib
+import hmac
 import secrets
 from datetime import datetime, timezone
 from typing import Optional
@@ -14,6 +15,7 @@ from fastapi import Request
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.responses import JSONResponse
 
+from app.config import settings
 from app.middleware.logging import StructuredLogger
 
 logger = StructuredLogger(__name__)
@@ -70,16 +72,11 @@ class CSRFMiddleware(BaseHTTPMiddleware):
         Returns:
             HMAC-SHA256 hash of the token
         """
-        # Use HMAC with a secret key instead of plain SHA-256
-        # This prevents token prediction attacks even if the hashing method is known
-        import hmac
-
-        # Create a secret key from the token itself (double HMAC approach)
-        # This makes it impossible to forge valid tokens without knowing the original
-        secret_key = hmac.new(token.encode(), b"csrf-salt", hashlib.sha256).digest()
-
-        # HMAC the token with the derived secret key
-        return hmac.new(secret_key, token.encode(), hashlib.sha256).hexdigest()
+        # Use HMAC with a server-side secret key
+        # This prevents token prediction attacks and ensures only the server can validate tokens
+        return hmac.new(
+            settings.jwt_secret_key.encode(), token.encode(), hashlib.sha256
+        ).hexdigest()
 
     def _should_protect(self, request: Request) -> bool:
         """

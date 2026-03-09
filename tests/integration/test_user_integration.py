@@ -130,26 +130,36 @@ class TestUserRoutesIntegration:
     """Integration tests for user management endpoints."""
 
     @pytest.mark.asyncio
-    async def test_register_user(self, authenticated_client, mock_user_management_service):
+    async def test_register_user(self, mock_user_management_service):
         """Test user registration."""
+        from app.main import create_app
+        from httpx import AsyncClient, ASGITransport
+        from unittest.mock import patch
+
         request_data = {
             "username": "newuser",
             "email": "newuser@example.com",
-            "password": "Password123",
+            "password": "Password!135",
         }
 
         with patch(
             "app.routes.users.get_user_management_service",
             return_value=mock_user_management_service,
         ):
-            response = await authenticated_client.post("/v1/users/register", json=request_data)
+            app = create_app(test_mode=True)
+            transport = ASGITransport(app=app)
+            async with AsyncClient(transport=transport, base_url="http://test") as client:
+                response = await client.post("/v1/users/register", json=request_data)
 
         assert response.status_code == 201
         data = response.json()
         assert "user_id" in data
         assert data["username"] == "newuser"
         assert data["email"] == "newuser@example.com"
-        assert data["message"] == "User created successfully"
+        assert (
+            data["message"]
+            == "User created successfully. Please check your email to verify your account."
+        )
 
     @pytest.mark.asyncio
     async def test_get_user(self, authenticated_client, mock_user_management_service):

@@ -248,7 +248,19 @@ class Settings:
                 "This is required for secure JWT token generation."
             )
         else:
-            # Check for known insecure default values
+            # Check for known insecure default values (using prefix/fuzzy matching)
+            insecure_prefixes = [
+                "your-secret-key",
+                "your-cursor-signing-key",
+                "your-webhook-secret-key",
+                "secret",
+                "default-secret",
+                "change-me",
+                "insecure-key",
+                "development-secret-key",
+                "test-secret",
+                "example-secret",
+            ]
             insecure_defaults = [
                 "your-secret-key-change-in-production",
                 "secret",
@@ -258,7 +270,11 @@ class Settings:
                 "development-secret-key-change-in-production-32-chars-min",
             ]
 
-            if self.jwt_secret_key.lower() in [d.lower() for d in insecure_defaults]:
+            jwt_key_lower = self.jwt_secret_key.lower()
+            is_insecure = jwt_key_lower in [d.lower() for d in insecure_defaults] or any(
+                jwt_key_lower.startswith(prefix) for prefix in insecure_prefixes
+            )
+            if is_insecure:
                 errors.append(
                     "JWT_SECRET_KEY is set to a known insecure default value. "
                     "This allows attackers to forge JWT tokens and bypass authentication."
@@ -290,6 +306,29 @@ class Settings:
             if len(self.cursor_signing_key) < 32:
                 errors.append(
                     "CURSOR_SIGNING_KEY is shorter than 32 characters. "
+                    "Short keys are vulnerable to brute force attacks. "
+                    "Use a secure, random key with at least 32 characters."
+                )
+
+        # Validate webhook secret key
+        if not self.webhook_secret_key:
+            if is_production:
+                errors.append(
+                    "WEBHOOK_SECRET_KEY environment variable is not set. "
+                    "This is required for secure webhook signature verification in production."
+                )
+        else:
+            # Check for known insecure default values
+            if self.webhook_secret_key.lower() in [d.lower() for d in insecure_defaults]:
+                errors.append(
+                    "WEBHOOK_SECRET_KEY is set to a known insecure default value. "
+                    "This allows attackers to forge webhook signatures."
+                )
+
+            # Validate minimum key length
+            if len(self.webhook_secret_key) < 32:
+                errors.append(
+                    "WEBHOOK_SECRET_KEY is shorter than 32 characters. "
                     "Short keys are vulnerable to brute force attacks. "
                     "Use a secure, random key with at least 32 characters."
                 )

@@ -30,6 +30,8 @@ from app.services.authorization import (
     Permission,
     require_permission,
     get_current_user,
+    Role,
+    has_any_role,
 )
 from app.services.session_manager import SessionLifecycleState, SessionManager
 
@@ -49,7 +51,11 @@ _state = SessionRoutesState()
 
 
 async def validate_session_ownership(
-    session_id: str, user_id: str, manager: SessionManager, db_session: Session
+    session_id: str,
+    user_id: str,
+    manager: SessionManager,
+    db_session: Session,
+    is_admin: bool = False,
 ) -> SessionModel:
     """
     Validate that the current user owns the specified session.
@@ -59,6 +65,7 @@ async def validate_session_ownership(
         user_id: Current user's ID
         manager: Session manager dependency
         db_session: Database session
+        is_admin: If True, ownership check is bypassed (admin access).
 
     Returns:
         Session model if ownership is valid
@@ -72,6 +79,10 @@ async def validate_session_ownership(
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, detail=f"Session {session_id} not found"
         )
+
+    # Admins bypass ownership checks (MF-012 / R-23)
+    if is_admin:
+        return session
 
     # Check ownership
     if session.user_id != user_id:
@@ -197,7 +208,7 @@ async def list_sessions(
         logger.error(f"Failed to list sessions: {e}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to list sessions: {str(e)}",
+            detail="Failed to list sessions",
         )
 
 
@@ -270,7 +281,13 @@ async def get_session(
         HTTPException: If session not found
     """
     # Validate session ownership
-    await validate_session_ownership(session_id, current_user.user_id, manager, db)
+    await validate_session_ownership(
+        session_id,
+        current_user.user_id,
+        manager,
+        db,
+        is_admin=has_any_role(current_user.roles, [Role.ADMIN]),
+    )
 
     try:
         sim_session = await manager.get_session(session_id)
@@ -314,7 +331,13 @@ async def get_session_metrics(
         HTTPException: If session not found
     """
     # Validate session ownership
-    await validate_session_ownership(session_id, current_user.user_id, manager, db)
+    await validate_session_ownership(
+        session_id,
+        current_user.user_id,
+        manager,
+        db,
+        is_admin=has_any_role(current_user.roles, [Role.ADMIN]),
+    )
 
     try:
         sim_session = await manager.get_session(session_id)
@@ -380,6 +403,10 @@ async def get_session_tasks(
                 status_code=status.HTTP_404_NOT_FOUND, detail=f"Session {session_id} not found"
             )
 
+        # Verify session ownership
+        if session.user_id != current_user.user_id:
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Access denied")
+
         # Get tasks for session
         tasks = db.query(Task).filter(Task.session_id == session_id).all()
 
@@ -406,7 +433,7 @@ async def get_session_tasks(
         logger.error(f"Failed to get tasks for session {session_id}: {e}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to get tasks for session: {str(e)}",
+            detail="Failed to get tasks for session",
         )
 
 
@@ -437,7 +464,13 @@ async def start_session(
         HTTPException: If session not found or cannot be started
     """
     # Validate session ownership
-    await validate_session_ownership(session_id, current_user.user_id, manager, db)
+    await validate_session_ownership(
+        session_id,
+        current_user.user_id,
+        manager,
+        db,
+        is_admin=has_any_role(current_user.roles, [Role.ADMIN]),
+    )
 
     try:
         sim_session = await manager.get_session(session_id)
@@ -487,7 +520,13 @@ async def pause_session(
         HTTPException: If session not found or cannot be paused
     """
     # Validate session ownership
-    await validate_session_ownership(session_id, current_user.user_id, manager, db)
+    await validate_session_ownership(
+        session_id,
+        current_user.user_id,
+        manager,
+        db,
+        is_admin=has_any_role(current_user.roles, [Role.ADMIN]),
+    )
 
     try:
         sim_session = await manager.get_session(session_id)
@@ -537,7 +576,13 @@ async def stop_session(
         HTTPException: If session not found
     """
     # Validate session ownership
-    await validate_session_ownership(session_id, current_user.user_id, manager, db)
+    await validate_session_ownership(
+        session_id,
+        current_user.user_id,
+        manager,
+        db,
+        is_admin=has_any_role(current_user.roles, [Role.ADMIN]),
+    )
 
     try:
         sim_session = await manager.get_session(session_id)
@@ -587,7 +632,13 @@ async def reset_session(
         HTTPException: If session not found
     """
     # Validate session ownership
-    await validate_session_ownership(session_id, current_user.user_id, manager, db)
+    await validate_session_ownership(
+        session_id,
+        current_user.user_id,
+        manager,
+        db,
+        is_admin=has_any_role(current_user.roles, [Role.ADMIN]),
+    )
 
     try:
         sim_session = await manager.get_session(session_id)
@@ -637,7 +688,13 @@ async def delete_session(
         HTTPException: If session not found or deletion fails
     """
     # Validate session ownership
-    await validate_session_ownership(session_id, current_user.user_id, manager, db)
+    await validate_session_ownership(
+        session_id,
+        current_user.user_id,
+        manager,
+        db,
+        is_admin=has_any_role(current_user.roles, [Role.ADMIN]),
+    )
 
     try:
         # Verify session exists before deletion
@@ -682,7 +739,13 @@ async def step_session(
         HTTPException: If session not found or cannot be stepped
     """
     # Validate session ownership
-    await validate_session_ownership(session_id, current_user.user_id, manager, db)
+    await validate_session_ownership(
+        session_id,
+        current_user.user_id,
+        manager,
+        db,
+        is_admin=has_any_role(current_user.roles, [Role.ADMIN]),
+    )
 
     try:
         sim_session = await manager.get_session(session_id)

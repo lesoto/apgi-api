@@ -36,7 +36,7 @@ class UserManagementService:
             username: Unique username
             email: User email address
             password: Plain text password
-            roles: List of user roles (defaults to ['user'])
+            roles: List of user roles (defaults to ['viewer'])
 
         Returns:
             Created User object
@@ -45,7 +45,7 @@ class UserManagementService:
             ValidationError: If username or email already exists
         """
         if roles is None:
-            roles = ["user"]
+            roles = ["viewer"]
 
         # Hash the password
         hashed_password = self.auth_manager.hash_password(password)

@@ -64,6 +64,9 @@ class AuthenticationMiddleware(BaseHTTPMiddleware):
         "/version",
         "/v1/auth/login",
         "/v1/auth/refresh",
+        "/v1/users/register",
+        "/v1/users/verify-email",
+        "/v1/users/create-default",
     }
 
     def __init__(self, app):
@@ -102,9 +105,15 @@ class AuthenticationMiddleware(BaseHTTPMiddleware):
                     401, "invalid_credentials", "Invalid authentication credentials"
                 )
             else:
-                # No authentication attempt - let the endpoint handle it
-                # (some endpoints may be optional auth)
-                return await call_next(request)
+                # BUG-005 fix: deny-by-default posture.
+                # No credentials supplied for a non-public path → reject immediately.
+                # This adds a defence-in-depth layer: even if an endpoint accidentally
+                # omits Depends(get_current_user), the middleware still blocks anonymous
+                # access.  Add to PUBLIC_PATHS any intentionally-public endpoint that
+                # requires no auth header at all.
+                return self._create_error_response(
+                    401, "authentication_required", "Authentication required"
+                )
 
         # Attach authentication information to request state
         auth_type, user_payload = auth_result
@@ -222,17 +231,51 @@ class AuthenticationMiddleware(BaseHTTPMiddleware):
     def _blocking_verify_token(self, token: str) -> TokenPayload:
         """
         Blocking version of token verification for use in executor.
+        Does synchronous JWT verification without Redis checks.
         """
-        import asyncio
+        import jwt
+        from app.services.auth_manager import TokenPayload, InvalidTokenError, ExpiredTokenError
+        from app.config import settings as _settings
+        from datetime import timezone, datetime
 
-        # Create database session for token verification
-        db = SessionLocal()
         try:
-            auth_manager = AuthManager(db)
-            payload = asyncio.run(auth_manager.verify_token(token, expected_type="access"))
+            secret_key = _settings.jwt_secret_key
+            if not secret_key:
+                raise InvalidTokenError("JWT secret key not configured")
+
+            # Decode token synchronously
+            payload_dict = jwt.decode(
+                token,
+                secret_key,
+                algorithms=["HS256"],
+            )
+
+            # Parse payload
+            payload = TokenPayload.from_dict(payload_dict)
+
+            # Verify token type
+            if payload.token_type != "access":
+                raise InvalidTokenError(
+                    f"Invalid token type: expected access, got {payload.token_type}"
+                )
+
+            # Check expiration
+            if datetime.now(timezone.utc) > payload.exp:
+                raise ExpiredTokenError("Token has expired")
+
+            # Note: Redis revocation check is skipped in middleware for performance
+            # Access tokens are short-lived, so revocation is less critical
+
             return payload
-        finally:
-            db.close()
+
+        except jwt.ExpiredSignatureError:
+            raise ExpiredTokenError("Token has expired")
+        except jwt.InvalidTokenError as e:
+            raise InvalidTokenError(f"Invalid token: {str(e)}")
+        except (ExpiredTokenError, InvalidTokenError):
+            raise
+        except Exception as e:
+            raise InvalidTokenError(f"Token verification failed: {str(e)}")
 
     async def _verify_api_key(self, api_key: str) -> APIKeyInfo:
         """
@@ -271,7 +314,11 @@ class AuthenticationMiddleware(BaseHTTPMiddleware):
             ).hexdigest()[:16]
 
             # Query API keys by prefix (should significantly reduce the number of candidates)
-            active_keys = db.query(APIKey).filter(APIKey.is_active.is_(True)).all()
+            active_keys = (
+                db.query(APIKey)
+                .filter(APIKey.is_active.is_(True), APIKey.key_prefix == prefix)
+                .all()
+            )
 
             # If no keys, the key is invalid
             if not active_keys:
@@ -279,17 +326,13 @@ class AuthenticationMiddleware(BaseHTTPMiddleware):
 
             # Find the specific key by prefix and bcrypt check
             db_api_key = None
-            print(f"DEBUG: prefix={prefix}")
-            print(f"DEBUG: active_keys count={len(active_keys)}")
             for candidate_key in active_keys:
-                print(f"DEBUG: candidate prefix={candidate_key.key_prefix}")
                 if hmac.compare_digest(
                     str(candidate_key.key_prefix), prefix
                 ) and auth_manager.verify_password(
-                    api_key, candidate_key.key_hash
-                ):  # type: ignore[arg-type]
+                    api_key, candidate_key.key_hash  # type: ignore[arg-type]
+                ):
                     db_api_key = candidate_key
-                    print("DEBUG: found match!")
                     break
 
             if not db_api_key:

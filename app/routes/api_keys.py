@@ -357,7 +357,9 @@ async def rotate_api_key(
         key_hash=key_hash,
         key_prefix=prefix,
         permissions=existing_key.permissions,
-        expires_at=existing_key.expires_at,
+        # BUG-020 fix: always use a fresh expiry, not the inherited one which may be expired.
+        # Default to 1 year from now; callers can adjust by updating afterward.
+        expires_at=datetime.now(timezone.utc) + timedelta(days=365),
         is_active=True,
     )
 

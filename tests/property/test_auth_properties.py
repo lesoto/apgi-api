@@ -82,9 +82,9 @@ def test_property_5_jwt_validation_no_token(path):
     # The actual rejection happens at the route level via dependencies
     response = asyncio.run(auth_middleware.dispatch(mock_request, mock_call_next))
 
-    # Property: When no token is provided, middleware should pass through
-    # (the route dependency will handle the rejection)
-    assert response.status_code == 200, "Middleware should pass through when no token provided"
+    # Property: When no token is provided, middleware should deny access (defense in depth)
+    # This matches the deny-by-default posture implemented in the middleware
+    assert response.status_code == 401, "Middleware should deny access when no token provided"
 
     # Property: Request state should not have authenticated flag set to True
     assert not getattr(

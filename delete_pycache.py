@@ -35,7 +35,6 @@ USAGE:
 For detailed options, run: python delete_pycache.py --help
 """
 
-# Essential files and directories to NEVER remove - APGI API Specific
 ESSENTIAL_FILES = {
     ".gitignore",
     "README.md",
@@ -94,18 +93,15 @@ ESSENTIAL_FILES = {
     "wsgi.py",
     "gunicorn.conf.py",
     "uwsgi.ini",
-    # Configuration files that should never be deleted
     "config.py",
     "settings.py",
     "conf.py",
     "app_config.py",
     "database_config.py",
-    # Essential application files
     "__init__.py",
     "celery_app.py",
     "exceptions.py",
     "exception_handlers.py",
-    # Security and certificates
     "*.pem",
     "*.crt",
     "*.key",
@@ -114,7 +110,6 @@ ESSENTIAL_FILES = {
     "cert.pem",
     "key.pem",
     "ca.pem",
-    # Database files (production)
     "*.db",
     "*.sqlite",
     "*.sqlite3",
@@ -123,14 +118,11 @@ ESSENTIAL_FILES = {
     "production.db",
 }
 
-# Essential directories to NEVER remove - APGI API Specific
 ESSENTIAL_DIRS = {
-    # Version control
     ".git",
     ".svn",
     ".hg",
     ".bzr",
-    # Source code directories (API structure)
     "app",
     "src",
     "source",
@@ -140,7 +132,6 @@ ESSENTIAL_DIRS = {
     "packages",
     "api",
     "backend",
-    # Application subdirectories (essential for API)
     "models",
     "routes",
     "views",
@@ -156,11 +147,9 @@ ESSENTIAL_DIRS = {
     "tasks",
     "jobs",
     "workers",
-    # Documentation
     "docs",
     "doc",
     "documentation",
-    # Test files
     "tests",
     "test",
     "specs",
@@ -168,24 +157,20 @@ ESSENTIAL_DIRS = {
     "unit_tests",
     "integration_tests",
     "e2e_tests",
-    # Examples and samples
     "examples",
     "example",
     "samples",
     "sample",
-    # Scripts and tools
     "scripts",
     "bin",
     "tools",
     "util",
     "utils",
-    # Configuration
     "config",
     "conf",
     "cfg",
     "settings",
     "etc",
-    # Data and resources
     "data",
     "dataset",
     "datasets",
@@ -196,11 +181,9 @@ ESSENTIAL_DIRS = {
     "media",
     "uploads",
     "storage",
-    # Templates and views
     "templates",
     "template",
     "views",
-    # Web assets
     "static",
     "public",
     "css",
@@ -209,7 +192,6 @@ ESSENTIAL_DIRS = {
     "images",
     "img",
     "fonts",
-    # Deployment and infrastructure
     "deployment",
     "deploy",
     "infrastructure",
@@ -218,47 +200,39 @@ ESSENTIAL_DIRS = {
     "k8s",
     "kubernetes",
     "helm",
-    # CI/CD
     ".github",
     ".gitlab-ci.yml",
     "ci",
     "cd",
     "pipeline",
     "workflows",
-    # Monitoring and logging
     "monitoring",
     "logs",
     "log",
     "metrics",
     "tracing",
-    # Security and secrets
     "secrets",
     "certificates",
     "ssl",
     "tls",
-    # Database and data storage
     "database",
     "db",
     "data",
     "storage",
     "backups",
     "dump",
-    # Cache and session storage
     "cache",
     "sessions",
     "redis",
     "memcached",
 }
 
-# Temporary and cache directories to remove - comprehensive list for all platforms
 TEMP_DIR_NAMES = {
-    # Python cache directories
     "__pycache__",
     "_pycache_",
     "_pycache__",
     "__cache__",
     "_cache_",
-    # Testing and coverage
     ".pytest_cache",
     ".mypy_cache",
     "mypy_cache",
@@ -275,7 +249,6 @@ TEMP_DIR_NAMES = {
     ".flake8",
     ".bandit",
     ".ipynb_checkpoints",
-    # Build and distribution
     "build",
     "dist",
     "out",
@@ -292,7 +265,6 @@ TEMP_DIR_NAMES = {
     "build-linux",
     "build-windows",
     "build-macos",
-    # Python packaging
     ".eggs",
     "*.egg-info",
     "pip-wheel-metadata",
@@ -304,7 +276,6 @@ TEMP_DIR_NAMES = {
     "*.tar.gz",
     "*.zip",
     "*.tgz",
-    # Virtual environments (only if explicitly requested)
     ".venv",
     "venv",
     ".env",
@@ -317,14 +288,12 @@ TEMP_DIR_NAMES = {
     ".envs",
     "anaconda3",
     "miniconda3",
-    # Node.js (if present)
     "node_modules",
     ".npm",
     ".yarn",
     ".pnpm",
     "bower_components",
     "jspm_packages",
-    # IDE and editor directories
     ".vscode",
     ".idea",
     ".eclipse",
@@ -336,7 +305,6 @@ TEMP_DIR_NAMES = {
     ".emacs.d",
     ".c9",
     ".cloud9",
-    # Cache and temporary directories
     ".cache",
     "cache",
     "caches",
@@ -346,7 +314,6 @@ TEMP_DIR_NAMES = {
     "tempfiles",
     ".tmp",
     ".temp",
-    # macOS specific
     ".DS_Store",
     "__MACOSX",
     ".DocumentRevisions-V100",
@@ -358,13 +325,11 @@ TEMP_DIR_NAMES = {
     ".Spotlight-V100",
     ".Trashes",
     ".fseventsd",
-    # Windows specific
     "Thumbs.db",
     "desktop.ini",
     "$RECYCLE.BIN",
     "System Volume Information",
     "RECYCLER",
-    # Linux specific
     ".fuse_hidden*",
     ".Trash-*",
     ".local",
@@ -376,7 +341,6 @@ TEMP_DIR_NAMES = {
     ".cache",
     ".dbus",
     ".gvfs",
-    # Platform agnostic temp directories
     "temp",
     "tmp",
     "cache",
@@ -401,12 +365,10 @@ TEMP_DIR_NAMES = {
     "bundles",
     "compiled",
     "output",
-    # Logs (only temporary logs, not essential log directories)
     "logs",
     "log",
     "tmp_logs",
     "temp_logs",
-    # Additional common temp/cache directories
     ".sass-cache",
     ".node_repl_history",
     ".python-version",
@@ -443,9 +405,7 @@ TEMP_DIR_NAMES = {
     "bundle",
 }
 
-# Temporary file patterns to remove - comprehensive list for all platforms
 TEMP_FILE_PATTERNS = [
-    # Python compiled files
     "*.pyc",
     "*.pyo",
     "*.pyd",
@@ -458,7 +418,6 @@ TEMP_FILE_PATTERNS = [
     "*.pyi.*",
     "*.pyx.*",
     "*.pyb.*",
-    # Coverage and testing files
     ".coverage",
     "coverage.xml",
     ".coverage.*",
@@ -472,7 +431,6 @@ TEMP_FILE_PATTERNS = [
     ".hypothesis",
     ".ruff_cache",
     ".benchmarks",
-    # Log files (temporary only)
     "*.log",
     "*.log.*",
     "*.out",
@@ -485,14 +443,12 @@ TEMP_FILE_PATTERNS = [
     "tmp.log",
     "debug.log",
     "error.log",
-    # System and editor files
     ".DS_Store",
     "Thumbs.db",
     "desktop.ini",
     "*.DS_Store",
     "*.Thumbs.db",
     "*.desktop.ini",
-    # Temporary and backup files
     "*.tmp",
     "*.temp",
     "*~",
@@ -517,7 +473,6 @@ TEMP_FILE_PATTERNS = [
     "*.swp.*",
     "*.swo.*",
     "*~.*",
-    # Lock and process files
     "*.pid",
     "*.lock",
     "*.lck",
@@ -526,7 +481,6 @@ TEMP_FILE_PATTERNS = [
     "*.lock.*",
     "*.lck.*",
     "*.wfl.*",
-    # Debug and crash files
     "*.core",
     "*.dump",
     "*.crash",
@@ -547,7 +501,6 @@ TEMP_FILE_PATTERNS = [
     "*.stats.*",
     "*.lprof.*",
     "*.pstats.*",
-    # Database temporary files (not production databases)
     "*.s3db",
     "*.sqlite-shm",
     "*.sqlite-wal",
@@ -564,7 +517,6 @@ TEMP_FILE_PATTERNS = [
     "*.test.db",
     "*.temp.db",
     "*.dev.db",
-    # Python packaging files
     "*.egg-info",
     "*.egg",
     "*.whl",
@@ -575,7 +527,6 @@ TEMP_FILE_PATTERNS = [
     "*.whl.*",
     "*.wheel.*",
     "*.dist-info.*",
-    # Archive files (temporary only)
     "*.tgz",
     "*.tar.gz",
     "*.zip",
@@ -592,7 +543,6 @@ TEMP_FILE_PATTERNS = [
     "*.tar.*",
     "*.tar.bz2.*",
     "*.tar.xz.*",
-    # Installation files (temporary)
     "*.deb",
     "*.rpm",
     "*.dmg",
@@ -605,7 +555,6 @@ TEMP_FILE_PATTERNS = [
     "*.pkg.*",
     "*.msi.*",
     "*.exe.*",
-    # Development files
     "*.patch",
     "*.diff",
     "*.rej",
@@ -632,7 +581,6 @@ TEMP_FILE_PATTERNS = [
     "*.tests.*",
     "*.spec.*",
     "*.mock.*",
-    # IDE and editor files
     ".vscode*",
     ".idea*",
     ".eclipse*",
@@ -643,14 +591,12 @@ TEMP_FILE_PATTERNS = [
     ".emacs*",
     ".c9*",
     ".cloud9*",
-    # Node.js files
     "node_modules*",
     ".npm*",
     ".yarn*",
     ".pnpm*",
     "bower_components*",
     "jspm_packages*",
-    # Java/C# build files
     "*.class",
     "*.jar",
     "*.war",
@@ -668,7 +614,6 @@ TEMP_FILE_PATTERNS = [
     "*.obj.*",
     "*.lib.*",
     "*.pdb.*",
-    # macOS specific
     ".DS_Store?",
     ".DS_Store??",
     ".DS_Store???",
@@ -677,7 +622,6 @@ TEMP_FILE_PATTERNS = [
     ".Spotlight-V100",
     ".Trashes",
     ".fseventsd",
-    # Windows specific
     "Thumbs.db?",
     "desktop.ini?",
     "*.lnk",
@@ -686,13 +630,10 @@ TEMP_FILE_PATTERNS = [
     "pagefile.sys",
     "hiberfil.sys",
     "swapfile.sys",
-    # Linux specific
     ".fuse_hidden*",
     ".directory",
     ".hidden",
-    # Emacs lock files
     ".#*",
-    # Version control temporary files
     "*.orig",
     "*.rej",
     ".merge*",
@@ -700,7 +641,6 @@ TEMP_FILE_PATTERNS = [
     ".svn*",
     ".hg*",
     ".bzr*",
-    # Configuration backup files
     "*.conf.bak",
     "*.config.bak",
     "*.cfg.bak",
@@ -709,7 +649,6 @@ TEMP_FILE_PATTERNS = [
     "*.yaml.bak",
     "*.yml.bak",
     "*.toml.bak",
-    # Runtime files
     "*.sock",
     "*.pid",
     "*.lock",
@@ -720,7 +659,6 @@ TEMP_FILE_PATTERNS = [
     "*.lock.*",
     "*.lck.*",
     "*.wfl.*",
-    # Additional temporary patterns
     "temp*",
     "tmp*",
     "cache*",
@@ -751,20 +689,18 @@ TEMP_FILE_PATTERNS = [
     "*.output",
 ]
 
-# Directories to skip during traversal (never enter)
 SKIP_TRAVERSE_DIRS = {
     ".git",
     ".svn",
     ".hg",
-    ".bzr",  # Version control
-    "node_modules",  # Node dependencies (handled separately)
+    ".bzr",
+    "node_modules",
     "venv",
     ".venv",
     "env",
-    ".env",  # Virtual environments (handled separately)
+    ".env",
 }
 
-# Default configuration
 DEFAULT_CONFIG = {
     "temp_dirs": list(TEMP_DIR_NAMES),
     "temp_files": TEMP_FILE_PATTERNS,
@@ -791,7 +727,6 @@ def load_config(config_path: str) -> Dict[str, Any]:
         return {**DEFAULT_CONFIG, **config}
     except FileNotFoundError:
         if os.path.basename(config_path) == ".cleanrc":
-            # Try to create default config
             try:
                 with open(config_path, "w") as f:
                     json.dump(DEFAULT_CONFIG, f, indent=2)
@@ -822,9 +757,8 @@ def is_safe_to_remove(item_path: str, root_dir: str, safe_mode: bool = True) -> 
     if not safe_mode:
         return True
 
-    # Never remove files directly in root unless they're clearly temporary
     rel_path = os.path.relpath(item_path, root_dir)
-    if rel_path.count(os.sep) == 0:  # Direct child of root
+    if rel_path.count(os.sep) == 0:
         return os.path.basename(item_path).startswith(".") or any(
             temp in os.path.basename(item_path).lower() for temp in ["temp", "tmp", "cache", "log"]
         )
@@ -872,7 +806,6 @@ def delete_temporary_items(
     backup_dir: Optional[str] = None,
 ):
     """Enhanced deletion of temporary directories and files with safety checks."""
-    # Load configuration
     if config is None:
         config = DEFAULT_CONFIG
 
@@ -884,11 +817,9 @@ def delete_temporary_items(
     safe_mode = cast(bool, config.get("safe_mode", True))
     backup_before_delete = cast(bool, config.get("backup_before_delete", False))
 
-    # Add user-specified patterns
     temp_dir_names.update(include_dir_patterns)
     temp_file_patterns.extend(include_file_patterns)
 
-    # Create backup directory if needed
     if backup_dir and backup_before_delete and not dry_run:
         os.makedirs(backup_dir, exist_ok=True)
         if verbose:
@@ -906,11 +837,9 @@ def delete_temporary_items(
                 dirnames[:] = []
                 continue
 
-        # Process directories
         for d in list(dirnames):
             full_d = os.path.join(dirpath, d)
 
-            # Skip essential directories
             if is_essential_dir(full_d, essential_dirs):
                 if verbose:
                     print(f"Skipping essential directory: {full_d}")
@@ -918,12 +847,10 @@ def delete_temporary_items(
                 skipped_essential += 1
                 continue
 
-            # Skip traversal directories
             if d in skip_traverse_dirs:
                 dirnames.remove(d)
                 continue
 
-            # Check if directory should be removed
             should_remove_dir = (
                 d in temp_dir_names
                 or matches_any(d, temp_dir_names)
@@ -932,7 +859,6 @@ def delete_temporary_items(
                 or (remove_venvs and d in set(venv_names))
             ) and not matches_any(d, exclude_dir_patterns)
 
-            # Additional safety check
             if should_remove_dir and not is_safe_to_remove(full_d, root_dir, safe_mode):
                 if verbose:
                     print(f"Skipping unsafe directory: {full_d}")
@@ -945,7 +871,6 @@ def delete_temporary_items(
                     removed_dirs += 1
                 else:
                     try:
-                        # Create backup if needed
                         if backup_before_delete and backup_dir:
                             if create_backup(full_d, backup_dir):
                                 if verbose:
@@ -957,33 +882,27 @@ def delete_temporary_items(
                         removed_dirs += 1
                     except Exception as e:
                         print(f"Error removing directory {full_d}: {e}")
-                # Prevent os.walk from descending into it
                 if d in dirnames:
                     dirnames.remove(d)
 
-        # Process files
         for f in list(filenames):
             full_f = os.path.join(dirpath, f)
 
-            # Skip essential files
             if is_essential_file(full_f, essential_files):
                 if verbose:
                     print(f"Skipping essential file: {full_f}")
                 skipped_essential += 1
                 continue
 
-            # Skip excluded patterns
             if matches_any(f, exclude_file_patterns):
                 continue
 
-            # Check if file should be removed
             should_remove_file = (
                 f in temp_file_patterns
                 or matches_any(f, temp_file_patterns)
                 or matches_any(f, include_file_patterns)
             )
 
-            # Additional safety check
             if should_remove_file and not is_safe_to_remove(full_f, root_dir, safe_mode):
                 if verbose:
                     print(f"Skipping unsafe file: {full_f}")
@@ -996,7 +915,6 @@ def delete_temporary_items(
                     removed_files += 1
                 else:
                     try:
-                        # Create backup if needed
                         if backup_before_delete and backup_dir:
                             if create_backup(full_f, backup_dir):
                                 if verbose:

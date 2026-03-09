@@ -22,6 +22,7 @@ from app.services.authorization import (
 )
 from app.services.data_export import DataExportService
 from app.services.session_manager import SessionManager
+from app.database.connection import get_db
 
 logger = logging.getLogger(__name__)
 
@@ -83,6 +84,7 @@ async def export_session_data(
     ),
     start_time: Optional[float] = Query(None, description="Start time for export (ms)"),
     end_time: Optional[float] = Query(None, description="End time for export (ms)"),
+    db=Depends(get_db),
     service: DataExportService = Depends(get_data_export_service),
     current_user=Depends(get_current_user),
 ):
@@ -119,6 +121,23 @@ async def export_session_data(
         if variables:
             var_list = [v.strip() for v in variables.split(",")]
 
+        # Validate session ownership
+        from app.database.models import Session as SessionModel
+
+        session = (
+            db.query(SessionModel)
+            .filter(
+                SessionModel.session_id == session_id, SessionModel.user_id == current_user.user_id
+            )
+            .first()
+        )
+
+        if not session:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Session {session_id} not found or access denied",
+            )
+
         # Export data with ownership validation
         data_bytes, content_type = await service.export_session_data(
             session_id=session_id,
@@ -139,7 +158,9 @@ async def export_session_data(
 
         # Add timestamp and hash for uniqueness and security
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        session_hash = hashlib.md5(f"{session_id}{current_user.user_id}".encode()).hexdigest()[:8]
+        session_hash = hashlib.sha256(f"{session_id}{current_user.user_id}".encode()).hexdigest()[
+            :8
+        ]
 
         filename = f"session_{safe_session_id}_{timestamp}_{session_hash}_export.{extension}"
 
@@ -152,7 +173,7 @@ async def export_session_data(
         return StreamingResponse(
             response_data,
             media_type=content_type,
-            headers={"Content-Disposition": f"attachment; filename={filename}"},
+            headers={"Content-Disposition": f'attachment; filename="{filename}"'},
         )
 
     except ValueError as e:

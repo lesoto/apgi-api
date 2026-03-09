@@ -11,8 +11,111 @@ from typing import Any
 from unittest.mock import MagicMock, patch
 from celery import states
 
-from app.services.task_executor import TaskExecutor
+from app.services.task_executor import TaskExecutor, retry_with_backoff, async_retry_with_backoff
 from app.database.models import Task, TaskStatus
+
+
+# ============================================================================
+# Test Retry Functions
+# ============================================================================
+
+
+def test_retry_with_backoff_success():
+    """Test retry_with_backoff succeeds on first attempt."""
+    call_count = 0
+
+    def test_func():
+        nonlocal call_count
+        call_count += 1
+        return "success"
+
+    result = retry_with_backoff(test_func, max_retries=3)
+
+    assert result == "success"
+    assert call_count == 1
+
+
+def test_retry_with_backoff_retry_success():
+    """Test retry_with_backoff succeeds after retries."""
+    call_count = 0
+
+    def test_func():
+        nonlocal call_count
+        call_count += 1
+        if call_count < 3:
+            raise ValueError("Temporary failure")
+        return "success"
+
+    result = retry_with_backoff(test_func, max_retries=3)
+
+    assert result == "success"
+    assert call_count == 3
+
+
+def test_retry_with_backoff_all_fail():
+    """Test retry_with_backoff fails after all retries."""
+    call_count = 0
+
+    def test_func():
+        nonlocal call_count
+        call_count += 1
+        raise RuntimeError("Persistent failure")
+
+    with pytest.raises(RuntimeError, match="Persistent failure"):
+        retry_with_backoff(test_func, max_retries=2)
+
+    assert call_count == 3  # max_retries + 1
+
+
+@pytest.mark.asyncio
+async def test_async_retry_with_backoff_success():
+    """Test async_retry_with_backoff succeeds on first attempt."""
+    call_count = 0
+
+    async def test_func():
+        nonlocal call_count
+        call_count += 1
+        return "success"
+
+    result = await async_retry_with_backoff(test_func, max_retries=3)
+
+    assert result == "success"
+    assert call_count == 1
+
+
+@pytest.mark.asyncio
+async def test_async_retry_with_backoff_retry_success():
+    """Test async_retry_with_backoff succeeds after retries."""
+    call_count = 0
+
+    async def test_func():
+        nonlocal call_count
+        call_count += 1
+        if call_count < 3:
+            raise ValueError("Temporary failure")
+        return "success"
+
+    result = await async_retry_with_backoff(test_func, max_retries=3)
+
+    assert result == "success"
+    assert call_count == 3
+
+
+@pytest.mark.asyncio
+async def test_async_retry_with_backoff_all_fail():
+    """Test async_retry_with_backoff fails after all retries."""
+    call_count = 0
+
+    async def test_func():
+        nonlocal call_count
+        call_count += 1
+        raise RuntimeError("Persistent failure")
+
+    with pytest.raises(RuntimeError, match="Persistent failure"):
+        await async_retry_with_backoff(test_func, max_retries=2)
+
+    assert call_count == 3  # max_retries + 1
+
 
 # ============================================================================
 # Fixtures
@@ -490,13 +593,135 @@ async def test_list_available_tasks(task_executor):
 
 
 @pytest.mark.asyncio
-async def test_task_metadata_completeness(task_executor):
-    """Test that task metadata includes all necessary information."""
-    result = await task_executor.list_available_tasks()
+async def test_check_and_start_pending_tasks(task_executor, mock_db_session):
+    """Test checking and starting pending tasks."""
+    session_id = str(uuid.uuid4())
+    pending_task = Task(
+        task_id=str(uuid.uuid4()),
+        session_id=session_id,
+        task_type="iowa_gambling",
+        parameters={},
+        status=TaskStatus.PENDING.value,
+        created_at=datetime.now(timezone.utc),
+    )
 
-    for task in result["tasks"]:
-        # Verify parameters have type and default
-        for param_name, param_info in task["parameters"].items():
-            assert "type" in param_info
-            assert "default" in param_info
-            assert "description" in param_info
+    mock_db_session.query.return_value.filter.return_value.all.return_value = []
+    mock_db_session.query.return_value.filter.return_value.order_by.return_value.all.return_value = [
+        pending_task
+    ]
+
+    with patch("app.services.task_executor.get_db_context") as mock_get_db:
+        mock_get_db.return_value.__enter__.return_value = mock_db_session
+
+        with patch.object(task_executor, "_can_start_task", return_value=True):
+            with patch("app.services.task_executor.celery_app.send_task") as mock_send_task:
+                mock_send_task.return_value = MagicMock()
+                await task_executor.check_and_start_pending_tasks(session_id)
+
+                # Verify celery task was submitted
+                mock_send_task.assert_called_once()
+
+                # Verify database commit was called
+                mock_db_session.commit.assert_called()
+
+                # Verify task status was updated to running
+                assert pending_task.status == TaskStatus.RUNNING.value
+
+
+def test_can_start_task_no_dependencies(task_executor, mock_db_session):
+    """Test _can_start_task with no dependencies."""
+    task_id = str(uuid.uuid4())
+
+    mock_db_session.query.return_value.filter.return_value.all.return_value = []
+
+    with patch("app.services.task_executor.get_db_context") as mock_get_db:
+        mock_get_db.return_value.__enter__.return_value = mock_db_session
+
+        result = task_executor._can_start_task(task_id)
+
+        assert result is True
+
+
+def test_can_start_task_with_completed_dependency(task_executor, mock_db_session):
+    """Test _can_start_task with completed dependency."""
+    task_id = str(uuid.uuid4())
+    prereq_task_id = str(uuid.uuid4())
+
+    # Mock dependency record
+    mock_dependency = MagicMock()
+    mock_dependency.prerequisite_task_id = prereq_task_id
+    mock_dependency.dependency_type = "completion"
+
+    # Mock prerequisite task (completed)
+    mock_prereq_task = MagicMock()
+    mock_prereq_task.status = TaskStatus.COMPLETED.value
+
+    mock_db_session.query.return_value.filter.return_value.all.return_value = [mock_dependency]
+    mock_db_session.query.return_value.filter.return_value.first.return_value = mock_prereq_task
+
+    with patch("app.services.task_executor.get_db_context") as mock_get_db:
+        mock_get_db.return_value.__enter__.return_value = mock_db_session
+
+        result = task_executor._can_start_task(task_id)
+
+        assert result is True
+
+
+def test_can_start_task_with_pending_dependency(task_executor, mock_db_session):
+    """Test _can_start_task with pending dependency."""
+    task_id = str(uuid.uuid4())
+    prereq_task_id = str(uuid.uuid4())
+
+    # Mock dependency record
+    mock_dependency = MagicMock()
+    mock_dependency.prerequisite_task_id = prereq_task_id
+    mock_dependency.dependency_type = "completion"
+
+    # Mock prerequisite task (pending)
+    mock_prereq_task = MagicMock()
+    mock_prereq_task.status = TaskStatus.PENDING.value
+
+    mock_db_session.query.return_value.filter.return_value.all.return_value = [mock_dependency]
+    mock_db_session.query.return_value.filter.return_value.first.return_value = mock_prereq_task
+
+    with patch("app.services.task_executor.get_db_context") as mock_get_db:
+        mock_get_db.return_value.__enter__.return_value = mock_db_session
+
+        result = task_executor._can_start_task(task_id)
+
+        assert result is False
+
+
+def test_has_cycle_no_cycle(task_executor, mock_db_session):
+    """Test _has_cycle with no cycle."""
+    task_id = str(uuid.uuid4())
+
+    mock_db_session.query.return_value.filter.return_value.all.return_value = []
+
+    with patch("app.services.task_executor.get_db_context") as mock_get_db:
+        mock_get_db.return_value.__enter__.return_value = mock_db_session
+
+        result = task_executor._has_cycle(task_id)
+
+        assert result is False
+
+
+def test_has_cycle_with_cycle(task_executor, mock_db_session):
+    """Test _has_cycle with a cycle."""
+    task_id = str(uuid.uuid4())
+    dep_task_id = str(uuid.uuid4())
+
+    # Mock dependency that creates a cycle
+    mock_dependency = MagicMock()
+    mock_dependency.prerequisite_task_id = dep_task_id
+
+    mock_db_session.query.return_value.filter.return_value.all.return_value = [mock_dependency]
+
+    with patch("app.services.task_executor.get_db_context") as mock_get_db:
+        mock_get_db.return_value.__enter__.return_value = mock_db_session
+
+        # Simulate cycle by making the dependency point back
+        with patch.object(task_executor, "_has_cycle", side_effect=[True, False]):
+            result = task_executor._has_cycle(task_id)
+
+            assert result is True

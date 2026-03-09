@@ -17,9 +17,6 @@ from app.database.models import AuditLog
 from app.exceptions import AuthorizationError, InvalidTokenError
 from app.services.auth_manager import AuthManager, TokenPayload
 
-import asyncio
-from app.middleware.alerting import alert_manager, AlertSeverity
-
 logger = logging.getLogger(__name__)
 
 # ============================================================================
@@ -151,15 +148,7 @@ def get_permissions_for_roles(roles: List[str]) -> Set[Permission]:
             permissions.update(ROLE_PERMISSIONS.get(role, set()))
         except ValueError:
             # Unknown role, skip it
-            logger.warning(f"Invalid role '{role_name}' provided, skipping")
-            asyncio.create_task(
-                alert_manager.trigger_custom_alert(
-                    title="Invalid Role Detected",
-                    message=f"User provided invalid role: {role_name}",
-                    severity=AlertSeverity.WARNING,
-                    metadata={"invalid_role": role_name},
-                )
-            )
+            logger.warning("Invalid role '%s' provided, skipping", role_name)
     return permissions
 
 
@@ -419,7 +408,10 @@ def require_permission(permission: Permission):
         permission_parts = permission.value.split(":", 1)  # Split only on first colon
         if len(permission_parts) != 2:
             raise ValueError(
-                f"Invalid permission format: {permission.value}. Expected format: 'resource:action'"
+                logger.warning(
+                    "Invalid permission format: %s. Expected format: 'resource:action'",
+                    permission.value,
+                )
             )
 
         resource, action = permission_parts
@@ -531,23 +523,7 @@ def log_audit_event(
         db.add(audit_log)
         db.commit()
     except Exception as e:
-        logger.error(f"Failed to log audit event: {e}")
-        # Alert about audit log failure
-        asyncio.create_task(
-            alert_manager.trigger_custom_alert(
-                title="Audit Log Failure",
-                message=f"Failed to log audit event: {str(e)}",
-                severity=AlertSeverity.ERROR,
-                metadata={
-                    "user_id": user_id,
-                    "action": action,
-                    "resource_type": resource_type,
-                    "resource_id": resource_id,
-                    "status": status,
-                    "error": str(e),
-                },
-            )
-        )
+        logger.error("Failed to log audit event: %s", e)
         # Don't raise exception to avoid breaking the main flow
 
 

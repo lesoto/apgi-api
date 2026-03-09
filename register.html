@@ -537,8 +537,11 @@
                     throw new Error(data.detail || "Registration integration failed.");
                 }
                 
+                console.log('API call succeeded, response status:', response.status);
+                
                 // Allow a slight intentional delay for UI aesthetics
                 setTimeout(() => {
+                    console.log('Executing setTimeout callback, calling nextStep success');
                     nextStep('step-success');
                 }, 1500);
                 

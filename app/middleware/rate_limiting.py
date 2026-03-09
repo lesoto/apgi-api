@@ -46,6 +46,7 @@ class RateLimitingMiddleware(BaseHTTPMiddleware):
 
         # Endpoint-specific rate limits (requests per minute)
         self.endpoint_rates = {
+            "auth:attempt": 10,  # Strict limit for authentication attempts
             "session:create": 10,  # Allow creating sessions more frequently
             "session:read": 60,  # Standard rate for reads
             "session:delete": 30,  # Moderate rate for deletes
@@ -91,15 +92,38 @@ class RateLimitingMiddleware(BaseHTTPMiddleware):
 
         # Fall back to IP address - prefer X-Forwarded-For header for proxy support
         client_ip = None
-        if "X-Forwarded-For" in request.headers:
+        direct_ip = request.client.host if request.client else "unknown"
+
+        # Only trust X-Forwarded-For if request comes from trusted proxy
+        trusted_proxies = [
+            "127.0.0.1",
+            "localhost",
+            "::1",  # localhost
+            "10.0.0.0/8",
+            "172.16.0.0/12",
+            "192.168.0.0/16",  # private networks
+        ]
+
+        def is_trusted_proxy(ip: str) -> bool:
+            """Check if IP is from a trusted proxy."""
+            for trusted in trusted_proxies:
+                if "/" in trusted:  # CIDR notation (simplified check)
+                    network, prefix = trusted.split("/")
+                    if ip.startswith(network.rstrip("0").rstrip(".")):
+                        return True
+                elif ip == trusted:
+                    return True
+            return False
+
+        if "X-Forwarded-For" in request.headers and is_trusted_proxy(direct_ip):
             # X-Forwarded-For can contain multiple IPs, take the first one
             forwarded_for = request.headers["X-Forwarded-For"]
             client_ip = forwarded_for.split(",")[0].strip()
-        elif "X-Real-IP" in request.headers:
+        elif "X-Real-IP" in request.headers and is_trusted_proxy(direct_ip):
             client_ip = request.headers["X-Real-IP"]
         else:
             # Fallback to direct client IP
-            client_ip = request.client.host if request.client else "unknown"
+            client_ip = direct_ip
 
         return f"ip:{client_ip}"
 
@@ -119,7 +143,9 @@ class RateLimitingMiddleware(BaseHTTPMiddleware):
         method = request.method
 
         # Map paths to endpoint identifiers
-        if path.startswith("/v1/sessions") and method == "POST":
+        if path.startswith("/v1/auth"):
+            return "auth:attempt"
+        elif path.startswith("/v1/sessions") and method == "POST":
             if path.endswith("/tasks"):
                 return "task:execute"
             return "session:create"

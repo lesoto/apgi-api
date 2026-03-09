@@ -73,7 +73,14 @@ async def list_webhook_deliveries(
                 detail=f"Invalid status_filter. Must be one of {ALLOWED_STATUSES}",
             )
 
-        # Calculate offset
+        # Validate pagination parameters
+        if page < 1:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Page must be >= 1")
+        if per_page < 1 or per_page > 100:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Per page must be between 1 and 100",
+            )
         offset = (page - 1) * per_page
 
         # Build query

@@ -11,7 +11,6 @@ from typing import Optional
 
 import redis.asyncio as redis
 from fastapi import FastAPI
-from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.gzip import GZipMiddleware
 
 # Check dependencies before starting
@@ -32,18 +31,36 @@ from app.exception_handlers import register_exception_handlers
 from app.middleware.alerting import configure_alerting
 from app.middleware.api_versioning import APIVersioningMiddleware
 from app.middleware.authentication import AuthenticationMiddleware
+from app.middleware.cors_config import configure_cors
 from app.middleware.csrf import CSRFMiddleware
 from app.middleware.deprecation import DeprecationMiddleware
 from app.middleware.metrics import PrometheusMetricsMiddleware
 from app.middleware.request_size_limit import RequestSizeLimitMiddleware
 from app.middleware.schema_validation import ResponseSchemaValidationMiddleware
 from app.middleware.rate_limiting import RateLimitingMiddleware
+from app.middleware.security_headers import SecurityHeadersMiddleware
 from app.middleware.logging import (
     RequestLoggingMiddleware,
     StructuredLogger,
     configure_structured_logging,
 )
 from app.middleware.profiling import ProfilingMiddleware
+from app.routes import (
+    admin,
+    auth,
+    users,
+    sessions,
+    templates,
+    state,
+    tasks,
+    export,
+    metrics,
+    health,
+    version,
+    payments,
+    api_keys,
+    webhooks,
+)
 
 # OpenTelemetry import is conditional - handle ImportError
 try:
@@ -53,17 +70,19 @@ try:
 except ImportError:
     OPENTELEMETRY_AVAILABLE = False
 from app.routes import (
+    api_keys,
     auth,
     export,
     health,
     metrics,
+    payments,
     sessions,
     state,
     tasks,
     templates,
     users,
     version,
-    payments,
+    webhooks,
 )
 from app.schemas.root import RootResponse
 from app.services.cache_service import init_cache_service
@@ -290,14 +309,11 @@ All endpoints except `/health`, `/docs`, and `/openapi.json` require authenticat
         RateLimitingMiddleware, redis_client=None, enabled=settings.rate_limit_enabled
     )
 
+    # Add security headers middleware
+    app.add_middleware(SecurityHeadersMiddleware)
+
     # Configure CORS
-    app.add_middleware(
-        CORSMiddleware,
-        allow_origins=settings.cors_origins,
-        allow_credentials=settings.cors_allow_credentials,
-        allow_methods=settings.cors_allow_methods,
-        allow_headers=settings.cors_allow_headers,
-    )
+    configure_cors(app)
 
     # Register exception handlers
     register_exception_handlers(app)
@@ -315,6 +331,7 @@ All endpoints except `/health`, `/docs`, and `/openapi.json` require authenticat
         }
 
     # Include routers
+    app.include_router(admin.router)
     app.include_router(auth.router)
     app.include_router(users.router)
     app.include_router(sessions.router)
@@ -326,6 +343,8 @@ All endpoints except `/health`, `/docs`, and `/openapi.json` require authenticat
     app.include_router(health.router)
     app.include_router(version.router)
     app.include_router(payments.router)
+    app.include_router(api_keys.router)
+    app.include_router(webhooks.router)
 
     # Configure deprecated endpoints
     version.configure_deprecated_endpoints({})

@@ -379,6 +379,10 @@ class AuthManager:
         if user.locked_until and now < user.locked_until:
             raise AuthenticationError("Account is locked due to too many failed login attempts")
 
+        # Check if account is active (email verified)
+        if not user.is_active:
+            raise AuthenticationError("Account is not activated. Please verify your email first.")
+
         # Verify password
         if not self.verify_password(password, user.password_hash):  # type: ignore[arg-type]
             # Increment failed login attempts
