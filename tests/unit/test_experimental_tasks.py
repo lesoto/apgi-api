@@ -2,7 +2,6 @@
 Unit tests for experimental tasks.
 
 Tests Celery tasks for Iowa Gambling, Masking Paradigm, Attentional Blink, etc.
-Validates Requirements 8.1, 8.2, 8.3.
 """
 
 import pytest
@@ -143,9 +142,7 @@ class TestExecuteIowaGamblingTask:
                 mock_celery_task.request.id = "task_123"
                 mock_celery_task.apgi_system = MagicMock()
 
-                result = execute_iowa_gambling_task.__class__.run(
-                    mock_celery_task, session_id, parameters
-                )
+                result = execute_iowa_gambling_task(mock_celery_task, session_id, parameters)
 
                 assert result["status"] == "completed"
                 assert result["task_type"] == "iowa_gambling"
@@ -154,7 +151,7 @@ class TestExecuteIowaGamblingTask:
     def test_execute_iowa_gambling_task_failure(self):
         """Test Iowa Gambling task execution failure."""
         session_id = "session_123"
-        parameters = {}
+        parameters: dict = {}
 
         with patch("app.tasks.experimental_tasks.IowaGamblingTask") as mock_task_class:
             mock_task_instance = MagicMock()

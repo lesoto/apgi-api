@@ -221,7 +221,7 @@ class TestUpdateAPIKey:
         """Test API key update when key not found."""
         mock_db_session.query.return_value.filter.return_value.first.return_value = None
 
-        request = APIKeyUpdateRequest(name="New Name")
+        request = APIKeyUpdateRequest(name="New Name", permissions=None, is_active=None)
 
         with pytest.raises(HTTPException) as exc_info:
             await update_api_key("nonexistent_key", request, mock_db_session, mock_current_user)
@@ -236,7 +236,7 @@ class TestUpdateAPIKey:
         mock_db_session.query.return_value.filter.return_value.first.return_value = mock_api_key
         mock_db_session.commit.side_effect = Exception("Database error")
 
-        request = APIKeyUpdateRequest(name="New Name")
+        request = APIKeyUpdateRequest(name="New Name", permissions=None, is_active=None)
 
         with pytest.raises(HTTPException) as exc_info:
             await update_api_key("test_key_123", request, mock_db_session, mock_current_user)

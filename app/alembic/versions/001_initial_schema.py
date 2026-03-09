@@ -1,9 +1,6 @@
 """Initial database schema
 
 Revision ID: 001
-Revises:
-Create Date: 2025-12-03 10:00:00.000000
-
 """
 
 import sqlalchemy as sa

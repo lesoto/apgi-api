@@ -97,7 +97,7 @@ async def register_user(
             roles=list(user.roles) if user.roles else [],  # type: ignore[arg-type]
             created_at=user.created_at,  # type: ignore[arg-type]
             message="User created successfully. Please check your email to verify your account.",
-        )  # type: ignore[arg-type]
+        )
 
     except ValueError as e:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
@@ -445,7 +445,7 @@ async def update_user(
             is_active=user.is_active,  # type: ignore[arg-type]
             created_at=user.created_at,  # type: ignore[arg-type]  # type: ignore[arg-type]
             updated_at=user.updated_at,  # type: ignore[arg-type]
-            last_login=user.last_login,
+            last_login=user.last_login,  # type: ignore[arg-type]
         )
 
     except UserNotFoundError:
@@ -602,7 +602,7 @@ async def enable_mfa(
 
         # Verify the code
         auth_manager = AuthManager(db)
-        if not auth_manager.verify_mfa_code(user.mfa_secret, request.code):
+        if not auth_manager.verify_mfa_code(user.mfa_secret, request.code):  # type: ignore[arg-type]
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="Invalid MFA code",

@@ -322,7 +322,7 @@ def downgrade() -> None:
         ["token_hash"],
         postgresql_nulls_not_distinct=False,
     )
-    op.drop_constraint(None, "audit_logs", type_="foreignkey")
+    op.drop_constraint("audit_logs_user_id_fkey", "audit_logs", type_="foreignkey")
     op.create_foreign_key(
         op.f("audit_logs_user_id_fkey"), "audit_logs", "users", ["user_id"], ["user_id"]
     )

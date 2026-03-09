@@ -33,8 +33,7 @@ def mock_request():
         def __init__(self):
             self.url = type("URL", (), {"path": "/api/test"})()
             self.headers = {}
-            self.state = type("State", (), {})()
-            self.state.authenticated = False
+            self.state = type("State", (), {"authenticated": False})()
 
     return MockRequest()
 

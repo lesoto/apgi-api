@@ -69,7 +69,7 @@ async def query_audit_logs(
     user_id: Optional[str] = Query(None, description="Filter by user ID"),
     action: Optional[str] = Query(None, description="Filter by action type"),
     resource_type: Optional[str] = Query(None, description="Filter by resource type"),
-    status: Optional[str] = Query(None, description="Filter by status (success/failure)"),
+    status_filter: Optional[str] = Query(None, description="Filter by status (success/failure)"),
     page: int = Query(1, ge=1, description="Page number"),
     per_page: int = Query(20, ge=1, le=100, description="Items per page"),
     db: Session = Depends(get_db),
@@ -90,8 +90,8 @@ async def query_audit_logs(
             filters.append(AuditLog.action == action)
         if resource_type:
             filters.append(AuditLog.resource_type == resource_type)
-        if status:
-            filters.append(AuditLog.status == status)
+        if status_filter:
+            filters.append(AuditLog.status == status_filter)
 
         if filters:
             query = query.filter(and_(*filters))

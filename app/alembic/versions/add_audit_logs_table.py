@@ -8,6 +8,7 @@ Create Date: 2025-02-27 10:00:00.000000
 
 import sqlalchemy as sa
 from alembic import op
+from sqlalchemy.dialects import postgresql
 
 # revision identifiers, used by Alembic.
 revision = "add_audit_logs_table"
@@ -65,7 +66,7 @@ def upgrade() -> None:
         ),
         sa.Column(
             "details",
-            sa.dialects.postgresql.JSONB(),
+            postgresql.JSONB(),
             nullable=True,
             comment="Additional details about the action",
         ),

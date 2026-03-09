@@ -407,11 +407,12 @@ def require_permission(permission: Permission):
         # Safely split permission value to handle malformed permissions
         permission_parts = permission.value.split(":", 1)  # Split only on first colon
         if len(permission_parts) != 2:
+            logger.warning(
+                "Invalid permission format: %s. Expected format: 'resource:action'",
+                permission.value,
+            )
             raise ValueError(
-                logger.warning(
-                    "Invalid permission format: %s. Expected format: 'resource:action'",
-                    permission.value,
-                )
+                f"Invalid permission format: {permission.value}. Expected format: 'resource:action'"
             )
 
         resource, action = permission_parts
