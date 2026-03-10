@@ -4,15 +4,17 @@ Session Management Routes
 API endpoints for creating, controlling, and managing APGI simulation sessions.
 """
 
+import asyncio
 import logging
-from typing import Optional, Dict, Any
+from typing import Optional, Dict, Any, cast, List
 
 import redis.asyncio as redis
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status, Request
 from sqlalchemy.orm import Session
 
 from app.database.connection import SessionLocal, get_db
-from app.database.models import Session as SessionModel, Task
+from datetime import datetime
+from app.database.models import Session as SessionModel, Task, Session
 from app.exceptions import ServiceUnavailableError, SessionNotFoundError, SessionStateConflictError
 from app.models.schemas import (
     ErrorResponse,
@@ -73,8 +75,18 @@ async def validate_session_ownership(
     Raises:
         HTTPException: If session not found or user doesn't own it
     """
-    # Get session from database to check ownership
-    session = db_session.query(SessionModel).filter(SessionModel.session_id == session_id).first()
+
+    # Blocking function for DB query
+    def _blocking_validate():
+        session = (
+            db_session.query(SessionModel).filter(SessionModel.session_id == session_id).first()
+        )
+        return session  # type: ignore[return-value]
+
+    # Execute DB query in executor to avoid blocking event loop
+    loop = asyncio.get_event_loop()
+    session = cast(SessionModel, await loop.run_in_executor(None, _blocking_validate))
+
     if not session:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, detail=f"Session {session_id} not found"
@@ -82,7 +94,7 @@ async def validate_session_ownership(
 
     # Admins bypass ownership checks (MF-012 / R-23)
     if is_admin:
-        return session
+        return session  # type: ignore[return-value]
 
     # Check ownership
     if session.user_id != user_id:
@@ -91,7 +103,7 @@ async def validate_session_ownership(
             detail="Access denied: you do not own this session",
         )
 
-    return session
+    return session  # type: ignore[return-value]
 
 
 # Create router
@@ -122,6 +134,72 @@ def get_session_manager() -> SessionManager:
     if _state.session_manager is None:
         raise ServiceUnavailableError("SessionManager", "Session manager not initialized")
     return _state.session_manager
+
+
+async def check_idempotency_key(
+    request: Request,
+    user_id: str,
+    redis_client: redis.Redis,
+    idempotency_key: Optional[str] = None,
+) -> Optional[Dict[str, Any]]:
+    """
+    Check for idempotency key and return cached response if exists.
+
+    Args:
+        request: HTTP request
+        user_id: User ID
+        redis_client: Redis client
+        idempotency_key: Idempotency key from header (optional)
+
+    Returns:
+        Cached response dict if found, None otherwise
+    """
+    if not idempotency_key:
+        # Check header
+        idempotency_key = request.headers.get("Idempotency-Key")
+        if not idempotency_key:
+            return None
+
+    # Validate key format (should be reasonably short)
+    if len(idempotency_key) > 255:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Idempotency-Key header too long (max 255 characters)",
+        )
+
+    # Check cache
+    cache_key = f"idempotency:{user_id}:{idempotency_key}"
+    cached_response = await redis_client.get(cache_key)
+
+    if cached_response:
+        import json
+
+        return cast(Dict[str, Any], json.loads(cached_response))  # type: ignore[return-value]
+
+    return None
+
+
+async def cache_idempotency_response(
+    user_id: str,
+    idempotency_key: str,
+    response_data: Dict[str, Any],
+    redis_client: redis.Redis,
+    ttl_seconds: int = 86400,  # 24 hours
+):
+    """
+    Cache response for idempotency key.
+
+    Args:
+        user_id: User ID
+        idempotency_key: Idempotency key
+        response_data: Response data to cache
+        redis_client: Redis client
+        ttl_seconds: TTL for cache
+    """
+    import json
+
+    cache_key = f"idempotency:{user_id}:{idempotency_key}"
+    await redis_client.setex(cache_key, ttl_seconds, json.dumps(response_data))
 
 
 def init_session_routes(redis_client: redis.Redis):
@@ -222,7 +300,9 @@ async def list_sessions(
 )
 async def create_session(
     request: SessionCreateRequest,
+    req: Request,
     manager: SessionManager = Depends(get_session_manager),
+    redis_client: redis.Redis = Depends(get_redis_client),
     current_user=Depends(get_current_user),
 ):
     """
@@ -230,7 +310,10 @@ async def create_session(
 
     Args:
         request: Session creation request with configuration
+        req: HTTP request for idempotency key
         manager: Session manager dependency
+        redis_client: Redis client for idempotency caching
+        current_user: Current authenticated user
 
     Returns:
         SessionCreateResponse with session ID and details
@@ -238,6 +321,16 @@ async def create_session(
     Raises:
         HTTPException: If session creation fails
     """
+    # Check idempotency key
+    cached_response = await check_idempotency_key(req, current_user.user_id, redis_client)
+    if cached_response:
+        # Convert cached datetime string back to datetime object
+        if "created_at" in cached_response and isinstance(cached_response["created_at"], str):
+            cached_response["created_at"] = datetime.fromisoformat(
+                cached_response["created_at"][:-1]
+            )
+        return SessionCreateResponse(**cached_response)  # type: ignore[call-arg]
+
     # Create session
     session_id = await manager.create_session(request, user_id=current_user.user_id)
 
@@ -246,12 +339,21 @@ async def create_session(
 
     logger.info(f"Session {session_id} created successfully")
 
-    return SessionCreateResponse(
-        session_id=session_id,
-        status=sim_session.state.value,
-        created_at=sim_session.created_at,
-        config=sim_session.config,
-    )
+    response_data = {
+        "session_id": session_id,
+        "status": sim_session.state.value,
+        "created_at": sim_session.created_at,
+        "config": sim_session.config,
+    }
+
+    # Cache response for idempotency
+    idempotency_key = req.headers.get("Idempotency-Key")
+    if idempotency_key:
+        await cache_idempotency_response(
+            current_user.user_id, idempotency_key, response_data, redis_client
+        )
+
+    return SessionCreateResponse(**response_data)
 
 
 @router.get(
@@ -395,46 +497,52 @@ async def get_session_tasks(
     Raises:
         HTTPException: If session not found
     """
-    try:
+
+    # Blocking function for DB queries
+    def _blocking_get_tasks():
         # Verify session exists
         session = db.query(SessionModel).filter(SessionModel.session_id == session_id).first()
         if not session:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND, detail=f"Session {session_id} not found"
-            )
+            return None
 
         # Verify session ownership
         if session.user_id != current_user.user_id:
-            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Access denied")
+            return "forbidden"
 
         # Get tasks for session
         tasks = db.query(Task).filter(Task.session_id == session_id).all()
+        return tasks
 
-        # Convert to response format
-        task_responses = [
-            TaskStatusResponse(
-                task_id=task.task_id,
-                status=task.status,
-                state=task.status,  # Use status as state since Celery state not stored in DB
-                result=task.result_data,
-                error=task.error_message,
-                info=None,
-            )
-            for task in tasks
-        ]
+    # Execute DB queries in executor to avoid blocking event loop
+    loop = asyncio.get_event_loop()
+    result = await loop.run_in_executor(None, _blocking_get_tasks)
 
-        logger.info(f"Retrieved {len(task_responses)} tasks for session {session_id}")
-
-        return SessionTaskListResponse(tasks=task_responses)
-
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error(f"Failed to get tasks for session {session_id}: {e}")
+    if result is None:
         raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Failed to get tasks for session",
+            status_code=status.HTTP_404_NOT_FOUND, detail=f"Session {session_id} not found"
         )
+
+    if result == "forbidden":
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Access denied")
+
+    tasks = cast(List[Task], result)
+
+    # Convert to response format
+    task_responses = [
+        TaskStatusResponse(
+            task_id=str(task.task_id),
+            status=str(task.status),
+            state=str(task.status),  # Use status as state since Celery state not stored in DB
+            result=task.result_data,
+            error=str(task.error_message) if task.error_message else None,
+            info=None,
+        )
+        for task in tasks
+    ]
+
+    logger.info(f"Retrieved {len(task_responses)} tasks for session {session_id}")
+
+    return SessionTaskListResponse(tasks=task_responses)
 
 
 @router.post(

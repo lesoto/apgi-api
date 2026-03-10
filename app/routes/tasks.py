@@ -503,6 +503,36 @@ async def create_task_dependency(
                 detail="Dependency already exists between these tasks",
             )
 
+        # Check for cycles in dependency graph
+        # Perform DFS from prerequisite_task_id to see if it can reach task_id
+        def has_cycle(start_task_id: str, target_task_id: str, visited: set[str]) -> bool:
+            """Check if there's a path from start_task_id to target_task_id (indicating a cycle)."""
+            if start_task_id in visited:
+                return False
+            if start_task_id == target_task_id:
+                return True
+
+            visited.add(start_task_id)
+
+            # Get all tasks that depend on start_task_id
+            dependents = (
+                db.query(TaskDependencyModel.dependent_task_id)
+                .filter(TaskDependencyModel.prerequisite_task_id == start_task_id)
+                .all()
+            )
+
+            for (dependent_id,) in dependents:
+                if has_cycle(dependent_id, target_task_id, visited.copy()):
+                    return True
+
+            return False
+
+        if has_cycle(request.prerequisite_task_id, task_id, set()):
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="Creating this dependency would create a cycle in the task dependency graph",
+            )
+
         # Create dependency
         dependency = TaskDependencyModel(
             dependent_task_id=task_id,

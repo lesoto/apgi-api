@@ -74,6 +74,8 @@ class CSRFMiddleware(BaseHTTPMiddleware):
         """
         # Use HMAC with a server-side secret key
         # This prevents token prediction attacks and ensures only the server can validate tokens
+        if not settings.jwt_secret_key:
+            raise ValueError("JWT secret key not configured")
         return hmac.new(
             settings.jwt_secret_key.encode(), token.encode(), hashlib.sha256
         ).hexdigest()
@@ -95,10 +97,10 @@ class CSRFMiddleware(BaseHTTPMiddleware):
         # Skip CSRF for API endpoints that use JWT authentication
         # (CSRF is primarily for browser-based form submissions)
         # However, DELETE requests should always be protected due to their destructive nature
-        if request.method == "DELETE":
-            return True
         if request.headers.get("authorization", "").startswith("Bearer "):
             return False
+        if request.method == "DELETE":
+            return True
 
         # Skip CSRF for content-type that's not form-based
         content_type = request.headers.get("content-type", "").lower()

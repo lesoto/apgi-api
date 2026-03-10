@@ -16,12 +16,13 @@ from typing import Any, Dict, Optional, Tuple, cast
 from collections import OrderedDict
 
 import redis.asyncio as redis
-from sqlalchemy import select
+from sqlalchemy import select, func
 
 from app.database.models import Session as SessionModel
 from app.database.models import SessionState
 from app.database.models import SessionTemplate
 from app.models.schemas import SessionCreateRequest
+from app.config import settings
 from apgi_system.system import APGISystem  # type: ignore[import-untyped]
 
 logger = logging.getLogger(__name__)
@@ -146,6 +147,70 @@ class SimulationSession:
 
         # Reinitialize subsystems with new config
         self.apgi_system._initialize_subsystems()
+
+    def _capture_state(self) -> Dict[str, Any]:
+        """Capture complete system state for pause/resume."""
+        state = cast(Dict[str, Any], self.apgi_system.get_state())
+
+        # Explicitly capture subsystem states for full restoration
+        state["allostasis"] = self.apgi_system.allostasis.save_state()  # type: ignore[attr-defined]
+        state["body"] = self.apgi_system.body.save_state()  # type: ignore[attr-defined]
+        state["precision"] = self.apgi_system.precision.save_state()  # type: ignore[attr-defined]
+        state["workspace"] = self.apgi_system.workspace.save_state()  # type: ignore[attr-defined]
+        state["self_model"] = self.apgi_system.self_model.save_state()  # type: ignore[attr-defined]
+        state["ignition"] = self.apgi_system.ignition.save_state()  # type: ignore[attr-defined]
+        return state
+
+    def _restore_state(self, state: Dict[str, Any]):
+        """Restore system state from snapshot."""
+        # Restore complete system state from snapshot
+        if not state:
+            logger.warning(f"Session {self.session_id} attempting to restore empty state")
+            return
+
+        # Restore basic simulation properties
+        self.apgi_system.time = state.get("time", 0.0)
+        self.apgi_system.history = state.get("history", {})
+
+        # Restore subsystem states if available
+        if "allostasis" in state:
+            self.apgi_system.allostasis.load_state(state["allostasis"])  # type: ignore[attr-defined]
+
+        if "body" in state:
+            self.apgi_system.body.load_state(state["body"])  # type: ignore[attr-defined]
+
+        if "precision" in state:
+            self.apgi_system.precision.load_state(state["precision"])  # type: ignore[attr-defined]
+
+        if "workspace" in state:
+            self.apgi_system.workspace.load_state(state["workspace"])  # type: ignore[attr-defined]
+
+        if "self_model" in state:
+            self.apgi_system.self_model.load_state(state["self_model"])  # type: ignore[attr-defined]
+
+        if "ignition" in state:
+            self.apgi_system.ignition.load_state(state["ignition"])  # type: ignore[attr-defined]
+
+        # Restore any other dynamic attributes from state
+        for key, value in state.items():
+            if (
+                hasattr(self.apgi_system, key)
+                and key
+                not in [
+                    "time",
+                    "history",
+                    "allostasis",
+                    "body",
+                    "precision",
+                    "workspace",
+                    "self_model",
+                    "ignition",
+                ]
+                and key.isidentifier()
+            ):
+                setattr(self.apgi_system, key, value)
+
+        logger.info(f"Session {self.session_id} full state restored")
 
     async def start(self) -> Dict[str, Any]:
         """
@@ -309,70 +374,30 @@ class SimulationSession:
 
             return state  # type: ignore
 
-    def _capture_state(self) -> Dict[str, Any]:
-        """Capture complete system state for pause/resume."""
-        state = cast(Dict[str, Any], self.apgi_system.get_state())
-
-        # Explicitly capture subsystem states for full restoration
-        state["allostasis"] = self.apgi_system.allostasis.save_state()  # type: ignore[attr-defined]
-        state["body"] = self.apgi_system.body.save_state()  # type: ignore[attr-defined]
-        state["precision"] = self.apgi_system.precision.save_state()  # type: ignore[attr-defined]
-        state["workspace"] = self.apgi_system.workspace.save_state()
-        state["self_model"] = self.apgi_system.self_model.save_state()
-        state["ignition"] = self.apgi_system.ignition.save_state()
-
         return state
 
-    def _restore_state(self, state: Dict[str, Any]):
-        """Restore system state from snapshot."""
-        # Restore complete system state from snapshot
-        if not state:
-            logger.warning(f"Session {self.session_id} attempting to restore empty state")
-            return
 
-        # Restore basic simulation properties
-        self.apgi_system.time = state.get("time", 0.0)
-        self.apgi_system.history = state.get("history", {})
+async def get_state(self) -> Dict[str, Any]:
+    """
+    Get current system state.
 
-        # Restore subsystem states if available
-        if "allostasis" in state:
-            self.apgi_system.allostasis.load_state(state["allostasis"])  # type: ignore[attr-defined]
+    Returns:
+        Complete system state
+    """
+    async with self.lock:
+        state = self.apgi_system.get_state()
 
-        if "body" in state:
-            self.apgi_system.body.load_state(state["body"])  # type: ignore[attr-defined]
+        # Add session metadata
+        state["session_metadata"] = {
+            "session_id": self.session_id,
+            "state": self.state.value,
+            "is_running": self.is_running,
+            "is_paused": self.is_paused,
+            "created_at": self.created_at.isoformat() + "Z",
+            "updated_at": self.updated_at.isoformat() + "Z",
+        }
 
-        if "precision" in state:
-            self.apgi_system.precision.load_state(state["precision"])  # type: ignore[attr-defined]
-
-        if "workspace" in state:
-            self.apgi_system.workspace.load_state(state["workspace"])  # type: ignore[attr-defined]
-
-        if "self_model" in state:
-            self.apgi_system.self_model.load_state(state["self_model"])  # type: ignore[attr-defined]
-
-        if "ignition" in state:
-            self.apgi_system.ignition.load_state(state["ignition"])  # type: ignore[attr-defined]
-
-        # Restore any other dynamic attributes from state
-        for key, value in state.items():
-            if (
-                hasattr(self.apgi_system, key)
-                and key
-                not in [
-                    "time",
-                    "history",
-                    "allostasis",
-                    "body",
-                    "precision",
-                    "workspace",
-                    "self_model",
-                    "ignition",
-                ]
-                and key.isidentifier()
-            ):
-                setattr(self.apgi_system, key, value)
-
-        logger.info(f"Session {self.session_id} full state restored")
+        return state
 
 
 class SessionManager:
@@ -481,6 +506,22 @@ class SessionManager:
             Session ID
         """
         session_id = str(uuid.uuid4())
+
+        # Check per-user session count cap
+        db_session = self.db_session_factory()
+        try:
+            session_count = db_session.scalar(
+                select(func.count(SessionModel.session_id))
+                .where(SessionModel.user_id == user_id)
+                .where(SessionModel.is_deleted.is_(False))
+            )
+            if session_count >= settings.max_sessions_per_user:
+                raise ValueError(
+                    f"User {user_id} has reached the maximum number of sessions ({settings.max_sessions_per_user}). "
+                    "Please delete some existing sessions before creating new ones."
+                )
+        finally:
+            db_session.close()
 
         # Prepare configuration
         config = {}
@@ -724,7 +765,10 @@ class SessionManager:
         self, session_id: str, new_state: SessionLifecycleState, user_id: Optional[str] = None
     ):
         """
-        Update session state in database and cache.
+        Update session state in database and cache atomically.
+
+        Uses SELECT FOR UPDATE to prevent race conditions when multiple
+        concurrent requests try to update the same session state.
 
         Args:
             session_id: Session identifier
@@ -736,10 +780,14 @@ class SessionManager:
         """
         # Validate session ID format
         validate_session_id(session_id)
-        # Update database
+
+        # Update database with row locking to prevent race conditions
         db_session = self.db_session_factory()
         try:
-            stmt = select(SessionModel).where(SessionModel.session_id == session_id)
+            # Use SELECT FOR UPDATE to lock the row atomically
+            stmt = (
+                select(SessionModel).where(SessionModel.session_id == session_id).with_for_update()
+            )
             result = db_session.execute(stmt)
             db_model = result.scalar_one_or_none()
 
@@ -747,6 +795,7 @@ class SessionManager:
                 db_model.state = new_state.value
                 db_model.updated_at = datetime.now(timezone.utc)
                 db_session.commit()
+                logger.info(f"Session {session_id} state updated to {new_state.value} atomically")
         except Exception as e:
             db_session.rollback()
             logger.error(f"Failed to update session {session_id} state: {e}")

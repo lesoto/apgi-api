@@ -16,7 +16,7 @@ from sqlalchemy.orm import Session
 
 from app.database.connection import get_db
 from app.database.models import User
-from app.exceptions import UserNotFoundError
+from app.exceptions import UserNotFoundError, ValidationError
 from app.models.schemas import (
     ErrorResponse,
     UserCreateRequest,
@@ -25,12 +25,19 @@ from app.models.schemas import (
     UserUpdateRequest,
     PasswordResetRequest,
     PasswordResetResponse,
+    PasswordResetEmailRequest,
+    PasswordResetEmailResponse,
+    PasswordResetConfirmRequest,
+    PasswordResetConfirmResponse,
     UserStatsResponse,
     MFAEnrollResponse,
     MFADisableRequest,
     MFADisableResponse,
     MFAEnableRequest,
     MFAEnableResponse,
+    MFABackupCodeVerifyRequest,
+    MFABackupCodeVerifyResponse,
+    MFABackupCodeRegenerateResponse,
 )
 from app.services.authorization import (
     Permission,
@@ -515,6 +522,96 @@ async def reset_user_password(
 
 
 @router.post(
+    "/reset-password",
+    response_model=PasswordResetEmailResponse,
+    summary="Request password reset",
+    description="Request a password reset token to be sent to the user's email",
+)
+async def request_password_reset(
+    request: PasswordResetEmailRequest,
+    db: Session = Depends(get_db),
+):
+    """
+    Request password reset by email.
+
+    Args:
+        request: Password reset email request
+        db: Database session
+
+    Returns:
+        PasswordResetEmailResponse with confirmation message
+
+    Raises:
+        HTTPException: If user not found or email sending fails
+    """
+    user_service = get_user_management_service(db)
+
+    try:
+        user_service.request_password_reset(request.email)
+
+        return PasswordResetEmailResponse(
+            message="If an account with that email exists, a password reset link has been sent."
+        )
+
+    except UserNotFoundError:
+        # Return success message to avoid email enumeration
+        return PasswordResetEmailResponse(
+            message="If an account with that email exists, a password reset link has been sent."
+        )
+    except Exception as e:
+        logger.error(f"Failed to request password reset: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="An internal error occurred",
+        )
+
+
+@router.post(
+    "/reset-password/confirm",
+    response_model=PasswordResetConfirmResponse,
+    summary="Confirm password reset",
+    description="Confirm password reset using the token and set new password",
+)
+async def confirm_password_reset(
+    request: PasswordResetConfirmRequest,
+    db: Session = Depends(get_db),
+):
+    """
+    Confirm password reset with token.
+
+    Args:
+        request: Password reset confirmation request with token and new password
+        db: Database session
+
+    Returns:
+        PasswordResetConfirmResponse with confirmation message
+
+    Raises:
+        HTTPException: If token is invalid or expired
+    """
+    user_service = get_user_management_service(db)
+
+    try:
+        user_service.confirm_password_reset(request.token, request.new_password)
+
+        return PasswordResetConfirmResponse(
+            message="Password has been reset successfully. You can now log in with your new password."
+        )
+
+    except ValidationError as e:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(e),
+        )
+    except Exception as e:
+        logger.error(f"Failed to confirm password reset: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="An internal error occurred",
+        )
+
+
+@router.post(
     "/mfa/enroll",
     response_model=MFAEnrollResponse,
     summary="Enroll MFA",
@@ -544,9 +641,15 @@ async def enroll_mfa(
         secret = auth_manager.generate_mfa_secret()
         qr_url = auth_manager.get_mfa_qr_url(current_user.username, secret)
 
-        # Save MFA secret to user (but don't enable yet - user needs to verify first)
+        # Generate backup codes (10 codes, 8 characters each)
+        import secrets
+
+        backup_codes = [secrets.token_hex(4).upper() for _ in range(10)]
+
+        # Save MFA secret and backup codes to user (but don't enable yet - user needs to verify first)
         user = user_service.get_user(current_user.user_id)
         user.mfa_secret = secret  # type: ignore[assignment]
+        user.mfa_backup_codes = backup_codes  # type: ignore[assignment]
         user.mfa_enabled = False  # type: ignore[assignment]
         user.updated_at = datetime.now(timezone.utc)  # type: ignore[assignment]
 
@@ -555,7 +658,8 @@ async def enroll_mfa(
         return MFAEnrollResponse(
             secret=secret,
             qr_code_url=qr_url,
-            message="Scan the QR code with your authenticator app, then use the generated code to complete setup.",
+            message="Scan the QR code with your authenticator app, then use the generated code to complete setup. Save these backup codes in a secure place - you can use them to recover access if you lose your device.",
+            backup_codes=backup_codes,
         )
 
     except Exception as e:
@@ -671,6 +775,7 @@ async def disable_mfa(
         # Disable MFA
         user.mfa_enabled = False  # type: ignore[assignment]
         user.mfa_secret = None  # type: ignore[assignment]
+        user.mfa_backup_codes = None  # type: ignore[assignment]
         user.updated_at = datetime.now(timezone.utc)  # type: ignore[assignment]
 
         db.commit()
@@ -685,6 +790,138 @@ async def disable_mfa(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="An internal error occurred during MFA disable",
+        )
+
+
+@router.post(
+    "/mfa/backup-code/verify",
+    response_model=MFABackupCodeVerifyResponse,
+    summary="Verify MFA backup code",
+    description="Verify a backup code for MFA recovery when TOTP is unavailable",
+)
+async def verify_mfa_backup_code(
+    request: MFABackupCodeVerifyRequest,
+    db: Session = Depends(get_db),
+    current_user: TokenPayload = Depends(get_current_user),
+):
+    """
+    Verify MFA backup code for recovery.
+
+    Args:
+        request: MFA backup code verification request
+        db: Database session
+        current_user: Authenticated user
+
+    Returns:
+        MFABackupCodeVerifyResponse with verification result
+
+    Raises:
+        HTTPException: If backup code is invalid or MFA not enabled
+    """
+    user_service = get_user_management_service(db)
+
+    try:
+        user = user_service.get_user(current_user.user_id)
+
+        if not user.mfa_enabled:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="MFA is not enabled for this account",
+            )
+
+        if not user.mfa_backup_codes:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="No backup codes available for this account",
+            )
+
+        # Check if the backup code exists and remove it (one-time use)
+        if request.code in user.mfa_backup_codes:
+            user.mfa_backup_codes.remove(request.code)  # type: ignore[union-attr]
+            user.updated_at = datetime.now(timezone.utc)  # type: ignore[assignment]
+
+            db.commit()
+
+            return MFABackupCodeVerifyResponse(
+                message="Backup code verified successfully. You can now log in."
+            )
+        else:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Invalid backup code",
+            )
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        db.rollback()
+        logger.error(f"Failed to verify MFA backup code for user {current_user.user_id}: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="An internal error occurred during backup code verification",
+        )
+
+
+@router.post(
+    "/mfa/backup-code/regenerate",
+    response_model=MFABackupCodeRegenerateResponse,
+    summary="Regenerate MFA backup codes",
+    description="Generate new backup codes for MFA recovery",
+)
+async def regenerate_mfa_backup_codes(
+    db: Session = Depends(get_db),
+    current_user: TokenPayload = Depends(get_current_user),
+):
+    """
+    Regenerate MFA backup codes.
+
+    Args:
+        db: Database session
+        current_user: Authenticated user
+
+    Returns:
+        MFABackupCodeRegenerateResponse with new backup codes
+
+    Raises:
+        HTTPException: If MFA not enabled
+    """
+    user_service = get_user_management_service(db)
+
+    try:
+        user = user_service.get_user(current_user.user_id)
+
+        if not user.mfa_enabled:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="MFA must be enabled to regenerate backup codes",
+            )
+
+        # Generate new backup codes
+        import secrets
+
+        new_backup_codes = [secrets.token_hex(4).upper() for _ in range(10)]
+
+        # Update user with new backup codes
+        user.mfa_backup_codes = new_backup_codes  # type: ignore[assignment]
+        user.updated_at = datetime.now(timezone.utc)  # type: ignore[assignment]
+
+        db.commit()
+
+        return MFABackupCodeRegenerateResponse(
+            backup_codes=new_backup_codes,
+            message="Backup codes regenerated successfully. Save these codes in a secure place - you can use them to recover access if you lose your device.",
+        )
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        db.rollback()
+        logger.error(
+            f"Failed to regenerate MFA backup codes for user {current_user.user_id}: {str(e)}"
+        )
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="An internal error occurred during backup code regeneration",
         )
 
 

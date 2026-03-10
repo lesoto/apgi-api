@@ -1,6 +1,267 @@
-# Deployment Guide
+# APGI API Operations Runbook
 
-This guide provides step-by-step instructions for deploying the APGI Standalone API in various environments.
+This document provides operational procedures for deploying, maintaining, and troubleshooting the APGI API in production environments.
+
+## Pre-Flight Checklist
+
+Complete this checklist before every deployment to ensure system readiness and minimize deployment risks.
+
+### Infrastructure Requirements
+
+- [ ] Kubernetes cluster accessible and healthy
+- [ ] Database (PostgreSQL) accessible and healthy
+- [ ] Redis cache accessible and healthy
+- [ ] SMTP server accessible (if email features enabled)
+- [ ] External services (Stripe, payment providers) accessible
+- [ ] Load balancer configured with proper SSL certificates
+- [ ] Monitoring systems (Prometheus, Grafana) operational
+- [ ] Log aggregation system operational
+
+### Application Prerequisites
+
+- [ ] Docker images built and pushed to registry
+- [ ] Database migrations tested in staging
+- [ ] Environment variables configured
+- [ ] Secrets mounted correctly
+- [ ] Service mesh (Istio/Linkerd) configured
+- [ ] Ingress rules updated for new routes
+- [ ] API gateway configured with proper routing
+
+### Testing and Validation
+
+- [ ] Unit tests passing (coverage > 90%)
+- [ ] Integration tests passing
+- [ ] End-to-end tests passing in staging
+- [ ] Performance tests completed (response time < 200ms)
+- [ ] Security scan completed (no critical vulnerabilities)
+- [ ] Accessibility audit completed (WCAG 2.1 AA compliant)
+
+### Operational Readiness
+
+- [ ] Runbooks updated for new features
+- [ ] Monitoring dashboards updated
+- [ ] Alert thresholds configured
+- [ ] On-call rotation updated
+- [ ] Communication plan prepared
+- [ ] Rollback plan documented and tested
+
+### Team Coordination
+
+- [ ] Deployment window scheduled (low-traffic hours)
+- [ ] Stakeholders notified
+- [ ] Rollback procedures communicated
+- [ ] Post-deployment monitoring plan established
+
+## Secrets Rotation SOP
+
+Regular rotation of secrets is critical for maintaining security posture.
+
+### API Keys Rotation
+
+```bash
+# List all active API keys older than 90 days
+kubectl exec deployment/apgi-api -- python -c "
+from app.database.connection import get_db
+from app.database.models import APIKey
+from datetime import datetime, timedelta
+
+db = next(get_db())
+old_keys = db.query(APIKey).filter(
+    APIKey.created_at < datetime.utcnow() - timedelta(days=90),
+    APIKey.is_active == True
+).all()
+
+for key in old_keys:
+    print(f'Key {key.key_id}: {key.created_at}')
+"
+
+# Rotate individual API key
+curl -X POST https://api.apgi.com/v1/api-keys/{key_id}/rotate \
+  -H "Authorization: Bearer {admin_token}"
+
+# Notify key owners
+# Send email notification to key owner with new key
+```
+
+### Database Credentials Rotation
+
+```bash
+# Update Kubernetes secret
+kubectl create secret generic apgi-db-secret \
+  --from-literal=password=$(openssl rand -base64 32) \
+  --dry-run=client -o yaml | kubectl apply -f -
+
+# Update database user password
+kubectl exec -it deployment/postgres -- psql -c "
+ALTER USER apgi PASSWORD '$(kubectl get secret apgi-db-secret -o jsonpath='{.data.password}' | base64 -d)';
+"
+
+# Restart application pods to pick up new credentials
+kubectl rollout restart deployment/apgi-api
+```
+
+### JWT Secret Rotation
+
+```bash
+# Generate new JWT secret
+NEW_JWT_SECRET=$(openssl rand -hex 32)
+
+# Update Kubernetes secret
+kubectl patch secret apgi-secrets \
+  -p "{\"data\":{\"jwt-secret\":\"$(echo -n $NEW_JWT_SECRET | base64)\"}}"
+
+# Wait for secret propagation
+sleep 30
+
+# Restart application pods
+kubectl rollout restart deployment/apgi-api
+
+# Verify new tokens work
+curl -H "Authorization: Bearer {test_token}" https://api.apgi.com/v1/users/me
+```
+
+### Certificate Rotation
+
+```bash
+# Renew SSL certificate via cert-manager
+kubectl certificate approve apgi-tls-cert
+
+# Verify certificate renewal
+kubectl get certificate apgi-tls-cert
+
+# Update DNS CAA records if necessary
+# CAA records should allow Let's Encrypt
+```
+
+## Automated Rollback Procedures
+
+Follow these steps to rollback a deployment in case of issues.
+
+### Automated Rollback
+
+```bash
+# Switch traffic back to previous version
+kubectl patch service apgi-api -p '{"spec":{"selector":{"version":"green"}}}'
+
+# Scale down blue environment
+kubectl scale deployment apgi-api-blue --replicas=0
+```
+
+### Database Rollback
+
+```bash
+# Identify migration to rollback
+kubectl exec deployment/apgi-api -- python -m alembic current
+
+# Rollback specific migration
+kubectl exec deployment/apgi-api -- python -m alembic downgrade {revision_id}
+
+# Verify data integrity
+kubectl exec deployment/apgi-api -- python -c "
+# Run data integrity checks
+from app.database.connection import get_db
+# Add integrity check queries here
+"
+```
+
+### Manual Rollback Steps
+
+1. **Assess Impact**: Determine which systems are affected
+2. **Stop Traffic**: Switch load balancer to maintenance page
+3. **Restore Backup**: If data corruption occurred, restore from backup
+4. **Rollback Code**: Deploy previous version
+5. **Verify Functionality**: Run health checks and smoke tests
+6. **Resume Traffic**: Switch load balancer back to application
+
+### Rollback Validation
+
+```bash
+# Verify application health
+curl -f https://api.apgi.com/health
+
+# Check error rates
+kubectl logs --since=1h deployment/apgi-api | grep ERROR | wc -l
+
+# Validate core functionality
+# Run critical user journey tests
+```
+
+## Backup and Restore
+
+### Database Backup and Restore (Kubernetes)
+
+```bash
+# Create database backup
+kubectl exec deployment/postgres -- pg_dump -U apgi apgi_db > backup_$(date +%Y%m%d_%H%M%S).sql
+
+# Upload to secure storage
+aws s3 cp backup_$(date +%Y%m%d_%H%M%S).sql s3://apgi-backups/database/
+
+# Clean up old backups (keep last 30 days)
+aws s3 ls s3://apgi-backups/database/ | awk '$1 < "'$(date -d '30 days ago' +%Y-%m-%d)'"' | xargs -I {} aws s3 rm s3://apgi-backups/database/{}
+```
+
+### Database Restore
+
+```bash
+# Stop application to prevent writes during restore
+kubectl scale deployment/apgi-api --replicas=0
+
+# Restore from backup
+kubectl exec -i deployment/postgres -- psql -U apgi apgi_db < backup_file.sql
+
+# Verify restore success
+kubectl exec deployment/postgres -- psql -U apgi -c "SELECT COUNT(*) FROM users;"
+
+# Restart application
+kubectl scale deployment/apgi-api --replicas=3
+```
+
+### Application Configuration Backup
+
+```bash
+# Backup Kubernetes resources
+kubectl get all,configmaps,secrets,ingresses -l app=apgi -o yaml > k8s_backup_$(date +%Y%m%d).yaml
+
+# Backup Helm releases
+helm list -A > helm_releases_$(date +%Y%m%d).txt
+```
+
+### Point-in-Time Recovery
+
+```bash
+# Enable WAL archiving in PostgreSQL
+# Configure pgBackRest or similar for PITR
+
+# Perform PITR restore
+kubectl exec deployment/postgres -- pgbackrest restore --type=time --target="2024-01-15 10:30:00"
+
+# Verify data consistency
+kubectl exec deployment/postgres -- psql -U apgi -c "
+SELECT max(created_at) FROM audit_logs;
+SELECT count(*) FROM users;
+"
+```
+
+## Emergency Contacts
+
+- **On-call Engineer**: +1-555-0123 (PagerDuty)
+- **DevOps Lead**: <devops@apgi.com>
+- **Security Team**: <security@apgi.com>
+- **Database Admin**: <dba@apgi.com>
+
+### Escalation Procedure
+
+1. **Level 1**: On-call engineer investigates for 15 minutes
+2. **Level 2**: Escalate to DevOps lead if unresolved after 30 minutes
+3. **Level 3**: Escalate to engineering manager if unresolved after 1 hour
+4. **Level 4**: Declare incident and notify all stakeholders
+
+---
+
+**Last Updated**: January 2025
+**Version**: 2.0
+**Authors**: DevOps Team
 
 ## Table of Contents
 
@@ -13,11 +274,11 @@ This guide provides step-by-step instructions for deploying the APGI Standalone 
 - [Production Checklist](#production-checklist)
 - [Monitoring and Maintenance](#monitoring-and-maintenance)
 - [Scaling](#scaling)
-- [Rollback Procedures](#rollback-procedures)
+- [Rollback and Recovery Procedures](#rollback-and-recovery-procedures)
 
 ## Prerequisites
 
-### Infrastructure Requirements
+### Prerequisites - Infrastructure Requirements
 
 **Minimum Requirements (Development/Staging):**
 
@@ -604,7 +865,7 @@ alembic downgrade <revision_id>
 alembic revision --autogenerate -m "Description of changes"
 ```
 
-### Database Backup
+### Database Backup and Restore (Manual)
 
 **Backup:**
 
@@ -905,7 +1166,7 @@ kubectl apply -f api-hpa.yaml
 - Deploy Redis Sentinel for high availability
 - Automatic failover on primary failure
 
-## Rollback Procedures
+## Rollback and Recovery Procedures
 
 ### Application Rollback
 
@@ -936,7 +1197,7 @@ kubectl rollout undo deployment/apgi-api --to-revision=2
 kubectl rollout history deployment/apgi-api
 ```
 
-### Database Rollback
+### Database Recovery
 
 **Rollback one migration:**
 

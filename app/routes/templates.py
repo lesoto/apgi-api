@@ -242,7 +242,7 @@ async def create_template(
             config_path=template.config_path,  # type: ignore[arg-type]
             custom_config=template.custom_config,  # type: ignore[arg-type]
             default_description=template.default_description,  # type: ignore[arg-type]
-            tags=list(template.tags) if template.tags else [],
+            tags=list(template.tags) if template.tags else [],  # type: ignore[arg-type]
             is_public=bool(template.is_public),
             created_at=template.created_at,  # type: ignore[arg-type]
             updated_at=template.updated_at,  # type: ignore[arg-type]
@@ -304,7 +304,7 @@ async def get_template(
             config_path=template.config_path,  # type: ignore[arg-type]
             custom_config=template.custom_config,  # type: ignore[arg-type]
             default_description=template.default_description,  # type: ignore[arg-type]
-            tags=list(template.tags) if template.tags else [],
+            tags=list(template.tags) if template.tags else [],  # type: ignore[arg-type]
             is_public=bool(template.is_public),
             created_at=template.created_at,  # type: ignore[arg-type]
             updated_at=template.updated_at,  # type: ignore[arg-type]
@@ -412,7 +412,7 @@ async def update_template(
             config_path=template.config_path,  # type: ignore[arg-type]
             custom_config=template.custom_config,  # type: ignore[arg-type]
             default_description=template.default_description,  # type: ignore[arg-type]
-            tags=list(template.tags) if template.tags else [],
+            tags=list(template.tags) if template.tags else [],  # type: ignore[arg-type]
             is_public=bool(template.is_public),
             created_at=template.created_at,  # type: ignore[arg-type]
             updated_at=template.updated_at,  # type: ignore[arg-type]

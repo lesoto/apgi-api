@@ -88,11 +88,16 @@ class User(Base):  # type: ignore[misc, valid-type]
     )
     mfa_secret = Column(String(255), nullable=True, comment="TOTP secret for MFA")
     mfa_enabled = Column(Boolean, nullable=False, default=False, comment="Whether MFA is enabled")
+    mfa_backup_codes = Column(JSON, nullable=True, comment="One-time backup codes for MFA recovery")
     email_verification_token = Column(
         String(255), nullable=True, comment="Token for email verification"
     )
     email_verification_expires_at = Column(
         DateTime(timezone=True), nullable=True, comment="Token expiration"
+    )
+    password_reset_token = Column(String(255), nullable=True, comment="Token for password reset")
+    password_reset_expires_at = Column(
+        DateTime(timezone=True), nullable=True, comment="Password reset token expiration"
     )
     is_deleted = Column(Boolean, nullable=False, default=False, comment="Soft delete flag")
     created_at = Column(
@@ -535,6 +540,9 @@ class WebhookDelivery(Base):  # type: ignore[misc, valid-type]
         comment="Associated task ID",
     )
     webhook_url = Column(String(500), nullable=False, comment="Target webhook URL")
+    resolved_ip = Column(
+        String(45), nullable=True, comment="Resolved IP address to prevent DNS rebinding"
+    )
     payload = Column(JSON, nullable=False, comment="Webhook payload as JSON")
     status = Column(String(20), nullable=False, default="pending", comment="Delivery status")
     attempts = Column(Integer, nullable=False, default=0, comment="Number of delivery attempts")

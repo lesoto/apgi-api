@@ -175,7 +175,7 @@ class UserManagementService:
             user.is_active = is_active  # type: ignore[assignment]
 
         # Update timestamp
-        user.updated_at = datetime.now(timezone.utc)
+        user.updated_at = datetime.now(timezone.utc)  # type: ignore[assignment]
 
         try:
             self.db.commit()
@@ -188,6 +188,148 @@ class UserManagementService:
             self.db.rollback()
             logger.error(f"Failed to update user {user_id}: {e}")
             raise
+
+    def request_password_reset(self, email: str) -> None:
+        """
+        Request password reset for a user by email.
+
+        Generates a reset token, saves it to the user record, and sends reset email.
+
+        Args:
+            email: User email address
+
+        Raises:
+            UserNotFoundError: If user not found
+        """
+        # Find user by email
+        user = (
+            self.db.query(User)
+            .filter(User.email == email)
+            .filter(User.is_deleted.is_(False))
+            .first()
+        )
+        if not user:
+            raise UserNotFoundError(f"User with email {email} not found")
+
+        # Generate reset token
+        import secrets
+        from datetime import timedelta
+
+        reset_token = secrets.token_urlsafe(32)
+        reset_expires = datetime.now(timezone.utc) + timedelta(hours=1)  # 1 hour expiry
+
+        # Save token to user
+        user.password_reset_token = reset_token  # type: ignore[assignment]
+        user.password_reset_expires_at = reset_expires  # type: ignore[assignment]
+        user.updated_at = datetime.now(timezone.utc)  # type: ignore[assignment]
+
+        try:
+            self.db.commit()
+
+            # Send reset email
+            self._send_password_reset_email(user.email, reset_token)  # type: ignore[arg-type]
+
+        except Exception as e:
+            self.db.rollback()
+            logger.error(f"Failed to request password reset for user {user.user_id}: {e}")
+            raise
+
+    def confirm_password_reset(self, token: str, new_password: str) -> None:
+        """
+        Confirm password reset using token.
+
+        Args:
+            token: Password reset token
+            new_password: New password
+
+        Raises:
+            ValidationError: If token is invalid or expired
+        """
+        # Find user with matching token
+        user = (
+            self.db.query(User)
+            .filter(User.password_reset_token == token)
+            .filter(User.password_reset_expires_at > datetime.now(timezone.utc))
+            .filter(User.is_deleted.is_(False))
+            .first()
+        )
+
+        if not user:
+            raise ValidationError("Invalid or expired password reset token")
+
+        # Update password and clear reset fields
+        user.password_hash = self.auth_manager.hash_password(new_password)  # type: ignore[assignment]
+        user.password_reset_token = None  # type: ignore[assignment]
+        user.password_reset_expires_at = None  # type: ignore[assignment]
+        user.updated_at = datetime.now(timezone.utc)  # type: ignore[assignment]
+
+        try:
+            self.db.commit()
+        except Exception as e:
+            self.db.rollback()
+            logger.error(f"Failed to confirm password reset for user {user.user_id}: {e}")
+            raise
+
+    def _send_password_reset_email(self, email: str, reset_token: str) -> None:
+        """
+        Send password reset email with reset link.
+
+        Args:
+            email: User's email address
+            reset_token: Password reset token
+        """
+        from app.config import settings
+        import smtplib
+        from email.mime.text import MIMEText
+        from email.mime.multipart import MIMEMultipart
+
+        if not settings.smtp_server:
+            logger.warning("SMTP server not configured, cannot send password reset email")
+            logger.info(f"Password reset for {email}: token is {reset_token}")
+            return
+
+        try:
+            # Create message
+            msg = MIMEMultipart()
+            msg["From"] = settings.smtp_from_email
+            msg["To"] = email
+            msg["Subject"] = "Reset Your APGI API Password"
+
+            # Email body with reset link
+            reset_url = f"{settings.base_url}/reset-password?token={reset_token}"
+            body = f"""
+Hello,
+
+You have requested to reset your password for the APGI API.
+
+Please click the link below to reset your password:
+
+{reset_url}
+
+This link will expire in 1 hour.
+
+If you did not request this password reset, please ignore this email.
+
+Best regards,
+APGI API Team
+            """
+
+            msg.attach(MIMEText(body, "plain"))
+
+            # Send email
+            server = smtplib.SMTP(settings.smtp_server, settings.smtp_port)
+            server.starttls()
+            if settings.smtp_username and settings.smtp_password:
+                server.login(settings.smtp_username, settings.smtp_password)
+            server.sendmail(settings.smtp_from_email, email, msg.as_string())
+            server.quit()
+
+            logger.info(f"Password reset email sent to {email}")
+
+        except Exception as e:
+            logger.error(f"Failed to send password reset email to {email}: {e}")
+            # Don't raise exception to avoid breaking password reset
+            logger.warning(f"Password reset failed to send email, token for {email}: {reset_token}")
 
     def reset_password(self, user_id: str, new_password: Optional[str] = None) -> str:
         """
@@ -218,7 +360,7 @@ class UserManagementService:
             password_to_set = "".join(secrets.choice(alphabet) for _ in range(12))
 
         user.password_hash = self.auth_manager.hash_password(password_to_set)  # type: ignore[assignment]
-        user.updated_at = datetime.now(timezone.utc)
+        user.updated_at = datetime.now(timezone.utc)  # type: ignore[assignment]
 
         try:
             self.db.commit()
@@ -232,7 +374,7 @@ class UserManagementService:
             logger.error(f"Failed to reset password for user {user_id}: {e}")
             raise
 
-    def _send_password_reset_email(self, email: str, new_password: str) -> None:
+    def _send_new_password_email(self, email: str, new_password: str) -> None:
         """
         Send password reset email with new password.
 
@@ -371,8 +513,8 @@ APGI API Team
         """
         user = self.get_user(user_id)  # This already filters not deleted
 
-        user.is_deleted = True
-        user.updated_at = datetime.now(timezone.utc)
+        user.is_deleted = True  # type: ignore[assignment]
+        user.updated_at = datetime.now(timezone.utc)  # type: ignore[assignment]
 
         try:
             self.db.commit()
@@ -400,7 +542,7 @@ APGI API Team
         users = self.db.query(User).filter(User.is_deleted.is_(False)).all()
         role_counts: dict[tuple[str, ...], int] = {}
         for user in users:
-            roles_list = list(user.roles or []) if user.roles else []
+            roles_list = list(user.roles or []) if user.roles else []  # type: ignore[union-attr]
             roles_tuple = tuple(sorted(roles_list))
             role_counts[roles_tuple] = role_counts.get(roles_tuple, 0) + 1
         role_counts_str: dict[str, int] = {str(k): v for k, v in role_counts.items()}

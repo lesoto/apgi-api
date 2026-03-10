@@ -281,3 +281,190 @@ async def delete_webhook_delivery(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="An internal error occurred",
         )
+
+
+# Dead-letter webhook management endpoints
+@router.get(
+    "/dead-letter",
+    response_model=WebhookDeliveryListResponse,
+    summary="List dead-letter webhook deliveries",
+    description="List webhook deliveries that have failed and been moved to dead-letter queue.",
+    dependencies=[Depends(require_permission(Permission.SYSTEM_ADMIN))],
+)
+async def list_dead_letter_deliveries(
+    page: int = 1,
+    per_page: int = 10,
+    db: Session = Depends(get_db),
+    current_user: TokenPayload = Depends(require_permission(Permission.SYSTEM_ADMIN)),
+):
+    """
+    List dead-letter webhook deliveries.
+
+    Args:
+        page: Page number (1-based)
+        per_page: Number of items per page
+        db: Database session
+        current_user: Current authenticated user (admin required)
+
+    Returns:
+        List of dead-letter webhook deliveries with pagination info
+    """
+    try:
+        # Validate pagination parameters
+        if page < 1:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Page must be >= 1")
+        if per_page < 1 or per_page > 100:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Per page must be between 1 and 100",
+            )
+        offset = (page - 1) * per_page
+
+        # Query only dead-letter deliveries
+        query = db.query(WebhookDelivery).filter(WebhookDelivery.status == "dead_letter")
+
+        # Get total count
+        total = query.count()
+
+        # Get paginated results
+        deliveries = query.offset(offset).limit(per_page).all()
+
+        # Convert to response models
+        delivery_responses = []
+        for delivery in deliveries:
+            delivery_responses.append(
+                WebhookDeliveryResponse(
+                    delivery_id=delivery.delivery_id,  # type: ignore[arg-type]
+                    task_id=delivery.task_id,  # type: ignore[arg-type]
+                    webhook_url=delivery.webhook_url,  # type: ignore[arg-type]
+                    status=delivery.status,  # type: ignore[arg-type]
+                    attempts=delivery.attempts,  # type: ignore[arg-type]
+                    last_attempt_at=delivery.last_attempt_at,  # type: ignore[arg-type]
+                    next_retry_at=delivery.next_retry_at,  # type: ignore[arg-type]
+                    response_status=delivery.response_status,  # type: ignore[arg-type]
+                    response_body=delivery.response_body,  # type: ignore[arg-type]
+                    error_message=delivery.error_message,  # type: ignore[arg-type]
+                    created_at=delivery.created_at,  # type: ignore[arg-type]
+                )
+            )
+
+        pagination = PaginationInfo(
+            page=page,
+            per_page=per_page,
+            total=total,
+        )
+
+        return WebhookDeliveryListResponse(
+            deliveries=delivery_responses,
+            pagination=pagination,
+        )
+    except HTTPException:
+        # Re-raise HTTP exceptions (like validation errors)
+        raise
+    except Exception as e:
+        logger.exception("Failed to list dead-letter webhook deliveries")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="An internal error occurred",
+        ) from e
+
+
+@router.post(
+    "/dead-letter/{delivery_id}/retry",
+    response_model=WebhookRetryResponse,
+    summary="Retry dead-letter webhook delivery",
+    description="Manually retry a dead-letter webhook delivery.",
+    dependencies=[Depends(require_permission(Permission.SYSTEM_ADMIN))],
+)
+async def retry_dead_letter_delivery(
+    delivery_id: str,
+    db: Session = Depends(get_db),
+    current_user: TokenPayload = Depends(require_permission(Permission.SYSTEM_ADMIN)),
+):
+    """
+    Retry a dead-letter webhook delivery.
+
+    Args:
+        delivery_id: Webhook delivery identifier
+        db: Database session
+        current_user: Current authenticated user (admin required)
+
+    Returns:
+        Retry operation result
+    """
+    # Check if delivery exists and is in dead-letter status
+    delivery = (
+        db.query(WebhookDelivery)
+        .filter(WebhookDelivery.delivery_id == delivery_id, WebhookDelivery.status == "dead_letter")
+        .first()
+    )
+
+    if not delivery:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Dead-letter webhook delivery not found"
+        )
+
+    try:
+        # Attempt delivery
+        webhook_manager = WebhookManager()
+        success = await webhook_manager.deliver_webhook(db, delivery_id)
+
+        # Refresh delivery from database
+        db.refresh(delivery)
+
+        return WebhookRetryResponse(
+            delivery_id=delivery_id,
+            success=success,
+            status=delivery.status,  # type: ignore[arg-type]
+            attempts=delivery.attempts,  # type: ignore[arg-type]
+            last_attempt_at=delivery.last_attempt_at,  # type: ignore[arg-type]
+        )
+    except Exception as e:
+        logger.exception("Failed to retry dead-letter webhook delivery")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="An internal error occurred",
+        )
+
+
+@router.delete(
+    "/dead-letter/{delivery_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+    summary="Purge dead-letter webhook delivery",
+    description="Permanently delete a dead-letter webhook delivery record.",
+    dependencies=[Depends(require_permission(Permission.SYSTEM_ADMIN))],
+)
+async def purge_dead_letter_delivery(
+    delivery_id: str,
+    db: Session = Depends(get_db),
+    current_user: TokenPayload = Depends(require_permission(Permission.SYSTEM_ADMIN)),
+):
+    """
+    Purge a dead-letter webhook delivery record.
+
+    Args:
+        delivery_id: Webhook delivery identifier
+        db: Database session
+        current_user: Current authenticated user (admin required)
+    """
+    delivery = (
+        db.query(WebhookDelivery)
+        .filter(WebhookDelivery.delivery_id == delivery_id, WebhookDelivery.status == "dead_letter")
+        .first()
+    )
+
+    if not delivery:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Dead-letter webhook delivery not found"
+        )
+
+    try:
+        db.delete(delivery)
+        db.commit()
+    except Exception as e:
+        db.rollback()
+        logger.exception("Failed to purge dead-letter webhook delivery")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="An internal error occurred",
+        )

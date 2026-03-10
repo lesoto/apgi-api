@@ -6,6 +6,7 @@ Adds security-related HTTP headers to all responses for defense in depth.
 
 from starlette.middleware.base import BaseHTTPMiddleware
 
+from app.config import settings
 from app.middleware.logging import StructuredLogger
 
 logger = StructuredLogger(__name__)
@@ -38,8 +39,7 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
 
         # Define security headers
         self.security_headers = {
-            # HSTS - HTTP Strict Transport Security
-            "Strict-Transport-Security": "max-age=31536000; includeSubDomains; preload",
+            # HSTS - HTTP Strict Transport Security (conditionally added)
             # Prevent MIME type sniffing
             "X-Content-Type-Options": "nosniff",
             # Prevent clickjacking
@@ -63,11 +63,14 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
             "X-DNS-Prefetch-Control": "off",
         }
 
+        # HSTS header - only added conditionally
+        self.hsts_header = "max-age=31536000; includeSubDomains; preload"
+
         # Content Security Policy - more restrictive
         self.csp_header = (
             "default-src 'self'; "
-            "script-src 'self' 'unsafe-inline' 'unsafe-eval'; "  # Allow for admin interfaces
-            "style-src 'self' 'unsafe-inline'; "
+            "script-src 'self'; "  # Removed unsafe-inline and unsafe-eval
+            "style-src 'self'; "  # Removed unsafe-inline
             "img-src 'self' data: https:; "
             "font-src 'self'; "
             "connect-src 'self'; "
@@ -101,5 +104,16 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
 
         # Add CSP header
         response.headers["Content-Security-Policy"] = self.csp_header
+
+        # Conditionally add HSTS header
+        # Only add in production and when request is over HTTPS
+        is_production = settings.environment.lower() in ["production", "prod"]
+        is_https = request.url.scheme == "https"
+
+        if is_production and is_https:
+            response.headers["Strict-Transport-Security"] = self.hsts_header
+        elif not is_production:
+            # In non-production, explicitly disable HSTS to avoid browser caching issues
+            response.headers["Strict-Transport-Security"] = "max-age=0"
 
         return response

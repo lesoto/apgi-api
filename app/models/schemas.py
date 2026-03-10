@@ -19,6 +19,43 @@ UUID_PATTERN = re.compile(
 )
 
 
+class CustomConfig(BaseModel):
+    """Custom configuration overrides with strict validation."""
+
+    model_config = ConfigDict(extra="allow")  # Allow arbitrary fields
+
+    @model_validator(mode="after")
+    def validate_config_structure(self):
+        """Validate that config values are reasonable types and not too deeply nested."""
+
+        def validate_value(value, depth=0, max_depth=5):
+            if depth > max_depth:
+                raise ValueError(f"Configuration nesting too deep (max {max_depth} levels)")
+
+            if isinstance(value, dict):
+                for k, v in value.items():
+                    if not isinstance(k, str) or not k.strip():
+                        raise ValueError(f"Configuration key must be a non-empty string, got: {k}")
+                    # Prevent dangerous keys
+                    dangerous_keys = {"database_url", "secret_key", "password", "token"}
+                    if k.lower() in dangerous_keys:
+                        raise ValueError(f'Configuration key "{k}" is not allowed in custom config')
+                    validate_value(v, depth + 1, max_depth)
+            elif isinstance(value, list):
+                for item in value:
+                    validate_value(item, depth + 1, max_depth)
+            elif not isinstance(value, (str, int, float, bool, type(None))):
+                raise ValueError(
+                    f"Configuration value must be a string, number, boolean, null, or nested structure, got: {type(value)}"
+                )
+
+        # Validate all fields
+        for field_name, field_value in self.__dict__.items():
+            validate_value(field_value)
+
+        return self
+
+
 class SessionTemplateCreateRequest(BaseModel):
     """Request to create a new session template."""
 
@@ -322,7 +359,7 @@ class SessionCreateRequest(BaseModel):
 
     template_id: Optional[str] = Field(None, description="Template ID to use for session creation")
     config_path: Optional[str] = Field(None, description="Path to YAML configuration file")
-    custom_config: Optional[Dict[str, Any]] = Field(
+    custom_config: Optional[CustomConfig] = Field(
         None, description="Custom configuration overrides"
     )
     description: Optional[str] = Field(
@@ -1263,6 +1300,56 @@ class PasswordResetRequest(BaseModel):
     new_password: str = Field(..., description="New password")
 
 
+class PasswordResetEmailRequest(BaseModel):
+    """Request to initiate password reset by email."""
+
+    email: str = Field(..., description="User email address")
+
+    @field_validator("email")
+    @classmethod
+    def validate_email(cls, v):
+        """Validate email format."""
+        if not v or not v.strip():
+            raise ValueError("Email cannot be empty")
+
+        email_regex = r"^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$"
+        if not re.match(email_regex, v):
+            raise ValueError("Invalid email format")
+
+        return v.strip().lower()
+
+
+class PasswordResetConfirmRequest(BaseModel):
+    """Request to confirm password reset with token."""
+
+    token: str = Field(..., description="Reset token")
+    new_password: str = Field(..., description="New password")
+
+    @field_validator("token")
+    @classmethod
+    def validate_token(cls, v):
+        """Validate token format."""
+        if not v or not v.strip():
+            raise ValueError("Token cannot be empty")
+
+        if len(v) > 255:
+            raise ValueError("Token is too long")
+
+        return v.strip()
+
+
+class PasswordResetEmailResponse(BaseModel):
+    """Response for password reset email request."""
+
+    message: str = Field(..., description="Response message")
+
+
+class PasswordResetConfirmResponse(BaseModel):
+    """Response for password reset confirmation."""
+
+    message: str = Field(..., description="Confirmation message")
+
+
 class PasswordResetResponse(BaseModel):
     """Response for password reset."""
 
@@ -1276,6 +1363,7 @@ class MFAEnrollResponse(BaseModel):
     secret: str = Field(..., description="MFA secret key")
     qr_code_url: str = Field(..., description="QR code URL for MFA app")
     message: str = Field(..., description="Enrollment instructions")
+    backup_codes: List[str] = Field(..., description="Backup recovery codes")
 
 
 class MFADisableRequest(BaseModel):
@@ -1300,6 +1388,38 @@ class MFAEnableResponse(BaseModel):
     """Response for MFA enable."""
 
     message: str = Field(..., description="Enable confirmation message")
+
+
+class MFABackupCodeVerifyRequest(BaseModel):
+    """Request to verify MFA backup code."""
+
+    code: str = Field(..., description="Backup code to verify")
+
+    @field_validator("code")
+    @classmethod
+    def validate_code(cls, v):
+        """Validate backup code format."""
+        if not v or not v.strip():
+            raise ValueError("Backup code cannot be empty")
+
+        # Backup codes are 8-character hex strings
+        if len(v) != 8 or not v.isalnum():
+            raise ValueError("Invalid backup code format")
+
+        return v.strip().upper()
+
+
+class MFABackupCodeVerifyResponse(BaseModel):
+    """Response for MFA backup code verification."""
+
+    message: str = Field(..., description="Verification result message")
+
+
+class MFABackupCodeRegenerateResponse(BaseModel):
+    """Response for MFA backup code regeneration."""
+
+    backup_codes: List[str] = Field(..., description="New backup codes")
+    message: str = Field(..., description="Regeneration confirmation message")
 
 
 # State Schemas

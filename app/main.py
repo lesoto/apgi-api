@@ -69,21 +69,6 @@ try:
     OPENTELEMETRY_AVAILABLE = True
 except ImportError:
     OPENTELEMETRY_AVAILABLE = False
-from app.routes import (
-    api_keys,
-    auth,
-    export,
-    health,
-    metrics,
-    payments,
-    sessions,
-    state,
-    tasks,
-    templates,
-    users,
-    version,
-    webhooks,
-)
 from app.schemas.root import RootResponse
 from app.services.cache_service import init_cache_service
 
@@ -350,16 +335,6 @@ All endpoints except `/health`, `/docs`, and `/openapi.json` require authenticat
     version.configure_deprecated_endpoints({})
 
     logger.info("APGI API application created successfully", version="1.0.0")
-
-    # Instrument application with OpenTelemetry after all routes are added
-    def instrument_application():
-        """Placeholder - instrumentation now happens in lifespan."""
-        pass
-
-    try:
-        instrument_application()
-    except ImportError:
-        logger.warning("OpenTelemetry instrumentation skipped")
 
     return app
 

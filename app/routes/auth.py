@@ -88,6 +88,24 @@ async def login(
         )
         raise AuthenticationError("Invalid username or password")
 
+    # Log successful authentication to AuditLog
+    from app.database.models import AuditLog
+    from datetime import timezone, datetime
+
+    audit_entry = AuditLog(
+        user_id=user.user_id,
+        action="login",
+        resource_type="user",
+        resource_id=user.user_id,
+        timestamp=datetime.now(timezone.utc),
+        details={"username": body.username, "method": "password"},
+        ip_address=request.client.host if request.client else None,
+        user_agent=request.headers.get("user-agent"),
+        status="success",
+    )
+    db.add(audit_entry)
+    db.commit()
+
     # Create tokens
     tokens = auth_manager.create_tokens_for_user(user, body.remember_me or False)
 
@@ -239,11 +257,12 @@ async def logout_access(
 
     auth_manager = AuthManager(db)
 
-    # Revoke the access token
+    # Revoke the access token (graceful degradation if Redis unavailable)
     revoked = await auth_manager.revoke_access_token(access_token)
 
     if not revoked:
-        raise InvalidTokenError("Access token could not be revoked")
+        logger.warning("Access token could not be revoked (Redis unavailable or invalid token)")
+        # Don't raise error - logout should always succeed
 
     # Return 204 No Content (no response body)
     return None

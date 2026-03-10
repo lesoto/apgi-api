@@ -9,12 +9,19 @@ import logging
 import time
 import traceback
 import uuid
+import contextvars
 from datetime import datetime, timezone
 from typing import Any, Callable, Optional
 
 from fastapi import Request
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.types import ASGIApp
+
+
+# Context variable for request ID propagation
+request_id_context: contextvars.ContextVar[Optional[str]] = contextvars.ContextVar(
+    "request_id", default=None
+)
 
 
 class StructuredLogger:
@@ -44,6 +51,12 @@ class StructuredLogger:
             "message": message,
             **kwargs,
         }
+
+        # Include request_id from context if available
+        request_id = request_id_context.get()
+        if request_id:
+            log_entry["request_id"] = request_id
+
         return json.dumps(log_entry)
 
     def info(self, message: str, **kwargs):
@@ -93,55 +106,62 @@ class RequestLoggingMiddleware(BaseHTTPMiddleware):
         request_id = str(uuid.uuid4())
         request.state.request_id = request_id
 
-        # Extract client identifier (IP or user ID if authenticated)
-        client_id = request.client.host if request.client else "unknown"
+        # Set request ID in context for downstream logging
+        token = request_id_context.set(request_id)
 
-        # Record start time
-        start_time = time.time()
-
-        # Process request
         try:
-            response = await call_next(request)
+            # Extract client identifier (IP or user ID if authenticated)
+            client_id = request.client.host if request.client else "unknown"
 
-            # Calculate duration
-            duration_ms = (time.time() - start_time) * 1000
+            # Record start time
+            start_time = time.time()
 
-            # Log successful request
-            self.logger.info(
-                "Request processed",
-                request_id=request_id,
-                method=request.method,
-                path=request.url.path,
-                status_code=response.status_code,
-                duration_ms=round(duration_ms, 2),
-                client_id=client_id,
-                user_agent=request.headers.get("user-agent", "unknown"),
-            )
+            # Process request
+            try:
+                response = await call_next(request)
 
-            # Add request ID to response headers
-            response.headers["X-Request-ID"] = request_id
+                # Calculate duration
+                duration_ms = (time.time() - start_time) * 1000
 
-            return response
+                # Log successful request
+                self.logger.info(
+                    "Request processed",
+                    request_id=request_id,
+                    method=request.method,
+                    path=request.url.path,
+                    status_code=response.status_code,
+                    duration_ms=round(duration_ms, 2),
+                    client_id=client_id,
+                    user_agent=request.headers.get("user-agent", "unknown"),
+                )
 
-        except Exception as e:
-            # Calculate duration
-            duration_ms = (time.time() - start_time) * 1000
+                # Add request ID to response headers
+                response.headers["X-Request-ID"] = request_id
 
-            # Log error
-            self.logger.error(
-                "Request failed",
-                request_id=request_id,
-                method=request.method,
-                path=request.url.path,
-                duration_ms=round(duration_ms, 2),
-                client_id=client_id,
-                error_type=type(e).__name__,
-                error_message=str(e),
-                stack_trace=traceback.format_exc(),
-            )
+                return response
 
-            # Re-raise exception to be handled by exception handlers
-            raise
+            except Exception as e:
+                # Calculate duration
+                duration_ms = (time.time() - start_time) * 1000
+
+                # Log error
+                self.logger.error(
+                    "Request failed",
+                    request_id=request_id,
+                    method=request.method,
+                    path=request.url.path,
+                    duration_ms=round(duration_ms, 2),
+                    client_id=client_id,
+                    error_type=type(e).__name__,
+                    error_message=str(e),
+                    stack_trace=traceback.format_exc(),
+                )
+
+                # Re-raise exception to be handled by exception handlers
+                raise
+        finally:
+            # Reset context variable
+            request_id_context.reset(token)
 
 
 class ErrorLoggingHandler:

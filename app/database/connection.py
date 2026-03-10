@@ -7,7 +7,6 @@ SQLAlchemy engine and session configuration.
 import logging
 import secrets
 import string
-import sys
 from contextlib import contextmanager
 from typing import Generator
 
@@ -118,16 +117,22 @@ def create_default_user():
         secure_username = generate_secure_username("default")
         secure_password = generate_secure_password()
 
-        # Print credentials only in interactive mode (never to logs)
-        if sys.stdout.isatty():
-            print(f"\n{'=' * 60}")
-            print("Generated default user credentials - STORE SECURELY")
-            print(f"Username: {secure_username}")
-            print(f"Password: {secure_password}")
-            print("NOTE: These credentials allow full system access - change immediately")
-            print(f"{'=' * 60}\n")
+        # Write credentials to secure file (never print to stdout/stderr)
+        import pathlib
 
-        logger.info(f"Default user created: {secure_username}")
+        secrets_file = pathlib.Path("/run/secrets/default_user")
+        secrets_file.parent.mkdir(parents=True, exist_ok=True)
+        secrets_content = f"""Generated default user credentials - STORE SECURELY
+Username: {secure_username}
+Password: {secure_password}
+NOTE: These credentials allow full system access - change immediately
+"""
+        secrets_file.write_text(secrets_content)
+        secrets_file.chmod(0o600)  # Owner read/write only
+
+        logger.warning(
+            f"Default user created: {secure_username} - credentials written to {secrets_file}"
+        )
 
         # Import here to avoid circular import
         from app.services.auth_manager import AuthManager
@@ -169,6 +174,9 @@ def get_db() -> Generator[Session, None, None]:
     db = SessionLocal()
     try:
         yield db
+    except Exception:
+        db.rollback()
+        raise
     finally:
         db.close()
 

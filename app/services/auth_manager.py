@@ -108,7 +108,7 @@ class AuthManager:
     @staticmethod
     def hash_password(password: str) -> str:
         """
-        Hash a password using bcrypt.
+        Hash a password using bcrypt with SHA-256 pre-hashing to preserve full entropy.
 
         Args:
             password: Plain text password to hash
@@ -122,19 +122,19 @@ class AuthManager:
         if not password:
             raise ValueError("Password cannot be empty")
 
-        # Truncate password to bcrypt's 72-byte limit for consistent behavior
-        password_bytes = password.encode("utf-8")
-        if len(password_bytes) > 72:
-            password_bytes = password_bytes[:72]
+        # Pre-hash password with SHA-256 to preserve full entropy for passwords > 72 bytes
+        import hashlib
+
+        password_hash = hashlib.sha256(password.encode("utf-8")).digest()
 
         salt = bcrypt.gensalt(rounds=12)
-        hashed = bcrypt.hashpw(password_bytes, salt)
+        hashed = bcrypt.hashpw(password_hash, salt)
         return hashed.decode("utf-8")
 
     @staticmethod
     def verify_password(plain_password: str, hashed_password: str) -> bool:
         """
-        Verify a password against its hash.
+        Verify a password against its hash using SHA-256 pre-hashing.
 
         Args:
             plain_password: Plain text password to verify
@@ -143,13 +143,13 @@ class AuthManager:
         Returns:
             True if password matches, False otherwise
         """
-        # Truncate password to bcrypt's 72-byte limit for consistent behavior
-        plain_password_bytes = plain_password.encode("utf-8")
-        if len(plain_password_bytes) > 72:
-            plain_password_bytes = plain_password_bytes[:72]
+        # Pre-hash password with SHA-256 to preserve full entropy for passwords > 72 bytes
+        import hashlib
+
+        plain_password_hash = hashlib.sha256(plain_password.encode("utf-8")).digest()
 
         hashed_password_bytes = hashed_password.encode("utf-8")
-        return bcrypt.checkpw(plain_password_bytes, hashed_password_bytes)
+        return bcrypt.checkpw(plain_password_hash, hashed_password_bytes)
 
     # ========================================================================
     # MFA Support
@@ -323,8 +323,10 @@ class AuthManager:
             exp = payload_dict.get("exp")
 
             if not jti:
-                logger.warning("Access token has no JTI, cannot revoke")
-                return False
+                logger.info(
+                    "Access token has no JTI, logout successful (token will expire naturally)"
+                )
+                return True
 
             # Add to blocklist with expiry
             from datetime import timezone

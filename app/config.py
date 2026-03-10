@@ -42,7 +42,7 @@ class Settings:
         self.base_url: str = os.getenv("BASE_URL", "https://localhost:8000")
 
         # Server Settings
-        self.host: str = os.getenv("HOST", "0.0.0.0")
+        self.host: str = os.getenv("HOST", "127.0.0.1")
         self.port: int = int(os.getenv("PORT", "8000"))
         self.reload: bool = (
             os.getenv("RELOAD", "true").lower() == "true"
@@ -52,6 +52,12 @@ class Settings:
 
         # Database Settings
         self.database_url: str = os.getenv("DATABASE_URL", "postgresql://localhost/apgi_api")
+
+        # Database Connection Pool Settings
+        self.pool_size: int = int(os.getenv("POOL_SIZE", "20"))
+        self.max_overflow: int = int(os.getenv("MAX_OVERFLOW", "30"))
+        self.pool_timeout: int = int(os.getenv("POOL_TIMEOUT", "30"))
+        self.pool_recycle: int = int(os.getenv("POOL_RECYCLE", "3600"))
 
         # Redis Settings
         self.redis_url: str = os.getenv("REDIS_URL", "redis://localhost:6379/0")
@@ -98,6 +104,7 @@ class Settings:
         # Rate Limiting Settings
         self.rate_limit_enabled: bool = os.getenv("RATE_LIMIT_ENABLED", "true").lower() == "true"
         self.rate_limit_per_minute: int = int(os.getenv("RATE_LIMIT_PER_MINUTE", "60"))
+        self.max_sessions_per_user: int = int(os.getenv("MAX_SESSIONS_PER_USER", "50"))
 
         # CORS Settings
         self.cors_origins: List[str] = self._parse_cors_origins()

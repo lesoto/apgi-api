@@ -66,8 +66,9 @@ class AuthenticationMiddleware(BaseHTTPMiddleware):
         "/v1/auth/refresh",
         "/v1/users/register",
         "/v1/users/verify-email",
-        "/v1/users/create-default",
     }
+
+    _redis_client = None
 
     def __init__(self, app):
         """
@@ -77,6 +78,16 @@ class AuthenticationMiddleware(BaseHTTPMiddleware):
             app: FastAPI application
         """
         super().__init__(app)
+
+    @classmethod
+    def set_redis_client(cls, redis_client):
+        """
+        Set Redis client for token revocation checking.
+
+        Args:
+            redis_client: Redis client instance
+        """
+        cls._redis_client = redis_client
 
     async def dispatch(self, request: Request, call_next):
         """
@@ -224,14 +235,23 @@ class AuthenticationMiddleware(BaseHTTPMiddleware):
             InvalidTokenError: If token is invalid
             ExpiredTokenError: If token has expired
         """
+        # First do blocking JWT decode
         loop = asyncio.get_event_loop()
-        payload = await loop.run_in_executor(None, self._blocking_verify_token, token)
+        payload = await loop.run_in_executor(None, self._decode_and_validate_token, token)
+
+        # Then check Redis for revocation asynchronously
+        if payload.jti and self._redis_client:
+            revoked = await self._redis_client.exists(f"revoked_access_tokens:{payload.jti}")
+            if revoked:
+                from app.services.auth_manager import InvalidTokenError
+
+                raise InvalidTokenError("Token has been revoked")
+
         return payload
 
-    def _blocking_verify_token(self, token: str) -> TokenPayload:
+    def _decode_and_validate_token(self, token: str) -> TokenPayload:
         """
-        Blocking version of token verification for use in executor.
-        Does synchronous JWT verification without Redis checks.
+        Blocking JWT decode and basic validation (without revocation check).
         """
         import jwt
         from app.services.auth_manager import TokenPayload, InvalidTokenError, ExpiredTokenError
@@ -262,9 +282,6 @@ class AuthenticationMiddleware(BaseHTTPMiddleware):
             # Check expiration
             if datetime.now(timezone.utc) > payload.exp:
                 raise ExpiredTokenError("Token has expired")
-
-            # Note: Redis revocation check is skipped in middleware for performance
-            # Access tokens are short-lived, so revocation is less critical
 
             return payload
 
@@ -314,9 +331,17 @@ class AuthenticationMiddleware(BaseHTTPMiddleware):
             ).hexdigest()[:16]
 
             # Query API keys by prefix (should significantly reduce the number of candidates)
+            from sqlalchemy import or_
+            from datetime import datetime, timezone
+
+            now = datetime.now(timezone.utc)
             active_keys = (
                 db.query(APIKey)
-                .filter(APIKey.is_active.is_(True), APIKey.key_prefix == prefix)
+                .filter(
+                    APIKey.is_active.is_(True),
+                    APIKey.key_prefix == prefix,
+                    or_(APIKey.expires_at.is_(None), APIKey.expires_at > now),
+                )
                 .all()
             )
 
@@ -336,7 +361,6 @@ class AuthenticationMiddleware(BaseHTTPMiddleware):
                     break
 
             if not db_api_key:
-                print("DEBUG: no match found")
                 raise ValueError("Invalid API key")
 
             # Check expiration

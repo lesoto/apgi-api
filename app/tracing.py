@@ -18,6 +18,8 @@ try:
     from opentelemetry.instrumentation.fastapi import FastAPIInstrumentor
     from opentelemetry.instrumentation.sqlalchemy import SQLAlchemyInstrumentor
     from opentelemetry.instrumentation.redis import RedisInstrumentor
+    from opentelemetry.instrumentation.celery import CeleryInstrumentor  # type: ignore[import]
+    from opentelemetry.instrumentation.httpx import HTTPXClientInstrumentor  # type: ignore[import]
     from opentelemetry.sdk.resources import Resource
 
     OPENTELEMETRY_AVAILABLE = True
@@ -66,14 +68,16 @@ def configure_distributed_tracing():
 
     # Configure Jaeger exporter
     jaeger_exporter = JaegerExporter(
-        agent_host_name="localhost",
-        agent_port=14268,
+        collector_endpoint=jaeger_endpoint,
+        username=os.getenv("JAEGER_USERNAME"),
+        password=os.getenv("JAEGER_PASSWORD"),
     )
 
     # Configure OTLP exporter
     otlp_exporter = OTLPSpanExporter(
         endpoint=otlp_endpoint,
-        insecure=True,
+        insecure=True,  # TODO: Make configurable for production
+        headers=os.getenv("OTLP_HEADERS", ""),
     )
 
     # Add span processors
@@ -101,13 +105,27 @@ def instrument_application():
         return
 
     # Instrument FastAPI
-    FastAPIInstrumentor.instrument()
+    FastAPIInstrumentor().instrument()
 
     # Instrument SQLAlchemy
     SQLAlchemyInstrumentor().instrument()
 
     # Instrument Redis
     RedisInstrumentor().instrument()
+
+    # Instrument Celery for distributed tracing of async tasks
+    try:
+        CeleryInstrumentor().instrument()
+        print("Celery tracing instrumentation enabled")
+    except Exception as e:
+        print(f"Failed to instrument Celery: {e}")
+
+    # Instrument HTTPX for distributed tracing of outbound HTTP calls
+    try:
+        HTTPXClientInstrumentor().instrument()
+        print("HTTPX client tracing instrumentation enabled")
+    except Exception as e:
+        print(f"Failed to instrument HTTPX: {e}")
 
 
 def get_tracer(name: str):

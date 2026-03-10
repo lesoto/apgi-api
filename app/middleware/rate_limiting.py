@@ -6,7 +6,9 @@ Middleware for enforcing rate limits on API requests.
 
 from datetime import datetime, timedelta, timezone
 
+import ipaddress
 import redis.asyncio as redis
+import threading
 from fastapi import Request
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.responses import JSONResponse
@@ -29,6 +31,7 @@ class RateLimitingMiddleware(BaseHTTPMiddleware):
     """
 
     _instance: Optional["RateLimitingMiddleware"] = None
+    _instance_lock = threading.Lock()
 
     def __init__(self, app, redis_client=None, enabled: bool = True):
         """
@@ -59,8 +62,9 @@ class RateLimitingMiddleware(BaseHTTPMiddleware):
         if redis_client:
             self.rate_limiter = RateLimiter(redis_client)
 
-        # Set global instance reference
-        RateLimitingMiddleware._instance = self
+        # Set global instance reference (thread-safe)
+        with RateLimitingMiddleware._instance_lock:
+            RateLimitingMiddleware._instance = self
 
     @classmethod
     def set_redis_client(cls, redis_client: redis.Redis):
@@ -95,25 +99,20 @@ class RateLimitingMiddleware(BaseHTTPMiddleware):
         direct_ip = request.client.host if request.client else "unknown"
 
         # Only trust X-Forwarded-For if request comes from trusted proxy
-        trusted_proxies = [
-            "127.0.0.1",
-            "localhost",
-            "::1",  # localhost
-            "10.0.0.0/8",
-            "172.16.0.0/12",
-            "192.168.0.0/16",  # private networks
+        TRUSTED_PROXY_NETS = [
+            ipaddress.ip_network("127.0.0.1/32"),
+            ipaddress.ip_network("10.0.0.0/8"),
+            ipaddress.ip_network("172.16.0.0/12"),
+            ipaddress.ip_network("192.168.0.0/16"),
+            ipaddress.ip_network("::1/128"),
         ]
 
         def is_trusted_proxy(ip: str) -> bool:
-            """Check if IP is from a trusted proxy."""
-            for trusted in trusted_proxies:
-                if "/" in trusted:  # CIDR notation (simplified check)
-                    network, prefix = trusted.split("/")
-                    if ip.startswith(network.rstrip("0").rstrip(".")):
-                        return True
-                elif ip == trusted:
-                    return True
-            return False
+            try:
+                addr = ipaddress.ip_address(ip)
+                return any(addr in net for net in TRUSTED_PROXY_NETS)
+            except ValueError:
+                return False
 
         if "X-Forwarded-For" in request.headers and is_trusted_proxy(direct_ip):
             # X-Forwarded-For can contain multiple IPs, take the first one
@@ -267,6 +266,7 @@ class RateLimitingMiddleware(BaseHTTPMiddleware):
                         "error": {
                             "code": "RATE_LIMIT_EXCEEDED",
                             "message": "Too many requests. Please try again later.",
+                            "request_id": getattr(request.state, "request_id", "unknown"),
                             "timestamp": datetime.now(timezone.utc).isoformat() + "Z",
                             "details": {
                                 "limit": settings.rate_limit_per_minute,
