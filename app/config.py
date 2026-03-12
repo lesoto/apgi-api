@@ -42,7 +42,7 @@ class Settings:
         self.base_url: str = os.getenv("BASE_URL", "https://localhost:8000")
 
         # Server Settings
-        self.host: str = os.getenv("HOST", "127.0.0.1")
+        self.host: str = os.getenv("HOST", "0.0.0.0")
         self.port: int = int(os.getenv("PORT", "8000"))
         self.reload: bool = (
             os.getenv("RELOAD", "true").lower() == "true"
@@ -117,7 +117,14 @@ class Settings:
                 method.strip() for method in cors_methods_env.split(",") if method.strip()
             ]
         else:
-            self.cors_allow_methods = ["*"]
+            self.cors_allow_methods = [
+                "GET",
+                "POST",
+                "PUT",
+                "DELETE",
+                "OPTIONS",
+                "HEAD",
+            ]
         cors_headers_env = os.getenv("CORS_ALLOW_HEADERS")
         if cors_headers_env:
             self.cors_allow_headers: List[str] = [
@@ -324,6 +331,12 @@ class Settings:
                     "WEBHOOK_SECRET_KEY environment variable is not set. "
                     "This is required for secure webhook signature verification in production."
                 )
+            else:
+                warnings.warn(
+                    "SECURITY WARNING: WEBHOOK_SECRET_KEY environment variable is not set. "
+                    "Webhook signature verification will be disabled. Set WEBHOOK_SECRET_KEY for development/testing.",
+                    UserWarning,
+                )
         else:
             # Check for known insecure default values
             if self.webhook_secret_key.lower() in [d.lower() for d in insecure_defaults]:
@@ -389,6 +402,25 @@ class Settings:
                 errors.append(
                     "REDIS_URL is not configured for production. "
                     "Set REDIS_URL environment variable with production Redis connection string."
+                )
+
+        # Validate Stripe keys for production
+        if is_production:
+            if self.stripe_secret_key in [
+                "sk_test_placeholder",
+                "sk_test_placeholder",
+            ] or not self.stripe_secret_key.startswith("sk_live_"):
+                errors.append(
+                    "STRIPE_SECRET_KEY is not configured for production or is using a test placeholder. "
+                    "Set STRIPE_SECRET_KEY environment variable with a valid production Stripe secret key."
+                )
+            if self.stripe_publishable_key in [
+                "pk_test_placeholder",
+                "pk_test_placeholder",
+            ] or not self.stripe_publishable_key.startswith("pk_live_"):
+                errors.append(
+                    "STRIPE_PUBLISHABLE_KEY is not configured for production or is using a test placeholder. "
+                    "Set STRIPE_PUBLISHABLE_KEY environment variable with a valid production Stripe publishable key."
                 )
 
         # Validate URL formats

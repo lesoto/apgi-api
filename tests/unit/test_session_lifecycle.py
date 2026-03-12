@@ -40,6 +40,8 @@ def mock_db_session():
     db_mock.close = MagicMock()
     db_mock.execute = MagicMock()
     db_mock.delete = MagicMock()
+    # Mock scalar to return integer for count queries
+    db_mock.scalar.return_value = 0
     return db_mock
 
 

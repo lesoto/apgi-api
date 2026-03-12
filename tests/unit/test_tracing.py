@@ -34,30 +34,46 @@ class TestTracingConfiguration:
                 "TRACING_SERVICE_NAME": "test-service",
                 "API_VERSION": "1.0.0",
             },
+            clear=True,
         ):
+            # Mock all OpenTelemetry modules
+            mock_opentelemetry = MagicMock()
+            mock_trace = MagicMock()
+            mock_sdk_trace = MagicMock()
+            mock_export = MagicMock()
+            mock_jaeger_exporter = MagicMock()
+            mock_otlp_exporter = MagicMock()
+            mock_resources = MagicMock()
+            mock_fastapi_inst = MagicMock()
+            mock_sqlalchemy_inst = MagicMock()
+            mock_redis_inst = MagicMock()
+
             with patch.dict(
                 "sys.modules",
                 {
-                    "opentelemetry": MagicMock(),
-                    "opentelemetry.trace": MagicMock(),
-                    "opentelemetry.sdk.trace": MagicMock(),
-                    "opentelemetry.sdk.trace.export": MagicMock(),
-                    "opentelemetry.exporter.jaeger.thrift": MagicMock(),
-                    "opentelemetry.exporter.otlp.proto.grpc.trace_exporter": MagicMock(),
-                    "opentelemetry.sdk.resources": MagicMock(),
-                    "opentelemetry.instrumentation.fastapi": MagicMock(),
-                    "opentelemetry.instrumentation.sqlalchemy": MagicMock(),
-                    "opentelemetry.instrumentation.redis": MagicMock(),
+                    "opentelemetry": mock_opentelemetry,
+                    "opentelemetry.trace": mock_trace,
+                    "opentelemetry.sdk.trace": mock_sdk_trace,
+                    "opentelemetry.sdk.trace.export": mock_export,
+                    "opentelemetry.exporter.jaeger.thrift": mock_jaeger_exporter,
+                    "opentelemetry.exporter.otlp.proto.grpc.trace_exporter": mock_otlp_exporter,
+                    "opentelemetry.sdk.resources": mock_resources,
+                    "opentelemetry.instrumentation.fastapi": mock_fastapi_inst,
+                    "opentelemetry.instrumentation.sqlalchemy": mock_sqlalchemy_inst,
+                    "opentelemetry.instrumentation.redis": mock_redis_inst,
                 },
-            ), patch("app.tracing.OPENTELEMETRY_AVAILABLE", True), patch(
-                "opentelemetry.trace.set_tracer_provider"
-            ) as mock_set_provider, patch(
-                "opentelemetry.sdk.trace.TracerProvider"
-            ) as mock_provider_class, patch(
-                "opentelemetry.sdk.trace.export.BatchSpanProcessor"
-            ) as mock_processor_class, patch(
-                "opentelemetry.sdk.resources.Resource.create"
-            ) as mock_resource_create:
+                clear=True,
+            ):
+                mock_set_provider = MagicMock()
+                mock_provider_class = MagicMock()
+                mock_processor_class = MagicMock()
+                mock_resource_create = MagicMock()
+
+                mock_trace.set_tracer_provider = mock_set_provider
+                mock_sdk_trace.TracerProvider = mock_provider_class
+                mock_export.BatchSpanProcessor = mock_processor_class
+                mock_resources.Resource.create = mock_resource_create
+
                 mock_provider = MagicMock()
                 mock_provider_class.return_value = mock_provider
 
@@ -87,28 +103,43 @@ class TestTracingConfiguration:
         """Test application instrumentation when enabled and OpenTelemetry is available."""
         from app.tracing import instrument_application
 
-        with patch.dict("os.environ", {"TRACING_ENABLED": "true"}):
+        with patch.dict("os.environ", {"TRACING_ENABLED": "true"}, clear=True):
+            # Mock all OpenTelemetry modules
+            mock_opentelemetry = MagicMock()
+            mock_trace = MagicMock()
+            mock_sdk_trace = MagicMock()
+            mock_export = MagicMock()
+            mock_jaeger_exporter = MagicMock()
+            mock_otlp_exporter = MagicMock()
+            mock_resources = MagicMock()
+            mock_fastapi_inst = MagicMock()
+            mock_sqlalchemy_inst = MagicMock()
+            mock_redis_inst = MagicMock()
+
             with patch.dict(
                 "sys.modules",
                 {
-                    "opentelemetry": MagicMock(),
-                    "opentelemetry.trace": MagicMock(),
-                    "opentelemetry.sdk.trace": MagicMock(),
-                    "opentelemetry.sdk.trace.export": MagicMock(),
-                    "opentelemetry.exporter.jaeger.thrift": MagicMock(),
-                    "opentelemetry.exporter.otlp.proto.grpc.trace_exporter": MagicMock(),
-                    "opentelemetry.sdk.resources": MagicMock(),
-                    "opentelemetry.instrumentation.fastapi": MagicMock(),
-                    "opentelemetry.instrumentation.sqlalchemy": MagicMock(),
-                    "opentelemetry.instrumentation.redis": MagicMock(),
+                    "opentelemetry": mock_opentelemetry,
+                    "opentelemetry.trace": mock_trace,
+                    "opentelemetry.sdk.trace": mock_export,
+                    "opentelemetry.exporter.jaeger.thrift": mock_jaeger_exporter,
+                    "opentelemetry.exporter.otlp.proto.grpc.trace_exporter": mock_otlp_exporter,
+                    "opentelemetry.sdk.resources": mock_resources,
+                    "opentelemetry.instrumentation.fastapi": mock_fastapi_inst,
+                    "opentelemetry.instrumentation.sqlalchemy": mock_sqlalchemy_inst,
+                    "opentelemetry.instrumentation.redis": mock_redis_inst,
                 },
-            ), patch("app.tracing.OPENTELEMETRY_AVAILABLE", True), patch(
-                "opentelemetry.instrumentation.fastapi.FastAPIInstrumentor.instrument"
-            ) as mock_fastapi, patch(
-                "opentelemetry.instrumentation.sqlalchemy.SQLAlchemyInstrumentor"
-            ) as mock_sql_class, patch(
-                "opentelemetry.instrumentation.redis.RedisInstrumentor"
-            ) as mock_redis_class:
+                clear=True,
+            ):
+                mock_fastapi = MagicMock()
+                mock_sql_class = MagicMock()
+                mock_redis_class = MagicMock()
+
+                mock_fastapi_inst.FastAPIInstrumentor = MagicMock()
+                mock_fastapi_inst.FastAPIInstrumentor.instrument = mock_fastapi
+                mock_sqlalchemy_inst.SQLAlchemyInstrumentor = mock_sql_class
+                mock_redis_inst.RedisInstrumentor = mock_redis_class
+
                 mock_sql_instance = MagicMock()
                 mock_sql_class.return_value = mock_sql_instance
                 mock_redis_instance = MagicMock()
@@ -132,11 +163,19 @@ class TestTracingConfiguration:
         """Test getting tracer when OpenTelemetry is available."""
         from app.tracing import get_tracer
 
-        with patch("app.tracing.OPENTELEMETRY_AVAILABLE", True), patch(
-            "opentelemetry.trace.get_tracer"
-        ) as mock_get_tracer:
+        # Mock OpenTelemetry modules
+        mock_opentelemetry = MagicMock()
+        mock_trace = MagicMock()
+
+        with patch.dict(
+            "sys.modules",
+            {"opentelemetry": mock_opentelemetry, "opentelemetry.trace": mock_trace},
+            clear=True,
+        ):
+            mock_get_tracer = MagicMock()
             mock_tracer = MagicMock()
             mock_get_tracer.return_value = mock_tracer
+            mock_trace.get_tracer = mock_get_tracer
 
             result = get_tracer("test_component")
 

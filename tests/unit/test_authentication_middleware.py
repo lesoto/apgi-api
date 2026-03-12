@@ -151,7 +151,7 @@ class TestAuthenticationMiddleware:
     async def test_verify_token_valid(self, auth_middleware, mock_user_payload):
         """Test token verification."""
         with patch.object(
-            auth_middleware, "_blocking_verify_token", return_value=mock_user_payload
+            auth_middleware, "_decode_and_validate_token", return_value=mock_user_payload
         ):
             result = await auth_middleware._verify_token("test_token")
 
@@ -160,13 +160,17 @@ class TestAuthenticationMiddleware:
     @pytest.mark.asyncio
     async def test_verify_token_invalid(self, auth_middleware):
         """Test invalid token verification."""
+        from app.exceptions import InvalidTokenError
+
         with patch.object(
-            auth_middleware, "_blocking_verify_token", side_effect=Exception("Invalid token")
+            auth_middleware,
+            "_decode_and_validate_token",
+            side_effect=InvalidTokenError("Invalid token"),
         ):
-            with pytest.raises(Exception):
+            with pytest.raises(InvalidTokenError):
                 await auth_middleware._verify_token("invalid_token")
 
-    def test_blocking_verify_token(self, auth_middleware, mock_user_payload):
+    def test_decode_and_validate_token(self, auth_middleware, mock_user_payload):
         """Test blocking token verification."""
         from unittest.mock import patch
 
@@ -182,7 +186,7 @@ class TestAuthenticationMiddleware:
         with patch("jwt.decode", return_value=mock_payload), patch(
             "app.services.auth_manager.TokenPayload.from_dict", return_value=mock_user_payload
         ):
-            result = auth_middleware._blocking_verify_token("valid.jwt.token")
+            result = auth_middleware._decode_and_validate_token("valid.jwt.token")
 
             assert result == mock_user_payload
 

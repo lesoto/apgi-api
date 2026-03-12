@@ -41,7 +41,8 @@ class WebhookManager:
         ipaddress.ip_network("fe80::/10"),  # IPv6 link-local
     ]
 
-    def _validate_webhook_url(self, webhook_url: str) -> str:
+    @staticmethod
+    def _validate_webhook_url(webhook_url: str) -> str:
         """
         Validate webhook URL for SSRF prevention and return resolved IP.
 

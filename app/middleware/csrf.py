@@ -96,11 +96,9 @@ class CSRFMiddleware(BaseHTTPMiddleware):
 
         # Skip CSRF for API endpoints that use JWT authentication
         # (CSRF is primarily for browser-based form submissions)
-        # However, DELETE requests should always be protected due to their destructive nature
+        # JWT-authenticated requests (including DELETE) bypass CSRF entirely
         if request.headers.get("authorization", "").startswith("Bearer "):
             return False
-        if request.method == "DELETE":
-            return True
 
         # Skip CSRF for content-type that's not form-based
         content_type = request.headers.get("content-type", "").lower()

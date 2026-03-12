@@ -6,8 +6,8 @@ API endpoints for exporting simulation data, summary statistics, and event analy
 
 import io
 import logging
-import re
 import hashlib
+from datetime import timezone
 from datetime import datetime
 from typing import Optional, Union, Generator
 
@@ -121,6 +121,16 @@ async def export_session_data(
         if variables:
             var_list = [v.strip() for v in variables.split(",")]
 
+            # Validate variable names (alphanumeric with underscores and hyphens)
+            import re
+
+            for var in var_list:
+                if not var or not re.match(r"^[a-zA-Z0-9_-]+$", var):
+                    raise HTTPException(
+                        status_code=status.HTTP_400_BAD_REQUEST,
+                        detail=f"Invalid variable name: '{var}'. Variable names must be alphanumeric with underscores and hyphens.",
+                    )
+
         # Validate session ownership
         from app.database.models import Session as SessionModel
 
@@ -157,7 +167,7 @@ async def export_session_data(
         safe_session_id = safe_session_id[:50]  # Limit length
 
         # Add timestamp and hash for uniqueness and security
-        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        timestamp = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S")
         session_hash = hashlib.sha256(f"{session_id}{current_user.user_id}".encode()).hexdigest()[
             :8
         ]
@@ -355,9 +365,16 @@ async def get_event_analysis(
         Dict with event analysis statistics
 
     Raises:
-        HTTPException: If session not found or analysis fails
-    """
+        HTTPException: If session not found or analysis fails"""
     try:
+        # Validate event_type parameter
+        valid_event_types = ["ignition", "metabolism", "allostatic_load"]
+        if event_type not in valid_event_types:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Invalid event_type '{event_type}'. Must be one of: {', '.join(valid_event_types)}",
+            )
+
         # Get event analysis with ownership validation
         analysis = await service.get_event_analysis(
             session_id=session_id, event_type=event_type, user_id=current_user.user_id
@@ -366,6 +383,8 @@ async def get_event_analysis(
         logger.info(f"Generated {event_type} event analysis for session {session_id}")
         return analysis
 
+    except HTTPException:
+        raise
     except ValueError as e:
         logger.warning(f"Event analysis failed for session {session_id}: {e}")
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))

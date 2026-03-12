@@ -142,7 +142,7 @@ class TestExecuteIowaGamblingTask:
                 mock_celery_task.request.id = "task_123"
                 mock_celery_task.apgi_system = MagicMock()
 
-                result = execute_iowa_gambling_task(mock_celery_task, session_id, parameters)
+                result = execute_iowa_gambling_task(session_id, parameters)
 
                 assert result["status"] == "completed"
                 assert result["task_type"] == "iowa_gambling"
@@ -162,7 +162,7 @@ class TestExecuteIowaGamblingTask:
             mock_celery_task.request.id = "task_123"
             mock_celery_task.apgi_system = MagicMock()
 
-            result = execute_iowa_gambling_task.run(mock_celery_task, session_id, parameters)
+            result = execute_iowa_gambling_task(session_id, parameters)
 
             assert result["status"] == "failed"
             assert "Task failed" in result["error"]
@@ -199,7 +199,7 @@ class TestExecuteMaskingParadigmTask:
                 mock_celery_task.request.id = "task_123"
                 mock_celery_task.apgi_system = MagicMock()
 
-                result = execute_masking_paradigm_task.run(mock_celery_task, session_id, parameters)
+                result = execute_masking_paradigm_task(session_id, parameters)
 
                 assert result["status"] == "completed"
                 assert result["task_type"] == "masking_paradigm"
@@ -236,9 +236,7 @@ class TestExecuteAttentionalBlinkTask:
                 mock_celery_task.request.id = "task_123"
                 mock_celery_task.apgi_system = MagicMock()
 
-                result = execute_attentional_blink_task.run(
-                    mock_celery_task, session_id, parameters
-                )
+                result = execute_attentional_blink_task(session_id, parameters)
 
                 assert result["status"] == "completed"
                 assert result["task_type"] == "attentional_blink"
@@ -275,7 +273,7 @@ class TestExecuteChangeBlindnessTask:
                 mock_celery_task.request.id = "task_123"
                 mock_celery_task.apgi_system = MagicMock()
 
-                result = execute_change_blindness_task.run(mock_celery_task, session_id, parameters)
+                result = execute_change_blindness_task(session_id, parameters)
 
                 assert result["status"] == "completed"
                 assert result["task_type"] == "change_blindness"
@@ -312,9 +310,7 @@ class TestExecuteBinocularRivalryTask:
                 mock_celery_task.request.id = "task_123"
                 mock_celery_task.apgi_system = MagicMock()
 
-                result = execute_binocular_rivalry_task.run(
-                    mock_celery_task, session_id, parameters
-                )
+                result = execute_binocular_rivalry_task(session_id, parameters)
 
                 assert result["status"] == "completed"
                 assert result["task_type"] == "binocular_rivalry"

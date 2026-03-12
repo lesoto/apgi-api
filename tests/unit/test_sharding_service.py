@@ -154,13 +154,9 @@ class TestDatabaseShardingService:
         """Test sharding setup validation for multiple shards with same URL."""
         mock_settings.database_shards_count = 3
         # Configure mock to return None for shard URLs, so all use same database_url
-        mock_settings.configure_mock(
-            **{
-                "database_shard_0_url": None,
-                "database_shard_1_url": None,
-                "database_shard_2_url": None,
-            }
-        )
+        mock_settings.database_shard_0_url = None
+        mock_settings.database_shard_1_url = None
+        mock_settings.database_shard_2_url = None
 
         with patch("app.services.sharding_service.settings", mock_settings):
             service = DatabaseShardingService()
@@ -169,7 +165,10 @@ class TestDatabaseShardingService:
             assert isinstance(result, dict)
             # Should have warning about same database URL
             assert len(result["warnings"]) > 0
-            assert any("same database URL" in w for w in result["warnings"])
+            assert any(
+                "Multiple shards configured but all using the same database URL" in w
+                for w in result["warnings"]
+            )
 
     def test_shard_config_dataclass(self):
         """Test ShardConfig dataclass."""

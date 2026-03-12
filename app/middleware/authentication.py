@@ -236,7 +236,7 @@ class AuthenticationMiddleware(BaseHTTPMiddleware):
             ExpiredTokenError: If token has expired
         """
         # First do blocking JWT decode
-        loop = asyncio.get_event_loop()
+        loop = asyncio.get_running_loop()
         payload = await loop.run_in_executor(None, self._decode_and_validate_token, token)
 
         # Then check Redis for revocation asynchronously
@@ -307,7 +307,7 @@ class AuthenticationMiddleware(BaseHTTPMiddleware):
         Raises:
             ValueError: If API key is invalid or expired
         """
-        loop = asyncio.get_event_loop()
+        loop = asyncio.get_running_loop()
         api_key_info = await loop.run_in_executor(None, self._blocking_verify_api_key, api_key)
         return api_key_info
 

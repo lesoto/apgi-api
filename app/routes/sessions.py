@@ -84,7 +84,7 @@ async def validate_session_ownership(
         return session  # type: ignore[return-value]
 
     # Execute DB query in executor to avoid blocking event loop
-    loop = asyncio.get_event_loop()
+    loop = asyncio.get_running_loop()
     session = cast(SessionModel, await loop.run_in_executor(None, _blocking_validate))
 
     if not session:
@@ -505,8 +505,9 @@ async def get_session_tasks(
         if not session:
             return None
 
-        # Verify session ownership
-        if session.user_id != current_user.user_id:
+        # Verify session ownership with admin bypass
+        is_admin = has_any_role(current_user.roles, [Role.ADMIN])
+        if session.user_id != current_user.user_id and not is_admin:
             return "forbidden"
 
         # Get tasks for session
@@ -514,7 +515,7 @@ async def get_session_tasks(
         return tasks
 
     # Execute DB queries in executor to avoid blocking event loop
-    loop = asyncio.get_event_loop()
+    loop = asyncio.get_running_loop()
     result = await loop.run_in_executor(None, _blocking_get_tasks)
 
     if result is None:

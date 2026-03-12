@@ -26,6 +26,18 @@ try:
 except (ImportError, TypeError) as e:
     # Handle Python 3.14 compatibility issues
     OPENTELEMETRY_AVAILABLE = False
+    # Set these to None to prevent NameError if used
+    trace = None  # type: ignore[assignment]
+    TracerProvider = None  # type: ignore[assignment]
+    BatchSpanProcessor = None  # type: ignore[assignment]
+    JaegerExporter = None  # type: ignore[assignment]
+    OTLPSpanExporter = None  # type: ignore[assignment]
+    FastAPIInstrumentor = None  # type: ignore[assignment]
+    SQLAlchemyInstrumentor = None  # type: ignore[assignment]
+    RedisInstrumentor = None  # type: ignore[assignment]
+    CeleryInstrumentor = None  # type: ignore[assignment]
+    HTTPXClientInstrumentor = None  # type: ignore[assignment]
+    Resource = None  # type: ignore[assignment]
     warnings.warn(
         f"OpenTelemetry not available: {str(e)}. "
         "Distributed tracing will be disabled. "

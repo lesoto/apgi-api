@@ -87,6 +87,7 @@ class UserManagementService:
     def create_default_user(self, username: str, email: str, password: str) -> User:
         """
         Create a default user with basic permissions.
+        Admin-created users are pre-activated (email verified).
 
         Args:
             username: Unique username
@@ -96,7 +97,32 @@ class UserManagementService:
         Returns:
             Created User object
         """
-        return self.create_user(username, email, password, roles=["user"])
+        # Hash the password
+        hashed_password = self.auth_manager.hash_password(password)
+
+        # Admin-created users are pre-activated (no email verification required)
+        user = User(
+            username=username,
+            email=email,
+            password_hash=hashed_password,
+            roles=["user"],
+            is_active=True,  # Admin-created users are pre-activated
+            email_verification_token=None,
+            email_verification_expires_at=None,
+        )
+
+        try:
+            self.db.add(user)
+            self.db.commit()
+            self.db.refresh(user)
+            return user
+        except IntegrityError:
+            self.db.rollback()
+            raise ValidationError("Username or email already exists")
+        except Exception as e:
+            self.db.rollback()
+            logger.error(f"Failed to create default user {username}: {e}")
+            raise
 
     def list_users(self, skip: int = 0, limit: int = 100, active_only: bool = True) -> List[User]:
         """
@@ -213,13 +239,15 @@ class UserManagementService:
 
         # Generate reset token
         import secrets
+        import hashlib
         from datetime import timedelta
 
         reset_token = secrets.token_urlsafe(32)
+        reset_token_hash = hashlib.sha256(reset_token.encode()).hexdigest()
         reset_expires = datetime.now(timezone.utc) + timedelta(hours=1)  # 1 hour expiry
 
-        # Save token to user
-        user.password_reset_token = reset_token  # type: ignore[assignment]
+        # Save token hash to user (not the raw token)
+        user.password_reset_token = reset_token_hash  # type: ignore[assignment]
         user.password_reset_expires_at = reset_expires  # type: ignore[assignment]
         user.updated_at = datetime.now(timezone.utc)  # type: ignore[assignment]
 
@@ -239,16 +267,21 @@ class UserManagementService:
         Confirm password reset using token.
 
         Args:
-            token: Password reset token
+            token: Password reset token (raw token from email)
             new_password: New password
 
         Raises:
             ValidationError: If token is invalid or expired
         """
-        # Find user with matching token
+        import hashlib
+
+        # Hash the submitted token to compare with stored hash
+        token_hash = hashlib.sha256(token.encode()).hexdigest()
+
+        # Find user with matching token hash
         user = (
             self.db.query(User)
-            .filter(User.password_reset_token == token)
+            .filter(User.password_reset_token == token_hash)
             .filter(User.password_reset_expires_at > datetime.now(timezone.utc))
             .filter(User.is_deleted.is_(False))
             .first()
@@ -262,6 +295,15 @@ class UserManagementService:
         user.password_reset_token = None  # type: ignore[assignment]
         user.password_reset_expires_at = None  # type: ignore[assignment]
         user.updated_at = datetime.now(timezone.utc)  # type: ignore[assignment]
+
+        # Revoke all existing refresh and access tokens for this user
+        # This ensures all sessions are invalidated after password reset
+        try:
+            self.auth_manager.revoke_all_user_tokens(user.user_id)  # type: ignore[arg-type]
+            logger.info(f"Revoked all tokens for user {user.user_id} after password reset")
+        except Exception as e:
+            logger.error(f"Failed to revoke tokens for user {user.user_id}: {e}")
+            # Don't fail the password reset if token revocation fails
 
         try:
             self.db.commit()
@@ -285,7 +327,7 @@ class UserManagementService:
 
         if not settings.smtp_server:
             logger.warning("SMTP server not configured, cannot send password reset email")
-            logger.info(f"Password reset for {email}: token is {reset_token}")
+            logger.info(f"Password reset initiated for {email}")
             return
 
         try:
@@ -329,7 +371,7 @@ APGI API Team
         except Exception as e:
             logger.error(f"Failed to send password reset email to {email}: {e}")
             # Don't raise exception to avoid breaking password reset
-            logger.warning(f"Password reset failed to send email, token for {email}: {reset_token}")
+            logger.warning("Password reset email failed to send")
 
     def reset_password(self, user_id: str, new_password: Optional[str] = None) -> str:
         """

@@ -570,7 +570,15 @@ def check_resource_ownership(
         return
 
     # Check if user is admin (if allowed)
-    if allow_admin and has_any_role(current_user.roles, [Role.ADMIN]):
+    # For API keys, check permissions instead of roles
+    is_admin = False
+    if allow_admin:
+        if has_any_role(current_user.roles, [Role.ADMIN]):
+            is_admin = True
+        elif current_user.permissions and "admin" in current_user.permissions:
+            is_admin = True
+
+    if is_admin:
         logger.info(
             "Resource ownership granted",
             extra={

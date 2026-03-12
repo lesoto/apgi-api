@@ -144,6 +144,8 @@ class RateLimitingMiddleware(BaseHTTPMiddleware):
         # Map paths to endpoint identifiers
         if path.startswith("/v1/auth"):
             return "auth:attempt"
+        elif path.startswith("/v1/users/register"):
+            return "auth:attempt"  # Registration should use same strict rate limit as auth
         elif path.startswith("/v1/sessions") and method == "POST":
             if path.endswith("/tasks"):
                 return "task:execute"

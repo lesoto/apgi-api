@@ -359,7 +359,7 @@ class SessionCreateRequest(BaseModel):
 
     template_id: Optional[str] = Field(None, description="Template ID to use for session creation")
     config_path: Optional[str] = Field(None, description="Path to YAML configuration file")
-    custom_config: Optional[CustomConfig] = Field(
+    custom_config: Optional[Dict[str, Any]] = Field(
         None, description="Custom configuration overrides"
     )
     description: Optional[str] = Field(
@@ -1494,6 +1494,37 @@ class PaginationInfo(BaseModel):
                 "page": 1,
                 "per_page": 10,
                 "total": 25,
+            }
+        }
+    )
+
+
+class UsersListResponse(BaseModel):
+    """Response for users list with pagination."""
+
+    users: List[UserResponse] = Field(..., description="List of users")
+    pagination: PaginationInfo = Field(..., description="Pagination information")
+
+    model_config = ConfigDict(
+        json_schema_extra={
+            "example": {
+                "users": [
+                    {
+                        "user_id": "user_abc123",
+                        "username": "testuser",
+                        "email": "test@example.com",
+                        "roles": ["viewer"],
+                        "is_active": True,
+                        "created_at": "2024-01-15T10:30:00Z",
+                        "updated_at": "2024-01-15T10:35:00Z",
+                        "last_login": None,
+                    }
+                ],
+                "pagination": {
+                    "page": 1,
+                    "per_page": 10,
+                    "total": 1,
+                },
             }
         }
     )

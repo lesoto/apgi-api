@@ -226,9 +226,9 @@ All endpoints except `/health`, `/docs`, and `/openapi.json` require authenticat
 - JSON is the primary data exchange format
 - Binary data (exports) uses appropriate MIME types
 """,
-        docs_url="/docs",
-        redoc_url="/redoc",
-        openapi_url="/openapi.json",
+        docs_url="/docs" if settings.environment == "development" else None,
+        redoc_url="/redoc" if settings.environment == "development" else None,
+        openapi_url="/openapi.json" if settings.environment == "development" else None,
         lifespan=lifespan,
     )
 

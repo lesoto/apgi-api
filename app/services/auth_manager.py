@@ -407,6 +407,19 @@ class AuthManager:
             if not mfa_code:
                 raise AuthenticationError("MFA code required")
             if not self.verify_mfa_code(user.mfa_secret, mfa_code):  # type: ignore[arg-type]  # type: ignore[attr-defined]
+                # Increment failed login attempts for MFA failures
+                user.failed_login_attempts = (user.failed_login_attempts or 0) + 1  # type: ignore[assignment]
+                # Check if should lock account (5 attempts)
+                if user.failed_login_attempts >= 5:
+                    user.locked_until = now + timedelta(minutes=15)  # type: ignore[assignment]
+                    logger.warning(
+                        f"Account locked for user {username} due to too many failed MFA attempts"
+                    )
+                try:
+                    self.db.commit()
+                except Exception as e:
+                    self.db.rollback()
+                    logger.error(f"Failed to update failed MFA attempts for user {username}: {e}")
                 raise AuthenticationError("Invalid MFA code")
 
         # Successful login: reset failed attempts and update last login
@@ -557,8 +570,10 @@ class AuthManager:
             )
             self.db.add(new_db_refresh_token)
 
-            # Revoke the old refresh token
-            db_token.revoked = True  # type: ignore[assignment]
+            # Revoke ALL old refresh tokens for this user (not just the current one)
+            # This prevents multiple active refresh tokens across devices
+            for old_token in db_tokens:
+                old_token.revoked = True  # type: ignore[assignment]
 
             self.db.commit()
         except Exception as e:
