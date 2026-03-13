@@ -7,6 +7,7 @@ SQLAlchemy engine and session configuration.
 import logging
 import secrets
 import string
+import uuid
 from contextlib import contextmanager
 from typing import Generator
 
@@ -119,8 +120,11 @@ def create_default_user():
 
         # Write credentials to secure file (never print to stdout/stderr)
         import pathlib
+        import tempfile
 
-        secrets_file = pathlib.Path("/run/secrets/default_user")
+        # Use temp directory instead of /run/secrets for non-container environments
+        secrets_dir = pathlib.Path(tempfile.gettempdir()) / "apgi_api_secrets"
+        secrets_file = secrets_dir / "default_user"
         secrets_file.parent.mkdir(parents=True, exist_ok=True)
         secrets_content = f"""Generated default user credentials - STORE SECURELY
 Username: {secure_username}
@@ -137,9 +141,10 @@ NOTE: These credentials allow full system access - change immediately
         # Import here to avoid circular import
         from app.services.auth_manager import AuthManager
 
-        # Create default user
+        # Create default user with proper UUID
+        user_id = str(uuid.uuid4())
         default_user = User(
-            user_id=secure_username,
+            user_id=user_id,
             username=secure_username,
             email=f"{secure_username}@apgi-system.local",
             password_hash=AuthManager.hash_password(secure_password),

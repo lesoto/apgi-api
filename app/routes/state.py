@@ -8,10 +8,12 @@ import logging
 from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
+from sqlalchemy.orm import Session
 
 from app.services.authorization import Permission, get_current_user, require_permission
-from app.routes.sessions import get_session_manager
+from app.routes.sessions import get_session_manager, validate_session_ownership
 from app.services.session_manager import SessionManager
+from app.database.connection import get_db
 
 from app.models.schemas import (
     AllostaticState,
@@ -57,6 +59,7 @@ async def get_system_state(
     session_id: str,
     manager: "SessionManager" = Depends(get_session_manager),
     current_user=Depends(get_current_user),
+    db: Session = Depends(get_db),
 ):
     """
     Get complete system state.
@@ -80,6 +83,9 @@ async def get_system_state(
     Raises:
         HTTPException: If session not found or state cannot be retrieved
     """
+    # Validate session ownership
+    await validate_session_ownership(session_id, current_user.user_id, manager, db)
+
     try:
         # Get session with ownership validation
         sim_session = await manager.get_session(session_id, current_user.user_id)
@@ -170,6 +176,7 @@ async def get_ignition_history(  # noqa: C901
     cursor: Optional[str] = Query(None, description="Pagination cursor"),
     manager: "SessionManager" = Depends(get_session_manager),
     current_user=Depends(get_current_user),
+    db: Session = Depends(get_db),
 ):
     """
     Get ignition event history.
@@ -191,6 +198,9 @@ async def get_ignition_history(  # noqa: C901
     Raises:
         HTTPException: If session not found or history cannot be retrieved
     """
+    # Validate session ownership
+    await validate_session_ownership(session_id, current_user.user_id, manager, db)
+
     try:
         # Warn about potentially expensive queries
         if limit and limit > 500:
@@ -326,6 +336,7 @@ async def get_interoceptive_state(
     session_id: str,
     manager: "SessionManager" = Depends(get_session_manager),
     current_user=Depends(get_current_user),
+    db: Session = Depends(get_db),
 ):
     """
     Get interoceptive body state.
@@ -345,6 +356,9 @@ async def get_interoceptive_state(
     Raises:
         HTTPException: If session not found or state cannot be retrieved
     """
+    # Validate session ownership
+    await validate_session_ownership(session_id, current_user.user_id, manager, db)
+
     try:
         # Get session
         sim_session = await manager.get_session(session_id, current_user.user_id)
@@ -386,6 +400,7 @@ async def get_prediction_errors(
     session_id: str,
     manager: "SessionManager" = Depends(get_session_manager),
     current_user=Depends(get_current_user),
+    db: Session = Depends(get_db),
 ):
     """
     Get prediction errors.
@@ -403,6 +418,9 @@ async def get_prediction_errors(
     Raises:
         HTTPException: If session not found or errors cannot be retrieved
     """
+    # Validate session ownership
+    await validate_session_ownership(session_id, current_user.user_id, manager, db)
+
     try:
         # Get session
         sim_session = await manager.get_session(session_id, current_user.user_id)
@@ -447,6 +465,7 @@ async def get_somatic_markers(
     session_id: str,
     manager: "SessionManager" = Depends(get_session_manager),
     current_user=Depends(get_current_user),
+    db: Session = Depends(get_db),
 ):
     """
     Get somatic markers.
@@ -464,6 +483,9 @@ async def get_somatic_markers(
     Raises:
         HTTPException: If session not found or markers cannot be retrieved
     """
+    # Validate session ownership
+    await validate_session_ownership(session_id, current_user.user_id, manager, db)
+
     try:
         # Get session
         sim_session = await manager.get_session(session_id, current_user.user_id)

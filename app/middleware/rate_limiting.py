@@ -55,6 +55,7 @@ class RateLimitingMiddleware(BaseHTTPMiddleware):
             "session:delete": 30,  # Moderate rate for deletes
             "task:execute": 5,  # Limit task execution
             "data:export": 10,  # Limit data exports
+            "users:reset-password": 5,  # Very strict limit for password reset
             "global": 60,  # Default rate
         }
 

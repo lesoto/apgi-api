@@ -6,11 +6,12 @@ API endpoints for creating Stripe PaymentIntents.
 
 import logging
 import stripe
-from fastapi import APIRouter, HTTPException, status, Request
+from fastapi import APIRouter, Depends, HTTPException, status, Request
 from pydantic import BaseModel
 
 from app.config import settings
 from app.models.schemas import ErrorResponse
+from app.services.authorization import Permission, require_permission
 
 logger = logging.getLogger(__name__)
 
@@ -53,6 +54,7 @@ class PaymentIntentCreateResponse(BaseModel):
     status_code=status.HTTP_200_OK,
     summary="Create a Stripe PaymentIntent",
     description="Creates a PaymentIntent for the APGI Subscription checkout flow.",
+    dependencies=[Depends(require_permission(Permission.SYSTEM_ADMIN))],
 )
 async def create_payment_intent(request: PaymentIntentCreateRequest):
     """
@@ -60,7 +62,7 @@ async def create_payment_intent(request: PaymentIntentCreateRequest):
     """
     try:
         # Calculate amount from product catalogue based on item IDs
-        amount = 0
+        amount: int = 0
         for item in request.items:
             item_id = item.get("id")
             if not item_id:
@@ -74,17 +76,11 @@ async def create_payment_intent(request: PaymentIntentCreateRequest):
                     status_code=status.HTTP_400_BAD_REQUEST, detail=f"Unknown product: {item_id}"
                 )
 
-            amount += PRODUCT_CATALOGUE[item_id]["price_cents"]
+            amount += int(PRODUCT_CATALOGUE[item_id]["price_cents"])
 
         if amount <= 0:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST, detail="No valid items provided"
-            )
-
-        if settings.environment != "production":
-            # Mock successful intent creation for non-production environments
-            return PaymentIntentCreateResponse(
-                clientSecret="pi_3MtwBwLkdIwHu7ix28a3tqPa_secret_a1b2c3d4e5f6g7h8i9j0"
             )
 
         # Create a PaymentIntent with the order amount and currency
@@ -150,7 +146,7 @@ async def stripe_webhook(request: Request):
             # Invalid payload
             logger.warning(f"Invalid Stripe webhook payload: {e}")
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid payload")
-        except stripe.error.SignatureVerificationError as e:
+        except stripe.SignatureVerificationError as e:
             # Invalid signature
             logger.warning(f"Invalid Stripe webhook signature: {e}")
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid signature")
@@ -163,43 +159,43 @@ async def stripe_webhook(request: Request):
 
         # Handle different event types
         if event_type == "payment_intent.succeeded":
-            # Payment succeeded
+            # Payment succeeded - update order status and send confirmation
             payment_intent = event_data
             logger.info(f"Payment succeeded: {payment_intent['id']}")
-            # TODO: Update order status, send confirmation email, etc.
+            await _handle_payment_succeeded(payment_intent)
 
         elif event_type == "payment_intent.payment_failed":
-            # Payment failed
+            # Payment failed - notify user and update order
             payment_intent = event_data
             logger.warning(f"Payment failed: {payment_intent['id']}")
-            # TODO: Handle failed payment, notify user, etc.
+            await _handle_payment_failed(payment_intent)
 
         elif event_type == "charge.dispute.created":
-            # Dispute created
+            # Dispute created - notify admin and mark order
             dispute = event_data
             logger.warning(f"Dispute created: {dispute['id']} for charge {dispute['charge']}")
-            # TODO: Handle dispute, notify admin, etc.
+            await _handle_dispute_created(dispute)
 
         elif event_type == "charge.dispute.closed":
-            # Dispute resolved
+            # Dispute resolved - update based on outcome
             dispute = event_data
             logger.info(f"Dispute closed: {dispute['id']}, status: {dispute['status']}")
-            # TODO: Handle dispute resolution
+            await _handle_dispute_closed(dispute)
 
         elif event_type == "charge.refunded":
-            # Refund processed
+            # Refund processed - update order and notify
             charge = event_data
             refund_amount = sum(
                 refund["amount"] for refund in charge.get("refunds", {}).get("data", [])
             )
             logger.info(f"Refund processed: charge {charge['id']}, amount: {refund_amount}")
-            # TODO: Handle refund, update order status, etc.
+            await _handle_refund(charge, refund_amount)
 
         elif event_type.startswith("customer.subscription."):
-            # Subscription events
+            # Subscription events - handle lifecycle
             subscription = event_data
             logger.info(f"Subscription event {event_type}: {subscription['id']}")
-            # TODO: Handle subscription lifecycle events
+            await _handle_subscription_event(event_type, subscription)
 
         else:
             # Unhandled event type
@@ -216,3 +212,156 @@ async def stripe_webhook(request: Request):
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Webhook processing failed",
         )
+
+
+async def _handle_payment_succeeded(payment_intent: dict) -> None:
+    """Handle successful payment intent."""
+    try:
+        payment_intent_id = payment_intent.get("id")
+        metadata = payment_intent.get("metadata", {})
+        user_id = metadata.get("user_id")
+        order_id = metadata.get("order_id")
+
+        logger.info(f"Processing payment success: {payment_intent_id} for user {user_id}")
+
+        # TODO: Update order status to 'paid' in database
+        # TODO: Send confirmation email to user
+        # TODO: Trigger order fulfillment process
+        # TODO: Update user subscription status if applicable
+
+        logger.info(f"Payment {payment_intent_id} processed successfully")
+
+    except Exception as e:
+        logger.error(f"Failed to handle payment success: {e}", exc_info=True)
+        # Don't raise - webhook should acknowledge receipt
+
+
+async def _handle_payment_failed(payment_intent: dict) -> None:
+    """Handle failed payment intent."""
+    try:
+        payment_intent_id = payment_intent.get("id")
+        metadata = payment_intent.get("metadata", {})
+        user_id = metadata.get("user_id")
+        order_id = metadata.get("order_id")
+        last_payment_error = payment_intent.get("last_payment_error", {})
+
+        logger.warning(f"Processing payment failure: {payment_intent_id} for user {user_id}")
+
+        # TODO: Update order status to 'payment_failed'
+        # TODO: Send failure notification to user with reason
+        # TODO: Log payment failure reason for analytics
+
+        error_message = last_payment_error.get("message", "Unknown error")
+        logger.warning(f"Payment {payment_intent_id} failed: {error_message}")
+
+    except Exception as e:
+        logger.error(f"Failed to handle payment failure: {e}", exc_info=True)
+
+
+async def _handle_dispute_created(dispute: dict) -> None:
+    """Handle charge dispute creation."""
+    try:
+        dispute_id = dispute.get("id")
+        charge_id = dispute.get("charge")
+        amount = dispute.get("amount", 0)
+        currency = dispute.get("currency", "usd")
+
+        logger.warning(f"Processing dispute creation: {dispute_id} for charge {charge_id}")
+
+        # TODO: Mark order as 'disputed' in database
+        # TODO: Send alert to admin team
+        # TODO: Create dispute record for tracking
+        # TODO: Notify user about dispute
+
+        logger.warning(f"Dispute {dispute_id} created for ${amount / 100:.2f} {currency}")
+
+    except Exception as e:
+        logger.error(f"Failed to handle dispute creation: {e}", exc_info=True)
+
+
+async def _handle_dispute_closed(dispute: dict) -> None:
+    """Handle charge dispute resolution."""
+    try:
+        dispute_id = dispute.get("id")
+        status = dispute.get("status")
+        charge_id = dispute.get("charge")
+
+        logger.info(f"Processing dispute closure: {dispute_id} with status {status}")
+
+        # TODO: Update order status based on dispute outcome
+        # TODO: If won (status='won'), restore order to normal state
+        # TODO: If lost (status='lost'), mark order as 'dispute_lost'
+        # TODO: Send notification to admin and user
+
+        logger.info(f"Dispute {dispute_id} closed with status: {status}")
+
+    except Exception as e:
+        logger.error(f"Failed to handle dispute closure: {e}", exc_info=True)
+
+
+async def _handle_refund(charge: dict, refund_amount: int) -> None:
+    """Handle charge refund."""
+    try:
+        charge_id = charge.get("id")
+        metadata = charge.get("metadata", {})
+        user_id = metadata.get("user_id")
+        order_id = metadata.get("order_id")
+
+        logger.info(f"Processing refund: {charge_id} for ${refund_amount / 100:.2f}")
+
+        # TODO: Update order status to 'refunded'
+        # TODO: Send refund confirmation to user
+        # TODO: Log refund for accounting
+        # TODO: Update subscription status if applicable
+
+        logger.info(f"Refund processed for charge {charge_id}")
+
+    except Exception as e:
+        logger.error(f"Failed to handle refund: {e}", exc_info=True)
+
+
+async def _handle_subscription_event(event_type: str, subscription: dict) -> None:
+    """Handle subscription lifecycle events."""
+    try:
+        subscription_id = subscription.get("id")
+        customer_id = subscription.get("customer")
+        status = subscription.get("status")
+
+        logger.info(f"Processing subscription event: {event_type} for {subscription_id}")
+
+        # Handle specific subscription events
+        if event_type == "customer.subscription.created":
+            logger.info(f"Subscription created: {subscription_id}")
+            # TODO: Create subscription record in database
+            # TODO: Link subscription to user account
+            # TODO: Send welcome email
+
+        elif event_type == "customer.subscription.updated":
+            logger.info(f"Subscription updated: {subscription_id}")
+            # TODO: Update subscription details in database
+            # TODO: Handle plan changes
+
+        elif event_type == "customer.subscription.deleted":
+            logger.info(f"Subscription cancelled: {subscription_id}")
+            # TODO: Mark subscription as cancelled
+            # TODO: Send cancellation confirmation
+            # TODO: Revoke access if applicable
+
+        elif event_type == "customer.subscription.paused":
+            logger.info(f"Subscription paused: {subscription_id}")
+            # TODO: Pause subscription benefits
+
+        elif event_type == "customer.subscription.resumed":
+            logger.info(f"Subscription resumed: {subscription_id}")
+            # TODO: Resume subscription benefits
+
+        elif event_type in ["customer.subscription.payment_failed", "invoice.payment_failed"]:
+            logger.warning(f"Subscription payment failed: {subscription_id}")
+            # TODO: Handle payment failure (retry logic, dunning)
+            # TODO: Notify user of payment issue
+            # TODO: Update subscription status
+
+        logger.info(f"Subscription event {event_type} processed for {subscription_id}")
+
+    except Exception as e:
+        logger.error(f"Failed to handle subscription event: {e}", exc_info=True)

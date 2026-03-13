@@ -72,8 +72,6 @@ except ImportError:
 from app.schemas.root import RootResponse
 from app.services.cache_service import init_cache_service
 
-from app.middleware.logging import StructuredLogger
-
 # Configure structured logging
 configure_structured_logging(settings.log_level)
 logger: StructuredLogger = StructuredLogger(__name__)

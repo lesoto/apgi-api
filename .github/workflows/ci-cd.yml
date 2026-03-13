@@ -44,6 +44,11 @@ jobs:
         python -m pip install --upgrade pip
         pip install -r requirements-dev.txt
 
+    - name: Check Alembic migration consistency
+      run: |
+        pip install -r requirements.txt
+        alembic check
+
     - name: Run Bandit (SAST)
       run: |
         pip install bandit

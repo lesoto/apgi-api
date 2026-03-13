@@ -406,18 +406,18 @@ class Settings:
 
         # Validate Stripe keys for production
         if is_production:
-            if self.stripe_secret_key in [
-                "sk_test_placeholder",
-                "sk_test_placeholder",
-            ] or not self.stripe_secret_key.startswith("sk_live_"):
+            if (
+                self.stripe_secret_key == "sk_test_placeholder"
+                or not self.stripe_secret_key.startswith("sk_live_")
+            ):
                 errors.append(
                     "STRIPE_SECRET_KEY is not configured for production or is using a test placeholder. "
                     "Set STRIPE_SECRET_KEY environment variable with a valid production Stripe secret key."
                 )
-            if self.stripe_publishable_key in [
-                "pk_test_placeholder",
-                "pk_test_placeholder",
-            ] or not self.stripe_publishable_key.startswith("pk_live_"):
+            if (
+                self.stripe_publishable_key == "pk_test_placeholder"
+                or not self.stripe_publishable_key.startswith("pk_live_")
+            ):
                 errors.append(
                     "STRIPE_PUBLISHABLE_KEY is not configured for production or is using a test placeholder. "
                     "Set STRIPE_PUBLISHABLE_KEY environment variable with a valid production Stripe publishable key."

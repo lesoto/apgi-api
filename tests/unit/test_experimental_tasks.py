@@ -142,7 +142,12 @@ class TestExecuteIowaGamblingTask:
                 mock_celery_task.request.id = "task_123"
                 mock_celery_task.apgi_system = MagicMock()
 
-                result = execute_iowa_gambling_task(session_id, parameters)
+                # Mock the APGISystem property directly
+                with patch("app.tasks.experimental_tasks.APGISystem") as mock_apgi_system_class:
+                    mock_apgi_system = MagicMock()
+                    mock_apgi_system_class.return_value = mock_apgi_system
+                    # Call the function without self - Celery provides it
+                    result = execute_iowa_gambling_task(session_id, parameters)
 
                 assert result["status"] == "completed"
                 assert result["task_type"] == "iowa_gambling"
@@ -162,7 +167,12 @@ class TestExecuteIowaGamblingTask:
             mock_celery_task.request.id = "task_123"
             mock_celery_task.apgi_system = MagicMock()
 
-            result = execute_iowa_gambling_task(session_id, parameters)
+            # Mock the APGISystem property directly
+            with patch("app.tasks.experimental_tasks.APGISystem") as mock_apgi_system_class:
+                mock_apgi_system = MagicMock()
+                mock_apgi_system_class.return_value = mock_apgi_system
+                # Call the function without self - Celery provides it
+                result = execute_iowa_gambling_task(session_id, parameters)
 
             assert result["status"] == "failed"
             assert "Task failed" in result["error"]
@@ -199,7 +209,12 @@ class TestExecuteMaskingParadigmTask:
                 mock_celery_task.request.id = "task_123"
                 mock_celery_task.apgi_system = MagicMock()
 
-                result = execute_masking_paradigm_task(session_id, parameters)
+                # Mock the APGISystem property directly
+                with patch("app.tasks.experimental_tasks.APGISystem") as mock_apgi_system_class:
+                    mock_apgi_system = MagicMock()
+                    mock_apgi_system_class.return_value = mock_apgi_system
+                    # Call the function without self - Celery provides it
+                    result = execute_masking_paradigm_task(session_id, parameters)
 
                 assert result["status"] == "completed"
                 assert result["task_type"] == "masking_paradigm"
@@ -236,7 +251,12 @@ class TestExecuteAttentionalBlinkTask:
                 mock_celery_task.request.id = "task_123"
                 mock_celery_task.apgi_system = MagicMock()
 
-                result = execute_attentional_blink_task(session_id, parameters)
+                # Mock the APGISystem property directly
+                with patch("app.tasks.experimental_tasks.APGISystem") as mock_apgi_system_class:
+                    mock_apgi_system = MagicMock()
+                    mock_apgi_system_class.return_value = mock_apgi_system
+                    # Call the function without self - Celery provides it
+                    result = execute_attentional_blink_task(session_id, parameters)
 
                 assert result["status"] == "completed"
                 assert result["task_type"] == "attentional_blink"
@@ -273,7 +293,12 @@ class TestExecuteChangeBlindnessTask:
                 mock_celery_task.request.id = "task_123"
                 mock_celery_task.apgi_system = MagicMock()
 
-                result = execute_change_blindness_task(session_id, parameters)
+                # Mock the APGISystem property directly
+                with patch("app.tasks.experimental_tasks.APGISystem") as mock_apgi_system_class:
+                    mock_apgi_system = MagicMock()
+                    mock_apgi_system_class.return_value = mock_apgi_system
+                    # Call the function without self - Celery provides it
+                    result = execute_change_blindness_task(session_id, parameters)
 
                 assert result["status"] == "completed"
                 assert result["task_type"] == "change_blindness"
@@ -310,7 +335,12 @@ class TestExecuteBinocularRivalryTask:
                 mock_celery_task.request.id = "task_123"
                 mock_celery_task.apgi_system = MagicMock()
 
-                result = execute_binocular_rivalry_task(session_id, parameters)
+                # Mock the APGISystem property directly
+                with patch("app.tasks.experimental_tasks.APGISystem") as mock_apgi_system_class:
+                    mock_apgi_system = MagicMock()
+                    mock_apgi_system_class.return_value = mock_apgi_system
+                    # Call the function without self - Celery provides it
+                    result = execute_binocular_rivalry_task(session_id, parameters)
 
                 assert result["status"] == "completed"
                 assert result["task_type"] == "binocular_rivalry"

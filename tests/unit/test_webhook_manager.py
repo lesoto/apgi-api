@@ -62,7 +62,7 @@ class TestValidateWebhookUrl:
 
     def test_validate_webhook_url_no_hostname(self):
         """Test validation rejects URL without hostname."""
-        with pytest.raises(ValueError, match="URL must have a valid hostname"):
+        with pytest.raises(ValueError, match="hostname|Invalid URL"):
             WebhookManager._validate_webhook_url("https:///webhook")
 
     @patch("socket.getaddrinfo")

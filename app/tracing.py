@@ -6,10 +6,9 @@ Provides distributed tracing capabilities for the APGI API.
 
 import os
 import warnings
-import typing
+from typing import TYPE_CHECKING, Any, cast
 
-# Handle OpenTelemetry compatibility issues with Python 3.14
-try:
+if TYPE_CHECKING:
     from opentelemetry import trace
     from opentelemetry.sdk.trace import TracerProvider
     from opentelemetry.sdk.trace.export import BatchSpanProcessor
@@ -18,26 +17,49 @@ try:
     from opentelemetry.instrumentation.fastapi import FastAPIInstrumentor
     from opentelemetry.instrumentation.sqlalchemy import SQLAlchemyInstrumentor
     from opentelemetry.instrumentation.redis import RedisInstrumentor
-    from opentelemetry.instrumentation.celery import CeleryInstrumentor  # type: ignore[import]
-    from opentelemetry.instrumentation.httpx import HTTPXClientInstrumentor  # type: ignore[import]
     from opentelemetry.sdk.resources import Resource
+
+# Module-level variables to hold the actual imports
+trace: Any = None
+TracerProvider: Any = None
+BatchSpanProcessor: Any = None
+JaegerExporter: Any = None
+OTLPSpanExporter: Any = None
+FastAPIInstrumentor: Any = None
+SQLAlchemyInstrumentor: Any = None
+RedisInstrumentor: Any = None
+Resource: Any = None
+
+# Handle OpenTelemetry compatibility issues with Python 3.14
+try:
+    from opentelemetry import trace as _trace
+    from opentelemetry.sdk.trace import TracerProvider as _TracerProvider
+    from opentelemetry.sdk.trace.export import BatchSpanProcessor as _BatchSpanProcessor
+    from opentelemetry.exporter.jaeger.thrift import JaegerExporter as _JaegerExporter
+    from opentelemetry.exporter.otlp.proto.grpc.trace_exporter import (
+        OTLPSpanExporter as _OTLPSpanExporter,
+    )
+    from opentelemetry.instrumentation.fastapi import FastAPIInstrumentor as _FastAPIInstrumentor
+    from opentelemetry.instrumentation.sqlalchemy import (
+        SQLAlchemyInstrumentor as _SQLAlchemyInstrumentor,
+    )
+    from opentelemetry.instrumentation.redis import RedisInstrumentor as _RedisInstrumentor
+    from opentelemetry.sdk.resources import Resource as _Resource
+
+    trace = _trace
+    TracerProvider = _TracerProvider
+    BatchSpanProcessor = _BatchSpanProcessor
+    JaegerExporter = _JaegerExporter
+    OTLPSpanExporter = _OTLPSpanExporter
+    FastAPIInstrumentor = _FastAPIInstrumentor
+    SQLAlchemyInstrumentor = _SQLAlchemyInstrumentor
+    RedisInstrumentor = _RedisInstrumentor
+    Resource = _Resource
 
     OPENTELEMETRY_AVAILABLE = True
 except (ImportError, TypeError) as e:
     # Handle Python 3.14 compatibility issues
     OPENTELEMETRY_AVAILABLE = False
-    # Set these to None to prevent NameError if used
-    trace = None  # type: ignore[assignment]
-    TracerProvider = None  # type: ignore[assignment]
-    BatchSpanProcessor = None  # type: ignore[assignment]
-    JaegerExporter = None  # type: ignore[assignment]
-    OTLPSpanExporter = None  # type: ignore[assignment]
-    FastAPIInstrumentor = None  # type: ignore[assignment]
-    SQLAlchemyInstrumentor = None  # type: ignore[assignment]
-    RedisInstrumentor = None  # type: ignore[assignment]
-    CeleryInstrumentor = None  # type: ignore[assignment]
-    HTTPXClientInstrumentor = None  # type: ignore[assignment]
-    Resource = None  # type: ignore[assignment]
     warnings.warn(
         f"OpenTelemetry not available: {str(e)}. "
         "Distributed tracing will be disabled. "
@@ -86,9 +108,10 @@ def configure_distributed_tracing():
     )
 
     # Configure OTLP exporter
+    otlp_insecure = os.getenv("OTLP_INSECURE", "true").lower() == "true"
     otlp_exporter = OTLPSpanExporter(
         endpoint=otlp_endpoint,
-        insecure=True,  # TODO: Make configurable for production
+        insecure=otlp_insecure,
         headers=os.getenv("OTLP_HEADERS", ""),
     )
 
@@ -96,7 +119,7 @@ def configure_distributed_tracing():
     span_processor_jaeger = BatchSpanProcessor(jaeger_exporter)
     span_processor_otlp = BatchSpanProcessor(otlp_exporter)
 
-    tracer_provider = typing.cast(TracerProvider, trace.get_tracer_provider())
+    tracer_provider = cast(TracerProvider, trace.get_tracer_provider())
     tracer_provider.add_span_processor(span_processor_jaeger)
     tracer_provider.add_span_processor(span_processor_otlp)
 
@@ -127,15 +150,31 @@ def instrument_application():
 
     # Instrument Celery for distributed tracing of async tasks
     try:
-        CeleryInstrumentor().instrument()
-        print("Celery tracing instrumentation enabled")
+        # Try to import and instrument Celery if available
+        try:
+            from opentelemetry.instrumentation.celery import (  # type: ignore[import]
+                CeleryInstrumentor,
+            )
+
+            CeleryInstrumentor().instrument()
+            print("Celery tracing instrumentation enabled")
+        except ImportError:
+            print("Celery instrumentation not available")
     except Exception as e:
         print(f"Failed to instrument Celery: {e}")
 
     # Instrument HTTPX for distributed tracing of outbound HTTP calls
     try:
-        HTTPXClientInstrumentor().instrument()
-        print("HTTPX client tracing instrumentation enabled")
+        # Try to import and instrument HTTPX if available
+        try:
+            from opentelemetry.instrumentation.httpx import (  # type: ignore[import]
+                HTTPXClientInstrumentor,
+            )
+
+            HTTPXClientInstrumentor().instrument()
+            print("HTTPX client tracing instrumentation enabled")
+        except ImportError:
+            print("HTTPX instrumentation not available")
     except Exception as e:
         print(f"Failed to instrument HTTPX: {e}")
 

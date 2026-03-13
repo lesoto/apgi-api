@@ -14,7 +14,7 @@ from sqlalchemy.orm import Session
 
 from app.database.connection import SessionLocal, get_db
 from datetime import datetime
-from app.database.models import Session as SessionModel, Task, Session
+from app.database.models import Session as SessionModel, Task
 from app.exceptions import ServiceUnavailableError, SessionNotFoundError, SessionStateConflictError
 from app.models.schemas import (
     ErrorResponse,
@@ -81,11 +81,11 @@ async def validate_session_ownership(
         session = (
             db_session.query(SessionModel).filter(SessionModel.session_id == session_id).first()
         )
-        return session  # type: ignore[return-value]
+        return session
 
     # Execute DB query in executor to avoid blocking event loop
     loop = asyncio.get_running_loop()
-    session = cast(SessionModel, await loop.run_in_executor(None, _blocking_validate))
+    session = await loop.run_in_executor(None, _blocking_validate)
 
     if not session:
         raise HTTPException(
@@ -94,7 +94,7 @@ async def validate_session_ownership(
 
     # Admins bypass ownership checks (MF-012 / R-23)
     if is_admin:
-        return session  # type: ignore[return-value]
+        return session
 
     # Check ownership
     if session.user_id != user_id:
@@ -103,7 +103,7 @@ async def validate_session_ownership(
             detail="Access denied: you do not own this session",
         )
 
-    return session  # type: ignore[return-value]
+    return session
 
 
 # Create router
@@ -174,7 +174,7 @@ async def check_idempotency_key(
     if cached_response:
         import json
 
-        return cast(Dict[str, Any], json.loads(cached_response))  # type: ignore[return-value]
+        return cast(Dict[str, Any], json.loads(cached_response))
 
     return None
 
@@ -329,7 +329,7 @@ async def create_session(
             cached_response["created_at"] = datetime.fromisoformat(
                 cached_response["created_at"][:-1]
             )
-        return SessionCreateResponse(**cached_response)  # type: ignore[call-arg]
+        return SessionCreateResponse(**cached_response)
 
     # Create session
     session_id = await manager.create_session(request, user_id=current_user.user_id)

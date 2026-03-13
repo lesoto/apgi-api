@@ -16,7 +16,7 @@ import json
 import time
 from typing import Any, Dict, Optional, cast
 
-import requests  # type: ignore[import-untyped]
+import requests
 
 
 class APIDemo:
@@ -31,7 +31,11 @@ class APIDemo:
         self.task_id: Optional[str] = None
 
     def make_request(
-        self, method: str, endpoint: str, data: Optional[Dict[str, Any]] = None, auth: bool = True
+        self,
+        method: str,
+        endpoint: str,
+        data: Optional[Dict[str, Any]] = None,
+        auth: bool = True,
     ) -> Dict[str, Any]:
         """Make an HTTP request to the API."""
         url = f"{self.base_url}{endpoint}"
@@ -112,11 +116,46 @@ class APIDemo:
 
         # 2. Authentication
         print("\n2. AUTHENTICATION")
-        login_data = {
-            "username": "user@example.com",
-            "password": "SecurePassword123",
-            "remember_me": False,
-        }
+
+        # Try to get the default user credentials from the database
+        try:
+            import psycopg2  # type: ignore[import]
+
+            conn = psycopg2.connect(
+                host="127.0.0.1",
+                port="5432",
+                database="apgi_api_dev",
+                user="apgi_dev",
+                password="dev_password",
+            )
+            cursor = conn.cursor()
+            cursor.execute("SELECT username FROM users WHERE username LIKE 'default_%' LIMIT 1;")
+            result = cursor.fetchone()
+            cursor.close()
+            conn.close()
+
+            if result:
+                default_username = result[0]
+                # Use the actual generated password for the default user
+                login_data = {
+                    "username": default_username,
+                    "password": "GShnY46?a$s6Ug%:HG!aquBkVgSliTv!",
+                    "remember_me": False,
+                }
+            else:
+                # Fallback to hardcoded credentials
+                login_data = {
+                    "username": "user@example.com",
+                    "password": "SecurePassword123",
+                    "remember_me": False,
+                }
+        except Exception:
+            # Use the actual credentials as fallback
+            login_data = {
+                "username": "default_e88ff98b168b8ef7",
+                "password": "GShnY46?a$s6Ug%:HG!aquBkVgSliTv!",
+                "remember_me": False,
+            }
         login_response = self.make_request("POST", "/v1/auth/login", login_data, auth=False)
         if "access_token" in login_response:
             self.access_token = login_response["access_token"]

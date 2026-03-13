@@ -102,7 +102,7 @@ async def register_user(
             user_id=str(user.user_id),
             username=str(user.username),
             email=str(user.email),
-            roles=list(user.roles) if user.roles else [],  # type: ignore[arg-type]
+            roles=list(user.roles) if user.roles else [],
             created_at=user.created_at,  # type: ignore[arg-type]
             message="User created successfully. Please check your email to verify your account.",
         )
@@ -155,7 +155,8 @@ async def verify_email(
 
     if not user:
         raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid or expired verification token"
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid or expired verification token",
         )
 
     # Activate user and clear verification fields
@@ -212,7 +213,7 @@ async def create_default_user(
             roles=user.roles,  # type: ignore[arg-type]
             created_at=user.created_at,  # type: ignore[arg-type]
             message="Default user created successfully",
-        )  # type: ignore[arg-type]
+        )
 
     except Exception as e:
         logger.error(f"Failed to create default user: {str(e)}")
@@ -225,6 +226,7 @@ async def create_default_user(
 @router.get(
     "/",
     response_model=UsersListResponse,
+    dependencies=[Depends(require_permission(Permission.USER_ADMIN))],
     summary="List users",
     description="List all users with pagination",
 )
@@ -262,12 +264,13 @@ async def list_users(
         active_only=active_only,
     )
 
-    # Get total count for pagination
-    total_users = user_service.get_user_stats()["total_users"]
+    # Get user stats once for pagination
+    stats = user_service.get_user_stats()
+    total_users = stats["total_users"]
 
     # Calculate total count based on active_only filter
     if active_only:
-        total_count = user_service.get_user_stats()["active_users"]
+        total_count = stats["active_users"]
     else:
         total_count = total_users
 
@@ -402,6 +405,65 @@ async def get_user(
     )
 
 
+@router.patch(
+    "/{user_id}",
+    response_model=UserResponse,
+    summary="Partially update user",
+    description="Partially update user information (requires admin privileges or own user)",
+)
+async def partial_update_user(
+    user_id: str,
+    request: UserUpdateRequest,
+    db: Session = Depends(get_db),
+    current_user: TokenPayload = Depends(get_current_user),
+):
+    """
+    Partially update user information.
+
+    Args:
+        user_id: User identifier
+        request: User update request
+        db: Database session
+        user_service: User management service
+        current_user: Authenticated user
+
+    Returns:
+        Updated UserResponse object
+
+    Raises:
+        HTTPException: If user not found or unauthorized
+    """
+    user_service = get_user_management_service(db)
+    # Check permissions (admin can update any user, users can only update themselves)
+    is_admin = has_permission(current_user.roles, Permission.USER_ADMIN)
+    is_own_user = current_user.user_id == user_id
+
+    if not (is_admin or is_own_user):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Not authorized to update this user",
+        )
+
+    try:
+        user = user_service.update_user(
+            user_id=user_id,
+            email=request.email,
+            roles=request.roles if is_admin else None,  # Only admins can change roles
+        )
+        return UserResponse(
+            user_id=user.user_id,  # type: ignore[arg-type]
+            username=user.username,  # type: ignore[arg-type]
+            email=user.email,  # type: ignore[arg-type]
+            roles=user.roles,  # type: ignore[arg-type]
+            is_active=user.is_active,  # type: ignore[arg-type]
+            created_at=user.created_at,  # type: ignore[arg-type]
+            updated_at=user.updated_at,  # type: ignore[arg-type]
+            last_login=user.last_login,  # type: ignore[arg-type]
+        )
+    except ValueError as e:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"User not found: {e}")
+
+
 @router.put(
     "/{user_id}",
     response_model=UserResponse,
@@ -437,7 +499,8 @@ async def update_user(
 
     if not (is_admin or is_own_user):
         raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN, detail="Not authorized to update this user"
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Not authorized to update this user",
         )
 
     try:
@@ -445,9 +508,6 @@ async def update_user(
             user_id=user_id,
             email=request.email,
             roles=request.roles if is_admin else None,  # Only admins can change roles
-            is_active=(
-                request.is_active if is_admin else None
-            ),  # Only admins can change active status
         )
 
         # Audit log role changes
@@ -462,7 +522,7 @@ async def update_user(
             email=user.email,  # type: ignore[arg-type]
             roles=user.roles,  # type: ignore[arg-type]
             is_active=user.is_active,  # type: ignore[arg-type]
-            created_at=user.created_at,  # type: ignore[arg-type]  # type: ignore[arg-type]
+            created_at=user.created_at,  # type: ignore[arg-type]
             updated_at=user.updated_at,  # type: ignore[arg-type]
             last_login=user.last_login,  # type: ignore[arg-type]
         )

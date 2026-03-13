@@ -108,6 +108,7 @@ async def authenticated_client(test_environment, mock_database_connection):
         patch("app.middleware.authentication.is_authenticated", return_value=True),
         patch("app.services.authorization.check_permission", return_value=None),
         patch("app.services.authorization.has_permission", return_value=True),
+        patch("app.services.authorization.require_permission", return_value=None),
         patch(
             "app.services.authorization.get_current_user",
             return_value=TokenPayload(
@@ -119,6 +120,8 @@ async def authenticated_client(test_environment, mock_database_connection):
             ),
         ),
         patch("app.routes.sessions.get_session_manager", return_value=mock_session_mgr),
+        patch("app.routes.state.validate_session_ownership", return_value=None),
+        patch("app.routes.state.require_permission", return_value=None),
     ):
         app = create_app(test_mode=True)
         transport = ASGITransport(app=app)

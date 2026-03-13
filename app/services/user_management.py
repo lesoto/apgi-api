@@ -27,7 +27,11 @@ class UserManagementService:
         self.auth_manager = AuthManager(db)
 
     def create_user(
-        self, username: str, email: str, password: str, roles: Optional[List[str]] = None
+        self,
+        username: str,
+        email: str,
+        password: str,
+        roles: Optional[List[str]] = None,
     ) -> User:
         """
         Create a new user account.
@@ -57,14 +61,18 @@ class UserManagementService:
         verification_token = secrets.token_urlsafe(32)
         verification_expires = datetime.now(timezone.utc) + timedelta(hours=24)
 
+        from app.config import settings
+
+        smtp_available = bool(settings.smtp_server)
+
         user = User(
             username=username,
             email=email,
             password_hash=hashed_password,
             roles=roles,
-            is_active=False,  # Require email verification before activation
-            email_verification_token=verification_token,
-            email_verification_expires_at=verification_expires,
+            is_active=not smtp_available,  # Auto-activate if SMTP unavailable
+            email_verification_token=verification_token if smtp_available else None,
+            email_verification_expires_at=verification_expires if smtp_available else None,
         )
 
         try:
@@ -72,8 +80,11 @@ class UserManagementService:
             self.db.commit()
             self.db.refresh(user)
 
-            # Send verification email
-            self._send_verification_email(user.email, verification_token)  # type: ignore[arg-type]
+            # Send verification email only if SMTP is configured
+            if smtp_available:
+                self._send_verification_email(user.email, verification_token)  # type: ignore[arg-type]
+            else:
+                logger.warning(f"SMTP not configured - user {username} auto-activated")
 
             return user
         except IntegrityError:
@@ -375,12 +386,11 @@ APGI API Team
 
     def reset_password(self, user_id: str, new_password: Optional[str] = None) -> str:
         """
-        Reset a user's password by generating a new random password and emailing it,
-        or using the provided password if specified.
+        Reset a user's password by generating a password reset token and emailing a reset link.
 
         Args:
             user_id: User identifier
-            new_password: Optional new password to set. If not provided, generates random.
+            new_password: Optional new password to set. If not provided, generates reset token.
 
         Returns:
             Success message (password not returned for security)
@@ -389,28 +399,26 @@ APGI API Team
             UserNotFoundError: If user not found
         """
         import secrets
-        import string
 
         user = self.get_user(user_id)
 
-        # Use provided password or generate a secure random password
-        if new_password is not None:
-            password_to_set = new_password
-        else:
-            # Generate a secure random password
-            alphabet = string.ascii_letters + string.digits + "!@#$%^&*"
-            password_to_set = "".join(secrets.choice(alphabet) for _ in range(12))
+        # Generate a secure reset token
+        reset_token = secrets.token_urlsafe(32)
 
-        user.password_hash = self.auth_manager.hash_password(password_to_set)  # type: ignore[assignment]
-        user.updated_at = datetime.now(timezone.utc)  # type: ignore[assignment]
+        # Store the reset token with expiration (24 hours)
+        from datetime import datetime, timedelta
+
+        setattr(user, "password_reset_token", reset_token)
+        setattr(user, "password_reset_expires_at", datetime.now(timezone.utc) + timedelta(hours=24))
+        setattr(user, "updated_at", datetime.now(timezone.utc))
 
         try:
             self.db.commit()
 
-            # Send new password via email
-            self._send_password_reset_email(user.email, password_to_set)  # type: ignore[arg-type]
+            # Send password reset link via email
+            self._send_password_reset_link_email(str(user.email), reset_token)
 
-            return "Password reset successful. Check your email for the new password."
+            return "Password reset initiated. Check your email for the reset link."
         except Exception as e:
             self.db.rollback()
             logger.error(f"Failed to reset password for user {user_id}: {e}")
@@ -431,7 +439,6 @@ APGI API Team
 
         if not settings.smtp_server:
             logger.warning("SMTP server not configured, cannot send password reset email")
-            logger.info(f"Password reset for {email}: new password is {new_password}")
             return
 
         try:
@@ -442,14 +449,12 @@ APGI API Team
             msg["Subject"] = "Your APGI API Password Has Been Reset"
 
             # Email body
-            body = f"""
+            body = """
 Hello,
 
 Your password for the APGI API has been reset.
 
-Your new password is: {new_password}
-
-Please log in with this password and change it to something you can remember.
+Please use the password reset link sent to your email to set a new password.
 
 If you did not request this password reset, please contact support immediately.
 
@@ -472,10 +477,67 @@ APGI API Team
         except Exception as e:
             logger.error(f"Failed to send password reset email to {email}: {e}")
             # Don't raise exception to avoid breaking password reset
-            # Log the password so it can be manually communicated if needed
-            logger.warning(
-                f"Password reset failed to send email, password for {email}: {new_password}"
-            )
+            logger.warning(f"Password reset email not delivered to {email}: SMTP error")
+
+    def _send_password_reset_link_email(self, email: str, reset_token: str) -> None:
+        """
+        Send password reset email with reset link.
+
+        Args:
+            email: User's email address
+            reset_token: Password reset token
+        """
+        from app.config import settings
+        import smtplib
+        from email.mime.text import MIMEText
+        from email.mime.multipart import MIMEMultipart
+
+        if not settings.smtp_server:
+            logger.warning("SMTP server not configured, cannot send password reset email")
+            return
+
+        try:
+            # Create message
+            msg = MIMEMultipart()
+            msg["From"] = settings.smtp_from_email
+            msg["To"] = email
+            msg["Subject"] = "Reset Your APGI API Password"
+
+            # Email body with reset link
+            reset_url = f"{settings.base_url}/reset-password?token={reset_token}"
+            body = f"""
+Hello,
+
+A password reset has been initiated for your APGI API account.
+
+Please reset your password by clicking the link below:
+
+{reset_url}
+
+This link will expire in 24 hours.
+
+If you did not request this password reset, please contact support immediately.
+
+Best regards,
+APGI API Team
+            """
+
+            msg.attach(MIMEText(body, "plain"))
+
+            # Send email
+            server = smtplib.SMTP(settings.smtp_server, settings.smtp_port)
+            server.starttls()
+            if settings.smtp_username and settings.smtp_password:
+                server.login(settings.smtp_username, settings.smtp_password)
+            server.sendmail(settings.smtp_from_email, email, msg.as_string())
+            server.quit()
+
+            logger.info(f"Password reset link email sent to {email}")
+
+        except Exception as e:
+            logger.error(f"Failed to send password reset link email to {email}: {e}")
+            # Don't raise exception to avoid breaking password reset
+            logger.warning(f"Password reset link email not delivered to {email}: SMTP error")
 
     def _send_verification_email(self, email: str, verification_token: str) -> None:
         """
@@ -492,7 +554,6 @@ APGI API Team
 
         if not settings.smtp_server:
             logger.warning("SMTP server not configured, cannot send verification email")
-            logger.info(f"Email verification for {email}: token is {verification_token}")
             return
 
         try:
@@ -536,9 +597,7 @@ APGI API Team
         except Exception as e:
             logger.error(f"Failed to send verification email to {email}: {e}")
             # Don't raise exception to avoid breaking registration
-            logger.warning(
-                f"Verification email failed to send, token for {email}: {verification_token}"
-            )
+            logger.warning(f"Verification email failed to send for {email}")
 
     def delete_user(self, user_id: str) -> bool:
         """
