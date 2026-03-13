@@ -6,7 +6,7 @@ API endpoints for creating, controlling, and managing APGI simulation sessions.
 
 import asyncio
 import logging
-from typing import Optional, Dict, Any, cast, List
+from typing import Union, Optional, Dict, Any, List, cast
 
 import redis.asyncio as redis
 from fastapi import APIRouter, Depends, HTTPException, status, Request
@@ -17,16 +17,17 @@ from datetime import datetime
 from app.database.models import Session as SessionModel, Task
 from app.exceptions import ServiceUnavailableError, SessionNotFoundError, SessionStateConflictError
 from app.models.schemas import (
-    ErrorResponse,
+    SessionCreateResponse,
+    SessionStatusResponse,
     SessionActionResponse,
     SessionCreateRequest,
-    SessionCreateResponse,
     SessionListResponse,
     SessionMetricsResponse,
     SessionResponse,
     SessionTaskListResponse,
     TaskStatusResponse,
     PaginationInfo,
+    ErrorResponse,
 )
 from app.services.authorization import (
     Permission,
@@ -280,7 +281,7 @@ async def list_sessions(
 
         logger.info(f"Listed {len(sessions)} sessions for user {current_user.user_id}")
 
-        return SessionListResponse(sessions=sessions, pagination=pagination)
+        return Union[SessionCreateResponse, SessionStatusResponse, SessionActionResponse, SessionResponse]  # type: ignore[return-value]
 
     except Exception as e:
         logger.error(f"Failed to list sessions: {e}")

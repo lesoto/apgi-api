@@ -643,7 +643,7 @@ APGI API Team
         users = self.db.query(User).filter(User.is_deleted.is_(False)).all()
         role_counts: dict[tuple[str, ...], int] = {}
         for user in users:
-            roles_list = list(user.roles or []) if user.roles else []  # type: ignore[union-attr]
+            roles_list = list(user.roles or [])  # type: ignore[arg-type]
             roles_tuple = tuple(sorted(roles_list))
             role_counts[roles_tuple] = role_counts.get(roles_tuple, 0) + 1
         role_counts_str: dict[str, int] = {str(k): v for k, v in role_counts.items()}

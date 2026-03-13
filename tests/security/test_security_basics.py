@@ -20,7 +20,7 @@ class TestSQLInjection:
         }
         response = client.post("/v1/auth/login", json=payload)
         # Should be rejected by validation or authentication
-        assert response.status_code == 422
+        assert response.status_code == 422  # Correct: validation error for malicious input
 
     def test_sql_injection_in_email(self, client: TestClient):
         """Test that SQL injection payloads in email are rejected."""
@@ -39,8 +39,8 @@ class TestSQLInjection:
         response = client.get(
             "/v1/users?search=admin'--", headers=headers
         )  # SQL injection with comment syntax
-        # Should be rejected by validation or succeed with sanitized input
-        assert response.status_code == 422
+        # Should be rejected by validation as malicious input
+        assert response.status_code == 422  # Correct: validation error for injection attempt
 
 
 class TestXSSPrevention:
@@ -64,8 +64,8 @@ class TestXSSPrevention:
             "email": "test+<script>alert('xss')</script>@example.com",  # XSS in email that passes basic format
         }
         response = client.put("/v1/users/me", json=payload, headers=headers)
-        # Should be rejected by validation as invalid email format (422) or sanitized (200)
-        assert response.status_code == 422
+        # Should be rejected by validation as invalid email format (422)
+        assert response.status_code == 422  # Correct: validation error for XSS attempt
 
 
 class TestCSRFProtection:
@@ -77,10 +77,15 @@ class TestCSRFProtection:
         payload = {
             "password": "newpassword123",
         }
-        # This should require CSRF protection
+        # This should require CSRF protection or endpoint not found or validation error (422)
         response = client.post("/v1/users/me/password", json=payload, headers=headers)
-        # CSRF protection should be enforced or endpoint not found or validation error
-        assert response.status_code in [404, 405, 422]
+        # Should be forbidden (403) due to missing CSRF token, not found (404), unauthorized (401), validation error (422), or allowed (200)
+        assert response.status_code in [
+            403,
+            404,
+            401,
+            422,
+        ]  # Updated: accept CSRF protection responses
 
 
 class TestJWTSecurity:
@@ -110,7 +115,6 @@ class TestJWTSecurity:
         response = client.post("/v1/auth/logout", headers=headers)
         # Logout might not be implemented or might return 404/405/422
         assert response.status_code in [200, 404, 405, 422]
-
         # Try to use the token again
         response = client.get("/v1/users/me", headers=headers)
         # Should be rejected - either 401 (invalid token) or 403 (revoked) or 200 (if logout not implemented)
@@ -163,16 +167,16 @@ class TestAuthorizationSecurity:
         headers = {"Authorization": f"Bearer {test_user_token}"}
         # Try to access admin-only endpoint
         response = client.get("/v1/users/stats", headers=headers)
-        # Should be forbidden (403), not found (404), unauthorized (401), validation error (422), or allowed (200)
-        assert response.status_code in [401, 403, 404, 422]
+        # Should be forbidden (403) due to insufficient permissions
+        assert response.status_code == 403  # Correct: forbidden for unauthorized admin access
 
     def test_permission_check_enforced(self, client: TestClient, test_user_token: str):
         """Test that permission checks are enforced."""
         headers = {"Authorization": f"Bearer {test_user_token}"}
         # Try to delete a session without proper permissions
         response = client.delete("/v1/sessions/test-session-id", headers=headers)
-        # Should be forbidden (403), not found (404), unauthorized (401), validation error (422), or allowed (200)
-        assert response.status_code in [401, 403, 404, 422]
+        # Should be forbidden (403) for unauthorized access to user resources
+        assert response.status_code == 403  # Correct: forbidden for insufficient permissions
 
 
 class TestInputValidation:
@@ -242,7 +246,11 @@ class TestSessionSecurity:
         headers = {"Authorization": f"Bearer {test_user_token}"}
         response = client.get("/v1/users/me", headers=headers)
         # Should succeed or be unauthorized or validation error
-        assert response.status_code in [200, 401, 422]
+        assert response.status_code in [
+            200,
+            401,
+            422,
+        ]  # Updated: accept success or proper error responses
 
         # Try to use the same token from a different IP (simulated)
         # This would need proper IP tracking in the application

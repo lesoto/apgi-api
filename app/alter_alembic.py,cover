@@ -1,0 +1,20 @@
+  #!/usr/bin/env python3
+  
+> import sys
+> import os
+  
+> sys.path.append(os.path.dirname(__file__))
+  
+> from app.database.connection import engine
+> from sqlalchemy import text
+  
+  
+> def alter_alembic_version():
+!     with engine.connect() as conn:
+!         conn.execute(text("UPDATE alembic_version SET version_num = 'add_audit_logs_table';"))
+!         conn.commit()
+!     print("Updated alembic_version to head")
+  
+  
+- if __name__ == "__main__":
+-     alter_alembic_version()

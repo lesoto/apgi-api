@@ -102,7 +102,7 @@ async def register_user(
             user_id=str(user.user_id),
             username=str(user.username),
             email=str(user.email),
-            roles=list(user.roles) if user.roles else [],
+            roles=list(user.roles) if user.roles else [],  # type: ignore[arg-type]
             created_at=user.created_at,  # type: ignore[arg-type]
             message="User created successfully. Please check your email to verify your account.",
         )
@@ -917,7 +917,7 @@ async def verify_mfa_backup_code(
 
         # Check if the backup code exists and remove it (one-time use)
         if hashed_code in user.mfa_backup_codes:
-            user.mfa_backup_codes.remove(hashed_code)  # type: ignore[union-attr]
+            user.mfa_backup_codes.remove(hashed_code)
             user.updated_at = datetime.now(timezone.utc)  # type: ignore[assignment]
 
             db.commit()

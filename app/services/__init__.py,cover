@@ -1,0 +1,49 @@
+> """
+> Services Package
+  
+> Business logic and service layer components for the standalone API.
+> """
+  
+> from app.services.auth_manager import AuthManager, TokenPayload
+> from app.services.authorization import (
+>     Permission,
+>     Role,
+>     check_permission,
+>     check_resource_ownership,
+>     get_current_user,
+>     get_permissions_for_roles,
+>     has_any_role,
+>     has_permission,
+>     require_any_role,
+>     require_permission,
+>     require_role,
+> )
+> from app.services.session_manager import (
+>     SessionLifecycleState,
+>     SessionManager,
+>     SimulationSession,
+>     validate_session_id,
+> )
+  
+> __all__ = [
+      # Auth Manager
+>     "AuthManager",
+>     "TokenPayload",
+      # Authorization
+>     "Role",
+>     "Permission",
+>     "get_permissions_for_roles",
+>     "has_permission",
+>     "has_any_role",
+>     "check_permission",
+>     "get_current_user",
+>     "require_permission",
+>     "require_role",
+>     "require_any_role",
+>     "check_resource_ownership",
+      # Session Manager
+>     "SessionManager",
+>     "SimulationSession",
+>     "SessionLifecycleState",
+>     "validate_session_id",
+> ]

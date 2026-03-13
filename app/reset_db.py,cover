@@ -1,0 +1,49 @@
+  #!/usr/bin/env python3
+  
+> import psycopg2
+> from psycopg2.extensions import ISOLATION_LEVEL_AUTOCOMMIT
+> import os
+> from dotenv import load_dotenv
+  
+  # Load environment variables
+> load_dotenv()
+  
+  # Database connection parameters
+> DB_HOST = os.getenv("DB_HOST", "localhost")
+> DB_PORT = os.getenv("DB_PORT", "5432")
+> DB_USER = os.getenv("DB_USER", "postgres")  # Use postgres superuser
+> DB_PASSWORD = os.getenv("DB_PASSWORD", "")  # Empty password for local postgres
+> DB_NAME = os.getenv("DB_NAME", "apgi_api_dev")
+  
+  
+> def recreate_database():
+      # Connect to default postgres database
+!     conn = psycopg2.connect(
+!         host=DB_HOST, port=DB_PORT, user=DB_USER, password=DB_PASSWORD, database="postgres"
+!     )
+!     conn.set_isolation_level(ISOLATION_LEVEL_AUTOCOMMIT)
+!     cursor = conn.cursor()
+  
+      # Terminate active connections to the database
+!     cursor.execute(
+!         f"""
+!         SELECT pg_terminate_backend(pid)
+!         FROM pg_stat_activity
+!         WHERE datname = '{DB_NAME}';
+!     """
+!     )
+  
+      # Drop the database if it exists
+!     cursor.execute(f"DROP DATABASE IF EXISTS {DB_NAME};")
+!     print(f"Database {DB_NAME} dropped.")
+  
+      # Create the database
+!     cursor.execute(f"CREATE DATABASE {DB_NAME};")
+!     print(f"Database {DB_NAME} created.")
+  
+!     cursor.close()
+!     conn.close()
+  
+  
+- if __name__ == "__main__":
+-     recreate_database()
