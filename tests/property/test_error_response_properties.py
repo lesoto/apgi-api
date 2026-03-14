@@ -514,15 +514,11 @@ def test_property_27_server_error_response(error_message):
         # Property 2: Response should be valid JSON
         # Handle response body decoding (can be bytes or memoryview)
         if hasattr(response.body, "decode"):
-            response_text = response.body.decode()
+            response_text = response.body.decode()  # type: ignore[attr-defined]
+        elif isinstance(response.body, memoryview):
+            response_text = response.body.tobytes().decode("utf-8", errors="ignore")
         else:
-            response_text = (
-                response.body.decode("utf-8", errors="ignore")  # type: ignore[attr-defined]
-                if isinstance(response.body, bytes)
-                else response.body.tobytes().decode("utf-8", errors="ignore")
-                if isinstance(response.body, memoryview)
-                else str(response.body)
-            )
+            response_text = str(response.body)
         response_data = json.loads(response_text)
 
         # Property 3: Error should have proper structure
@@ -722,15 +718,11 @@ def test_property_28_file_paths_not_exposed(file_path):
         # Property: Response should not contain the file path
         # Handle response body decoding (can be bytes or memoryview)
         if hasattr(response.body, "decode"):
-            response_text = response.body.decode()
+            response_text = response.body.decode()  # type: ignore[attr-defined]
+        elif isinstance(response.body, memoryview):
+            response_text = response.body.tobytes().decode("utf-8", errors="ignore")
         else:
-            response_text = (
-                response.body.decode("utf-8", errors="ignore")  # type: ignore[attr-defined]
-                if isinstance(response.body, bytes)
-                else response.body.tobytes().decode("utf-8", errors="ignore")
-                if isinstance(response.body, memoryview)
-                else str(response.body)
-            )
+            response_text = str(response.body)
         assert file_path not in response_text, "Response should not contain internal file paths"
 
         # Verify generic error message is returned

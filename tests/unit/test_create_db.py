@@ -2,56 +2,94 @@
 Unit tests for create_db.py utility module.
 """
 
-from unittest.mock import patch
+from unittest.mock import patch, MagicMock
+import pytest
+import psycopg2
+
+
+@pytest.fixture
+def create_db_module():
+    """Fixture that imports the create_db module with mocked dependencies."""
+    with patch("app.create_db.psycopg2"):
+        from app import create_db
+    return create_db
 
 
 class TestCreateDatabase:
     """Test create_db.py functionality."""
 
-    def test_create_database_success(self):
+    @patch("app.create_db.psycopg2.connect")
+    def test_create_database_success(self, mock_connect, create_db_module):
         """Test successful database creation."""
-        with patch("app.create_db.create_database") as mock_create:
-            mock_create.return_value = None
+        mock_conn = MagicMock()
+        mock_connect.return_value = mock_conn
+        mock_conn.autocommit = True
+        mock_cursor = MagicMock()
+        mock_conn.cursor.return_value = mock_cursor
 
-            from app.create_db import create_database
+        create_db_module.create_database()
 
-            result = create_database()
+        mock_cursor.execute.assert_called()
+        mock_cursor.close.assert_called()
+        mock_conn.close.assert_called()
 
-            assert result is None
-            mock_create.assert_called_once()
+    @patch("app.create_db.psycopg2.connect")
+    def test_create_database_duplicate_database(self, mock_connect, create_db_module):
+        """Test handling when database already exists."""
+        mock_conn = MagicMock()
+        mock_connect.return_value = mock_conn
+        mock_conn.autocommit = True
+        mock_cursor = MagicMock()
+        mock_conn.cursor.return_value = mock_cursor
+        mock_cursor.execute.side_effect = [
+            psycopg2.errors.DuplicateDatabase("Database exists"),
+            None,
+            None,
+        ]
 
-    def test_create_database_permission_error(self):
-        """Test handling when permission is denied."""
-        with patch("app.create_db.create_database") as mock_create:
-            mock_create.side_effect = PermissionError("Permission denied")
+        create_db_module.create_database()
 
-            from app.create_db import create_database
+    @patch("app.create_db.psycopg2.connect")
+    def test_create_database_duplicate_user(self, mock_connect, create_db_module):
+        """Test handling when user already exists."""
+        mock_conn = MagicMock()
+        mock_connect.return_value = mock_conn
+        mock_conn.autocommit = True
+        mock_cursor = MagicMock()
+        mock_conn.cursor.return_value = mock_cursor
+        mock_cursor.execute.side_effect = [
+            None,
+            psycopg2.errors.DuplicateObject("User exists"),
+            None,
+        ]
 
-            result = create_database()
+        create_db_module.create_database()
 
-            assert result is None
-            mock_create.assert_called_once()
+    @patch("app.create_db.psycopg2.connect")
+    def test_create_database_connection_error(self, mock_connect, create_db_module):
+        """Test handling when connection fails."""
+        mock_connect.side_effect = Exception("Connection failed")
 
-    def test_create_database_file_exists_error(self):
-        """Test handling when database file already exists."""
-        with patch("app.create_db.create_database") as mock_create:
-            mock_create.side_effect = FileExistsError("Database file already exists")
+        create_db_module.create_database()
 
-            from app.create_db import create_database
+    @patch("app.create_db.psycopg2.connect")
+    def test_create_database_cursor_error(self, mock_connect, create_db_module):
+        """Test handling when cursor creation fails."""
+        mock_conn = MagicMock()
+        mock_connect.return_value = mock_conn
+        mock_conn.autocommit = True
+        mock_conn.cursor.side_effect = Exception("Cursor creation failed")
 
-            result = create_database()
+        create_db_module.create_database()
 
-            assert result is None
-            mock_create.assert_called_once()
+    @patch("app.create_db.psycopg2.connect")
+    def test_create_database_execute_error(self, mock_connect, create_db_module):
+        """Test handling when execute fails."""
+        mock_conn = MagicMock()
+        mock_connect.return_value = mock_conn
+        mock_conn.autocommit = True
+        mock_cursor = MagicMock()
+        mock_conn.cursor.return_value = mock_cursor
+        mock_cursor.execute.side_effect = Exception("Execute failed")
 
-    def test_create_database_unexpected_error(self):
-        """Test handling of unexpected errors."""
-        with patch("app.create_db.create_database") as mock_create:
-            mock_create.side_effect = RuntimeError("Unexpected error")
-
-            from app.create_db import create_database
-
-            result = create_database()
-
-            assert result is None
-            mock_create.assert_called_once()
+        create_db_module.create_database()

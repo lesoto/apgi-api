@@ -690,6 +690,24 @@ class SessionActionResponse(BaseModel):
     )
 
 
+class SessionStatusResponse(BaseModel):
+    """Response for session status."""
+
+    session_id: str = Field(..., description="Unique session identifier")
+    status: str = Field(..., description="Session status")
+    message: Optional[str] = Field(None, description="Status message")
+
+    model_config = ConfigDict(
+        json_schema_extra={
+            "example": {
+                "session_id": "sess_abc123",
+                "status": "running",
+                "message": "Session is currently active",
+            }
+        }
+    )
+
+
 class TaskDependencyCreateRequest(BaseModel):
     """Request to create a task dependency."""
 

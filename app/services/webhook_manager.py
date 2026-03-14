@@ -106,7 +106,7 @@ class WebhookManager:
             if allowed_ip is None:
                 raise ValueError("No valid IP address found for hostname")
 
-            return cast(str, allowed_ip)  # type: ignore[return-value]
+            return cast(str, allowed_ip)
 
         except Exception as e:
             raise ValueError(f"Invalid webhook URL: {e}")
@@ -202,8 +202,7 @@ class WebhookManager:
             return True
 
         # Check retry attempts
-        retry_count = delivery.retry_count
-        if delivery.attempts >= retry_count:
+        if delivery.attempts >= delivery.retry_count:
             delivery.status = "dead_letter"  # type: ignore[assignment]
             delivery.error_message = "Maximum retry attempts exceeded, moved to dead-letter queue"  # type: ignore[assignment]
             db.commit()
@@ -254,14 +253,15 @@ class WebhookManager:
             )
 
             # For HTTPS, we need to handle SSL verification carefully
-            # Since we're pinning the IP, we should verify the hostname matches the original
+            # Since we're pinning the IP, certificate hostname verification will fail
+            # We disable hostname verification but keep certificate validation
             if parsed_url.scheme == "https":
                 import ssl
 
-                # Create SSL context that verifies hostname against original hostname
+                # Create SSL context that validates certificate but not hostname
+                # This allows connecting to IP-pinned URLs while still validating the certificate
                 ssl_context = ssl.create_default_context()
-                # Note: This is a simplified approach. In production, you might want to
-                # implement proper certificate validation for the pinned IP
+                ssl_context.check_hostname = False
 
                 connector = aiohttp.TCPConnector(ssl=ssl_context)
             else:
@@ -289,9 +289,29 @@ class WebhookManager:
                         db.commit()
                         return True
                     else:
-                        delivery.status = "dead_letter"  # type: ignore[assignment]
-                        delivery.error_message = "Maximum retry attempts exceeded, moved to dead-letter queue"  # type: ignore[assignment]
-                        db.commit()
+                        # Check if retries are available
+                        if delivery.attempts < delivery.retry_count:
+                            delivery.status = "retry"  # type: ignore[assignment]
+                            retry_delays = cast(
+                                list[int], delivery.retry_delays or [5, 30, 300, 1800, 3600]
+                            )
+                            attempts_value = (
+                                int(delivery.attempts) if delivery.attempts is not None else 0
+                            )
+                            delay_index = min(attempts_value, len(retry_delays) - 1)
+                            delay_value = (
+                                retry_delays[delay_index]
+                                if delay_index < len(retry_delays)
+                                else retry_delays[-1]
+                            )
+                            delivery.next_retry_at = datetime.now(timezone.utc) + timedelta(seconds=float(cast(float, delay_value)))  # type: ignore[assignment]
+                            delivery.error_message = f"HTTP {response.status} - will retry"  # type: ignore[assignment]
+                            db.commit()
+                            return False
+                        else:
+                            delivery.status = "dead_letter"  # type: ignore[assignment]
+                            delivery.error_message = "Maximum retry attempts exceeded, moved to dead-letter queue"  # type: ignore[assignment]
+                            db.commit()
                         # Alert about dead-letter webhook
                         await alert_manager.trigger_custom_alert(
                             title="Webhook Dead-Letter",
@@ -312,10 +332,27 @@ class WebhookManager:
             delivery.attempts += 1  # type: ignore[assignment]
             delivery.last_attempt_at = datetime.now(timezone.utc)  # type: ignore[assignment]
             delivery.error_message = f"Unexpected error: {str(e)}"  # type: ignore[assignment]
-            delivery.status = "dead_letter"  # type: ignore[assignment]
-            db.commit()
-            logger.error(f"Unexpected error delivering webhook {delivery_id}: {e}", exc_info=True)
-            return False
+
+            # Check if retries are available
+            if delivery.attempts < delivery.retry_count:
+                delivery.status = "retry"  # type: ignore[assignment]
+                retry_delays = cast(list[int], delivery.retry_delays or [5, 30, 300, 1800, 3600])
+                delay_index = min(int(delivery.attempts), len(retry_delays) - 1)
+                delivery.next_retry_at = datetime.now(timezone.utc) + timedelta(seconds=float(cast(float, retry_delays[delay_index])))  # type: ignore[assignment]
+                db.commit()
+                logger.error(
+                    f"Unexpected error delivering webhook {delivery_id}: {e}, will retry",
+                    exc_info=True,
+                )
+                return False
+            else:
+                delivery.status = "dead_letter"  # type: ignore[assignment]
+                db.commit()
+                logger.error(
+                    f"Unexpected error delivering webhook {delivery_id}: {e}, max retries exceeded",
+                    exc_info=True,
+                )
+                return False
 
     async def process_pending_deliveries(self, db: Session) -> int:
         now = datetime.now(timezone.utc)
@@ -324,7 +361,7 @@ class WebhookManager:
             .filter(
                 WebhookDelivery.status.in_(["pending", "retry"]),
                 WebhookDelivery.next_retry_at <= now,
-                WebhookDelivery.attempts < 5,
+                WebhookDelivery.attempts < WebhookDelivery.retry_count,
             )
             .all()
         )

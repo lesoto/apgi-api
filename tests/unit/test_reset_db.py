@@ -2,49 +2,108 @@
 Unit tests for reset_db.py utility module.
 """
 
-from unittest.mock import patch
-from app.reset_db import recreate_database
+from unittest.mock import patch, MagicMock
+import pytest
+
+
+@pytest.fixture
+def reset_db_module():
+    """Fixture that imports the reset_db module with mocked dependencies."""
+    with patch("app.reset_db.psycopg2"):
+        from app import reset_db
+    return reset_db
 
 
 class TestResetDatabase:
     """Test reset_db.py functionality."""
 
-    def test_recreate_database_success(self):
+    @patch("app.reset_db.psycopg2.connect")
+    def test_recreate_database_success(self, mock_connect, reset_db_module):
         """Test successful database reset."""
-        with patch("app.reset_db.recreate_database") as mock_reset:
-            mock_reset.return_value = None
+        mock_conn = MagicMock()
+        mock_connect.return_value = mock_conn
+        mock_conn.set_isolation_level = MagicMock()
+        mock_cursor = MagicMock()
+        mock_conn.cursor.return_value = mock_cursor
 
-            result = recreate_database()
+        reset_db_module.recreate_database()
 
-            assert result is None
-            mock_reset.assert_called_once()
+        mock_cursor.execute.assert_called()
+        mock_cursor.close.assert_called()
+        mock_conn.close.assert_called()
 
-    def test_recreate_database_permission_error(self):
-        """Test handling when permission is denied."""
-        with patch("app.reset_db.recreate_database") as mock_reset:
-            mock_reset.side_effect = PermissionError("Permission denied")
+    @patch("app.reset_db.psycopg2.connect")
+    def test_recreate_database_connection_error(self, mock_connect, reset_db_module):
+        """Test handling when connection fails."""
+        mock_connect.side_effect = Exception("Connection failed")
 
-            result = recreate_database()
+        reset_db_module.recreate_database()
 
-            assert result is None
-            mock_reset.assert_called_once()
+    @patch("app.reset_db.psycopg2.connect")
+    def test_recreate_database_cursor_error(self, mock_connect, reset_db_module):
+        """Test handling when cursor creation fails."""
+        mock_conn = MagicMock()
+        mock_connect.return_value = mock_conn
+        mock_conn.set_isolation_level = MagicMock()
+        mock_conn.cursor.side_effect = Exception("Cursor creation failed")
 
-    def test_recreate_database_file_not_found(self):
-        """Test handling when database file is not found."""
-        with patch("app.reset_db.recreate_database") as mock_reset:
-            mock_reset.side_effect = FileNotFoundError("Database file not found")
+        reset_db_module.recreate_database()
 
-            result = recreate_database()
+    @patch("app.reset_db.psycopg2.connect")
+    def test_recreate_database_execute_error(self, mock_connect, reset_db_module):
+        """Test handling when execute fails."""
+        mock_conn = MagicMock()
+        mock_connect.return_value = mock_conn
+        mock_conn.set_isolation_level = MagicMock()
+        mock_cursor = MagicMock()
+        mock_conn.cursor.return_value = mock_cursor
+        mock_cursor.execute.side_effect = Exception("Execute failed")
 
-            assert result is None
-            mock_reset.assert_called_once()
+        reset_db_module.recreate_database()
 
-    def test_recreate_database_unexpected_error(self):
-        """Test handling of unexpected errors."""
-        with patch("app.reset_db.recreate_database") as mock_reset:
-            mock_reset.side_effect = RuntimeError("Unexpected error")
+    @patch("app.reset_db.psycopg2.connect")
+    def test_recreate_database_terminate_connections_error(self, mock_connect, reset_db_module):
+        """Test handling when terminating connections fails."""
+        mock_conn = MagicMock()
+        mock_connect.return_value = mock_conn
+        mock_conn.set_isolation_level = MagicMock()
+        mock_cursor = MagicMock()
+        mock_conn.cursor.return_value = mock_cursor
+        mock_cursor.execute.side_effect = [
+            Exception("Terminate failed"),
+            None,
+            None,
+        ]
 
-            result = recreate_database()
+        reset_db_module.recreate_database()
 
-            assert result is None
-            mock_reset.assert_called_once()
+    @patch("app.reset_db.psycopg2.connect")
+    def test_recreate_database_drop_error(self, mock_connect, reset_db_module):
+        """Test handling when drop database fails."""
+        mock_conn = MagicMock()
+        mock_connect.return_value = mock_conn
+        mock_conn.set_isolation_level = MagicMock()
+        mock_cursor = MagicMock()
+        mock_conn.cursor.return_value = mock_cursor
+        mock_cursor.execute.side_effect = [
+            None,
+            Exception("Drop failed"),
+        ]
+
+        reset_db_module.recreate_database()
+
+    @patch("app.reset_db.psycopg2.connect")
+    def test_recreate_database_create_error(self, mock_connect, reset_db_module):
+        """Test handling when create database fails."""
+        mock_conn = MagicMock()
+        mock_connect.return_value = mock_conn
+        mock_conn.set_isolation_level = MagicMock()
+        mock_cursor = MagicMock()
+        mock_conn.cursor.return_value = mock_cursor
+        mock_cursor.execute.side_effect = [
+            None,
+            None,
+            Exception("Create failed"),
+        ]
+
+        reset_db_module.recreate_database()

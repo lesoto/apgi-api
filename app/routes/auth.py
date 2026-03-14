@@ -88,26 +88,31 @@ async def login(
         )
         raise AuthenticationError("Invalid username or password")
 
-    # Log successful authentication to AuditLog
-    from app.database.models import AuditLog
-    from datetime import timezone, datetime
-
-    audit_entry = AuditLog(
-        user_id=user.user_id,
-        action="login",
-        resource_type="user",
-        resource_id=user.user_id,
-        timestamp=datetime.now(timezone.utc),
-        details={"username": body.username, "method": "password"},
-        ip_address=request.client.host if request.client else None,
-        user_agent=request.headers.get("user-agent"),
-        status="success",
-    )
-    db.add(audit_entry)
-    db.commit()
-
-    # Create tokens
+    # Create tokens first
     tokens = auth_manager.create_tokens_for_user(user, body.remember_me or False)
+
+    # Log successful authentication to AuditLog (best-effort, doesn't block token issuance)
+    try:
+        from app.database.models import AuditLog
+        from datetime import timezone, datetime
+
+        audit_entry = AuditLog(
+            user_id=user.user_id,
+            action="login",
+            resource_type="user",
+            resource_id=user.user_id,
+            timestamp=datetime.now(timezone.utc),
+            details={"username": body.username, "method": "password"},
+            ip_address=request.client.host if request.client else None,
+            user_agent=request.headers.get("user-agent"),
+            status="success",
+        )
+        db.add(audit_entry)
+        db.commit()
+    except Exception as e:
+        logger.error(f"Audit log commit failed: {e}")
+        db.rollback()
+        # Don't raise - tokens have already been generated
 
     return TokenResponse(**tokens)
 

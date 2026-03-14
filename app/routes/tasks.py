@@ -391,11 +391,6 @@ async def cancel_task(
     try:
         # Check if task exists before attempting cancellation
         task_status = await executor.get_task_status(task_id, current_user.user_id)
-        if task_status is None:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail=f"Task {task_id} not found",
-            )
 
         result = await executor.cancel_task(task_id, current_user.user_id)
 

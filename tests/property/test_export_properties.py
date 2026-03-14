@@ -7,6 +7,7 @@ and content-type headers.
 """
 
 import json
+from typing import cast
 from hypothesis import given, strategies as st, assume, settings
 from unittest.mock import Mock, AsyncMock
 import sys
@@ -65,7 +66,7 @@ def create_export_endpoint():
             filename = f"session_{session_id}_export.{extension}"
 
             return StreamingResponse(
-                BytesIO(data_bytes),
+                BytesIO(cast(bytes, data_bytes)),
                 media_type=content_type,
                 headers={"Content-Disposition": f"attachment; filename={filename}"},
             )
@@ -119,7 +120,7 @@ def test_property_19_export_authorization_different_user(
         raise ValueError(f"Session {session_id} not found or access denied")
 
     mock_service.export_session_data = AsyncMock(side_effect=mock_export)
-    mock_service_holder["service"] = mock_service
+    mock_service_holder["service"] = mock_service  # type: ignore[assignment]
 
     client = TestClient(app)
 

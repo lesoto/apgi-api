@@ -8,15 +8,45 @@ from dotenv import load_dotenv
 # Load environment variables
 load_dotenv()
 
-# Database connection parameters
-DB_HOST = os.getenv("DB_HOST", "localhost")
-DB_PORT = os.getenv("DB_PORT", "5432")
-DB_USER = os.getenv("DB_USER", "postgres")  # Use postgres superuser
-DB_PASSWORD = os.getenv("DB_PASSWORD", "")  # Empty password for local postgres
-DB_NAME = os.getenv("DB_NAME", "apgi_api_dev")
+# Parse DATABASE_URL to get connection parameters
+DATABASE_URL = os.getenv("DATABASE_URL")
+if not DATABASE_URL:
+    raise ValueError("DATABASE_URL environment variable not set")
+
+# Parse postgresql://user:password@host:port/database
+import re
+
+match = re.match(r"postgresql://([^:]+):([^@]+)@([^:]+):(\d+)/(.+)", DATABASE_URL)
+if not match:
+    raise ValueError("Invalid DATABASE_URL format")
+
+DB_USER, DB_PASSWORD, DB_HOST, DB_PORT, DB_NAME = match.groups()
+
+print(f"Connecting to PostgreSQL at {DB_HOST}:{DB_PORT} as user {DB_USER}")
 
 
 def recreate_database():
+    """
+    Recreate the application database.
+
+    This function tries to drop and recreate the database.
+    If the user doesn't have sufficient privileges, it will attempt to
+    clear all tables instead as a fallback.
+    """
+    try:
+        # Try the full database recreation first
+        _drop_and_create_database()
+    except psycopg2.errors.InsufficientPrivilege:
+        print("Insufficient privileges to drop database. Attempting to clear all tables instead...")
+        _clear_all_tables()
+    except Exception as e:
+        print(f"Error during database recreation: {e}")
+        print("Attempting to clear all tables instead...")
+        _clear_all_tables()
+
+
+def _drop_and_create_database():
+    """Drop and recreate the database (requires superuser privileges)."""
     # Connect to default postgres database
     conn = psycopg2.connect(
         host=DB_HOST, port=DB_PORT, user=DB_USER, password=DB_PASSWORD, database="postgres"
@@ -43,6 +73,39 @@ def recreate_database():
 
     cursor.close()
     conn.close()
+
+
+def _clear_all_tables():
+    """Clear all tables in the database (fallback method)."""
+    # Connect to the target database
+    conn = psycopg2.connect(
+        host=DB_HOST, port=DB_PORT, user=DB_USER, password=DB_PASSWORD, database=DB_NAME
+    )
+    conn.set_isolation_level(ISOLATION_LEVEL_AUTOCOMMIT)
+    cursor = conn.cursor()
+
+    # Get all table names
+    cursor.execute(
+        """
+        SELECT tablename
+        FROM pg_tables
+        WHERE schemaname = 'public'
+    """
+    )
+    tables = [row[0] for row in cursor.fetchall()]
+
+    # Drop all tables in dependency order (handle foreign key constraints)
+    # First drop tables that might be referenced by others
+    for table in sorted(tables, reverse=True):
+        try:
+            cursor.execute(f"DROP TABLE IF EXISTS {table} CASCADE;")
+            print(f"Dropped table: {table}")
+        except Exception as e:
+            print(f"Error dropping table {table}: {e}")
+
+    cursor.close()
+    conn.close()
+    print(f"All tables cleared in database {DB_NAME}")
 
 
 if __name__ == "__main__":

@@ -66,6 +66,9 @@ class AuthenticationMiddleware(BaseHTTPMiddleware):
         "/v1/auth/refresh",
         "/v1/users/register",
         "/v1/users/verify-email",
+        "/v1/users/reset-password",
+        "/v1/users/reset-password/confirm",
+        "/v1/payments/webhook",
     }
 
     _redis_client = None

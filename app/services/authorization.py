@@ -6,9 +6,9 @@ Role-Based Access Control (RBAC) for API endpoints.
 
 import logging
 from enum import Enum
-from typing import Any, Dict, List, Optional, Set
+from typing import Any, Dict, List, Optional, Set, cast
 
-from fastapi import Depends
+from fastapi import Depends, Request
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from sqlalchemy.orm import Session
 
@@ -341,13 +341,19 @@ security = HTTPBearer()
 
 
 async def get_current_user(
-    credentials: HTTPAuthorizationCredentials = Depends(security), db: Session = Depends(get_db)
+    request: Request,
+    credentials: Optional[HTTPAuthorizationCredentials] = Depends(HTTPBearer(auto_error=False)),
+    db: Session = Depends(get_db),
 ) -> TokenPayload:
     """
-    FastAPI dependency to get current authenticated user from JWT token.
+    FastAPI dependency to get current authenticated user from JWT token or API key.
+
+    First checks if the authentication middleware has already authenticated the user
+    via API key (stored in request.state.user). If not, falls back to JWT token extraction.
 
     Args:
-        credentials: HTTP authorization credentials
+        request: FastAPI request object
+        credentials: HTTP authorization credentials (optional)
         db: Database session
 
     Returns:
@@ -356,6 +362,11 @@ async def get_current_user(
     Raises:
         InvalidTokenError: If token is invalid or expired
     """
+    # Check if middleware already authenticated via API key
+    if hasattr(request.state, "user") and request.state.user:
+        return cast(TokenPayload, request.state.user)
+
+    # Fall back to JWT token authentication
     if not credentials or not credentials.credentials:
         raise InvalidTokenError(
             "Missing authorization token. Please provide a valid JWT token in the Authorization header."
@@ -365,7 +376,7 @@ async def get_current_user(
     auth_manager = AuthManager(db)
 
     try:
-        payload = await auth_manager.verify_token(token, expected_type="access")
+        payload: TokenPayload = await auth_manager.verify_token(token, expected_type="access")
         return payload
     except Exception as e:
         # Provide more helpful error messages based on the exception type

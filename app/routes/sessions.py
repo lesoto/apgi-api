@@ -6,7 +6,7 @@ API endpoints for creating, controlling, and managing APGI simulation sessions.
 
 import asyncio
 import logging
-from typing import Union, Optional, Dict, Any, List, cast
+from typing import Optional, Dict, Any, List, cast
 
 import redis.asyncio as redis
 from fastapi import APIRouter, Depends, HTTPException, status, Request
@@ -18,7 +18,6 @@ from app.database.models import Session as SessionModel, Task
 from app.exceptions import ServiceUnavailableError, SessionNotFoundError, SessionStateConflictError
 from app.models.schemas import (
     SessionCreateResponse,
-    SessionStatusResponse,
     SessionActionResponse,
     SessionCreateRequest,
     SessionListResponse,
@@ -78,9 +77,12 @@ async def validate_session_ownership(
     """
 
     # Blocking function for DB query
-    def _blocking_validate():
+    def _blocking_validate() -> SessionModel | None:
         session = (
-            db_session.query(SessionModel).filter(SessionModel.session_id == session_id).first()
+            db_session.query(SessionModel)
+            .filter(SessionModel.session_id == session_id)
+            .filter(SessionModel.is_deleted.is_(False))
+            .first()
         )
         return session
 
@@ -95,6 +97,7 @@ async def validate_session_ownership(
 
     # Admins bypass ownership checks (MF-012 / R-23)
     if is_admin:
+        assert session is not None
         return session
 
     # Check ownership
@@ -268,7 +271,7 @@ async def list_sessions(
                 created_at=session.created_at,
                 updated_at=session.updated_at,
                 config=session.config,
-                description=session.config.get("description"),
+                description=session.description,
             )
             for session in sessions_data["sessions"]
         ]
@@ -281,7 +284,7 @@ async def list_sessions(
 
         logger.info(f"Listed {len(sessions)} sessions for user {current_user.user_id}")
 
-        return Union[SessionCreateResponse, SessionStatusResponse, SessionActionResponse, SessionResponse]  # type: ignore[return-value]
+        return SessionListResponse(sessions=sessions, pagination=pagination)
 
     except Exception as e:
         logger.error(f"Failed to list sessions: {e}")
@@ -325,11 +328,9 @@ async def create_session(
     # Check idempotency key
     cached_response = await check_idempotency_key(req, current_user.user_id, redis_client)
     if cached_response:
-        # Convert cached datetime string back to datetime object
+        # Convert cached datetime string back to datetime object, preserving timezone
         if "created_at" in cached_response and isinstance(cached_response["created_at"], str):
-            cached_response["created_at"] = datetime.fromisoformat(
-                cached_response["created_at"][:-1]
-            )
+            cached_response["created_at"] = datetime.fromisoformat(cached_response["created_at"])
         return SessionCreateResponse(**cached_response)
 
     # Create session
@@ -354,7 +355,12 @@ async def create_session(
             current_user.user_id, idempotency_key, response_data, redis_client
         )
 
-    return SessionCreateResponse(**response_data)
+    return SessionCreateResponse(
+        session_id=str(response_data["session_id"]),
+        status=str(response_data["status"]),
+        created_at=cast(datetime, response_data["created_at"]),
+        config=cast(Dict[str, Any], response_data["config"]),
+    )
 
 
 @router.get(
@@ -403,7 +409,7 @@ async def get_session(
         created_at=sim_session.created_at,
         updated_at=sim_session.updated_at,
         config=sim_session.config,
-        description=sim_session.config.get("description"),
+        description=getattr(sim_session, "description", "No description"),
     )
 
 
@@ -535,7 +541,7 @@ async def get_session_tasks(
             task_id=str(task.task_id),
             status=str(task.status),
             state=str(task.status),  # Use status as state since Celery state not stored in DB
-            result=task.result_data,
+            result=dict(task.result_data) if task.result_data else None,  # type: ignore[arg-type]
             error=str(task.error_message) if task.error_message else None,
             info=None,
         )

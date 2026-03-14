@@ -147,6 +147,8 @@ class RateLimitingMiddleware(BaseHTTPMiddleware):
             return "auth:attempt"
         elif path.startswith("/v1/users/register"):
             return "auth:attempt"  # Registration should use same strict rate limit as auth
+        elif path.startswith("/v1/users/reset-password"):
+            return "users:reset-password"  # Password reset endpoints
         elif path.startswith("/v1/sessions") and method == "POST":
             if path.endswith("/tasks"):
                 return "task:execute"
@@ -272,7 +274,7 @@ class RateLimitingMiddleware(BaseHTTPMiddleware):
                             "request_id": getattr(request.state, "request_id", "unknown"),
                             "timestamp": datetime.now(timezone.utc).isoformat() + "Z",
                             "details": {
-                                "limit": settings.rate_limit_per_minute,
+                                "limit": limit,
                                 "retry_after": reset_time,
                                 "reset_at": (
                                     datetime.now(timezone.utc) + timedelta(seconds=reset_time)

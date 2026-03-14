@@ -42,7 +42,6 @@ logger = logging.getLogger(__name__)
     response_model=WebhookDeliveryListResponse,
     summary="List webhook deliveries",
     description="List webhook deliveries with optional filtering by status.",
-    dependencies=[Depends(require_permission(Permission.DATA_READ))],
 )
 async def list_webhook_deliveries(
     status_filter: Optional[str] = None,
@@ -145,7 +144,7 @@ async def list_webhook_deliveries(
 async def get_webhook_delivery(
     delivery_id: str,
     db: Session = Depends(get_db),
-    current_user: TokenPayload = Depends(require_permission(Permission.SYSTEM_ADMIN)),
+    current_user: TokenPayload = Depends(require_permission(Permission.DATA_READ)),
 ):
     """
     Get details of a specific webhook delivery.

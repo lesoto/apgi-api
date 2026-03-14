@@ -26,6 +26,33 @@ class UserManagementService:
         self.db = db
         self.auth_manager = AuthManager(db)
 
+    def _validate_password_complexity(self, password: str) -> None:
+        """
+        Validate password complexity requirements.
+
+        Args:
+            password: Plain text password to validate
+
+        Raises:
+            ValidationError: If password doesn't meet complexity requirements
+        """
+        import re
+
+        # Minimum length
+        if len(password) < 12:
+            raise ValidationError("Password must be at least 12 characters long")
+
+        # Complexity requirements
+        has_upper = re.search(r"[A-Z]", password) is not None
+        has_lower = re.search(r"[a-z]", password) is not None
+        has_digit = re.search(r"\d", password) is not None
+        has_special = re.search(r'[!@#$%^&*()_+\-=\[\]{};:\'"\\|,.<>/?]', password) is not None
+
+        if not (has_upper and has_lower and has_digit and has_special):
+            raise ValidationError(
+                "Password must contain uppercase, lowercase, digit, and special character"
+            )
+
     def create_user(
         self,
         username: str,
@@ -46,10 +73,13 @@ class UserManagementService:
             Created User object
 
         Raises:
-            ValidationError: If username or email already exists
+            ValidationError: If username or email already exists or password doesn't meet requirements
         """
         if roles is None:
             roles = ["viewer"]
+
+        # Validate password complexity
+        self._validate_password_complexity(password)
 
         # Hash the password
         hashed_password = self.auth_manager.hash_password(password)
@@ -282,9 +312,12 @@ class UserManagementService:
             new_password: New password
 
         Raises:
-            ValidationError: If token is invalid or expired
+            ValidationError: If token is invalid or expired or password doesn't meet requirements
         """
         import hashlib
+
+        # Validate password complexity
+        self._validate_password_complexity(new_password)
 
         # Hash the submitted token to compare with stored hash
         token_hash = hashlib.sha256(token.encode()).hexdigest()
@@ -405,10 +438,12 @@ APGI API Team
         # Generate a secure reset token
         reset_token = secrets.token_urlsafe(32)
 
-        # Store the reset token with expiration (24 hours)
+        # Store the hashed reset token with expiration (24 hours)
+        import hashlib
         from datetime import datetime, timedelta
 
-        setattr(user, "password_reset_token", reset_token)
+        token_hash = hashlib.sha256(reset_token.encode()).hexdigest()
+        setattr(user, "password_reset_token", token_hash)
         setattr(user, "password_reset_expires_at", datetime.now(timezone.utc) + timedelta(hours=24))
         setattr(user, "updated_at", datetime.now(timezone.utc))
 
@@ -423,61 +458,6 @@ APGI API Team
             self.db.rollback()
             logger.error(f"Failed to reset password for user {user_id}: {e}")
             raise
-
-    def _send_new_password_email(self, email: str, new_password: str) -> None:
-        """
-        Send password reset email with new password.
-
-        Args:
-            email: User's email address
-            new_password: New password to send
-        """
-        from app.config import settings
-        import smtplib
-        from email.mime.text import MIMEText
-        from email.mime.multipart import MIMEMultipart
-
-        if not settings.smtp_server:
-            logger.warning("SMTP server not configured, cannot send password reset email")
-            return
-
-        try:
-            # Create message
-            msg = MIMEMultipart()
-            msg["From"] = settings.smtp_from_email
-            msg["To"] = email
-            msg["Subject"] = "Your APGI API Password Has Been Reset"
-
-            # Email body
-            body = """
-Hello,
-
-Your password for the APGI API has been reset.
-
-Please use the password reset link sent to your email to set a new password.
-
-If you did not request this password reset, please contact support immediately.
-
-Best regards,
-APGI API Team
-            """
-
-            msg.attach(MIMEText(body, "plain"))
-
-            # Send email
-            server = smtplib.SMTP(settings.smtp_server, settings.smtp_port)
-            server.starttls()
-            if settings.smtp_username and settings.smtp_password:
-                server.login(settings.smtp_username, settings.smtp_password)
-            server.sendmail(settings.smtp_from_email, email, msg.as_string())
-            server.quit()
-
-            logger.info(f"Password reset email sent to {email}")
-
-        except Exception as e:
-            logger.error(f"Failed to send password reset email to {email}: {e}")
-            # Don't raise exception to avoid breaking password reset
-            logger.warning(f"Password reset email not delivered to {email}: SMTP error")
 
     def _send_password_reset_link_email(self, email: str, reset_token: str) -> None:
         """

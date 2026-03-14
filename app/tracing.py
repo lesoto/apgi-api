@@ -6,7 +6,7 @@ Provides distributed tracing capabilities for the APGI API.
 
 import os
 import warnings
-from typing import TYPE_CHECKING, Any, cast
+from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
     from opentelemetry import trace
@@ -119,7 +119,7 @@ def configure_distributed_tracing():
     span_processor_jaeger = _BatchSpanProcessor(jaeger_exporter)
     span_processor_otlp = _BatchSpanProcessor(otlp_exporter)
 
-    tracer_provider = cast(_TracerProvider, _trace.get_tracer_provider())
+    tracer_provider = _trace.get_tracer_provider()
     tracer_provider.add_span_processor(span_processor_jaeger)
     tracer_provider.add_span_processor(span_processor_otlp)
 
@@ -152,9 +152,7 @@ def instrument_application():
     try:
         # Try to import and instrument Celery if available
         try:
-            from opentelemetry.instrumentation.celery import (  # type: ignore[import-not-found]
-                CeleryInstrumentor,
-            )
+            from opentelemetry.instrumentation.celery import CeleryInstrumentor  # type: ignore[import-not-found]
 
             CeleryInstrumentor().instrument()
             print("Celery tracing instrumentation enabled")

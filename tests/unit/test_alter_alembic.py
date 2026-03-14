@@ -2,7 +2,7 @@
 Unit tests for alter_alembic.py utility module.
 """
 
-from unittest.mock import patch
+from unittest.mock import patch, MagicMock
 from app.alter_alembic import alter_alembic_version
 
 
@@ -11,40 +11,41 @@ class TestAlterAlembicVersion:
 
     def test_alter_alembic_version_success(self):
         """Test successful version alteration."""
-        with patch("app.alter_alembic.alter_alembic_version") as mock_alter:
-            mock_alter.return_value = "2.0.0"
+        with patch("app.alter_alembic.engine") as mock_engine:
+            mock_conn = MagicMock()
+            mock_engine.connect.return_value.__enter__.return_value = mock_conn
 
-            result = alter_alembic_version()
+            alter_alembic_version()
 
-            assert result == "2.0.0"
-            mock_alter.assert_called_once_with("2.0.0")
+            mock_conn.execute.assert_called_once()
+            mock_conn.commit.assert_called_once()
 
-    def test_alter_alembic_version_file_not_found(self):
-        """Test handling when alembic.ini file is not found."""
-        with patch("app.alter_alembic.alter_alembic_version") as mock_alter:
-            mock_alter.side_effect = FileNotFoundError("alembic.ini not found")
+    def test_alter_alembic_version_database_error(self):
+        """Test handling when database operation fails."""
+        with patch("app.alter_alembic.engine") as mock_engine:
+            mock_conn = MagicMock()
+            mock_engine.connect.return_value.__enter__.return_value = mock_conn
+            mock_conn.execute.side_effect = Exception("Database error")
 
-            result = alter_alembic_version()
+            alter_alembic_version()
 
-            assert result is None
-            mock_alter.assert_called_once_with("2.0.0")
+            mock_conn.execute.assert_called_once()
 
-    def test_alter_alembic_version_permission_error(self):
-        """Test handling when permission denied."""
-        with patch("app.alter_alembic.alter_alembic_version") as mock_alter:
-            mock_alter.side_effect = PermissionError("Permission denied")
+    def test_alter_alembic_version_connection_error(self):
+        """Test handling when connection fails."""
+        with patch("app.alter_alembic.engine") as mock_engine:
+            mock_engine.connect.side_effect = Exception("Connection failed")
 
-            result = alter_alembic_version()
+            alter_alembic_version()
 
-            assert result is None
-            mock_alter.assert_called_once_with("2.0.0")
+    def test_alter_alembic_version_commit_error(self):
+        """Test handling when commit fails."""
+        with patch("app.alter_alembic.engine") as mock_engine:
+            mock_conn = MagicMock()
+            mock_engine.connect.return_value.__enter__.return_value = mock_conn
+            mock_conn.commit.side_effect = Exception("Commit failed")
 
-    def test_alter_alembic_version_invalid_format(self):
-        """Test handling when version format is invalid."""
-        with patch("app.alter_alembic.alter_alembic_version") as mock_alter:
-            mock_alter.return_value = "invalid.version.format"
+            alter_alembic_version()
 
-            result = alter_alembic_version()
-
-            assert result is None
-            mock_alter.assert_called_once_with("2.0.0")
+            mock_conn.execute.assert_called_once()
+            mock_conn.commit.assert_called_once()
