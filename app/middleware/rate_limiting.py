@@ -261,7 +261,7 @@ class RateLimitingMiddleware(BaseHTTPMiddleware):
                     "Rate limit exceeded",
                     client_id=client_id,
                     endpoint=endpoint,
-                    limit=settings.rate_limit_per_minute,
+                    limit=limit,
                     retry_after=reset_time,
                 )
 

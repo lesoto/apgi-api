@@ -131,7 +131,17 @@ class Settings:
                 header.strip() for header in cors_headers_env.split(",") if header.strip()
             ]
         else:
-            self.cors_allow_headers = ["*"]
+            # Explicit allowlist avoids the wildcard + credentials CORS spec conflict
+            # (browsers reject credentialed requests when server returns Allow-Headers: *).
+            self.cors_allow_headers = [
+                "Authorization",
+                "Content-Type",
+                "X-CSRF-Token",
+                "X-API-Key",
+                "Idempotency-Key",
+                "Accept",
+                "Origin",
+            ]
 
         # Logging Settings
         self.log_level: str = os.getenv("LOG_LEVEL", self._get_default_log_level())
@@ -224,6 +234,9 @@ class Settings:
         self.stripe_publishable_key: str = os.getenv(
             "STRIPE_PUBLISHABLE_KEY", "pk_test_placeholder"
         )
+        # Stripe webhook endpoint secret — required for signature verification.
+        # Generate via Stripe dashboard → Webhooks → your endpoint → Signing secret.
+        self.stripe_webhook_secret: Optional[str] = os.getenv("STRIPE_WEBHOOK_SECRET")
 
         # Validate security settings after initialization
         self.__post_init__()
@@ -404,6 +417,16 @@ class Settings:
                     "Set REDIS_URL environment variable with production Redis connection string."
                 )
 
+        # Validate BASE_URL for production (used in password reset and verification emails)
+        if is_production:
+            if self.base_url == "https://localhost:8000" or "localhost" in self.base_url:
+                errors.append(
+                    "BASE_URL is set to localhost in production. "
+                    "Set BASE_URL environment variable to the public API base URL "
+                    "(e.g. https://api.yourdomain.com) so that password reset and "
+                    "email verification links are reachable."
+                )
+
         # Validate Stripe keys for production
         if is_production:
             if (
@@ -421,6 +444,12 @@ class Settings:
                 errors.append(
                     "STRIPE_PUBLISHABLE_KEY is not configured for production or is using a test placeholder. "
                     "Set STRIPE_PUBLISHABLE_KEY environment variable with a valid production Stripe publishable key."
+                )
+            if not self.stripe_webhook_secret:
+                errors.append(
+                    "STRIPE_WEBHOOK_SECRET is not configured for production. "
+                    "Set STRIPE_WEBHOOK_SECRET to your Stripe webhook signing secret to enable "
+                    "webhook signature verification."
                 )
 
         # Validate URL formats

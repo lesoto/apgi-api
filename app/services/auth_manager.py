@@ -570,10 +570,9 @@ class AuthManager:
             )
             self.db.add(new_db_refresh_token)
 
-            # Revoke ALL old refresh tokens for this user (not just the current one)
-            # This prevents multiple active refresh tokens across devices
-            for old_token in db_tokens:
-                old_token.revoked = True  # type: ignore[assignment]
+            # Revoke only the presented refresh token (not all tokens for the user).
+            # Revoking all tokens would silently log out other devices (e.g. mobile, desktop).
+            db_token.revoked = True  # type: ignore[assignment]
 
             self.db.commit()
         except Exception as e:

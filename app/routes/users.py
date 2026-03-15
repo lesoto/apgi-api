@@ -336,7 +336,7 @@ async def get_current_user_profile(
     response_model=UserStatsResponse,
     summary="Get user statistics",
     description="Retrieve user statistics (requires admin privileges)",
-    dependencies=[Depends(require_permission(Permission.USER_READ))],
+    dependencies=[Depends(require_permission(Permission.USER_ADMIN))],
 )
 async def get_user_stats(
     db: Session = Depends(get_db),
