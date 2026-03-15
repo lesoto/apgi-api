@@ -50,13 +50,14 @@ class SecurityValidationMiddleware(BaseHTTPMiddleware):
         else:
             logger.info("Security validation middleware disabled")
 
-    # SQL injection patterns
+    # SQL injection patterns — narrowed to avoid false positives on common words/emails.
+    # These patterns target syntax-level injection artefacts rather than reserved words
+    # that appear legitimately in usernames (e.g. "Anderson", "insert@domain.com").
     SQL_INJECTION_PATTERNS = [
-        r"('|--|#|;|/\*|/\*\|--|/\*\*/)",
-        r"(\b(UNION|SELECT|INSERT|UPDATE|DELETE|DROP|CREATE|ALTER|EXEC|)\b)",
-        r"(\b(OR|AND|NOT|LIKE|IN|BETWEEN|EXISTS)\b)",
-        r"(\'|\"|;|\-\-)",
-        r"(\b(WAITFOR|DELAY|BENCHMARK|SLEEP)\b)",
+        r"('--|--\s|#\s|/\*|\*/|;\s*DROP\s|;\s*SELECT\s|;\s*INSERT\s|;\s*UPDATE\s|;\s*DELETE\s)",
+        r"(\b(UNION\s+ALL\s+SELECT|UNION\s+SELECT)\b)",
+        r"(\b(WAITFOR\s+DELAY|BENCHMARK\s*\(|SLEEP\s*\()\b)",
+        r"(1\s*=\s*1|'1'\s*=\s*'1'|1\s*OR\s*1)",
     ]
 
     # XSS patterns
@@ -76,7 +77,9 @@ class SecurityValidationMiddleware(BaseHTTPMiddleware):
         r"<style[^>]*>.*?</style>",
     ]
 
-    # Malicious character patterns
+    # Malicious character patterns — true control characters only.
+    # Tab (\x09), newline (\x0a), carriage return (\x0d) are excluded because they
+    # legitimately appear in multiline JSON fields and formatted text.
     MALICIOUS_CHARS = [
         "\x00",
         "\x01",
@@ -87,11 +90,8 @@ class SecurityValidationMiddleware(BaseHTTPMiddleware):
         "\x06",
         "\x07",
         "\x08",
-        "\x09",
-        "\x0a",
         "\x0b",
         "\x0c",
-        "\x0d",
         "\x0e",
         "\x0f",
         "\x1a",
@@ -100,9 +100,6 @@ class SecurityValidationMiddleware(BaseHTTPMiddleware):
         "\x1d",
         "\x1e",
         "\x1f",
-        "\r",
-        "\n",
-        "\t",
     ]
 
     async def dispatch(self, request: Request, call_next):
@@ -237,7 +234,7 @@ class SecurityValidationMiddleware(BaseHTTPMiddleware):
             return {"is_valid": False, "error_message": "Username too long (max 100 characters)"}
 
         # Username format validation (alphanumeric with some allowed chars)
-        if not re.match(r"^[a-zA-Z0-9_@.+$", username):
+        if not re.match(r"^[a-zA-Z0-9_@.+$\-]{1,100}$", username):
             return {"is_valid": False, "error_message": "Username contains invalid characters"}
 
         # Validate email

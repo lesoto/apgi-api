@@ -403,8 +403,9 @@ APGI API Team
             msg.attach(MIMEText(body, "plain"))
 
             # Send email
+            import ssl as _ssl
             server = smtplib.SMTP(settings.smtp_server, settings.smtp_port)
-            server.starttls()
+            server.starttls(context=_ssl.create_default_context())
             if settings.smtp_username and settings.smtp_password:
                 server.login(settings.smtp_username, settings.smtp_password)
             server.sendmail(settings.smtp_from_email, email, msg.as_string())
@@ -505,8 +506,9 @@ APGI API Team
             msg.attach(MIMEText(body, "plain"))
 
             # Send email
+            import ssl as _ssl
             server = smtplib.SMTP(settings.smtp_server, settings.smtp_port)
-            server.starttls()
+            server.starttls(context=_ssl.create_default_context())
             if settings.smtp_username and settings.smtp_password:
                 server.login(settings.smtp_username, settings.smtp_password)
             server.sendmail(settings.smtp_from_email, email, msg.as_string())
@@ -565,8 +567,9 @@ APGI API Team
             msg.attach(MIMEText(body, "plain"))
 
             # Send email
+            import ssl as _ssl
             server = smtplib.SMTP(settings.smtp_server, settings.smtp_port)
-            server.starttls()
+            server.starttls(context=_ssl.create_default_context())
             if settings.smtp_username and settings.smtp_password:
                 server.login(settings.smtp_username, settings.smtp_password)
             server.sendmail(settings.smtp_from_email, email, msg.as_string())

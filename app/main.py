@@ -39,6 +39,7 @@ from app.middleware.request_size_limit import RequestSizeLimitMiddleware
 from app.middleware.schema_validation import ResponseSchemaValidationMiddleware
 from app.middleware.rate_limiting import RateLimitingMiddleware
 from app.middleware.security_headers import SecurityHeadersMiddleware
+from app.middleware.security_validation import SecurityValidationMiddleware
 from app.middleware.logging import (
     RequestLoggingMiddleware,
     StructuredLogger,
@@ -283,6 +284,10 @@ All endpoints except `/health`, `/docs`, and `/openapi.json` require authenticat
     # Add authentication middleware (extracts and verifies JWT tokens) - skip in test mode
     if not test_mode:
         app.add_middleware(AuthenticationMiddleware)
+
+    # Add security input validation middleware - skip in test mode
+    if not test_mode:
+        app.add_middleware(SecurityValidationMiddleware, enabled=True)
 
     # Add deprecation middleware
     app.add_middleware(DeprecationMiddleware, deprecated_endpoints={})

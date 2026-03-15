@@ -558,18 +558,22 @@ class TokenResponse(BaseModel):
 
 
 class TokenRefreshResponse(BaseModel):
-    """Response for token refresh without refresh token fields."""
+    """Response for token refresh including the new rotated refresh token."""
 
     access_token: str = Field(..., description="JWT access token")
+    refresh_token: str = Field(..., description="New JWT refresh token (rotated; old token is revoked)")
     token_type: str = Field("bearer", description="Token type")
     expires_in: int = Field(..., description="Access token expiration time in seconds")
+    refresh_expires_in: Optional[int] = Field(None, description="Refresh token expiration time in seconds")
 
     model_config = ConfigDict(
         json_schema_extra={
             "example": {
                 "access_token": "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9...",
+                "refresh_token": "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9...",
                 "token_type": "bearer",
-                "expires_in": 3600,
+                "expires_in": 1800,
+                "refresh_expires_in": 604800,
             }
         }
     )
