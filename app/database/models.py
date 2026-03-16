@@ -75,7 +75,7 @@ class User(Base):  # type: ignore[misc, valid-type]
         String(255), unique=True, nullable=False, index=True, comment="User email address"
     )
     password_hash = Column(String(255), nullable=False, comment="Hashed password")
-    roles = Column(JSON, nullable=False, default=lambda: [], comment="User roles for RBAC")  # type: ignore[var-annotated]
+    roles = Column(JSON, nullable=False, default=lambda: [], comment="User roles for RBAC")
     is_active = Column(
         Boolean, nullable=False, default=True, comment="Whether the user account is active"
     )
@@ -148,7 +148,7 @@ class SessionTemplate(Base):  # type: ignore[misc, valid-type]
     config_path = Column(String(255), nullable=True, comment="Path to YAML configuration file")
     custom_config = Column(JSON, nullable=True, comment="Default custom configuration overrides")
     default_description = Column(Text, nullable=True, comment="Default session description")
-    tags = Column(JSON, nullable=True, default=lambda: [], comment="Template tags for organization")  # type: ignore[var-annotated]
+    tags = Column(JSON, nullable=True, default=lambda: [], comment="Template tags for organization")
     is_public = Column(Boolean, nullable=False, default=False, comment="Whether template is public")
     created_at = Column(
         DateTime(timezone=True),
@@ -236,7 +236,7 @@ class Session(Base):  # type: ignore[misc, valid-type]
         comment="Last update timestamp",
     )
     description = Column(Text, nullable=True, comment="Human-readable session description")
-    tags = Column(JSON, nullable=True, default=lambda: [], comment="Session tags for organization")  # type: ignore[var-annotated]
+    tags = Column(JSON, nullable=True, default=lambda: [], comment="Session tags for organization")
     is_deleted = Column(Boolean, nullable=False, default=False, comment="Soft delete flag")
 
     # Relationships
@@ -494,7 +494,9 @@ class APIKey(Base):  # type: ignore[misc, valid-type]
     key_prefix = Column(
         String(16), nullable=False, index=True, comment="HMAC prefix for fast lookup"
     )
-    permissions = Column(JSON, nullable=False, default=lambda: [], comment="Permissions for this key")  # type: ignore[var-annotated]
+    permissions = Column(
+        JSON, nullable=False, default=lambda: [], comment="Permissions for this key"
+    )
     expires_at = Column(
         DateTime(timezone=True),
         nullable=False,

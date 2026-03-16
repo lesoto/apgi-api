@@ -480,7 +480,7 @@ class AuthManager:
         import hashlib
 
         sha = hashlib.sha256(refresh_token.encode("utf-8")).hexdigest()
-        db_token = (
+        db_token: Optional[RefreshToken] = (
             self.db.query(RefreshToken)
             .filter(
                 and_(
@@ -492,7 +492,7 @@ class AuthManager:
             .first()
         )
 
-        if db_token and not self.verify_password(refresh_token, db_token.token_hash):
+        if db_token and not self.verify_password(refresh_token, db_token.token_hash):  # type: ignore[arg-type]
             db_token = None
 
         if not db_token:
@@ -569,7 +569,7 @@ class AuthManager:
             import hashlib
 
             sha = hashlib.sha256(refresh_token.encode("utf-8")).hexdigest()
-            db_token = (
+            db_token: Optional[RefreshToken] = (
                 self.db.query(RefreshToken)
                 .filter(
                     and_(
@@ -581,7 +581,7 @@ class AuthManager:
                 .first()
             )
 
-            if db_token and not self.verify_password(refresh_token, db_token.token_hash):
+            if db_token and not self.verify_password(refresh_token, db_token.token_hash):  # type: ignore[arg-type]
                 db_token = None
 
             try:

@@ -1,19 +1,12 @@
 """
 Unit tests for app/tracing.py - OpenTelemetry distributed tracing configuration.
 
-The module has a known NameError bug at lines 49-57 (references `trace`, `TracerProvider` etc.
-without the proper names being defined), causing the initial import-time try block to fail
-with a NameError, which means OPENTELEMETRY_AVAILABLE is set to False on Python 3.14.
-
-The conftest.py already mocks all opentelemetry.* modules, so we test the public API
-(configure_distributed_tracing, instrument_application, get_tracer) by patching the
-module-level variables and OPENTELEMETRY_AVAILABLE flag directly.
+Tests the actual configure_distributed_tracing implementation and related utilities.
 """
 
 import os
-import sys
 import pytest
-from unittest.mock import patch, MagicMock, call
+from unittest.mock import patch, MagicMock
 
 
 # ---------------------------------------------------------------------------
@@ -97,10 +90,147 @@ class TestConfigureDistributedTracing:
     def test_configure_enabled_sets_tracer_provider(self):
         """When enabled, set_tracer_provider is called once."""
         mock_trace = MagicMock()
+
+
+class TestOpenTelemetryDependencyFailure:
+    """Tests for OpenTelemetry dependency failure handling (Lines 39-59)."""
+
+    def test_import_error_sets_opentelemetry_unavailable(self):
+        """When ImportError occurs, OPENTELEMETRY_AVAILABLE is set to False."""
+        import importlib
+        import app.tracing
+
+        # Reload the module to trigger import attempt
+        with patch("app.tracing.trace", side_effect=ImportError("No module named 'opentelemetry'")):
+            with patch("app.tracing.TracerProvider", side_effect=ImportError("No module")):
+                with patch("app.tracing.BatchSpanProcessor", side_effect=ImportError("No module")):
+                    with patch("app.tracing.JaegerExporter", side_effect=ImportError("No module")):
+                        with patch(
+                            "app.tracing.OTLPSpanExporter", side_effect=ImportError("No module")
+                        ):
+                            with patch(
+                                "app.tracing.FastAPIInstrumentor",
+                                side_effect=ImportError("No module"),
+                            ):
+                                with patch(
+                                    "app.tracing.SQLAlchemyInstrumentor",
+                                    side_effect=ImportError("No module"),
+                                ):
+                                    with patch(
+                                        "app.tracing.RedisInstrumentor",
+                                        side_effect=ImportError("No module"),
+                                    ):
+                                        with patch(
+                                            "app.tracing.Resource",
+                                            side_effect=ImportError("No module"),
+                                        ):
+                                            importlib.reload(app.tracing)
+
+        assert app.tracing.OPENTELEMETRY_AVAILABLE is False
+
+    def test_type_error_sets_opentelemetry_unavailable(self):
+        """When TypeError occurs (Python 3.14 compatibility), OPENTELEMETRY_AVAILABLE is set to False."""
+        import importlib
+        import app.tracing
+
+        # Reload the module to trigger import attempt
+        with patch("app.tracing.trace", side_effect=TypeError("Type error")):
+            importlib.reload(app.tracing)
+
+        assert app.tracing.OPENTELEMETRY_AVAILABLE is False
+
+    def test_warning_issued_on_import_failure(self):
+        """When import fails, a warning is issued."""
+        import importlib
+        import app.tracing
+
+        with patch("app.tracing.trace", side_effect=ImportError("No module")):
+            with patch("app.tracing.TracerProvider", side_effect=ImportError("No module")):
+                with patch("app.tracing.BatchSpanProcessor", side_effect=ImportError("No module")):
+                    with patch("app.tracing.JaegerExporter", side_effect=ImportError("No module")):
+                        with patch(
+                            "app.tracing.OTLPSpanExporter", side_effect=ImportError("No module")
+                        ):
+                            with patch(
+                                "app.tracing.FastAPIInstrumentor",
+                                side_effect=ImportError("No module"),
+                            ):
+                                with patch(
+                                    "app.tracing.SQLAlchemyInstrumentor",
+                                    side_effect=ImportError("No module"),
+                                ):
+                                    with patch(
+                                        "app.tracing.RedisInstrumentor",
+                                        side_effect=ImportError("No module"),
+                                    ):
+                                        with patch(
+                                            "app.tracing.Resource",
+                                            side_effect=ImportError("No module"),
+                                        ):
+                                            with pytest.warns(
+                                                ImportWarning, match="OpenTelemetry not available"
+                                            ):
+                                                importlib.reload(app.tracing)
+
+    def test_module_variables_set_to_none_on_failure(self):
+        """When import fails, module variables are set to None."""
+        import importlib
+        import app.tracing
+
+        with patch("app.tracing.trace", side_effect=ImportError("No module")):
+            with patch("app.tracing.TracerProvider", side_effect=ImportError("No module")):
+                with patch("app.tracing.BatchSpanProcessor", side_effect=ImportError("No module")):
+                    with patch("app.tracing.JaegerExporter", side_effect=ImportError("No module")):
+                        with patch(
+                            "app.tracing.OTLPSpanExporter", side_effect=ImportError("No module")
+                        ):
+                            with patch(
+                                "app.tracing.FastAPIInstrumentor",
+                                side_effect=ImportError("No module"),
+                            ):
+                                with patch(
+                                    "app.tracing.SQLAlchemyInstrumentor",
+                                    side_effect=ImportError("No module"),
+                                ):
+                                    with patch(
+                                        "app.tracing.RedisInstrumentor",
+                                        side_effect=ImportError("No module"),
+                                    ):
+                                        with patch(
+                                            "app.tracing.Resource",
+                                            side_effect=ImportError("No module"),
+                                        ):
+                                            importlib.reload(app.tracing)
+
+        # Check that all module-level variables are None
+        assert app.tracing._trace is None
+        assert app.tracing._TracerProvider is None
+        assert app.tracing._BatchSpanProcessor is None
+        assert app.tracing._JaegerExporter is None
+        assert app.tracing._OTLPSpanExporter is None
+        assert app.tracing._FastAPIInstrumentor is None
+        assert app.tracing._SQLAlchemyInstrumentor is None
+        assert app.tracing._RedisInstrumentor is None
+        assert app.tracing._Resource is None
+
+    def test_partial_import_failure(self):
+        """When only some imports fail, OPENTELEMETRY_AVAILABLE is still False."""
+        import importlib
+        import app.tracing
+
+        # Some imports succeed, some fail
+        mock_trace = MagicMock()
         mock_tracer_provider_cls = MagicMock()
         mock_provider_instance = MagicMock()
         mock_tracer_provider_cls.return_value = mock_provider_instance
         mock_trace.get_tracer_provider.return_value = mock_provider_instance
+
+        with patch("app.tracing.trace", return_value=mock_trace):
+            with patch("app.tracing.TracerProvider", side_effect=ImportError("No module")):
+                importlib.reload(app.tracing)
+
+        # Should still be unavailable if any import fails
+        assert app.tracing.OPENTELEMETRY_AVAILABLE is False
 
         mock_resource = MagicMock()
 
@@ -128,6 +258,8 @@ class TestConfigureDistributedTracing:
 
     def test_configure_adds_two_span_processors(self):
         """configure_distributed_tracing adds span processors for Jaeger and OTLP."""
+        import app.tracing as tracing_module
+
         mock_trace = MagicMock()
         mock_provider_instance = MagicMock()
         mock_tracer_provider_cls = MagicMock(return_value=mock_provider_instance)

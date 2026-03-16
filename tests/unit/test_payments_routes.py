@@ -27,6 +27,17 @@ class TestPaymentRoutes:
         """Mock Stripe client."""
         with patch("app.routes.payments.stripe") as mock:
             mock.PaymentIntent.create.return_value = Mock(client_secret="test_secret")
+            mock.Webhook.construct_event.return_value = {
+                "type": "test_event",
+                "data": {"object": {"id": "test_id"}},
+            }
+            yield mock
+
+    @pytest.fixture
+    def mock_settings(self):
+        """Mock settings for webhook configuration."""
+        with patch("app.routes.payments.settings") as mock:
+            mock.stripe_webhook_secret = "whsec_test_secret"
             yield mock
 
     @pytest.fixture
@@ -97,7 +108,7 @@ class TestPaymentRoutes:
         assert exc.value.status_code == 400
 
     @pytest.mark.asyncio
-    async def test_stripe_webhook_invalid_payload(self, mock_db):
+    async def test_stripe_webhook_invalid_payload(self, mock_db, mock_settings):
         """Test webhook with invalid payload."""
         with patch("app.routes.payments.stripe") as mock_stripe:
             mock_stripe.Webhook.construct_event.side_effect = ValueError("Invalid payload")
@@ -110,12 +121,11 @@ class TestPaymentRoutes:
             assert exc.value.status_code == 400
 
     @pytest.mark.asyncio
-    async def test_stripe_webhook_invalid_signature(self):
+    async def test_stripe_webhook_invalid_signature(self, mock_settings):
         """Test webhook with invalid signature."""
         with patch("app.routes.payments.stripe") as mock_stripe:
-            mock_stripe.Webhook.construct_event.side_effect = (
-                mock_stripe.SignatureVerificationError("Invalid sig")
-            )
+            mock_stripe.SignatureVerificationError = Exception
+            mock_stripe.Webhook.construct_event.side_effect = Exception("Invalid sig")
             request = Mock(
                 headers={"stripe-signature": "test_sig"}, body=AsyncMock(return_value=b"test")
             )
@@ -125,7 +135,7 @@ class TestPaymentRoutes:
             assert exc.value.status_code == 400
 
     @pytest.mark.asyncio
-    async def test_stripe_webhook_payment_succeeded(self):
+    async def test_stripe_webhook_payment_succeeded(self, mock_settings):
         """Test webhook payment succeeded event."""
         with patch("app.routes.payments.stripe") as mock_stripe:
             with patch("app.routes.payments._handle_payment_succeeded") as mock_handler:
@@ -141,7 +151,7 @@ class TestPaymentRoutes:
                 assert result["status"] == "success"
 
     @pytest.mark.asyncio
-    async def test_stripe_webhook_payment_failed(self):
+    async def test_stripe_webhook_payment_failed(self, mock_settings):
         """Test webhook payment failed event."""
         with patch("app.routes.payments.stripe") as mock_stripe:
             with patch("app.routes.payments._handle_payment_failed") as mock_handler:
@@ -157,23 +167,30 @@ class TestPaymentRoutes:
                 assert result["status"] == "success"
 
     @pytest.mark.asyncio
-    async def test_stripe_webhook_dispute_created(self):
+    async def test_stripe_webhook_dispute_created(self, mock_db, mock_settings):
         """Test webhook dispute created event."""
         with patch("app.routes.payments.stripe") as mock_stripe:
-            with patch("app.routes.payments._handle_dispute_created") as mock_handler:
-                mock_stripe.Webhook.construct_event.return_value = {
-                    "type": "charge.dispute.created",
-                    "data": {"object": {"id": "dp_test"}},
-                }
-                request = Mock(
-                    headers={"stripe-signature": "test_sig"}, body=AsyncMock(return_value=b"test")
-                )
+            mock_stripe.Webhook.construct_event.return_value = {
+                "type": "charge.dispute.created",
+                "data": {
+                    "object": {
+                        "id": "dp_test",
+                        "charge": "ch_test",
+                        "amount": 9900,
+                        "currency": "usd",
+                        "reason": "product_not_received",
+                    }
+                },
+            }
+            request = Mock(
+                headers={"stripe-signature": "test_sig"}, body=AsyncMock(return_value=b"test")
+            )
 
-                result = await stripe_webhook(request)
-                assert result["status"] == "success"
+            result = await stripe_webhook(request)
+            assert result["status"] == "success"
 
     @pytest.mark.asyncio
-    async def test_stripe_webhook_dispute_closed(self):
+    async def test_stripe_webhook_dispute_closed(self, mock_settings):
         """Test webhook dispute closed event."""
         with patch("app.routes.payments.stripe") as mock_stripe:
             with patch("app.routes.payments._handle_dispute_closed") as mock_handler:
@@ -189,7 +206,7 @@ class TestPaymentRoutes:
                 assert result["status"] == "success"
 
     @pytest.mark.asyncio
-    async def test_stripe_webhook_refund(self):
+    async def test_stripe_webhook_refund(self, mock_settings):
         """Test webhook refund event."""
         with patch("app.routes.payments.stripe") as mock_stripe:
             with patch("app.routes.payments._handle_refund") as mock_handler:
@@ -205,7 +222,7 @@ class TestPaymentRoutes:
                 assert result["status"] == "success"
 
     @pytest.mark.asyncio
-    async def test_stripe_webhook_subscription_created(self):
+    async def test_stripe_webhook_subscription_created(self, mock_settings):
         """Test webhook subscription created event."""
         with patch("app.routes.payments.stripe") as mock_stripe:
             with patch("app.routes.payments._handle_subscription_event") as mock_handler:

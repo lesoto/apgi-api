@@ -4,7 +4,6 @@ Unit tests for security validation middleware.
 
 import pytest
 from unittest.mock import AsyncMock
-from fastapi import HTTPException
 from app.middleware.security_validation import SecurityValidationMiddleware
 
 

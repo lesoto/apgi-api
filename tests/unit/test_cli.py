@@ -242,6 +242,32 @@ class TestCLISeed:
 
     @patch("app.services.seeding_service.DatabaseSeedingService")
     @patch("app.database.connection.init_db")
+    def test_seed_with_verbose_and_clear(self, mock_init, mock_seeder):
+        """Test seed command with both verbose and clear flags to cover logging lines."""
+        mock_seeder_instance = MagicMock()
+        mock_seeder.return_value = mock_seeder_instance
+        mock_seeder_instance.clear_all_data.return_value = {"users": 5, "templates": 3}
+        mock_seeder_instance.seed_all.return_value = {
+            "users": ["user1", "user2", "user3", "user4", "user5", "user6"],
+            "templates": ["template1"],
+        }
+
+        with patch.dict(
+            sys.modules,
+            {
+                "app.services.seeding_service.DatabaseSeedingService": mock_seeder,
+                "app.database.connection": MagicMock(init_db=mock_init),
+            },
+        ):
+            from app.cli import cli
+
+            runner = CliRunner()
+            result = runner.invoke(cli, ["seed", "--clear", "--verbose"])
+            assert result.exit_code == 0
+            # Verify clear_all_data and seed_all were called
+            mock_seeder_instance.clear_all_data.assert_called_once()
+            mock_seeder_instance.seed_all.assert_called_once()
+
     def test_seed_failure(self, mock_init, mock_seeder):
         """Test seed command handles errors gracefully."""
         mock_init.side_effect = Exception("Seeding failed")
@@ -307,3 +333,26 @@ class TestCLIClearSeed:
             runner = CliRunner()
             result = runner.invoke(cli, ["clear-seed-data", "--confirm"])
             assert result.exit_code == 1
+
+
+class TestCLIMain:
+    """Test CLI main group functionality."""
+
+    def test_cli_help(self):
+        """Test CLI help command."""
+        from app.cli import cli
+
+        runner = CliRunner()
+        result = runner.invoke(cli, ["--help"])
+        assert result.exit_code == 0
+        assert "APGI API command-line interface" in result.output
+
+    def test_cli_group_invoke(self):
+        """Test CLI group invocation without subcommand."""
+        from app.cli import cli
+
+        runner = CliRunner()
+        result = runner.invoke(cli, [])
+        # Click returns exit code 2 when no subcommand is provided
+        assert result.exit_code == 2
+        assert "Usage:" in result.output

@@ -279,12 +279,13 @@ class TestBusinessMetricsService:
     def test_metric_value_dataclass(self):
         """Test MetricValue dataclass."""
         metric = MetricValue(
-            value=100, timestamp=datetime.now(timezone.utc), metadata={"type": "counter"}
+            value=100, label="test_metric", description="A test metric", unit="count"
         )
 
         assert metric.value == 100
-        assert metric.timestamp is not None
-        assert metric.metadata == {"type": "counter"}
+        assert metric.label == "test_metric"
+        assert metric.description == "A test metric"
+        assert metric.unit == "count"
 
     def test_time_series_point_dataclass(self):
         """Test TimeSeriesPoint dataclass."""

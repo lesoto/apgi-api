@@ -6,8 +6,6 @@ Tests the actual RateLimitingMiddleware ASGI interface, not a fictional API.
 
 import pytest
 from unittest.mock import AsyncMock, MagicMock, patch
-from starlette.testclient import TestClient
-from fastapi import FastAPI
 
 
 # ---------------------------------------------------------------------------
@@ -116,10 +114,12 @@ class TestGetClientId:
         class _State:
             user = _User()
 
-        class _Request:
-            state = _State()
-            client = MagicMock()
-            headers = {}
+        class _Request(MagicMock):
+            def __init__(self):
+                super().__init__()
+                self.state = _State()
+                self.client = MagicMock()
+                self.headers = {}
 
         result = mw._get_client_id(_Request())
         assert result == "user:abc123"
@@ -226,6 +226,160 @@ class TestGetEndpointIdentifier:
 # ---------------------------------------------------------------------------
 # _should_skip_rate_limiting() tests
 # ---------------------------------------------------------------------------
+
+
+class TestTrustedProxy:
+    """Test trusted proxy detection for X-Forwarded-For headers (Lines 111-122)."""
+
+    def _make_mw(self):
+        from app.middleware.rate_limiting import RateLimitingMiddleware
+
+        return RateLimitingMiddleware(AsyncMock(), enabled=True)
+
+    def test_x_forwarded_for_from_localhost(self):
+        """X-Forwarded-For trusted when from localhost (127.0.0.1)."""
+        mw = self._make_mw()
+
+        request = MagicMock()
+        del request.state.user
+        request.client.host = "127.0.0.1"
+        request.headers = {"X-Forwarded-For": "203.0.113.1, 198.51.100.1"}
+
+        result = mw._get_client_id(request)
+        assert result == "ip:203.0.113.1"
+
+    def test_x_forwarded_for_from_10_network(self):
+        """X-Forwarded-For trusted when from 10.0.0.0/8 network."""
+        mw = self._make_mw()
+
+        request = MagicMock()
+        del request.state.user
+        request.client.host = "10.0.1.5"
+        request.headers = {"X-Forwarded-For": "203.0.113.1"}
+
+        result = mw._get_client_id(request)
+        assert result == "ip:203.0.113.1"
+
+    def test_x_forwarded_for_from_172_network(self):
+        """X-Forwarded-For trusted when from 172.16.0.0/12 network."""
+        mw = self._make_mw()
+
+        request = MagicMock()
+        del request.state.user
+        request.client.host = "172.16.0.1"
+        request.headers = {"X-Forwarded-For": "203.0.113.1"}
+
+        result = mw._get_client_id(request)
+        assert result == "ip:203.0.113.1"
+
+    def test_x_forwarded_for_from_192_network(self):
+        """X-Forwarded-For trusted when from 192.168.0.0/16 network."""
+        mw = self._make_mw()
+
+        request = MagicMock()
+        del request.state.user
+        request.client.host = "192.168.1.1"
+        request.headers = {"X-Forwarded-For": "203.0.113.1"}
+
+        result = mw._get_client_id(request)
+        assert result == "ip:203.0.113.1"
+
+    def test_x_forwarded_for_from_ipv6_localhost(self):
+        """X-Forwarded-For trusted when from IPv6 localhost (::1)."""
+        mw = self._make_mw()
+
+        request = MagicMock()
+        del request.state.user
+        request.client.host = "::1"
+        request.headers = {"X-Forwarded-For": "2001:db8::1"}
+
+        result = mw._get_client_id(request)
+        assert result == "ip:2001:db8::1"
+
+    def test_x_forwarded_for_not_trusted_external_ip(self):
+        """X-Forwarded-For NOT trusted when from external IP."""
+        mw = self._make_mw()
+
+        request = MagicMock()
+        del request.state.user
+        request.client.host = "203.0.113.1"
+        request.headers = {"X-Forwarded-For": "198.51.100.1"}
+
+        result = mw._get_client_id(request)
+        # Should use direct IP, not forwarded
+        assert result == "ip:203.0.113.1"
+
+    def test_x_forwarded_for_multiple_ips_takes_first(self):
+        """X-Forwarded-For with multiple IPs takes the first one."""
+        mw = self._make_mw()
+
+        request = MagicMock()
+        del request.state.user
+        request.client.host = "127.0.0.1"
+        request.headers = {"X-Forwarded-For": "203.0.113.1, 198.51.100.1, 192.0.2.1"}
+
+        result = mw._get_client_id(request)
+        assert result == "ip:203.0.113.1"
+
+    def test_x_real_ip_trusted_from_localhost(self):
+        """X-Real-IP trusted when from localhost."""
+        mw = self._make_mw()
+
+        request = MagicMock()
+        del request.state.user
+        request.client.host = "127.0.0.1"
+        request.headers = {"X-Real-IP": "203.0.113.1"}
+
+        result = mw._get_client_id(request)
+        assert result == "ip:203.0.113.1"
+
+    def test_x_real_ip_not_trusted_external(self):
+        """X-Real-IP NOT trusted when from external IP."""
+        mw = self._make_mw()
+
+        request = MagicMock()
+        del request.state.user
+        request.client.host = "203.0.113.1"
+        request.headers = {"X-Real-IP": "198.51.100.1"}
+
+        result = mw._get_client_id(request)
+        assert result == "ip:203.0.113.1"
+
+    def test_x_forwarded_for_takes_priority_over_x_real_ip(self):
+        """X-Forwarded-For takes priority over X-Real-IP when both present."""
+        mw = self._make_mw()
+
+        request = MagicMock()
+        del request.state.user
+        request.client.host = "127.0.0.1"
+        request.headers = {"X-Forwarded-For": "203.0.113.1", "X-Real-IP": "198.51.100.1"}
+
+        result = mw._get_client_id(request)
+        assert result == "ip:203.0.113.1"
+
+    def test_x_forwarded_for_with_whitespace(self):
+        """X-Forwarded-For handles whitespace correctly."""
+        mw = self._make_mw()
+
+        request = MagicMock()
+        del request.state.user
+        request.client.host = "127.0.0.1"
+        request.headers = {"X-Forwarded-For": "  203.0.113.1  "}
+
+        result = mw._get_client_id(request)
+        assert result == "ip:203.0.113.1"
+
+    def test_no_proxy_headers_uses_direct_ip(self):
+        """No proxy headers, uses direct client IP."""
+        mw = self._make_mw()
+
+        request = MagicMock()
+        del request.state.user
+        request.client.host = "203.0.113.1"
+        request.headers = {}
+
+        result = mw._get_client_id(request)
+        assert result == "ip:203.0.113.1"
 
 
 class TestShouldSkipRateLimiting:

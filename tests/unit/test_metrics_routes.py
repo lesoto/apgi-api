@@ -23,6 +23,7 @@ Also tests:
 """
 
 import pytest
+from typing import Any, Dict
 from unittest.mock import patch, MagicMock, AsyncMock
 from fastapi import HTTPException
 
@@ -386,7 +387,7 @@ class TestCompleteDashboard:
         from app.routes.metrics import get_complete_dashboard
 
         mock_service = MagicMock()
-        dashboard_data = {"overview": {}}
+        dashboard_data: Dict[str, Any] = {"overview": {}}
         mock_service.get_dashboard_data.return_value = dashboard_data
 
         with patch("app.routes.metrics.get_cache_service", return_value=None):

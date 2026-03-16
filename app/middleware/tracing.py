@@ -29,7 +29,6 @@ try:
         logger = logging.getLogger(__name__)
         logger.warning(f"JaegerExporter not available: {jaeger_error}")
         JAEGER_EXPORTER_AVAILABLE = False
-        JaegerExporter = None
 
 except Exception as e:
     logger = logging.getLogger(__name__)
@@ -87,7 +86,7 @@ def configure_distributed_tracing(
             logger.info("Console trace exporter enabled")
 
         # Jaeger exporter
-        if jaeger_endpoint and JAEGER_EXPORTER_AVAILABLE:
+        if jaeger_endpoint and JAEGER_EXPORTER_AVAILABLE and JaegerExporter:
             jaeger_exporter = JaegerExporter(
                 agent_host_name=(
                     jaeger_endpoint.split(":")[0] if ":" in jaeger_endpoint else jaeger_endpoint
@@ -99,7 +98,7 @@ def configure_distributed_tracing(
             logger.info(f"Jaeger trace exporter configured at {jaeger_endpoint}")
         elif jaeger_endpoint and not JAEGER_EXPORTER_AVAILABLE:
             logger.warning(
-                f"Jaeger endpoint configured but JaegerExporter not available, skipping Jaeger export"
+                "Jaeger endpoint configured but JaegerExporter not available, skipping Jaeger export"
             )
 
         # OTLP gRPC exporter
@@ -121,11 +120,10 @@ def configure_distributed_tracing(
         )  # type: ignore[call-arg]
 
         # SQLAlchemy instrumentation
-        SQLAlchemyInstrumentor().instrument(
-            engine=(
-                SQLAlchemyInstrumentor()._engines[0] if SQLAlchemyInstrumentor()._engines else None  # type: ignore[attr-defined]
-            )
-        )
+        try:
+            SQLAlchemyInstrumentor().instrument()
+        except Exception as e:
+            logger.warning(f"SQLAlchemy instrumentation failed: {e}")
 
         # Redis instrumentation
         RedisInstrumentor().instrument()
@@ -146,9 +144,8 @@ def _server_request_hook(span, scope):
         if hasattr(scope, "get") and callable(scope.get):
             route = scope.get("route")
             if route:
-                span.set_attribute(
-                    "http.route", route.path if hasattr(route, "path") else str(route)  # type: ignore[attr-defined]
-                )
+                route_path = getattr(route, "path", None)
+                span.set_attribute("http.route", route_path if route_path else str(route))
 
         # Add user information if available
         if hasattr(scope, "get") and callable(scope.get):

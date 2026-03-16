@@ -231,7 +231,7 @@ class TestCreateUser:
 
             user = service.create_user("testuser", "test@example.com", "SecurePass123!")
 
-            assert user.is_active is False  # Not activated without SMTP
+            assert user.is_active is False  # type: ignore[comparison-overlap]  # Not activated without SMTP
 
 
 class TestCreateDefaultUser:
@@ -255,7 +255,7 @@ class TestCreateDefaultUser:
 
             assert user.user_id == "user123"
             assert user.username == "admin"
-            assert user.is_active is True  # Pre-activated
+            assert user.is_active is True  # type: ignore[comparison-overlap]  # Pre-activated
             assert user.email_verification_token is None
 
     def test_create_default_user_duplicate(self, mock_db, mock_auth_manager):
@@ -440,7 +440,7 @@ class TestUpdateUser:
 
         user = service.update_user("user123", is_active=False)
 
-        assert user.is_active is False
+        assert user.is_active is False  # type: ignore[comparison-overlap]
         mock_db.commit.assert_called_once()
 
     def test_update_user_not_found(self, mock_db, mock_auth_manager):

@@ -107,24 +107,29 @@ class TestProfilingService:
     def test_record_performance_snapshot(self, mock_service):
         """Test recording performance snapshot."""
         mock_service.record_performance_snapshot(
-            cpu_percent=50.0, memory_mb=512.0, response_time=0.1
+            cpu_percent=50.0,
+            memory_mb=512.0,
+            active_threads=5,
+            active_coroutines=3,
+            request_count=100,
+            response_time_avg=0.1,
         )
 
         assert len(mock_service.snapshots) == 1
         assert mock_service.snapshots[0].cpu_percent == 50.0
         assert mock_service.snapshots[0].memory_mb == 512.0
-        assert mock_service.snapshots[0].response_time == 0.1
+        assert mock_service.snapshots[0].response_time_avg == 0.1
 
     def test_record_performance_snapshot_max_snapshots(self, mock_service):
         """Test recording performance snapshot when max reached."""
         mock_service.max_snapshots = 2
 
         # Add max snapshots
-        mock_service.record_performance_snapshot(50.0, 512.0, 0.1)
-        mock_service.record_performance_snapshot(60.0, 614.0, 0.2)
+        mock_service.record_performance_snapshot(50.0, 512.0, 5, 3, 100, 0.1)
+        mock_service.record_performance_snapshot(60.0, 614.0, 6, 4, 120, 0.2)
 
         # Add one more - should remove the oldest
-        mock_service.record_performance_snapshot(70.0, 716.0, 0.3)
+        mock_service.record_performance_snapshot(70.0, 716.0, 7, 5, 140, 0.3)
 
         assert len(mock_service.snapshots) == 2
         assert mock_service.snapshots[0].cpu_percent == 60.0  # Second snapshot
@@ -145,16 +150,28 @@ class TestProfilingService:
                 timestamp=now - timedelta(hours=2),
                 cpu_percent=50.0,
                 memory_mb=512.0,
-                response_time=0.1,
+                active_threads=5,
+                active_coroutines=3,
+                request_count=100,
+                response_time_avg=0.1,
             ),
             PerformanceSnapshot(
                 timestamp=now - timedelta(minutes=30),
                 cpu_percent=60.0,
                 memory_mb=614.0,
-                response_time=0.2,
+                active_threads=6,
+                active_coroutines=4,
+                request_count=120,
+                response_time_avg=0.2,
             ),
             PerformanceSnapshot(
-                timestamp=now, cpu_percent=70.0, memory_mb=716.0, response_time=0.3
+                timestamp=now,
+                cpu_percent=70.0,
+                memory_mb=716.0,
+                active_threads=7,
+                active_coroutines=5,
+                request_count=140,
+                response_time_avg=0.3,
             ),
         ]
 
@@ -172,13 +189,19 @@ class TestProfilingService:
                 timestamp=now - timedelta(hours=2),
                 cpu_percent=50.0,
                 memory_mb=512.0,
-                response_time=0.1,
+                active_threads=5,
+                active_coroutines=3,
+                request_count=100,
+                response_time_avg=0.1,
             ),
             PerformanceSnapshot(
                 timestamp=now - timedelta(hours=1),
                 cpu_percent=60.0,
                 memory_mb=614.0,
-                response_time=0.2,
+                active_threads=6,
+                active_coroutines=4,
+                request_count=120,
+                response_time_avg=0.2,
             ),
         ]
 
@@ -287,16 +310,28 @@ class TestProfilingService:
                 timestamp=now - timedelta(minutes=10),
                 cpu_percent=80.0,
                 memory_mb=1024.0,
-                response_time=1.0,
+                active_threads=8,
+                active_coroutines=6,
+                request_count=200,
+                response_time_avg=1.0,
             ),
             PerformanceSnapshot(
                 timestamp=now - timedelta(minutes=5),
                 cpu_percent=90.0,
                 memory_mb=1536.0,
-                response_time=2.0,
+                active_threads=9,
+                active_coroutines=7,
+                request_count=250,
+                response_time_avg=2.0,
             ),
             PerformanceSnapshot(
-                timestamp=now, cpu_percent=85.0, memory_mb=1280.0, response_time=1.5
+                timestamp=now,
+                cpu_percent=85.0,
+                memory_mb=1280.0,
+                active_threads=8,
+                active_coroutines=6,
+                request_count=225,
+                response_time_avg=1.5,
             ),
         ]
 
@@ -314,36 +349,50 @@ class TestProfilingService:
         """Test PerformanceSnapshot dataclass."""
         timestamp = datetime.now(timezone.utc)
         snapshot = PerformanceSnapshot(
-            timestamp=timestamp, cpu_percent=50.0, memory_mb=512.0, response_time=0.1
+            timestamp=timestamp,
+            cpu_percent=50.0,
+            memory_mb=512.0,
+            active_threads=5,
+            active_coroutines=3,
+            request_count=100,
+            response_time_avg=0.1,
         )
 
         assert snapshot.timestamp == timestamp
         assert snapshot.cpu_percent == 50.0
         assert snapshot.memory_mb == 512.0
-        assert snapshot.response_time == 0.1
+        assert snapshot.response_time_avg == 0.1
 
     def test_profiling_result_dataclass(self):
         """Test ProfilingResult dataclass."""
         function_stats = [{"function": "test_function", "calls": 5, "time": 0.1}]
-        result = ProfilingResult(function_stats=function_stats, duration=0.5, memory_usage=1024)
+        result = ProfilingResult(
+            function_stats=function_stats,
+            total_calls=5,
+            total_time=0.5,
+            memory_peak=1024,
+            duration=0.5,
+        )
 
         assert result.function_stats == function_stats
+        assert result.total_calls == 5
+        assert result.total_time == 0.5
+        assert result.memory_peak == 1024
         assert result.duration == 0.5
-        assert result.memory_usage == 1024
 
     def test_edge_case_max_snapshots_zero(self, mock_service):
         """Test edge case with max_snapshots set to zero."""
         mock_service.max_snapshots = 0
 
         # Add a snapshot - should immediately remove it
-        mock_service.record_performance_snapshot(50.0, 512.0, 0.1)
+        mock_service.record_performance_snapshot(50.0, 512.0, 5, 3, 100, 0.1)
 
         assert len(mock_service.snapshots) == 0
 
     def test_edge_case_negative_hours(self, mock_service):
         """Test edge case with negative hours parameter."""
         # Add some snapshots
-        mock_service.record_performance_snapshot(50.0, 512.0, 0.1)
+        mock_service.record_performance_snapshot(50.0, 512.0, 5, 3, 100, 0.1)
 
         result = mock_service.get_performance_history(hours=-1)
 

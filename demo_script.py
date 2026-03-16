@@ -119,7 +119,7 @@ class APIDemo:
 
         # Try to get the default user credentials from the database
         try:
-            import psycopg2  # type: ignore
+            import psycopg2
 
             conn = psycopg2.connect(
                 host="127.0.0.1",

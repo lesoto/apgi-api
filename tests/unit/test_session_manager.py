@@ -243,17 +243,17 @@ class TestSimulationSession:
         mock_state = {"time": 0.0}
         session.apgi_system.get_state = MagicMock(return_value=mock_state)
         session.apgi_system.allostasis = MagicMock()
-        session.apgi_system.allostasis.save_state = MagicMock(return_value={})  # type: ignore[attr-defined] - Needed for MagicMock dynamic attributes
-        session.apgi_system.body = MagicMock()  # type: ignore[attr-defined] - Needed for MagicMock dynamic attributes
-        session.apgi_system.body.save_state = MagicMock(return_value={})  # type: ignore[attr-defined] - Needed for MagicMock dynamic attributes
+        session.apgi_system.allostasis.save_state = MagicMock(return_value={})
+        session.apgi_system.body = MagicMock()  # type: ignore[attr-defined]  # type: ignore[attr-defined]
+        session.apgi_system.body.save_state = MagicMock(return_value={})
         session.apgi_system.precision = MagicMock()
-        session.apgi_system.precision.save_state = MagicMock(return_value={})  # type: ignore[attr-defined] - Needed for MagicMock dynamic attributes
-        session.apgi_system.workspace = MagicMock()  # type: ignore[attr-defined] - Needed for MagicMock dynamic attributes
-        session.apgi_system.workspace.save_state = MagicMock(return_value={})  # type: ignore[attr-defined] - Needed for MagicMock dynamic attributes
-        session.apgi_system.self_model = MagicMock()  # type: ignore[attr-defined] - Needed for MagicMock dynamic attributes
-        session.apgi_system.self_model.save_state = MagicMock(return_value={})  # type: ignore[attr-defined] - Needed for MagicMock dynamic attributes
-        session.apgi_system.ignition = MagicMock()  # type: ignore[attr-defined] - Needed for MagicMock dynamic attributes
-        session.apgi_system.ignition.save_state = MagicMock(return_value={})  # type: ignore[attr-defined] - Needed for MagicMock dynamic attributes
+        session.apgi_system.precision.save_state = MagicMock(return_value={})
+        session.apgi_system.workspace = MagicMock()  # type: ignore[attr-defined]  # type: ignore[attr-defined]
+        session.apgi_system.workspace.save_state = MagicMock(return_value={})  # type: ignore[attr-defined]
+        session.apgi_system.self_model = MagicMock()  # type: ignore[attr-defined]
+        session.apgi_system.self_model.save_state = MagicMock(return_value={})  # type: ignore[attr-defined]
+        session.apgi_system.ignition = MagicMock()  # type: ignore[attr-defined]
+        session.apgi_system.ignition.save_state = MagicMock(return_value={})  # type: ignore[attr-defined]
 
         result = session._capture_state()
 
@@ -275,14 +275,13 @@ class TestSimulationSession:
         }
 
         # Mock load_state methods
-        session.apgi_system.allostasis = MagicMock()  # type: ignore[attr-defined] - Needed for MagicMock dynamic attributes
-        session.apgi_system.allostasis.load_state = MagicMock()  # type: ignore[attr-defined] - Needed for MagicMock dynamic attributes
-        session.apgi_system.body = MagicMock()  # type: ignore[attr-defined] - Needed for MagicMock dynamic attributes
-        session.apgi_system.body.load_state = MagicMock()  # type: ignore[attr-defined] - Needed for MagicMock dynamic attributes
-        session.apgi_system.precision = MagicMock()  # type: ignore[attr-defined] - Needed for MagicMock dynamic attributes
-        session.apgi_system.precision.load_state = MagicMock()  # type: ignore[attr-defined] - Needed for MagicMock dynamic attributes
+        session.apgi_system.allostasis = MagicMock()  # type: ignore[attr-defined]
+        session.apgi_system.allostasis.load_state = MagicMock()  # type: ignore[attr-defined]
+        session.apgi_system.body = MagicMock()  # type: ignore[attr-defined]  # type: ignore[attr-defined]
+        session.apgi_system.body.load_state = MagicMock()  # type: ignore[attr-defined]
+        session.apgi_system.precision = MagicMock()  # type: ignore[attr-defined]
         session.apgi_system.precision.load_state = MagicMock()  # type: ignore[attr-defined]
-        session.apgi_system.workspace = MagicMock()  # type: ignore[attr-defined]
+        session.apgi_system.workspace = MagicMock()  # type: ignore[attr-defined]  # type: ignore[attr-defined]
         session.apgi_system.workspace.load_state = MagicMock()  # type: ignore[attr-defined]
         session.apgi_system.self_model = MagicMock()  # type: ignore[attr-defined]
         session.apgi_system.self_model.load_state = MagicMock()  # type: ignore[attr-defined]

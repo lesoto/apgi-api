@@ -206,7 +206,7 @@ class TestFastApiDependencies:
         credentials = Mock()
         credentials.credentials = "valid.jwt.token"
 
-        user = await get_current_user(request, credentials, mock_db)
+        user = await get_current_user(request, credentials, mock_db)  # type: ignore[arg-type]
 
         assert user.user_id == "user123"
         mock_auth_manager_instance.verify_token.assert_called_once_with(
@@ -230,7 +230,7 @@ class TestFastApiDependencies:
         request = _Request()
 
         with pytest.raises(InvalidTokenError):
-            await get_current_user(request, None, mock_db)
+            await get_current_user(request, None, mock_db)  # type: ignore[arg-type]
 
     @patch("app.services.authorization.AuthManager")
     @pytest.mark.asyncio
@@ -254,7 +254,7 @@ class TestFastApiDependencies:
         credentials.credentials = "expired.jwt.token"
 
         with pytest.raises(InvalidTokenError) as exc_info:
-            await get_current_user(request, credentials, mock_db)
+            await get_current_user(request, credentials, mock_db)  # type: ignore[arg-type]
         assert "expired" in str(exc_info.value).lower()
 
     @patch("app.services.authorization.AuthManager")
@@ -281,7 +281,7 @@ class TestFastApiDependencies:
         credentials.credentials = "not.a.valid.token"
 
         with pytest.raises(InvalidTokenError):
-            await get_current_user(request, credentials, mock_db)
+            await get_current_user(request, credentials, mock_db)  # type: ignore[arg-type]
 
     @patch("app.services.authorization.AuthManager")
     @pytest.mark.asyncio
@@ -307,7 +307,7 @@ class TestFastApiDependencies:
         credentials.credentials = "malformed"
 
         with pytest.raises(InvalidTokenError):
-            await get_current_user(request, credentials, mock_db)
+            await get_current_user(request, credentials, mock_db)  # type: ignore[arg-type]
 
     @patch("app.services.authorization.AuthManager")
     @pytest.mark.asyncio
@@ -333,7 +333,7 @@ class TestFastApiDependencies:
         credentials.credentials = "refresh.token"
 
         with pytest.raises(InvalidTokenError):
-            await get_current_user(request, credentials, mock_db)
+            await get_current_user(request, credentials, mock_db)  # type: ignore[arg-type]
 
     @patch("app.services.authorization.AuthManager")
     @pytest.mark.asyncio
@@ -359,7 +359,7 @@ class TestFastApiDependencies:
         credentials.credentials = "some.token"
 
         with pytest.raises(InvalidTokenError):
-            await get_current_user(request, credentials, mock_db)
+            await get_current_user(request, credentials, mock_db)  # type: ignore[arg-type]
 
     def test_require_permission_decorator(self):
         """Test require_permission decorator creation."""

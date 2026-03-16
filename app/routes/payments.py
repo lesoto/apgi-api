@@ -236,7 +236,7 @@ async def _handle_payment_succeeded(db: Session, payment_intent: dict) -> None:
         if order_id:
             order = db.query(Order).filter(Order.order_id == order_id).first()
             if order:
-                order.status = "succeeded"
+                order.status = "succeeded"  # type: ignore[assignment]
                 db.commit()
                 logger.info(
                     f"Payment {payment_intent_id} processed successfully - "
@@ -274,7 +274,7 @@ async def _handle_payment_failed(db: Session, payment_intent: dict) -> None:
         if order_id:
             order = db.query(Order).filter(Order.order_id == order_id).first()
             if order:
-                order.status = "failed"
+                order.status = "failed"  # type: ignore[assignment]
                 db.commit()
 
         logger.warning(
@@ -349,7 +349,7 @@ async def _handle_refund(db: Session, charge: dict, refund_amount: int) -> None:
         if order_id:
             order = db.query(Order).filter(Order.order_id == order_id).first()
             if order:
-                order.status = "refunded"
+                order.status = "refunded"  # type: ignore[assignment]
                 db.commit()
 
         # Log refund for accounting and record keeping
@@ -425,14 +425,14 @@ async def _handle_subscription_event(db: Session, event_type: str, subscription:
                 from datetime import datetime
                 import time
 
-                sub.status = status
-                sub.plan_id = subscription.get("plan", {}).get("id", sub.plan_id)
+                sub.status = status  # type: ignore[assignment]
+                sub.plan_id = subscription.get("plan", {}).get("id", sub.plan_id)  # type: ignore[assignment]
                 sub.current_period_start = datetime.fromtimestamp(
                     subscription.get("current_period_start", time.time()), timezone.utc
-                )
+                )  # type: ignore[assignment]
                 sub.current_period_end = datetime.fromtimestamp(
                     subscription.get("current_period_end", time.time()), timezone.utc
-                )
+                )  # type: ignore[assignment]
                 sub.cancel_at_period_end = subscription.get("cancel_at_period_end", False)
 
                 if status in ["canceled", "unpaid", "paused", "past_due"]:
@@ -448,7 +448,7 @@ async def _handle_subscription_event(db: Session, event_type: str, subscription:
                 .first()
             )
             if sub:
-                sub.status = "past_due"
+                sub.status = "past_due"  # type: ignore[assignment]
                 db.commit()
 
         logger.info(f"Subscription event {event_type} processed for {subscription_id}")

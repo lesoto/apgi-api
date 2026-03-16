@@ -23,7 +23,7 @@ from app.database.models import SessionState
 from app.database.models import SessionTemplate
 from app.models.schemas import SessionCreateRequest
 from app.config import settings
-from apgi_system.system import APGISystem  # type: ignore[import-untyped]
+from app import APGISystem  # type: ignore[import-untyped]
 
 logger = logging.getLogger(__name__)
 
@@ -153,12 +153,12 @@ class SimulationSession:
         state = cast(Dict[str, Any], self.apgi_system.get_state())
 
         # Explicitly capture subsystem states for full restoration
-        state["allostasis"] = self.apgi_system.allostasis.save_state()  # type: ignore[attr-defined]
-        state["body"] = self.apgi_system.body.save_state()  # type: ignore[attr-defined]
-        state["precision"] = self.apgi_system.precision.save_state()  # type: ignore[attr-defined]
-        state["workspace"] = self.apgi_system.workspace.save_state()  # type: ignore[attr-defined]
-        state["self_model"] = self.apgi_system.self_model.save_state()  # type: ignore[attr-defined]
-        state["ignition"] = self.apgi_system.ignition.save_state()  # type: ignore[attr-defined]
+        state["allostasis"] = self.apgi_system.allostasis.save_state()
+        state["body"] = self.apgi_system.body.save_state()
+        state["precision"] = self.apgi_system.precision.save_state()
+        state["workspace"] = self.apgi_system.workspace.save_state()
+        state["self_model"] = self.apgi_system.self_model.save_state()
+        state["ignition"] = self.apgi_system.ignition.save_state()
         return state
 
     def _restore_state(self, state: Dict[str, Any]):
@@ -174,22 +174,22 @@ class SimulationSession:
 
         # Restore subsystem states if available
         if "allostasis" in state:
-            self.apgi_system.allostasis.load_state(state["allostasis"])  # type: ignore[attr-defined]
+            self.apgi_system.allostasis.load_state(state["allostasis"])
 
         if "body" in state:
-            self.apgi_system.body.load_state(state["body"])  # type: ignore[attr-defined]
+            self.apgi_system.body.load_state(state["body"])
 
         if "precision" in state:
-            self.apgi_system.precision.load_state(state["precision"])  # type: ignore[attr-defined]
+            self.apgi_system.precision.load_state(state["precision"])
 
         if "workspace" in state:
-            self.apgi_system.workspace.load_state(state["workspace"])  # type: ignore[attr-defined]
+            self.apgi_system.workspace.load_state(state["workspace"])
 
         if "self_model" in state:
-            self.apgi_system.self_model.load_state(state["self_model"])  # type: ignore[attr-defined]
+            self.apgi_system.self_model.load_state(state["self_model"])
 
         if "ignition" in state:
-            self.apgi_system.ignition.load_state(state["ignition"])  # type: ignore[attr-defined]
+            self.apgi_system.ignition.load_state(state["ignition"])
 
         # Restore any other dynamic attributes from state
         for key, value in state.items():
@@ -350,7 +350,7 @@ class SimulationSession:
             ignition_thresholds = history.setdefault("ignition_thresholds", [])
             ignition_thresholds.append(ignition_data.get("threshold", 2.0))
 
-            return state  # type: ignore
+            return cast(Dict[str, Any], state)
 
     async def get_state(self) -> Dict[str, Any]:
         """
@@ -372,30 +372,7 @@ class SimulationSession:
                 "updated_at": self.updated_at.isoformat() + "Z",
             }
 
-            return state  # type: ignore
-
-        return state
-
-
-async def get_state(self) -> Dict[str, Any]:
-    """
-    Get current system state.
-
-    Returns:
-        Complete system state
-    """
-    async with self.lock:
-        state = self.apgi_system.get_state()
-
-        # Add session metadata
-        state["session_metadata"] = {
-            "session_id": self.session_id,
-            "state": self.state.value,
-            "is_running": self.is_running,
-            "is_paused": self.is_paused,
-            "created_at": self.created_at.isoformat() + "Z",
-            "updated_at": self.updated_at.isoformat() + "Z",
-        }
+            return cast(Dict[str, Any], state)
 
         return state
 

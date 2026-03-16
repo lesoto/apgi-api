@@ -5,6 +5,7 @@ Tests for response schema validation against OpenAPI schemas.
 """
 
 import pytest
+from typing import Any, Dict
 from unittest.mock import MagicMock, AsyncMock
 from fastapi import Request, Response
 import json
@@ -71,7 +72,7 @@ class TestResponseSchemaValidationMiddleware:
         """Test initialization with OpenAPI schema."""
         from app.middleware.schema_validation import ResponseSchemaValidationMiddleware
 
-        schema = {"paths": {}}
+        schema: Dict[str, Any] = {"paths": {}}
         middleware = ResponseSchemaValidationMiddleware(mock_app, openapi_schema=schema)
 
         assert middleware.openapi_schema == schema

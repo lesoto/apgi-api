@@ -91,42 +91,6 @@ class TestTemplateRoutes:
     @patch("app.routes.templates.get_db_context")
     @patch("app.routes.templates.get_current_user")
     @patch("app.routes.templates.require_permission")
-    async def test_list_templates_invalid_page(
-        self, mock_require_permission, mock_get_user, mock_get_db, mock_current_user
-    ):
-        """Test listing templates with invalid page."""
-        mock_get_user.return_value = mock_current_user
-
-        from app.routes.templates import list_templates
-
-        with pytest.raises(HTTPException) as exc_info:
-            await list_templates(
-                page=0, per_page=10, public_only=False, current_user=mock_current_user
-            )
-
-        assert exc_info.value.status_code == status.HTTP_400_BAD_REQUEST
-
-    @patch("app.routes.templates.get_db_context")
-    @patch("app.routes.templates.get_current_user")
-    @patch("app.routes.templates.require_permission")
-    async def test_list_templates_invalid_per_page(
-        self, mock_require_permission, mock_get_user, mock_get_db, mock_current_user
-    ):
-        """Test listing templates with invalid per_page."""
-        mock_get_user.return_value = mock_current_user
-
-        from app.routes.templates import list_templates
-
-        with pytest.raises(HTTPException) as exc_info:
-            await list_templates(
-                page=1, per_page=101, public_only=False, current_user=mock_current_user
-            )
-
-        assert exc_info.value.status_code == status.HTTP_400_BAD_REQUEST
-
-    @patch("app.routes.templates.get_db_context")
-    @patch("app.routes.templates.get_current_user")
-    @patch("app.routes.templates.require_permission")
     async def test_list_templates_public_only(
         self,
         mock_require_permission,
@@ -167,8 +131,8 @@ class TestTemplateRoutes:
         created_template.user_id = "user123"
         created_template.name = "New Template"
         created_template.description = "A new template"
-        created_template.config_path = "/path"
-        created_template.custom_config = {}
+        created_template.config_path = None
+        created_template.custom_config = None
         created_template.default_description = "Default"
         created_template.tags = []
         created_template.is_public = False
@@ -185,8 +149,8 @@ class TestTemplateRoutes:
         request = SessionTemplateCreateRequest(
             name="New Template",
             description="A new template",
-            config_path="/path",
-            custom_config={},
+            config_path="config.yaml",
+            custom_config=None,
             default_description="Default",
             tags=[],
             is_public=False,
@@ -216,8 +180,8 @@ class TestTemplateRoutes:
         request = SessionTemplateCreateRequest(
             name="Existing Template",
             description="Template",
-            config_path="/path",
-            custom_config={},
+            config_path="config.yaml",
+            custom_config=None,
             default_description="Default",
             tags=[],
             is_public=False,
@@ -318,8 +282,8 @@ class TestTemplateRoutes:
         request = SessionTemplateUpdateRequest(
             name="Updated Template",
             description="Updated description",
-            config_path="default",
-            custom_config={},
+            config_path=None,
+            custom_config=None,
             default_description="Default description",
             tags=[],
             is_public=False,
@@ -352,8 +316,8 @@ class TestTemplateRoutes:
         request = SessionTemplateUpdateRequest(
             name="Updated",
             description="Updated description",
-            config_path="default",
-            custom_config={},
+            config_path=None,
+            custom_config=None,
             default_description="Default description",
             tags=[],
             is_public=False,

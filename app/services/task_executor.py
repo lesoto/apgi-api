@@ -451,7 +451,7 @@ class TaskExecutor:
             return True
 
     def _has_cycle(
-        self, task_id: str, visited: set[str] = None, rec_stack: set[str] = None
+        self, task_id: str, visited: Optional[set[str]] = None, rec_stack: Optional[set[str]] = None
     ) -> bool:
         """
         Detect cycles in task dependency graph using DFS.
@@ -482,7 +482,7 @@ class TaskExecutor:
             for dep in dependencies:
                 prereq_id = dep.prerequisite_task_id
                 if prereq_id not in visited:
-                    if self._has_cycle(prereq_id, visited, rec_stack):
+                    if self._has_cycle(prereq_id, visited, rec_stack):  # type: ignore[arg-type]
                         return True
                 elif prereq_id in rec_stack:
                     return True
