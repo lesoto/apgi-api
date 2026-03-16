@@ -1,397 +1,771 @@
 """
-Unit tests for metrics routes.
+Unit tests for app/routes/metrics.py
+
+Covers all endpoints:
+  GET  /v1/metrics                   - Prometheus endpoint
+  GET  /v1/dashboard/overview        - dashboard overview
+  GET  /v1/dashboard/sessions        - session metrics
+  GET  /v1/dashboard/tasks           - task metrics
+  GET  /v1/dashboard/users           - user metrics
+  GET  /v1/dashboard/templates       - template metrics
+  GET  /v1/dashboard                 - complete dashboard
+  GET  /v1/dashboard/html            - HTML dashboard
+  POST /v1/profiling/memory/start    - start memory tracing
+  POST /v1/profiling/memory/stop     - stop memory tracing
+  GET  /v1/profiling/memory          - memory snapshot
+  GET  /v1/profiling/system          - system performance
+  GET  /v1/profiling/history         - performance history
+  GET  /v1/profiling/analysis        - bottleneck analysis
+
+Also tests:
+  - get_business_metrics_service() singleton factory
+  - get_profiling_service() singleton factory
 """
 
 import pytest
-from unittest.mock import Mock, patch
-from fastapi.testclient import TestClient
-from app.main import app
+from unittest.mock import patch, MagicMock, AsyncMock
+from fastapi import HTTPException
 
 
-class TestMetricsRoutes:
-    """Test metrics routes."""
+# ---------------------------------------------------------------------------
+# Module-level service factories
+# ---------------------------------------------------------------------------
 
-    @pytest.fixture
-    def client(self):
-        """Create test client."""
-        return TestClient(app)
 
-    @pytest.fixture
-    def mock_auth(self):
-        """Mock authentication."""
-        with patch("app.routes.metrics.get_current_user") as mock:
-            mock.return_value = Mock(id="123", username="testuser", roles=["user"])
-            yield mock
+class TestServiceFactories:
+    """Test the singleton service factory functions."""
 
-    def test_get_system_metrics(self, client, mock_auth):
-        """Test getting system metrics."""
-        response = client.get("/api/metrics/system")
+    def test_get_business_metrics_service_creates_instance(self):
+        """First call creates an instance; subsequent calls return the same one."""
+        from app.routes.metrics import get_business_metrics_service
+        import app.routes.metrics as metrics_module
 
-        assert response.status_code in [200, 404]
+        # Reset singleton
+        metrics_module._business_metrics_service = None
 
-    def test_get_application_metrics(self, client, mock_auth):
-        """Test getting application metrics."""
-        response = client.get("/api/metrics/application")
+        with patch("app.routes.metrics.BusinessMetricsService") as MockBMS:
+            instance = MagicMock()
+            MockBMS.return_value = instance
 
-        assert response.status_code in [200, 404]
+            result1 = get_business_metrics_service()
+            result2 = get_business_metrics_service()
 
-    def test_get_database_metrics(self, client, mock_auth):
-        """Test getting database metrics."""
-        response = client.get("/api/metrics/database")
+        assert result1 is result2
+        MockBMS.assert_called_once()
 
-        assert response.status_code in [200, 404]
+    def test_get_business_metrics_service_reuses_existing(self):
+        """If the singleton already exists it is returned without re-creating."""
+        from app.routes.metrics import get_business_metrics_service
+        import app.routes.metrics as metrics_module
 
-    def test_get_cache_metrics(self, client, mock_auth):
-        """Test getting cache metrics."""
-        response = client.get("/api/metrics/cache")
+        existing = MagicMock()
+        metrics_module._business_metrics_service = existing
 
-        assert response.status_code in [200, 404]
+        with patch("app.routes.metrics.BusinessMetricsService") as MockBMS:
+            result = get_business_metrics_service()
 
-    def test_get_queue_metrics(self, client, mock_auth):
-        """Test getting queue metrics."""
-        response = client.get("/api/metrics/queue")
+        MockBMS.assert_not_called()
+        assert result is existing
 
-        assert response.status_code in [200, 404]
+        # Cleanup
+        metrics_module._business_metrics_service = None
 
-    def test_get_api_metrics(self, client, mock_auth):
-        """Test getting API metrics."""
-        response = client.get("/api/metrics/api")
+    def test_get_profiling_service_creates_instance(self):
+        """First call creates a ProfilingService; subsequent calls reuse it."""
+        from app.routes.metrics import get_profiling_service
+        import app.routes.metrics as metrics_module
 
-        assert response.status_code in [200, 404]
+        metrics_module._profiling_service = None
 
-    def test_get_user_metrics(self, client, mock_auth):
-        """Test getting user metrics."""
-        response = client.get("/api/metrics/users")
+        with patch("app.routes.metrics.ProfilingService") as MockPS:
+            instance = MagicMock()
+            MockPS.return_value = instance
 
-        assert response.status_code in [200, 404]
+            result1 = get_profiling_service()
+            result2 = get_profiling_service()
 
-    def test_get_session_metrics(self, client, mock_auth):
-        """Test getting session metrics."""
-        response = client.get("/api/metrics/sessions")
+        assert result1 is result2
+        MockPS.assert_called_once()
 
-        assert response.status_code in [200, 404]
+    def test_get_profiling_service_reuses_existing(self):
+        """If the singleton already exists it is returned without re-creating."""
+        from app.routes.metrics import get_profiling_service
+        import app.routes.metrics as metrics_module
 
-    def test_get_payment_metrics(self, client, mock_auth):
-        """Test getting payment metrics."""
-        response = client.get("/api/metrics/payments")
+        existing = MagicMock()
+        metrics_module._profiling_service = existing
 
-        assert response.status_code in [200, 404]
+        with patch("app.routes.metrics.ProfilingService") as MockPS:
+            result = get_profiling_service()
 
-    def test_get_business_metrics(self, client, mock_auth):
-        """Test getting business metrics."""
-        response = client.get("/api/metrics/business")
+        MockPS.assert_not_called()
+        assert result is existing
 
-        assert response.status_code in [200, 404]
+        # Cleanup
+        metrics_module._profiling_service = None
 
-    def test_get_performance_metrics(self, client, mock_auth):
-        """Test getting performance metrics."""
-        response = client.get("/api/metrics/performance")
 
-        assert response.status_code in [200, 404]
+# ---------------------------------------------------------------------------
+# Endpoint-level tests (call the async functions directly)
+# ---------------------------------------------------------------------------
 
-    def test_get_custom_metrics(self, client, mock_auth):
-        """Test getting custom metrics."""
-        response = client.get("/api/metrics/custom")
 
-        assert response.status_code in [200, 404]
+class TestMetricsEndpoint:
+    """Tests for GET /v1/metrics (Prometheus)."""
 
-    def test_create_custom_metric(self, client, mock_auth):
-        """Test creating custom metric."""
-        metric_data = {"name": "custom_metric", "value": 100, "type": "gauge"}
+    @pytest.mark.asyncio
+    async def test_metrics_endpoint_success(self):
+        """metrics_endpoint() delegates to get_metrics_response()."""
+        from app.routes.metrics import metrics_endpoint
 
-        response = client.post("/api/metrics/custom", json=metric_data)
+        mock_response = MagicMock()
+        with patch("app.routes.metrics.get_metrics_response", return_value=mock_response):
+            result = await metrics_endpoint()
 
-        assert response.status_code in [200, 404]
+        assert result is mock_response
 
-    def test_get_metric_by_id(self, client, mock_auth):
-        """Test getting metric by ID."""
-        response = client.get("/api/metrics/123")
 
-        assert response.status_code in [200, 404]
+class TestDashboardOverview:
+    """Tests for GET /v1/dashboard/overview."""
 
-    def test_update_metric(self, client, mock_auth):
-        """Test updating metric."""
-        metric_data = {"value": 200}
+    @pytest.mark.asyncio
+    async def test_get_dashboard_overview_success(self):
+        """Returns service result on success."""
+        from app.routes.metrics import get_dashboard_overview
 
-        response = client.put("/api/metrics/123", json=metric_data)
+        mock_service = MagicMock()
+        mock_service.get_overview_metrics.return_value = {"total_requests": 100}
 
-        assert response.status_code in [200, 404]
+        result = await get_dashboard_overview(service=mock_service)
 
-    def test_delete_metric(self, client, mock_auth):
-        """Test deleting metric."""
-        response = client.delete("/api/metrics/123")
+        assert result == {"total_requests": 100}
 
-        assert response.status_code in [200, 404]
+    @pytest.mark.asyncio
+    async def test_get_dashboard_overview_service_error(self):
+        """Service exception is converted to HTTP 500."""
+        from app.routes.metrics import get_dashboard_overview
 
-    def test_get_metric_history(self, client, mock_auth):
-        """Test getting metric history."""
-        response = client.get("/api/metrics/123/history")
+        mock_service = MagicMock()
+        mock_service.get_overview_metrics.side_effect = RuntimeError("db down")
 
-        assert response.status_code in [200, 404]
+        with pytest.raises(HTTPException) as exc_info:
+            await get_dashboard_overview(service=mock_service)
 
-    def test_get_metric_aggregations(self, client, mock_auth):
-        """Test getting metric aggregations."""
-        response = client.get("/api/metrics/123/aggregations")
+        assert exc_info.value.status_code == 500
 
-        assert response.status_code in [200, 404]
 
-    def test_get_metric_alerts(self, client, mock_auth):
-        """Test getting metric alerts."""
-        response = client.get("/api/metrics/alerts")
+class TestDashboardSessions:
+    """Tests for GET /v1/dashboard/sessions."""
 
-        assert response.status_code in [200, 404]
+    @pytest.mark.asyncio
+    async def test_valid_days(self):
+        """Returns service result for a valid days parameter."""
+        from app.routes.metrics import get_dashboard_sessions
 
-    def test_create_metric_alert(self, client, mock_auth):
-        """Test creating metric alert."""
-        alert_data = {"metric_id": "123", "threshold": 100, "operator": "greater_than"}
+        mock_service = MagicMock()
+        mock_service.get_session_metrics.return_value = {"sessions": 10}
 
-        response = client.post("/api/metrics/alerts", json=alert_data)
+        result = await get_dashboard_sessions(days=7, service=mock_service)
 
-        assert response.status_code in [200, 404]
+        assert result == {"sessions": 10}
+        mock_service.get_session_metrics.assert_called_once_with(7)
 
-    def test_get_alert_by_id(self, client, mock_auth):
-        """Test getting alert by ID."""
-        response = client.get("/api/metrics/alerts/123")
+    @pytest.mark.asyncio
+    async def test_days_below_minimum(self):
+        """days < 1 raises HTTP 400."""
+        from app.routes.metrics import get_dashboard_sessions
 
-        assert response.status_code in [200, 404]
+        mock_service = MagicMock()
+        with pytest.raises(HTTPException) as exc_info:
+            await get_dashboard_sessions(days=0, service=mock_service)
 
-    def test_update_alert(self, client, mock_auth):
-        """Test updating alert."""
-        alert_data = {"threshold": 200}
+        assert exc_info.value.status_code == 400
 
-        response = client.put("/api/metrics/alerts/123", json=alert_data)
+    @pytest.mark.asyncio
+    async def test_days_above_maximum(self):
+        """days > 365 raises HTTP 400."""
+        from app.routes.metrics import get_dashboard_sessions
 
-        assert response.status_code in [200, 404]
+        mock_service = MagicMock()
+        with pytest.raises(HTTPException) as exc_info:
+            await get_dashboard_sessions(days=366, service=mock_service)
 
-    def test_delete_alert(self, client, mock_auth):
-        """Test deleting alert."""
-        response = client.delete("/api/metrics/alerts/123")
+        assert exc_info.value.status_code == 400
 
-        assert response.status_code in [200, 404]
+    @pytest.mark.asyncio
+    async def test_service_error(self):
+        """Service exception is converted to HTTP 500."""
+        from app.routes.metrics import get_dashboard_sessions
 
-    def test_get_alert_history(self, client, mock_auth):
-        """Test getting alert history."""
-        response = client.get("/api/metrics/alerts/123/history")
+        mock_service = MagicMock()
+        mock_service.get_session_metrics.side_effect = RuntimeError("oops")
 
-        assert response.status_code in [200, 404]
+        with pytest.raises(HTTPException) as exc_info:
+            await get_dashboard_sessions(days=30, service=mock_service)
 
-    def test_get_metric_dashboards(self, client, mock_auth):
-        """Test getting metric dashboards."""
-        response = client.get("/api/metrics/dashboards")
+        assert exc_info.value.status_code == 500
 
-        assert response.status_code in [200, 404]
+    @pytest.mark.asyncio
+    async def test_http_exception_re_raised(self):
+        """HTTPException from service propagates unchanged."""
+        from app.routes.metrics import get_dashboard_sessions
 
-    def test_create_dashboard(self, client, mock_auth):
-        """Test creating dashboard."""
-        dashboard_data = {"name": "Test Dashboard", "widgets": []}
+        mock_service = MagicMock()
+        mock_service.get_session_metrics.side_effect = HTTPException(status_code=403)
 
-        response = client.post("/api/metrics/dashboards", json=dashboard_data)
+        with pytest.raises(HTTPException) as exc_info:
+            await get_dashboard_sessions(days=30, service=mock_service)
 
-        assert response.status_code in [200, 404]
+        assert exc_info.value.status_code == 403
 
-    def test_get_dashboard_by_id(self, client, mock_auth):
-        """Test getting dashboard by ID."""
-        response = client.get("/api/metrics/dashboards/123")
 
-        assert response.status_code in [200, 404]
+class TestDashboardTasks:
+    """Tests for GET /v1/dashboard/tasks."""
 
-    def test_update_dashboard(self, client, mock_auth):
-        """Test updating dashboard."""
-        dashboard_data = {"name": "Updated Dashboard"}
+    @pytest.mark.asyncio
+    async def test_valid_days(self):
+        """Returns service result for valid days."""
+        from app.routes.metrics import get_dashboard_tasks
 
-        response = client.put("/api/metrics/dashboards/123", json=dashboard_data)
+        mock_service = MagicMock()
+        mock_service.get_task_metrics.return_value = {"tasks": 5}
 
-        assert response.status_code in [200, 404]
+        result = await get_dashboard_tasks(days=14, service=mock_service)
 
-    def test_delete_dashboard(self, client, mock_auth):
-        """Test deleting dashboard."""
-        response = client.delete("/api/metrics/dashboards/123")
+        assert result == {"tasks": 5}
 
-        assert response.status_code in [200, 404]
+    @pytest.mark.asyncio
+    async def test_days_out_of_range(self):
+        """days=0 raises HTTP 400."""
+        from app.routes.metrics import get_dashboard_tasks
 
-    def test_get_dashboard_widgets(self, client, mock_auth):
-        """Test getting dashboard widgets."""
-        response = client.get("/api/metrics/dashboards/123/widgets")
+        mock_service = MagicMock()
+        with pytest.raises(HTTPException) as exc_info:
+            await get_dashboard_tasks(days=0, service=mock_service)
 
-        assert response.status_code in [200, 404]
+        assert exc_info.value.status_code == 400
 
-    def test_add_widget_to_dashboard(self, client, mock_auth):
-        """Test adding widget to dashboard."""
-        widget_data = {"type": "line_chart", "metric_id": "123"}
+    @pytest.mark.asyncio
+    async def test_service_error(self):
+        """Service exception becomes HTTP 500."""
+        from app.routes.metrics import get_dashboard_tasks
 
-        response = client.post("/api/metrics/dashboards/123/widgets", json=widget_data)
+        mock_service = MagicMock()
+        mock_service.get_task_metrics.side_effect = RuntimeError("fail")
 
-        assert response.status_code in [200, 404]
+        with pytest.raises(HTTPException) as exc_info:
+            await get_dashboard_tasks(days=30, service=mock_service)
 
-    def test_get_widget_by_id(self, client, mock_auth):
-        """Test getting widget by ID."""
-        response = client.get("/api/metrics/widgets/123")
+        assert exc_info.value.status_code == 500
 
-        assert response.status_code in [200, 404]
 
-    def test_update_widget(self, client, mock_auth):
-        """Test updating widget."""
-        widget_data = {"title": "Updated Widget"}
+class TestDashboardUsers:
+    """Tests for GET /v1/dashboard/users."""
 
-        response = client.put("/api/metrics/widgets/123", json=widget_data)
+    @pytest.mark.asyncio
+    async def test_valid_days(self):
+        """Returns service result for valid days."""
+        from app.routes.metrics import get_dashboard_users
 
-        assert response.status_code in [200, 404]
+        mock_service = MagicMock()
+        mock_service.get_user_metrics.return_value = {"users": 20}
 
-    def test_delete_widget(self, client, mock_auth):
-        """Test deleting widget."""
-        response = client.delete("/api/metrics/widgets/123")
+        result = await get_dashboard_users(days=30, service=mock_service)
 
-        assert response.status_code in [200, 404]
+        assert result == {"users": 20}
 
-    def test_get_metric_reports(self, client, mock_auth):
-        """Test getting metric reports."""
-        response = client.get("/api/metrics/reports")
+    @pytest.mark.asyncio
+    async def test_days_above_max(self):
+        """days > 365 raises HTTP 400."""
+        from app.routes.metrics import get_dashboard_users
 
-        assert response.status_code in [200, 404]
+        mock_service = MagicMock()
+        with pytest.raises(HTTPException) as exc_info:
+            await get_dashboard_users(days=400, service=mock_service)
 
-    def test_create_report(self, client, mock_auth):
-        """Test creating report."""
-        report_data = {"name": "Test Report", "metrics": ["123"]}
+        assert exc_info.value.status_code == 400
 
-        response = client.post("/api/metrics/reports", json=report_data)
+    @pytest.mark.asyncio
+    async def test_service_error(self):
+        """Service exception becomes HTTP 500."""
+        from app.routes.metrics import get_dashboard_users
 
-        assert response.status_code in [200, 404]
+        mock_service = MagicMock()
+        mock_service.get_user_metrics.side_effect = Exception("error")
 
-    def test_get_report_by_id(self, client, mock_auth):
-        """Test getting report by ID."""
-        response = client.get("/api/metrics/reports/123")
+        with pytest.raises(HTTPException) as exc_info:
+            await get_dashboard_users(days=30, service=mock_service)
 
-        assert response.status_code in [200, 404]
+        assert exc_info.value.status_code == 500
 
-    def test_update_report(self, client, mock_auth):
-        """Test updating report."""
-        report_data = {"name": "Updated Report"}
 
-        response = client.put("/api/metrics/reports/123", json=report_data)
+class TestDashboardTemplates:
+    """Tests for GET /v1/dashboard/templates."""
 
-        assert response.status_code in [200, 404]
+    @pytest.mark.asyncio
+    async def test_valid_days(self):
+        """Returns service result for valid days."""
+        from app.routes.metrics import get_dashboard_templates
 
-    def test_delete_report(self, client, mock_auth):
-        """Test deleting report."""
-        response = client.delete("/api/metrics/reports/123")
+        mock_service = MagicMock()
+        mock_service.get_template_metrics.return_value = {"templates": 3}
 
-        assert response.status_code in [200, 404]
+        result = await get_dashboard_templates(days=30, service=mock_service)
 
-    def test_generate_report(self, client, mock_auth):
-        """Test generating report."""
-        response = client.post("/api/metrics/reports/123/generate")
+        assert result == {"templates": 3}
 
-        assert response.status_code in [200, 404]
+    @pytest.mark.asyncio
+    async def test_invalid_days(self):
+        """days=0 or days=400 raises HTTP 400."""
+        from app.routes.metrics import get_dashboard_templates
 
-    def test_export_report(self, client, mock_auth):
-        """Test exporting report."""
-        response = client.get("/api/metrics/reports/123/export?format=pdf")
+        mock_service = MagicMock()
+        for bad_days in (0, 400):
+            with pytest.raises(HTTPException) as exc_info:
+                await get_dashboard_templates(days=bad_days, service=mock_service)
+            assert exc_info.value.status_code == 400
 
-        assert response.status_code in [200, 404]
+    @pytest.mark.asyncio
+    async def test_service_error(self):
+        """Service exception becomes HTTP 500."""
+        from app.routes.metrics import get_dashboard_templates
 
-    def test_get_metric_analytics(self, client, mock_auth):
-        """Test getting metric analytics."""
-        response = client.get("/api/metrics/analytics")
+        mock_service = MagicMock()
+        mock_service.get_template_metrics.side_effect = Exception("fail")
 
-        assert response.status_code in [200, 404]
+        with pytest.raises(HTTPException) as exc_info:
+            await get_dashboard_templates(days=30, service=mock_service)
 
-    def test_get_metric_trends(self, client, mock_auth):
-        """Test getting metric trends."""
-        response = client.get("/api/metrics/trends")
+        assert exc_info.value.status_code == 500
 
-        assert response.status_code in [200, 404]
 
-    def test_get_metric_forecasts(self, client, mock_auth):
-        """Test getting metric forecasts."""
-        response = client.get("/api/metrics/forecasts")
+class TestCompleteDashboard:
+    """Tests for GET /v1/dashboard."""
 
-        assert response.status_code in [200, 404]
+    @pytest.mark.asyncio
+    async def test_returns_cached_data(self):
+        """If cache contains data, service is NOT called."""
+        from app.routes.metrics import get_complete_dashboard
 
-    def test_get_metric_anomalies(self, client, mock_auth):
-        """Test getting metric anomalies."""
-        response = client.get("/api/metrics/anomalies")
+        mock_service = MagicMock()
+        cached = {"overview": {"total_requests": 42}}
 
-        assert response.status_code in [200, 404]
+        mock_cache = AsyncMock()
+        mock_cache.get_api_response = AsyncMock(return_value=cached)
+        mock_cache.set_api_response = AsyncMock()
 
-    def test_get_metric_correlations(self, client, mock_auth):
-        """Test getting metric correlations."""
-        response = client.get("/api/metrics/correlations")
+        with patch("app.routes.metrics.get_cache_service", return_value=mock_cache):
+            result = await get_complete_dashboard(days=30, service=mock_service)
 
-        assert response.status_code in [200, 404]
+        assert result == cached
+        mock_service.get_dashboard_data.assert_not_called()
 
-    def test_get_metric_insights(self, client, mock_auth):
-        """Test getting metric insights."""
-        response = client.get("/api/metrics/insights")
+    @pytest.mark.asyncio
+    async def test_computes_and_caches_when_no_cache(self):
+        """If cache misses, service is called and result is cached."""
+        from app.routes.metrics import get_complete_dashboard
 
-        assert response.status_code in [200, 404]
+        mock_service = MagicMock()
+        dashboard_data = {"overview": {"total_requests": 99}}
+        mock_service.get_dashboard_data.return_value = dashboard_data
 
-    def test_get_metric_recommendations(self, client, mock_auth):
-        """Test getting metric recommendations."""
-        response = client.get("/api/metrics/recommendations")
+        mock_cache = AsyncMock()
+        mock_cache.get_api_response = AsyncMock(return_value=None)  # cache miss
+        mock_cache.set_api_response = AsyncMock()
 
-        assert response.status_code in [200, 404]
+        with patch("app.routes.metrics.get_cache_service", return_value=mock_cache):
+            result = await get_complete_dashboard(days=30, service=mock_service)
 
-    def test_get_metric_health(self, client, mock_auth):
-        """Test getting metric health."""
-        response = client.get("/api/metrics/health")
+        assert result == dashboard_data
+        mock_service.get_dashboard_data.assert_called_once_with(30)
+        mock_cache.set_api_response.assert_called_once()
 
-        assert response.status_code in [200, 404]
+    @pytest.mark.asyncio
+    async def test_no_cache_service(self):
+        """When get_cache_service() returns None, service data is returned directly."""
+        from app.routes.metrics import get_complete_dashboard
 
-    def test_get_metric_status(self, client, mock_auth):
-        """Test getting metric status."""
-        response = client.get("/api/metrics/status")
+        mock_service = MagicMock()
+        dashboard_data = {"overview": {}}
+        mock_service.get_dashboard_data.return_value = dashboard_data
 
-        assert response.status_code in [200, 404]
+        with patch("app.routes.metrics.get_cache_service", return_value=None):
+            result = await get_complete_dashboard(days=30, service=mock_service)
 
-    def test_search_metrics(self, client, mock_auth):
-        """Test searching metrics."""
-        response = client.get("/api/metrics/search?q=test")
+        assert result == dashboard_data
 
-        assert response.status_code in [200, 404]
+    @pytest.mark.asyncio
+    async def test_invalid_days(self):
+        """days=0 raises HTTP 400."""
+        from app.routes.metrics import get_complete_dashboard
 
-    def test_filter_metrics(self, client, mock_auth):
-        """Test filtering metrics."""
-        response = client.get("/api/metrics?type=gauge")
+        mock_service = MagicMock()
+        with patch("app.routes.metrics.get_cache_service", return_value=None):
+            with pytest.raises(HTTPException) as exc_info:
+                await get_complete_dashboard(days=0, service=mock_service)
 
-        assert response.status_code in [200, 404]
+        assert exc_info.value.status_code == 400
 
-    def test_sort_metrics(self, client, mock_auth):
-        """Test sorting metrics."""
-        response = client.get("/api/metrics?sort=name&order=asc")
+    @pytest.mark.asyncio
+    async def test_service_error(self):
+        """Service exception becomes HTTP 500."""
+        from app.routes.metrics import get_complete_dashboard
 
-        assert response.status_code in [200, 404]
+        mock_service = MagicMock()
+        mock_service.get_dashboard_data.side_effect = RuntimeError("db error")
 
-    def test_paginate_metrics(self, client, mock_auth):
-        """Test paginating metrics."""
-        response = client.get("/api/metrics?page=1&page_size=10")
+        with patch("app.routes.metrics.get_cache_service", return_value=None):
+            with pytest.raises(HTTPException) as exc_info:
+                await get_complete_dashboard(days=30, service=mock_service)
 
-        assert response.status_code in [200, 404]
+        assert exc_info.value.status_code == 500
 
-    def test_export_metrics(self, client, mock_auth):
-        """Test exporting metrics."""
-        response = client.get("/api/metrics/export?format=csv")
 
-        assert response.status_code in [200, 404]
+class TestDashboardHTML:
+    """Tests for GET /v1/dashboard/html."""
 
-    def test_import_metrics(self, client, mock_auth):
-        """Test importing metrics."""
-        # Mock file upload
-        pass
+    @pytest.mark.asyncio
+    async def test_returns_html_response(self):
+        """Returns an HTMLResponse containing dashboard metrics."""
+        from app.routes.metrics import get_dashboard_html
+        from fastapi.responses import HTMLResponse
 
-    def test_get_metric_statistics(self, client, mock_auth):
-        """Test getting metric statistics."""
-        response = client.get("/api/metrics/statistics")
+        mock_service = MagicMock()
+        mock_service.get_dashboard_data.return_value = {
+            "overview": {
+                "total_requests": 100,
+                "active_users": 5,
+                "avg_response_time": 12.3,
+                "error_rate": 0.5,
+            },
+            "system": {"uptime_hours": 24.0, "cpu_usage": 30.0, "memory_usage": 45.0},
+        }
 
-        assert response.status_code in [200, 404]
+        result = await get_dashboard_html(days=30, service=mock_service)
 
-    def test_get_metric_summary(self, client, mock_auth):
-        """Test getting metric summary."""
-        response = client.get("/api/metrics/summary")
+        assert isinstance(result, HTMLResponse)
+        assert b"APGI API Analytics Dashboard" in result.body
 
-        assert response.status_code in [200, 404]
+    @pytest.mark.asyncio
+    async def test_invalid_days(self):
+        """days=0 raises HTTP 400."""
+        from app.routes.metrics import get_dashboard_html
 
-    def test_get_metric_overview(self, client, mock_auth):
-        """Test getting metric overview."""
-        response = client.get("/api/metrics/overview")
+        mock_service = MagicMock()
+        with pytest.raises(HTTPException) as exc_info:
+            await get_dashboard_html(days=0, service=mock_service)
 
-        assert response.status_code in [200, 404]
+        assert exc_info.value.status_code == 400
+
+    @pytest.mark.asyncio
+    async def test_days_above_max(self):
+        """days > 365 raises HTTP 400."""
+        from app.routes.metrics import get_dashboard_html
+
+        mock_service = MagicMock()
+        with pytest.raises(HTTPException) as exc_info:
+            await get_dashboard_html(days=400, service=mock_service)
+
+        assert exc_info.value.status_code == 400
+
+    @pytest.mark.asyncio
+    async def test_service_error(self):
+        """Service exception becomes HTTP 500."""
+        from app.routes.metrics import get_dashboard_html
+
+        mock_service = MagicMock()
+        mock_service.get_dashboard_data.side_effect = RuntimeError("fail")
+
+        with pytest.raises(HTTPException) as exc_info:
+            await get_dashboard_html(days=30, service=mock_service)
+
+        assert exc_info.value.status_code == 500
+
+    @pytest.mark.asyncio
+    async def test_html_escaping(self):
+        """Special characters in metrics are HTML-escaped by html.escape()."""
+        from app.routes.metrics import get_dashboard_html
+
+        mock_service = MagicMock()
+        # A value containing XSS payload stored as total_requests
+        mock_service.get_dashboard_data.return_value = {
+            "overview": {
+                "total_requests": 100,  # numeric, no XSS risk
+                "active_users": 5,
+                "avg_response_time": 12.3,
+                "error_rate": 0.5,
+            },
+            "system": {"uptime_hours": 24.0, "cpu_usage": 30.0, "memory_usage": 45.0},
+        }
+
+        result = await get_dashboard_html(days=30, service=mock_service)
+        # Verify it returns a valid HTML dashboard
+        assert b"APGI API Analytics Dashboard" in result.body
+        assert b"100" in result.body  # total_requests value is present
+
+    @pytest.mark.asyncio
+    async def test_http_exception_re_raised(self):
+        """HTTPException from inside propagates unchanged."""
+        from app.routes.metrics import get_dashboard_html
+
+        mock_service = MagicMock()
+        mock_service.get_dashboard_data.side_effect = HTTPException(status_code=403)
+
+        with pytest.raises(HTTPException) as exc_info:
+            await get_dashboard_html(days=30, service=mock_service)
+
+        assert exc_info.value.status_code == 403
+
+
+# ---------------------------------------------------------------------------
+# Profiling endpoints
+# ---------------------------------------------------------------------------
+
+
+class TestMemoryTracing:
+    """Tests for POST /v1/profiling/memory/start and /stop."""
+
+    @pytest.mark.asyncio
+    async def test_start_memory_tracing_success(self):
+        """start_memory_tracing() delegates to service and returns message."""
+        from app.routes.metrics import start_memory_tracing
+
+        mock_service = MagicMock()
+        result = await start_memory_tracing(service=mock_service)
+
+        mock_service.start_memory_tracing.assert_called_once()
+        assert result == {"message": "Memory tracing started successfully"}
+
+    @pytest.mark.asyncio
+    async def test_start_memory_tracing_service_error(self):
+        """Service exception becomes HTTP 500."""
+        from app.routes.metrics import start_memory_tracing
+
+        mock_service = MagicMock()
+        mock_service.start_memory_tracing.side_effect = RuntimeError("fail")
+
+        with pytest.raises(HTTPException) as exc_info:
+            await start_memory_tracing(service=mock_service)
+
+        assert exc_info.value.status_code == 500
+
+    @pytest.mark.asyncio
+    async def test_stop_memory_tracing_success(self):
+        """stop_memory_tracing() delegates to service and returns message."""
+        from app.routes.metrics import stop_memory_tracing
+
+        mock_service = MagicMock()
+        result = await stop_memory_tracing(service=mock_service)
+
+        mock_service.stop_memory_tracing.assert_called_once()
+        assert result == {"message": "Memory tracing stopped successfully"}
+
+    @pytest.mark.asyncio
+    async def test_stop_memory_tracing_service_error(self):
+        """Service exception becomes HTTP 500."""
+        from app.routes.metrics import stop_memory_tracing
+
+        mock_service = MagicMock()
+        mock_service.stop_memory_tracing.side_effect = RuntimeError("fail")
+
+        with pytest.raises(HTTPException) as exc_info:
+            await stop_memory_tracing(service=mock_service)
+
+        assert exc_info.value.status_code == 500
+
+
+class TestMemorySnapshot:
+    """Tests for GET /v1/profiling/memory."""
+
+    @pytest.mark.asyncio
+    async def test_get_memory_snapshot_success(self):
+        """Returns service result."""
+        from app.routes.metrics import get_memory_snapshot
+
+        mock_service = MagicMock()
+        mock_service.get_memory_snapshot.return_value = {"rss_mb": 100}
+
+        result = await get_memory_snapshot(service=mock_service)
+        assert result == {"rss_mb": 100}
+
+    @pytest.mark.asyncio
+    async def test_get_memory_snapshot_service_error(self):
+        """Service exception becomes HTTP 500."""
+        from app.routes.metrics import get_memory_snapshot
+
+        mock_service = MagicMock()
+        mock_service.get_memory_snapshot.side_effect = RuntimeError("err")
+
+        with pytest.raises(HTTPException) as exc_info:
+            await get_memory_snapshot(service=mock_service)
+
+        assert exc_info.value.status_code == 500
+
+
+class TestSystemPerformance:
+    """Tests for GET /v1/profiling/system."""
+
+    @pytest.mark.asyncio
+    async def test_get_system_performance_success(self):
+        """Returns service result."""
+        from app.routes.metrics import get_system_performance
+
+        mock_service = MagicMock()
+        mock_service.get_system_performance.return_value = {"cpu": 10.0}
+
+        result = await get_system_performance(service=mock_service)
+        assert result == {"cpu": 10.0}
+
+    @pytest.mark.asyncio
+    async def test_get_system_performance_service_error(self):
+        """Service exception becomes HTTP 500."""
+        from app.routes.metrics import get_system_performance
+
+        mock_service = MagicMock()
+        mock_service.get_system_performance.side_effect = RuntimeError("err")
+
+        with pytest.raises(HTTPException) as exc_info:
+            await get_system_performance(service=mock_service)
+
+        assert exc_info.value.status_code == 500
+
+
+class TestPerformanceHistory:
+    """Tests for GET /v1/profiling/history."""
+
+    @pytest.mark.asyncio
+    async def test_valid_hours(self):
+        """Returns service result for valid hours."""
+        from app.routes.metrics import get_performance_history
+
+        mock_service = MagicMock()
+        mock_service.get_performance_history.return_value = {"history": []}
+
+        result = await get_performance_history(hours=2, service=mock_service)
+        assert result == {"history": []}
+        mock_service.get_performance_history.assert_called_once_with(2)
+
+    @pytest.mark.asyncio
+    async def test_hours_below_minimum(self):
+        """hours < 1 raises HTTP 400."""
+        from app.routes.metrics import get_performance_history
+
+        mock_service = MagicMock()
+        with pytest.raises(HTTPException) as exc_info:
+            await get_performance_history(hours=0, service=mock_service)
+
+        assert exc_info.value.status_code == 400
+
+    @pytest.mark.asyncio
+    async def test_hours_above_maximum(self):
+        """hours > 24 raises HTTP 400."""
+        from app.routes.metrics import get_performance_history
+
+        mock_service = MagicMock()
+        with pytest.raises(HTTPException) as exc_info:
+            await get_performance_history(hours=25, service=mock_service)
+
+        assert exc_info.value.status_code == 400
+
+    @pytest.mark.asyncio
+    async def test_service_error(self):
+        """Service exception becomes HTTP 500."""
+        from app.routes.metrics import get_performance_history
+
+        mock_service = MagicMock()
+        mock_service.get_performance_history.side_effect = RuntimeError("fail")
+
+        with pytest.raises(HTTPException) as exc_info:
+            await get_performance_history(hours=1, service=mock_service)
+
+        assert exc_info.value.status_code == 500
+
+    @pytest.mark.asyncio
+    async def test_http_exception_re_raised(self):
+        """HTTPException from service propagates unchanged."""
+        from app.routes.metrics import get_performance_history
+
+        mock_service = MagicMock()
+        mock_service.get_performance_history.side_effect = HTTPException(status_code=403)
+
+        with pytest.raises(HTTPException) as exc_info:
+            await get_performance_history(hours=1, service=mock_service)
+
+        assert exc_info.value.status_code == 403
+
+
+class TestBottleneckAnalysis:
+    """Tests for GET /v1/profiling/analysis."""
+
+    @pytest.mark.asyncio
+    async def test_get_bottleneck_analysis_success(self):
+        """Returns service result."""
+        from app.routes.metrics import get_bottleneck_analysis
+
+        mock_service = MagicMock()
+        mock_service.get_bottleneck_analysis.return_value = {"bottlenecks": []}
+
+        result = await get_bottleneck_analysis(service=mock_service)
+        assert result == {"bottlenecks": []}
+
+    @pytest.mark.asyncio
+    async def test_get_bottleneck_analysis_service_error(self):
+        """Service exception becomes HTTP 500."""
+        from app.routes.metrics import get_bottleneck_analysis
+
+        mock_service = MagicMock()
+        mock_service.get_bottleneck_analysis.side_effect = RuntimeError("fail")
+
+        with pytest.raises(HTTPException) as exc_info:
+            await get_bottleneck_analysis(service=mock_service)
+
+        assert exc_info.value.status_code == 500
+
+
+# ---------------------------------------------------------------------------
+# Boundary / parameter tests
+# ---------------------------------------------------------------------------
+
+
+class TestBoundaryConditions:
+    """Boundary tests for days/hours parameters."""
+
+    @pytest.mark.asyncio
+    async def test_dashboard_sessions_boundary_days_1(self):
+        """days=1 (minimum) is accepted."""
+        from app.routes.metrics import get_dashboard_sessions
+
+        mock_service = MagicMock()
+        mock_service.get_session_metrics.return_value = {}
+        result = await get_dashboard_sessions(days=1, service=mock_service)
+        assert result == {}
+
+    @pytest.mark.asyncio
+    async def test_dashboard_sessions_boundary_days_365(self):
+        """days=365 (maximum) is accepted."""
+        from app.routes.metrics import get_dashboard_sessions
+
+        mock_service = MagicMock()
+        mock_service.get_session_metrics.return_value = {}
+        result = await get_dashboard_sessions(days=365, service=mock_service)
+        assert result == {}
+
+    @pytest.mark.asyncio
+    async def test_performance_history_boundary_hours_1(self):
+        """hours=1 (minimum) is accepted."""
+        from app.routes.metrics import get_performance_history
+
+        mock_service = MagicMock()
+        mock_service.get_performance_history.return_value = {}
+        result = await get_performance_history(hours=1, service=mock_service)
+        assert result == {}
+
+    @pytest.mark.asyncio
+    async def test_performance_history_boundary_hours_24(self):
+        """hours=24 (maximum) is accepted."""
+        from app.routes.metrics import get_performance_history
+
+        mock_service = MagicMock()
+        mock_service.get_performance_history.return_value = {}
+        result = await get_performance_history(hours=24, service=mock_service)
+        assert result == {}

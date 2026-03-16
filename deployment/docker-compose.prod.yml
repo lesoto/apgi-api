@@ -96,7 +96,9 @@ services:
       interval: 30s
       timeout: 10s
       retries: 3
+      retries: 3
       start_period: 10s
+    command: bash -c "python app/create_demo_user.py && uvicorn app.main:app --host 0.0.0.0 --port 8000 --workers 4"
 
   # Celery Worker (Production Build)
   celery_worker:

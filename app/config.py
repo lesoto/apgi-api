@@ -182,6 +182,9 @@ class Settings:
         self.smtp_username: Optional[str] = os.getenv("SMTP_USERNAME")
         self.smtp_password: Optional[str] = os.getenv("SMTP_PASSWORD")
         self.smtp_from_email: str = os.getenv("SMTP_FROM_EMAIL", "noreply@apgi-api.com")
+        self.require_email_verification: bool = (
+            os.getenv("REQUIRE_EMAIL_VERIFICATION", "true").lower() == "true"
+        )
 
         # Request Size Limiting
         self.max_request_size_mb: int = int(os.getenv("MAX_REQUEST_SIZE_MB", "10"))

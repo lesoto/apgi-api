@@ -6,10 +6,14 @@ API endpoints for creating Stripe PaymentIntents.
 
 import logging
 import stripe
-from fastapi import APIRouter, Depends, HTTPException, status, Request
+from datetime import timezone
 from pydantic import BaseModel
+from fastapi import APIRouter, Depends, HTTPException, status, Request
+from sqlalchemy.orm import Session
 
 from app.config import settings
+from app.database.connection import get_db
+from app.database.models import Order, Subscription, User
 from app.models.schemas import ErrorResponse
 from app.services.authorization import Permission, require_permission
 
@@ -111,7 +115,7 @@ async def create_payment_intent(request: PaymentIntentCreateRequest):
     summary="Handle Stripe webhooks",
     description="Processes Stripe webhook events including refunds, disputes, and subscriptions.",
 )
-async def stripe_webhook(request: Request):
+async def stripe_webhook(request: Request, db: Session = Depends(get_db)):
     """
     Handle Stripe webhook events.
 
@@ -162,25 +166,25 @@ async def stripe_webhook(request: Request):
             # Payment succeeded - update order status and send confirmation
             payment_intent = event_data
             logger.info(f"Payment succeeded: {payment_intent['id']}")
-            await _handle_payment_succeeded(payment_intent)
+            await _handle_payment_succeeded(db, payment_intent)
 
         elif event_type == "payment_intent.payment_failed":
             # Payment failed - notify user and update order
             payment_intent = event_data
             logger.warning(f"Payment failed: {payment_intent['id']}")
-            await _handle_payment_failed(payment_intent)
+            await _handle_payment_failed(db, payment_intent)
 
         elif event_type == "charge.dispute.created":
             # Dispute created - notify admin and mark order
             dispute = event_data
             logger.warning(f"Dispute created: {dispute['id']} for charge {dispute['charge']}")
-            await _handle_dispute_created(dispute)
+            await _handle_dispute_created(db, dispute)
 
         elif event_type == "charge.dispute.closed":
             # Dispute resolved - update based on outcome
             dispute = event_data
             logger.info(f"Dispute closed: {dispute['id']}, status: {dispute['status']}")
-            await _handle_dispute_closed(dispute)
+            await _handle_dispute_closed(db, dispute)
 
         elif event_type == "charge.refunded":
             # Refund processed - update order and notify
@@ -189,13 +193,13 @@ async def stripe_webhook(request: Request):
                 refund["amount"] for refund in charge.get("refunds", {}).get("data", [])
             )
             logger.info(f"Refund processed: charge {charge['id']}, amount: {refund_amount}")
-            await _handle_refund(charge, refund_amount)
+            await _handle_refund(db, charge, refund_amount)
 
         elif event_type.startswith("customer.subscription."):
             # Subscription events - handle lifecycle
             subscription = event_data
             logger.info(f"Subscription event {event_type}: {subscription['id']}")
-            await _handle_subscription_event(event_type, subscription)
+            await _handle_subscription_event(db, event_type, subscription)
 
         else:
             # Unhandled event type
@@ -214,7 +218,7 @@ async def stripe_webhook(request: Request):
         )
 
 
-async def _handle_payment_succeeded(payment_intent: dict) -> None:
+async def _handle_payment_succeeded(db: Session, payment_intent: dict) -> None:
     """Handle successful payment intent."""
     try:
         payment_intent_id = payment_intent.get("id")
@@ -229,21 +233,26 @@ async def _handle_payment_succeeded(payment_intent: dict) -> None:
             f"amount: ${amount / 100:.2f} {currency}"
         )
 
-        # Log payment success for analytics
-        # Note: Full order management requires Order model implementation
-        # Current implementation logs event for manual processing
-
-        logger.info(
-            f"Payment {payment_intent_id} processed successfully - "
-            f"User: {user_id}, Order: {order_id}"
-        )
+        if order_id:
+            order = db.query(Order).filter(Order.order_id == order_id).first()
+            if order:
+                order.status = "succeeded"
+                db.commit()
+                logger.info(
+                    f"Payment {payment_intent_id} processed successfully - "
+                    f"User: {user_id}, Order: {order_id}"
+                )
+            else:
+                logger.warning(
+                    f"Order {order_id} not found for successful payment {payment_intent_id}"
+                )
 
     except Exception as e:
         logger.error(f"Failed to handle payment success: {e}", exc_info=True)
         # Don't raise - webhook should acknowledge receipt
 
 
-async def _handle_payment_failed(payment_intent: dict) -> None:
+async def _handle_payment_failed(db: Session, payment_intent: dict) -> None:
     """Handle failed payment intent."""
     try:
         payment_intent_id = payment_intent.get("id")
@@ -262,7 +271,12 @@ async def _handle_payment_failed(payment_intent: dict) -> None:
         )
 
         # Log payment failure for analytics and manual follow-up
-        # Note: Full order management requires Order model implementation
+        if order_id:
+            order = db.query(Order).filter(Order.order_id == order_id).first()
+            if order:
+                order.status = "failed"
+                db.commit()
+
         logger.warning(
             f"Payment {payment_intent_id} failed - User: {user_id}, "
             f"Order: {order_id}, Amount: ${amount / 100:.2f}, Error: {error_message}"
@@ -272,7 +286,7 @@ async def _handle_payment_failed(payment_intent: dict) -> None:
         logger.error(f"Failed to handle payment failure: {e}", exc_info=True)
 
 
-async def _handle_dispute_created(dispute: dict) -> None:
+async def _handle_dispute_created(db: Session, dispute: dict) -> None:
     """Handle charge dispute creation."""
     try:
         dispute_id = dispute.get("id")
@@ -298,7 +312,7 @@ async def _handle_dispute_created(dispute: dict) -> None:
         logger.error(f"Failed to handle dispute creation: {e}", exc_info=True)
 
 
-async def _handle_dispute_closed(dispute: dict) -> None:
+async def _handle_dispute_closed(db: Session, dispute: dict) -> None:
     """Handle charge dispute resolution."""
     try:
         dispute_id = dispute.get("id")
@@ -318,7 +332,7 @@ async def _handle_dispute_closed(dispute: dict) -> None:
         logger.error(f"Failed to handle dispute closure: {e}", exc_info=True)
 
 
-async def _handle_refund(charge: dict, refund_amount: int) -> None:
+async def _handle_refund(db: Session, charge: dict, refund_amount: int) -> None:
     """Handle charge refund."""
     try:
         charge_id = charge.get("id")
@@ -332,8 +346,13 @@ async def _handle_refund(charge: dict, refund_amount: int) -> None:
             f"user: {user_id}"
         )
 
+        if order_id:
+            order = db.query(Order).filter(Order.order_id == order_id).first()
+            if order:
+                order.status = "refunded"
+                db.commit()
+
         # Log refund for accounting and record keeping
-        # Note: Full refund management requires Order model implementation
         logger.info(
             f"Refund processed - Charge: {charge_id}, Amount: ${refund_amount / 100:.2f} {currency}, "
             f"User: {user_id}, Order: {order_id}"
@@ -343,7 +362,7 @@ async def _handle_refund(charge: dict, refund_amount: int) -> None:
         logger.error(f"Failed to handle refund: {e}", exc_info=True)
 
 
-async def _handle_subscription_event(event_type: str, subscription: dict) -> None:
+async def _handle_subscription_event(db: Session, event_type: str, subscription: dict) -> None:
     """Handle subscription lifecycle events."""
     try:
         subscription_id = subscription.get("id")
@@ -362,28 +381,75 @@ async def _handle_subscription_event(event_type: str, subscription: dict) -> Non
             logger.info(
                 f"Subscription created: {subscription_id}, Customer: {customer_id}, User: {user_id}"
             )
-            # Log subscription creation for record keeping
-            # Note: Full subscription management requires Subscription model implementation
+            # Find existing subscription or create a new one
+            sub = (
+                db.query(Subscription)
+                .filter(Subscription.stripe_subscription_id == subscription_id)
+                .first()
+            )
+            if not sub and user_id:
+                # Add check since user_id might be required but let's assume valid user limits
+                from datetime import datetime
+                import time
 
-        elif event_type == "customer.subscription.updated":
-            logger.info(f"Subscription updated: {subscription_id}, Status: {status}")
-            # Log subscription updates for record keeping
+                sub = Subscription(
+                    user_id=user_id,
+                    stripe_subscription_id=subscription_id,
+                    stripe_customer_id=customer_id,
+                    plan_id=subscription.get("plan", {}).get("id", "unknown"),
+                    status=status,
+                    current_period_start=datetime.fromtimestamp(
+                        subscription.get("current_period_start", time.time()), timezone.utc
+                    ),
+                    current_period_end=datetime.fromtimestamp(
+                        subscription.get("current_period_end", time.time()), timezone.utc
+                    ),
+                    cancel_at_period_end=subscription.get("cancel_at_period_end", False),
+                )
+                db.add(sub)
+                db.commit()
 
-        elif event_type == "customer.subscription.deleted":
-            logger.info(f"Subscription cancelled: {subscription_id}, User: {user_id}")
-            # Log cancellation for record keeping
+        elif event_type in [
+            "customer.subscription.updated",
+            "customer.subscription.deleted",
+            "customer.subscription.paused",
+            "customer.subscription.resumed",
+        ]:
+            logger.info(f"Subscription event: {subscription_id}, Status: {status}")
+            sub = (
+                db.query(Subscription)
+                .filter(Subscription.stripe_subscription_id == subscription_id)
+                .first()
+            )
+            if sub:
+                from datetime import datetime
+                import time
 
-        elif event_type == "customer.subscription.paused":
-            logger.info(f"Subscription paused: {subscription_id}")
-            # Log pause event
+                sub.status = status
+                sub.plan_id = subscription.get("plan", {}).get("id", sub.plan_id)
+                sub.current_period_start = datetime.fromtimestamp(
+                    subscription.get("current_period_start", time.time()), timezone.utc
+                )
+                sub.current_period_end = datetime.fromtimestamp(
+                    subscription.get("current_period_end", time.time()), timezone.utc
+                )
+                sub.cancel_at_period_end = subscription.get("cancel_at_period_end", False)
 
-        elif event_type == "customer.subscription.resumed":
-            logger.info(f"Subscription resumed: {subscription_id}")
-            # Log resume event
+                if status in ["canceled", "unpaid", "paused", "past_due"]:
+                    user = db.query(User).filter(User.user_id == sub.user_id).first()
+                    # if they canceled, their current_period_end dictates access. If unpaid: you might remove entitlements
+                db.commit()
 
         elif event_type in ["customer.subscription.payment_failed", "invoice.payment_failed"]:
             logger.warning(f"Subscription payment failed: {subscription_id}, User: {user_id}")
-            # Log payment failure for manual follow-up
+            sub = (
+                db.query(Subscription)
+                .filter(Subscription.stripe_subscription_id == subscription_id)
+                .first()
+            )
+            if sub:
+                sub.status = "past_due"
+                db.commit()
 
         logger.info(f"Subscription event {event_type} processed for {subscription_id}")
 

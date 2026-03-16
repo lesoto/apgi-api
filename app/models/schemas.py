@@ -13,6 +13,62 @@ import re
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 
+# Base Models
+# ----------------------------------------------------------------------------
+
+
+class TokenPayload:
+    """JWT token payload data."""
+
+    def __init__(
+        self,
+        user_id: str,
+        username: str,
+        roles: List[str],
+        exp: datetime,
+        token_type: str = "access",
+        jti: Optional[str] = None,
+        permissions: Optional[List[str]] = None,
+    ):
+        self.user_id = user_id
+        self.username = username
+        self.roles = roles
+        self.exp = exp
+        self.token_type = token_type
+        self.jti = jti
+        self.permissions = permissions
+
+    def to_dict(self) -> Dict[str, Any]:
+        """Convert to dictionary for JWT encoding."""
+        data = {
+            "user_id": self.user_id,
+            "username": self.username,
+            "roles": self.roles,
+            "exp": int(self.exp.timestamp()),
+            "token_type": self.token_type,
+        }
+        if self.jti:
+            data["jti"] = self.jti
+        if self.permissions:
+            data["permissions"] = self.permissions
+        return data
+
+    @classmethod
+    def from_dict(cls, data: Dict[str, Any]) -> "TokenPayload":
+        """Create from dictionary after JWT decoding."""
+        from datetime import timezone
+
+        return cls(
+            user_id=data["user_id"],
+            username=data["username"],
+            roles=data["roles"],
+            exp=datetime.fromtimestamp(data["exp"], tz=timezone.utc),
+            token_type=data.get("token_type", "access"),
+            jti=data.get("jti"),
+            permissions=data.get("permissions"),
+        )
+
+
 # Pre-compiled regex patterns for performance
 UUID_PATTERN = re.compile(
     r"^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$", re.IGNORECASE
@@ -213,9 +269,15 @@ class SessionTemplateUpdateRequest(BaseModel):
         if not isinstance(v, str) or not v.strip():
             raise ValueError("Configuration path must be a non-empty string")
 
-        # Basic path validation - prevent directory traversal
-        if ".." in v:
+        # Basic path validation - prevent directory traversal and absolute paths
+        import os
+        import urllib.parse
+
+        decoded = urllib.parse.unquote(v)
+        if ".." in v or ".." in decoded or "%2e" in v.lower():
             raise ValueError("Invalid configuration path: directory traversal not allowed")
+        if os.path.isabs(v):
+            raise ValueError("Invalid configuration path: absolute paths not allowed")
 
         # Check for valid file extension
         if not v.endswith((".yaml", ".yml")):
@@ -392,9 +454,15 @@ class SessionCreateRequest(BaseModel):
         if not isinstance(v, str) or not v.strip():
             raise ValueError("Configuration path must be a non-empty string")
 
-        # Basic path validation - prevent directory traversal
-        if ".." in v:
+        # Basic path validation - prevent directory traversal and absolute paths
+        import os
+        import urllib.parse
+
+        decoded = urllib.parse.unquote(v)
+        if ".." in v or ".." in decoded or "%2e" in v.lower():
             raise ValueError("Invalid configuration path: directory traversal not allowed")
+        if os.path.isabs(v):
+            raise ValueError("Invalid configuration path: absolute paths not allowed")
 
         # Check for valid file extension
         if not v.endswith((".yaml", ".yml")):
@@ -561,10 +629,14 @@ class TokenRefreshResponse(BaseModel):
     """Response for token refresh including the new rotated refresh token."""
 
     access_token: str = Field(..., description="JWT access token")
-    refresh_token: str = Field(..., description="New JWT refresh token (rotated; old token is revoked)")
+    refresh_token: str = Field(
+        ..., description="New JWT refresh token (rotated; old token is revoked)"
+    )
     token_type: str = Field("bearer", description="Token type")
     expires_in: int = Field(..., description="Access token expiration time in seconds")
-    refresh_expires_in: Optional[int] = Field(None, description="Refresh token expiration time in seconds")
+    refresh_expires_in: Optional[int] = Field(
+        None, description="Refresh token expiration time in seconds"
+    )
 
     model_config = ConfigDict(
         json_schema_extra={
@@ -1289,7 +1361,6 @@ class UserCreateResponse(BaseModel):
     user_id: str = Field(..., description="Unique user identifier")
     username: str = Field(..., description="Username")
     email: str = Field(..., description="Email address")
-    roles: list[str] = Field(..., description="User roles")
     created_at: datetime = Field(..., description="Creation timestamp")
     message: str = Field(..., description="Response message")
 

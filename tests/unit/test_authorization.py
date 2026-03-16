@@ -161,6 +161,7 @@ class TestFastApiDependencies:
 
     @patch("app.services.authorization.AuthManager")
     @patch("app.services.authorization.get_db")
+    @pytest.mark.asyncio
     async def test_get_current_user_with_api_key(self, mock_get_db, mock_auth_manager):
         """Test get_current_user with API key authentication."""
         mock_db = Mock()
@@ -177,20 +178,29 @@ class TestFastApiDependencies:
 
     @patch("app.services.authorization.AuthManager")
     @patch("app.services.authorization.get_db")
+    @pytest.mark.asyncio
     async def test_get_current_user_with_jwt_token(self, mock_get_db, mock_auth_manager):
         """Test get_current_user with JWT token authentication."""
+        from unittest.mock import AsyncMock
+
         mock_db = Mock()
         mock_get_db.return_value = mock_db
 
-        # Mock AuthManager to return valid payload
+        # Mock AuthManager to return valid payload (verify_token is async)
         mock_auth_manager_instance = Mock()
         mock_auth_manager.return_value = mock_auth_manager_instance
         mock_payload = Mock(user_id="user123", roles=["admin"])
-        mock_auth_manager_instance.verify_token.return_value = mock_payload
+        mock_auth_manager_instance.verify_token = AsyncMock(return_value=mock_payload)
 
-        # Mock request without API key user
-        request = Mock()
-        del request.state  # Simulate no state.user
+        # Mock request without API key user (no state attribute)
+        # Create a request with state that has no 'user' attribute
+        class _State:
+            pass
+
+        class _Request:
+            state = _State()
+
+        request = _Request()
 
         # Mock credentials
         credentials = Mock()
@@ -205,16 +215,151 @@ class TestFastApiDependencies:
 
     @patch("app.services.authorization.AuthManager")
     @patch("app.services.authorization.get_db")
+    @pytest.mark.asyncio
     async def test_get_current_user_without_credentials(self, mock_get_db, mock_auth_manager):
         """Test get_current_user without any credentials."""
         mock_db = Mock()
         mock_get_db.return_value = mock_db
 
-        request = Mock()
-        del request.state
+        class _State:
+            pass
+
+        class _Request:
+            state = _State()
+
+        request = _Request()
 
         with pytest.raises(InvalidTokenError):
             await get_current_user(request, None, mock_db)
+
+    @patch("app.services.authorization.AuthManager")
+    @pytest.mark.asyncio
+    async def test_get_current_user_expired_token(self, mock_auth_manager):
+        """Test get_current_user with expired token raises specific InvalidTokenError."""
+        from unittest.mock import AsyncMock
+
+        mock_db = Mock()
+        mock_auth_manager_instance = Mock()
+        mock_auth_manager.return_value = mock_auth_manager_instance
+        mock_auth_manager_instance.verify_token = AsyncMock(side_effect=Exception("Token expired"))
+
+        class _State:
+            pass
+
+        class _Request:
+            state = _State()
+
+        request = _Request()
+        credentials = Mock()
+        credentials.credentials = "expired.jwt.token"
+
+        with pytest.raises(InvalidTokenError) as exc_info:
+            await get_current_user(request, credentials, mock_db)
+        assert "expired" in str(exc_info.value).lower()
+
+    @patch("app.services.authorization.AuthManager")
+    @pytest.mark.asyncio
+    async def test_get_current_user_invalid_token(self, mock_auth_manager):
+        """Test get_current_user with invalid token raises specific InvalidTokenError."""
+        from unittest.mock import AsyncMock
+
+        mock_db = Mock()
+        mock_auth_manager_instance = Mock()
+        mock_auth_manager.return_value = mock_auth_manager_instance
+        mock_auth_manager_instance.verify_token = AsyncMock(
+            side_effect=Exception("Invalid token format")
+        )
+
+        class _State:
+            pass
+
+        class _Request:
+            state = _State()
+
+        request = _Request()
+        credentials = Mock()
+        credentials.credentials = "not.a.valid.token"
+
+        with pytest.raises(InvalidTokenError):
+            await get_current_user(request, credentials, mock_db)
+
+    @patch("app.services.authorization.AuthManager")
+    @pytest.mark.asyncio
+    async def test_get_current_user_malformed_token(self, mock_auth_manager):
+        """Test get_current_user with malformed token."""
+        from unittest.mock import AsyncMock
+
+        mock_db = Mock()
+        mock_auth_manager_instance = Mock()
+        mock_auth_manager.return_value = mock_auth_manager_instance
+        mock_auth_manager_instance.verify_token = AsyncMock(
+            side_effect=Exception("malformed token data")
+        )
+
+        class _State:
+            pass
+
+        class _Request:
+            state = _State()
+
+        request = _Request()
+        credentials = Mock()
+        credentials.credentials = "malformed"
+
+        with pytest.raises(InvalidTokenError):
+            await get_current_user(request, credentials, mock_db)
+
+    @patch("app.services.authorization.AuthManager")
+    @pytest.mark.asyncio
+    async def test_get_current_user_wrong_token_type(self, mock_auth_manager):
+        """Test get_current_user when refresh token provided instead of access token."""
+        from unittest.mock import AsyncMock
+
+        mock_db = Mock()
+        mock_auth_manager_instance = Mock()
+        mock_auth_manager.return_value = mock_auth_manager_instance
+        mock_auth_manager_instance.verify_token = AsyncMock(
+            side_effect=Exception("Token type mismatch")
+        )
+
+        class _State:
+            pass
+
+        class _Request:
+            state = _State()
+
+        request = _Request()
+        credentials = Mock()
+        credentials.credentials = "refresh.token"
+
+        with pytest.raises(InvalidTokenError):
+            await get_current_user(request, credentials, mock_db)
+
+    @patch("app.services.authorization.AuthManager")
+    @pytest.mark.asyncio
+    async def test_get_current_user_generic_error(self, mock_auth_manager):
+        """Test get_current_user when auth fails with a generic error."""
+        from unittest.mock import AsyncMock
+
+        mock_db = Mock()
+        mock_auth_manager_instance = Mock()
+        mock_auth_manager.return_value = mock_auth_manager_instance
+        mock_auth_manager_instance.verify_token = AsyncMock(
+            side_effect=Exception("Connection refused")
+        )
+
+        class _State:
+            pass
+
+        class _Request:
+            state = _State()
+
+        request = _Request()
+        credentials = Mock()
+        credentials.credentials = "some.token"
+
+        with pytest.raises(InvalidTokenError):
+            await get_current_user(request, credentials, mock_db)
 
     def test_require_permission_decorator(self):
         """Test require_permission decorator creation."""
@@ -233,6 +378,97 @@ class TestFastApiDependencies:
         dependency = require_any_role([Role.ADMIN, Role.RESEARCHER])
 
         assert callable(dependency)
+
+    @pytest.mark.asyncio
+    async def test_require_permission_inner_checker_grants(self):
+        """Inner checker grants access when user has the permission."""
+        from app.services.authorization import require_permission, Permission
+
+        # Get the inner 'permission_checker' coroutine function
+        checker = require_permission(Permission.SESSION_READ)
+
+        user = Mock()
+        user.user_id = "u1"
+        user.roles = ["admin"]
+        user.permissions = None
+
+        result = await checker(current_user=user)
+        assert result is user
+
+    @pytest.mark.asyncio
+    async def test_require_permission_inner_checker_denies(self):
+        """Inner checker raises AuthorizationError when user lacks permission."""
+        from app.services.authorization import require_permission, Permission
+
+        checker = require_permission(Permission.SYSTEM_ADMIN)
+
+        user = Mock()
+        user.user_id = "u1"
+        user.roles = ["viewer"]
+        user.permissions = None
+
+        with pytest.raises(AuthorizationError):
+            await checker(current_user=user)
+
+    @pytest.mark.asyncio
+    async def test_require_role_inner_checker_grants(self):
+        """Inner checker grants access when user has the required role."""
+        from app.services.authorization import require_role, Role
+
+        checker = require_role(Role.ADMIN)
+
+        user = Mock()
+        user.user_id = "u1"
+        user.roles = ["admin"]
+        user.permissions = None
+
+        result = await checker(current_user=user)
+        assert result is user
+
+    @pytest.mark.asyncio
+    async def test_require_role_inner_checker_denies(self):
+        """Inner checker raises AuthorizationError when user lacks the role."""
+        from app.services.authorization import require_role, Role
+
+        checker = require_role(Role.ADMIN)
+
+        user = Mock()
+        user.user_id = "u1"
+        user.roles = ["viewer"]
+        user.permissions = None
+
+        with pytest.raises(AuthorizationError):
+            await checker(current_user=user)
+
+    @pytest.mark.asyncio
+    async def test_require_any_role_inner_checker_grants(self):
+        """Inner checker grants when user has any of the acceptable roles."""
+        from app.services.authorization import require_any_role, Role
+
+        checker = require_any_role([Role.ADMIN, Role.RESEARCHER])
+
+        user = Mock()
+        user.user_id = "u1"
+        user.roles = ["researcher"]
+        user.permissions = None
+
+        result = await checker(current_user=user)
+        assert result is user
+
+    @pytest.mark.asyncio
+    async def test_require_any_role_inner_checker_denies(self):
+        """Inner checker raises AuthorizationError when user has none of the roles."""
+        from app.services.authorization import require_any_role, Role
+
+        checker = require_any_role([Role.ADMIN, Role.RESEARCHER])
+
+        user = Mock()
+        user.user_id = "u1"
+        user.roles = ["viewer"]
+        user.permissions = None
+
+        with pytest.raises(AuthorizationError):
+            await checker(current_user=user)
 
 
 class TestAuditLogging:
@@ -326,10 +562,18 @@ class TestEnums:
 
     def test_permission_comparison(self):
         """Test permission comparison."""
-        assert Permission.SESSION_READ != Permission.SESSION_CREATE
+        # Test that same permissions are equal
         assert Permission.SESSION_READ == Permission.SESSION_READ
+        # Test that different permissions have different string values
+        assert Permission.SESSION_READ.value != Permission.SESSION_CREATE.value  # type: ignore[comparison-overlap]
+        # Test that different permission objects are not the same
+        assert Permission.SESSION_READ is not Permission.SESSION_CREATE  # type: ignore[comparison-overlap]
 
     def test_role_comparison(self):
         """Test role comparison."""
-        assert Role.ADMIN != Role.VIEWER
+        # Test that same roles are equal
         assert Role.ADMIN == Role.ADMIN
+        # Test that different roles have different string values
+        assert Role.ADMIN.value != Role.VIEWER.value  # type: ignore[comparison-overlap]
+        # Test that different role objects are not the same
+        assert Role.ADMIN is not Role.VIEWER  # type: ignore[comparison-overlap]

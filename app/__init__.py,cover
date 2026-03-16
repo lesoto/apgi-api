@@ -1,7 +1,0 @@
-> """
-> Standalone APGI API Application
-  
-> This package contains the standalone REST API for the APGI system.
-> """
-  
-> __version__ = "1.0.0"

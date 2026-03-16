@@ -27,16 +27,19 @@ REQUIRED_DEPENDENCIES = {
 }
 
 
-def parse_version(version_str: str) -> Tuple[int, ...]:
+def parse_version(version_str: Optional[str]) -> Tuple[int, ...]:
     """
     Parse version string into tuple of integers for comparison.
 
     Args:
-        version_str: Version string like "1.2.3"
+        version_str: Version string like "1.2.3" or None
 
     Returns:
-        Tuple of version components like (1, 2, 3)
+        Tuple of version components like (1, 2, 3) or (0, 0, 0) for invalid/None input
     """
+    if not version_str:
+        return (0, 0, 0)
+
     try:
         return tuple(int(x) for x in version_str.split(".")[:3])
     except (ValueError, AttributeError):

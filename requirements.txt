@@ -20,7 +20,6 @@ opentelemetry-instrumentation>=0.61b0
 opentelemetry-instrumentation-fastapi>=0.61b0
 opentelemetry-instrumentation-sqlalchemy>=0.61b0
 opentelemetry-instrumentation-redis>=0.61b0
-opentelemetry-exporter-jaeger>=0.61b0
 opentelemetry-exporter-otlp-proto-grpc>=0.61b0
 pyotp>=2.9.0
 pyyaml>=6.0.1

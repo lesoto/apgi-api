@@ -38,7 +38,7 @@ celery_app = Celery(
     "apgi_tasks",
     broker=settings.celery_broker_url,
     backend=settings.celery_result_backend,
-    include=["app.tasks.experimental_tasks"],
+    include=["app.tasks.experimental_tasks", "app.tasks.webhook_tasks"],
 )
 
 # Configure Celery
@@ -59,4 +59,13 @@ celery_app.conf.update(
 # Task routing (optional - for future expansion)
 celery_app.conf.task_routes = {
     "app.tasks.experimental_tasks.*": {"queue": "experimental"},
+    "app.tasks.webhook_tasks.*": {"queue": "celery"},
+}
+
+# Beat schedule for periodic tasks
+celery_app.conf.beat_schedule = {
+    "retry-failed-webhooks": {
+        "task": "process_pending_webhooks",
+        "schedule": 60.0,  # Run every minute
+    },
 }

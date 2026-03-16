@@ -8,7 +8,6 @@ import uuid
 from enum import Enum as PythonEnum
 
 from sqlalchemy import (
-    ARRAY,
     Boolean,
     Column,
     DateTime,
@@ -76,7 +75,7 @@ class User(Base):  # type: ignore[misc, valid-type]
         String(255), unique=True, nullable=False, index=True, comment="User email address"
     )
     password_hash = Column(String(255), nullable=False, comment="Hashed password")
-    roles = Column(ARRAY(Text), nullable=False, default=lambda: [], comment="User roles for RBAC")  # type: ignore[var-annotated]
+    roles = Column(JSON, nullable=False, default=lambda: [], comment="User roles for RBAC")  # type: ignore[var-annotated]
     is_active = Column(
         Boolean, nullable=False, default=True, comment="Whether the user account is active"
     )
@@ -149,7 +148,7 @@ class SessionTemplate(Base):  # type: ignore[misc, valid-type]
     config_path = Column(String(255), nullable=True, comment="Path to YAML configuration file")
     custom_config = Column(JSON, nullable=True, comment="Default custom configuration overrides")
     default_description = Column(Text, nullable=True, comment="Default session description")
-    tags = Column(ARRAY(Text), nullable=True, default=lambda: [], comment="Template tags for organization")  # type: ignore[var-annotated]
+    tags = Column(JSON, nullable=True, default=lambda: [], comment="Template tags for organization")  # type: ignore[var-annotated]
     is_public = Column(Boolean, nullable=False, default=False, comment="Whether template is public")
     created_at = Column(
         DateTime(timezone=True),
@@ -237,7 +236,7 @@ class Session(Base):  # type: ignore[misc, valid-type]
         comment="Last update timestamp",
     )
     description = Column(Text, nullable=True, comment="Human-readable session description")
-    tags = Column(ARRAY(Text), nullable=True, default=lambda: [], comment="Session tags for organization")  # type: ignore[var-annotated]
+    tags = Column(JSON, nullable=True, default=lambda: [], comment="Session tags for organization")  # type: ignore[var-annotated]
     is_deleted = Column(Boolean, nullable=False, default=False, comment="Soft delete flag")
 
     # Relationships
@@ -446,6 +445,9 @@ class RefreshToken(Base):  # type: ignore[misc, valid-type]
         comment="Associated user ID",
     )
     token_hash = Column(String(255), nullable=False, comment="Hashed refresh token")
+    token_sha256 = Column(
+        String(64), nullable=True, index=True, comment="SHA-256 hash for fast lookup"
+    )
     expires_at = Column(
         DateTime(timezone=True), nullable=False, index=True, comment="Token expiration timestamp"
     )
@@ -492,7 +494,7 @@ class APIKey(Base):  # type: ignore[misc, valid-type]
     key_prefix = Column(
         String(16), nullable=False, index=True, comment="HMAC prefix for fast lookup"
     )
-    permissions = Column(ARRAY(Text), nullable=False, default=lambda: [], comment="Permissions for this key")  # type: ignore[var-annotated]
+    permissions = Column(JSON, nullable=False, default=lambda: [], comment="Permissions for this key")  # type: ignore[var-annotated]
     expires_at = Column(
         DateTime(timezone=True),
         nullable=False,
@@ -626,3 +628,112 @@ class AuditLog(Base):  # type: ignore[misc, valid-type]
 
     def __repr__(self):
         return f"<AuditLog(audit_id={self.audit_id}, user_id={self.user_id}, action={self.action})>"
+
+
+class Order(Base):  # type: ignore[misc, valid-type]
+    """Order for single purchases like a lifetime license."""
+
+    __tablename__ = "orders"
+
+    order_id = Column(
+        String(36),
+        primary_key=True,
+        default=lambda: str(uuid.uuid4()),
+        comment="Unique order identifier",
+    )
+    user_id = Column(
+        String(36),
+        ForeignKey("users.user_id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+        comment="Associated user ID",
+    )
+    stripe_payment_intent_id = Column(
+        String(255), nullable=True, index=True, comment="Stripe PaymentIntent ID"
+    )
+    amount_cents = Column(Integer, nullable=False, comment="Order amount in cents")
+    currency = Column(String(3), nullable=False, default="usd", comment="Currency code")
+    status = Column(
+        String(50),
+        nullable=False,
+        default="pending",
+        index=True,
+        comment="Order status (e.g., pending, succeeded, failed, refunded)",
+    )
+    items = Column(JSON, nullable=False, comment="Details of purchased items")
+    created_at = Column(
+        DateTime(timezone=True),
+        nullable=False,
+        server_default=func.now(),
+        comment="Creation timestamp",
+    )
+    updated_at = Column(
+        DateTime(timezone=True),
+        nullable=False,
+        server_default=func.now(),
+        onupdate=func.now(),
+        comment="Last update timestamp",
+    )
+
+    # Relationships
+    user = relationship("User", backref="orders")
+
+
+class Subscription(Base):  # type: ignore[misc, valid-type]
+    """Subscription model for recurring billing and entitlements."""
+
+    __tablename__ = "subscriptions"
+
+    subscription_id = Column(
+        String(36),
+        primary_key=True,
+        default=lambda: str(uuid.uuid4()),
+        comment="Internal subscription identifier",
+    )
+    user_id = Column(
+        String(36),
+        ForeignKey("users.user_id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+        unique=True,
+        comment="Associated user ID (1-to-1 max typically)",
+    )
+    stripe_subscription_id = Column(
+        String(255), nullable=True, unique=True, index=True, comment="Stripe Subscription ID"
+    )
+    stripe_customer_id = Column(
+        String(255), nullable=True, index=True, comment="Stripe Customer ID"
+    )
+    plan_id = Column(String(100), nullable=False, comment="Internal plan identifier")
+    status = Column(
+        String(50),
+        nullable=False,
+        default="active",
+        index=True,
+        comment="Subscription status (e.g., active, past_due, canceled)",
+    )
+    current_period_start = Column(
+        DateTime(timezone=True), nullable=True, comment="Current billing period start"
+    )
+    current_period_end = Column(
+        DateTime(timezone=True), nullable=True, comment="Current billing period end"
+    )
+    cancel_at_period_end = Column(
+        Boolean, nullable=False, default=False, comment="Cancel at period end flag"
+    )
+    created_at = Column(
+        DateTime(timezone=True),
+        nullable=False,
+        server_default=func.now(),
+        comment="Creation timestamp",
+    )
+    updated_at = Column(
+        DateTime(timezone=True),
+        nullable=False,
+        server_default=func.now(),
+        onupdate=func.now(),
+        comment="Last update timestamp",
+    )
+
+    # Relationships
+    user = relationship("User", backref="subscription", uselist=False)

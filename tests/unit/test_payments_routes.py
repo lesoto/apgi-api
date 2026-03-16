@@ -4,6 +4,7 @@ Unit tests for payment routes.
 
 import pytest
 from unittest.mock import Mock, patch, AsyncMock
+from sqlalchemy.orm import Session
 from fastapi import HTTPException
 from app.routes.payments import (
     create_payment_intent,
@@ -14,14 +15,8 @@ from app.routes.payments import (
     _handle_dispute_closed,
     _handle_refund,
     _handle_subscription_event,
+    PaymentIntentCreateRequest,
 )
-
-
-# Mock PaymentIntentCreateRequest since it doesn't exist in schemas
-class PaymentIntentCreateRequest:
-    def __init__(self, items=None, currency=None, **kwargs):
-        self.items = items or []
-        self.currency = currency or "usd"
 
 
 class TestPaymentRoutes:
@@ -33,6 +28,18 @@ class TestPaymentRoutes:
         with patch("app.routes.payments.stripe") as mock:
             mock.PaymentIntent.create.return_value = Mock(client_secret="test_secret")
             yield mock
+
+    @pytest.fixture
+    def mock_db(self):
+        """Mock database session."""
+        db = Mock(spec=Session)
+        db.query = Mock()
+        db.add = Mock()
+        db.commit = Mock()
+        db.rollback = Mock()
+        db.refresh = Mock()
+        db.delete = Mock()
+        return db
 
     @pytest.mark.asyncio
     async def test_create_payment_intent_success(self, mock_stripe):
@@ -48,24 +55,27 @@ class TestPaymentRoutes:
         """Test payment intent creation with missing item ID."""
         request = PaymentIntentCreateRequest(items=[{}], currency="usd")
 
-        with pytest.raises(HTTPException, status_code=400):
+        with pytest.raises(HTTPException) as exc:
             await create_payment_intent(request)
+        assert exc.value.status_code == 400
 
     @pytest.mark.asyncio
     async def test_create_payment_intent_unknown_product(self, mock_stripe):
         """Test payment intent creation with unknown product."""
         request = PaymentIntentCreateRequest(items=[{"id": "unknown"}], currency="usd")
 
-        with pytest.raises(HTTPException, status_code=400):
+        with pytest.raises(HTTPException) as exc:
             await create_payment_intent(request)
+        assert exc.value.status_code == 400
 
     @pytest.mark.asyncio
     async def test_create_payment_intent_no_valid_items(self, mock_stripe):
         """Test payment intent creation with no valid items."""
         request = PaymentIntentCreateRequest(items=[], currency="usd")
 
-        with pytest.raises(HTTPException, status_code=400):
+        with pytest.raises(HTTPException) as exc:
             await create_payment_intent(request)
+        assert exc.value.status_code == 400
 
     @pytest.mark.asyncio
     async def test_create_payment_intent_stripe_error(self, mock_stripe):
@@ -73,19 +83,21 @@ class TestPaymentRoutes:
         mock_stripe.PaymentIntent.create.side_effect = Exception("Stripe error")
         request = PaymentIntentCreateRequest(items=[{"id": "cognitive-engine-v2"}], currency="usd")
 
-        with pytest.raises(HTTPException, status_code=500):
+        with pytest.raises(HTTPException) as exc:
             await create_payment_intent(request)
+        assert exc.value.status_code == 500
 
     @pytest.mark.asyncio
-    async def test_stripe_webhook_missing_signature(self):
+    async def test_stripe_webhook_missing_signature(self, mock_db):
         """Test webhook without signature header."""
         request = Mock(headers={}, body=AsyncMock(return_value=b"test_payload"))
 
-        with pytest.raises(HTTPException, status_code=400):
+        with pytest.raises(HTTPException) as exc:
             await stripe_webhook(request)
+        assert exc.value.status_code == 400
 
     @pytest.mark.asyncio
-    async def test_stripe_webhook_invalid_payload(self):
+    async def test_stripe_webhook_invalid_payload(self, mock_db):
         """Test webhook with invalid payload."""
         with patch("app.routes.payments.stripe") as mock_stripe:
             mock_stripe.Webhook.construct_event.side_effect = ValueError("Invalid payload")
@@ -93,8 +105,9 @@ class TestPaymentRoutes:
                 headers={"stripe-signature": "test_sig"}, body=AsyncMock(return_value=b"test")
             )
 
-            with pytest.raises(HTTPException, status_code=400):
+            with pytest.raises(HTTPException) as exc:
                 await stripe_webhook(request)
+            assert exc.value.status_code == 400
 
     @pytest.mark.asyncio
     async def test_stripe_webhook_invalid_signature(self):
@@ -107,8 +120,9 @@ class TestPaymentRoutes:
                 headers={"stripe-signature": "test_sig"}, body=AsyncMock(return_value=b"test")
             )
 
-            with pytest.raises(HTTPException, status_code=400):
+            with pytest.raises(HTTPException) as exc:
                 await stripe_webhook(request)
+            assert exc.value.status_code == 400
 
     @pytest.mark.asyncio
     async def test_stripe_webhook_payment_succeeded(self):
@@ -207,7 +221,7 @@ class TestPaymentRoutes:
                 assert result["status"] == "success"
 
     @pytest.mark.asyncio
-    async def test_handle_payment_succeeded(self):
+    async def test_handle_payment_succeeded(self, mock_db):
         """Test payment success handler."""
         payment_intent = {
             "id": "pi_test",
@@ -216,10 +230,10 @@ class TestPaymentRoutes:
             "metadata": {"user_id": "user123", "order_id": "order123"},
         }
 
-        await _handle_payment_succeeded(payment_intent)  # Should not raise
+        await _handle_payment_succeeded(mock_db, payment_intent)  # Should not raise
 
     @pytest.mark.asyncio
-    async def test_handle_payment_failed(self):
+    async def test_handle_payment_failed(self, mock_db):
         """Test payment failure handler."""
         payment_intent = {
             "id": "pi_test",
@@ -228,10 +242,10 @@ class TestPaymentRoutes:
             "last_payment_error": {"message": "Card declined", "type": "card_error"},
         }
 
-        await _handle_payment_failed(payment_intent)  # Should not raise
+        await _handle_payment_failed(mock_db, payment_intent)  # Should not raise
 
     @pytest.mark.asyncio
-    async def test_handle_dispute_created(self):
+    async def test_handle_dispute_created(self, mock_db):
         """Test dispute creation handler."""
         dispute = {
             "id": "dp_test",
@@ -241,17 +255,17 @@ class TestPaymentRoutes:
             "reason": "product_not_received",
         }
 
-        await _handle_dispute_created(dispute)  # Should not raise
+        await _handle_dispute_created(mock_db, dispute)  # Should not raise
 
     @pytest.mark.asyncio
-    async def test_handle_dispute_closed(self):
+    async def test_handle_dispute_closed(self, mock_db):
         """Test dispute closure handler."""
         dispute = {"id": "dp_test", "status": "lost", "charge": "ch_test"}
 
-        await _handle_dispute_closed(dispute)  # Should not raise
+        await _handle_dispute_closed(mock_db, dispute)  # Should not raise
 
     @pytest.mark.asyncio
-    async def test_handle_refund(self):
+    async def test_handle_refund(self, mock_db):
         """Test refund handler."""
         charge = {
             "id": "ch_test",
@@ -260,64 +274,64 @@ class TestPaymentRoutes:
             "metadata": {"user_id": "user123", "order_id": "order123"},
         }
 
-        await _handle_refund(charge, 9900)  # Should not raise
+        await _handle_refund(mock_db, charge, 9900)  # Should not raise
 
     @pytest.mark.asyncio
-    async def test_handle_subscription_event_created(self):
+    async def test_handle_subscription_event_created(self, mock_db):
         """Test subscription created event handler."""
         subscription = {"id": "sub_test", "customer": "cus_test", "status": "active"}
 
         await _handle_subscription_event(
-            "customer.subscription.created", subscription
+            mock_db, "customer.subscription.created", subscription
         )  # Should not raise
 
     @pytest.mark.asyncio
-    async def test_handle_subscription_event_updated(self):
+    async def test_handle_subscription_event_updated(self, mock_db):
         """Test subscription updated event handler."""
         subscription = {"id": "sub_test", "customer": "cus_test", "status": "active"}
 
         await _handle_subscription_event(
-            "customer.subscription.updated", subscription
+            mock_db, "customer.subscription.updated", subscription
         )  # Should not raise
 
     @pytest.mark.asyncio
-    async def test_handle_subscription_event_deleted(self):
+    async def test_handle_subscription_event_deleted(self, mock_db):
         """Test subscription deleted event handler."""
         subscription = {"id": "sub_test", "customer": "cus_test", "status": "canceled"}
 
         await _handle_subscription_event(
-            "customer.subscription.deleted", subscription
+            mock_db, "customer.subscription.deleted", subscription
         )  # Should not raise
 
     @pytest.mark.asyncio
-    async def test_handle_subscription_event_paused(self):
+    async def test_handle_subscription_event_paused(self, mock_db):
         """Test subscription paused event handler."""
         subscription = {"id": "sub_test", "customer": "cus_test", "status": "paused"}
 
         await _handle_subscription_event(
-            "customer.subscription.paused", subscription
+            mock_db, "customer.subscription.paused", subscription
         )  # Should not raise
 
     @pytest.mark.asyncio
-    async def test_handle_subscription_event_resumed(self):
+    async def test_handle_subscription_event_resumed(self, mock_db):
         """Test subscription resumed event handler."""
         subscription = {"id": "sub_test", "customer": "cus_test", "status": "active"}
 
         await _handle_subscription_event(
-            "customer.subscription.resumed", subscription
+            mock_db, "customer.subscription.resumed", subscription
         )  # Should not raise
 
     @pytest.mark.asyncio
-    async def test_handle_subscription_event_payment_failed(self):
+    async def test_handle_subscription_event_payment_failed(self, mock_db):
         """Test subscription payment failed event handler."""
         subscription = {"id": "sub_test", "customer": "cus_test", "status": "past_due"}
 
         await _handle_subscription_event(
-            "customer.subscription.payment_failed", subscription
+            mock_db, "customer.subscription.payment_failed", subscription
         )  # Should not raise
 
     @pytest.mark.asyncio
-    async def test_handle_payment_succeeded_error(self):
+    async def test_handle_payment_succeeded_error(self, mock_db):
         """Test payment success handler with error."""
         payment_intent = {
             "id": "pi_test",
@@ -326,10 +340,10 @@ class TestPaymentRoutes:
             "metadata": {"user_id": "user123"},
         }
 
-        await _handle_payment_succeeded(payment_intent)  # Should not raise
+        await _handle_payment_succeeded(mock_db, payment_intent)  # Should not raise
 
     @pytest.mark.asyncio
-    async def test_handle_payment_failed_error(self):
+    async def test_handle_payment_failed_error(self, mock_db):
         """Test payment failure handler with error."""
         payment_intent = {
             "id": "pi_test",
@@ -338,34 +352,34 @@ class TestPaymentRoutes:
             "last_payment_error": {"message": "Card declined"},
         }
 
-        await _handle_payment_failed(payment_intent)  # Should not raise
+        await _handle_payment_failed(mock_db, payment_intent)  # Should not raise
 
     @pytest.mark.asyncio
-    async def test_handle_dispute_created_error(self):
+    async def test_handle_dispute_created_error(self, mock_db):
         """Test dispute creation handler with error."""
         dispute = {"id": "dp_test", "charge": "ch_test", "amount": 9900}
 
-        await _handle_dispute_created(dispute)  # Should not raise
+        await _handle_dispute_created(mock_db, dispute)  # Should not raise
 
     @pytest.mark.asyncio
-    async def test_handle_dispute_closed_error(self):
+    async def test_handle_dispute_closed_error(self, mock_db):
         """Test dispute closure handler with error."""
         dispute = {"id": "dp_test", "status": "lost"}
 
-        await _handle_dispute_closed(dispute)  # Should not raise
+        await _handle_dispute_closed(mock_db, dispute)  # Should not raise
 
     @pytest.mark.asyncio
-    async def test_handle_refund_error(self):
+    async def test_handle_refund_error(self, mock_db):
         """Test refund handler with error."""
         charge = {"id": "ch_test", "amount": 9900}
 
-        await _handle_refund(charge, 9900)  # Should not raise
+        await _handle_refund(mock_db, charge, 9900)  # Should not raise
 
     @pytest.mark.asyncio
-    async def test_handle_subscription_event_error(self):
+    async def test_handle_subscription_event_error(self, mock_db):
         """Test subscription event handler with error."""
         subscription = {"id": "sub_test", "customer": "cus_test"}
 
         await _handle_subscription_event(
-            "customer.subscription.created", subscription
+            mock_db, "customer.subscription.created", subscription
         )  # Should not raise

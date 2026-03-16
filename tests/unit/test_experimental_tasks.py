@@ -147,7 +147,7 @@ class TestExecuteIowaGamblingTask:
                     mock_apgi_system = MagicMock()
                     mock_apgi_system_class.return_value = mock_apgi_system
                     # Call the function without self - Celery provides it
-                    result = execute_iowa_gambling_task(session_id, {})
+                    result = execute_iowa_gambling_task(None, "test_session_id", parameters={})
 
                 assert result["status"] == "completed"
                 assert result["task_type"] == "iowa_gambling"
@@ -172,7 +172,7 @@ class TestExecuteIowaGamblingTask:
                 mock_apgi_system = MagicMock()
                 mock_apgi_system_class.return_value = mock_apgi_system
                 # Call the function without self - Celery provides it
-                result = execute_iowa_gambling_task(session_id, {})
+                result = execute_iowa_gambling_task(None, "session_123", parameters={})
 
             assert result["status"] == "failed"
             assert "Task failed" in result["error"]
@@ -214,7 +214,7 @@ class TestExecuteMaskingParadigmTask:
                     mock_apgi_system = MagicMock()
                     mock_apgi_system_class.return_value = mock_apgi_system
                     # Call the function without self - Celery provides it
-                    result = execute_masking_paradigm_task(session_id, parameters)
+                    result = execute_masking_paradigm_task(None, "test_session_id", parameters={})
 
                 assert result["status"] == "completed"
                 assert result["task_type"] == "masking_paradigm"
@@ -256,7 +256,7 @@ class TestExecuteAttentionalBlinkTask:
                     mock_apgi_system = MagicMock()
                     mock_apgi_system_class.return_value = mock_apgi_system
                     # Call the function without self - Celery provides it
-                    result = execute_attentional_blink_task(session_id, {})
+                    result = execute_attentional_blink_task(None, "session_123", parameters={})
 
                 assert result["status"] == "completed"
                 assert result["task_type"] == "attentional_blink"
@@ -298,7 +298,7 @@ class TestExecuteChangeBlindnessTask:
                     mock_apgi_system = MagicMock()
                     mock_apgi_system_class.return_value = mock_apgi_system
                     # Call the function without self - Celery provides it
-                    result = execute_change_blindness_task(session_id, parameters)
+                    result = execute_change_blindness_task(None, "session_123", parameters={})
 
                 assert result["status"] == "completed"
                 assert result["task_type"] == "change_blindness"
@@ -340,7 +340,7 @@ class TestExecuteBinocularRivalryTask:
                     mock_apgi_system = MagicMock()
                     mock_apgi_system_class.return_value = mock_apgi_system
                     # Call the function without self - Celery provides it
-                    result = execute_binocular_rivalry_task(session_id, parameters)
+                    result = execute_binocular_rivalry_task(None, "session_123", parameters={})
 
                 assert result["status"] == "completed"
                 assert result["task_type"] == "binocular_rivalry"

@@ -57,8 +57,9 @@ class TestSessionRoutesValidation:
         """Test session ownership validation when session not found."""
         mock_db.query.return_value.filter.return_value.filter.return_value.first.return_value = None
 
-        with pytest.raises(HTTPException, status_code=404):
+        with pytest.raises(HTTPException) as exc_info:
             await validate_session_ownership("session123", "user123", mock_manager, mock_db)
+        assert exc_info.value.status_code == 404
 
     @pytest.mark.asyncio
     async def test_validate_session_ownership_access_denied(self, mock_db, mock_manager, mock_user):
@@ -72,8 +73,9 @@ class TestSessionRoutesValidation:
             session
         )
 
-        with pytest.raises(HTTPException, status_code=403):
+        with pytest.raises(HTTPException) as exc_info:
             await validate_session_ownership("session123", "user123", mock_manager, mock_db)
+        assert exc_info.value.status_code == 403
 
     @pytest.mark.asyncio
     async def test_validate_session_ownership_admin_bypass(self, mock_db, mock_manager, mock_user):
@@ -121,8 +123,9 @@ class TestSessionIdempotency:
         """Test idempotency check with key too long."""
         mock_request.headers = {"Idempotency-Key": "a" * 256}
 
-        with pytest.raises(HTTPException, status_code=400):
+        with pytest.raises(HTTPException) as exc_info:
             await check_idempotency_key(mock_request, "user123", mock_redis)
+        assert exc_info.value.status_code == 400
 
     @pytest.mark.asyncio
     async def test_check_idempotency_key_cached_response(self, mock_redis, mock_request):
@@ -223,16 +226,18 @@ class TestSessionRoutesHelpers:
         """Test session listing with invalid page."""
         from app.routes.sessions import list_sessions
 
-        with pytest.raises(HTTPException, status_code=400):
+        with pytest.raises(HTTPException) as exc_info:
             await list_sessions(0, 10, None, mock_session_manager, mock_current_user)
+        assert exc_info.value.status_code == 400
 
     @pytest.mark.asyncio
     async def test_list_sessions_invalid_per_page(self, mock_session_manager, mock_current_user):
         """Test session listing with invalid per_page."""
         from app.routes.sessions import list_sessions
 
-        with pytest.raises(HTTPException, status_code=400):
+        with pytest.raises(HTTPException) as exc_info:
             await list_sessions(1, 101, None, mock_session_manager, mock_current_user)
+        assert exc_info.value.status_code == 400
 
     @pytest.mark.asyncio
     async def test_list_sessions_error(self, mock_session_manager, mock_current_user):
@@ -241,8 +246,9 @@ class TestSessionRoutesHelpers:
 
         from app.routes.sessions import list_sessions
 
-        with pytest.raises(HTTPException, status_code=500):
+        with pytest.raises(HTTPException) as exc_info:
             await list_sessions(1, 10, None, mock_session_manager, mock_current_user)
+        assert exc_info.value.status_code == 500
 
 
 class TestSessionRoutesGetSession:

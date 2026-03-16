@@ -1,502 +1,929 @@
-"""
-Unit tests for user management service.
-"""
+"""Unit tests for user management service."""
 
 import pytest
-from unittest.mock import Mock
+from unittest.mock import MagicMock, patch
+from datetime import datetime, timezone, timedelta
+from sqlalchemy.orm import Session
+from sqlalchemy.exc import IntegrityError
 from app.services.user_management import UserManagementService
+from app.exceptions import UserNotFoundError, ValidationError
 
 
-class TestUserManagementService:
-    """Test user management service."""
+@pytest.fixture
+def mock_db():
+    """Mock database session."""
+    db = MagicMock(spec=Session)
+    db.commit = MagicMock()
+    db.rollback = MagicMock()
+    db.query = MagicMock()
+    db.add = MagicMock()
+    db.delete = MagicMock()
+    db.refresh = MagicMock()
+    return db
 
-    @pytest.fixture
-    def mock_db(self):
-        """Mock database session."""
-        return Mock()
 
-    @pytest.fixture
-    def service(self, mock_db):
-        """Create user management service instance."""
-        return UserManagementService(mock_db)
+@pytest.fixture
+def mock_auth_manager():
+    """Mock auth manager."""
+    with patch("app.services.user_management.AuthManager") as mock:
+        manager = mock.return_value
+        manager.hash_password = MagicMock(return_value="hashed_password")
+        manager.revoke_all_user_tokens = MagicMock(return_value=1)
+        yield manager
 
-    def test_user_registration_success(self, service):
-        """Test successful user registration."""
-        user_data = {
-            "user_id": "user123",
-            "username": "testuser",
-            "email": "test@example.com",
-            "password": "SecurePassword123",
-        }
 
-        user = service.register_user(user_data)
+@pytest.fixture
+def mock_user_model():
+    """Mock user model."""
+    user = MagicMock()
+    user.user_id = "user123"
+    user.username = "testuser"
+    user.email = "test@example.com"
+    user.password_hash = "hashed_password"
+    user.roles = ["viewer"]
+    user.is_active = True
+    user.is_deleted = False
+    user.created_at = datetime.now(timezone.utc)
+    user.updated_at = datetime.now(timezone.utc)
+    user.last_login = None
+    user.mfa_secret = None
+    user.mfa_enabled = False
+    user.mfa_backup_codes = None
+    user.email_verification_token = None
+    user.email_verification_expires_at = None
+    user.password_reset_token = None
+    user.password_reset_expires_at = None
+    return user
 
-        assert user is not None
-        assert user.email == "test@example.com"
 
-    def test_user_registration_validation(self, service):
-        """Test user registration validation."""
-        invalid_data = {"username": "test", "email": "invalid", "password": "short"}
+class TestPasswordValidation:
+    """Tests for password validation."""
 
-        with pytest.raises(ValueError):
-            service.register_user(invalid_data)
+    def test_validate_password_complexity_success(self, mock_db, mock_auth_manager):
+        """Test successful password validation."""
+        service = UserManagementService(mock_db)
 
-    def test_user_profile_update(self, service):
-        """Test user profile update."""
-        user_id = "user123"
-        update_data = {"email": "newemail@example.com", "name": "New Name"}
+        # Should not raise
+        service._validate_password_complexity("SecurePass123!")
 
-        user = service.update_user_profile(user_id, update_data)
+    def test_validate_password_complexity_too_short(self, mock_db, mock_auth_manager):
+        """Test password validation with too short password."""
+        service = UserManagementService(mock_db)
+
+        with pytest.raises(ValidationError) as exc_info:
+            service._validate_password_complexity("Short1!")
+
+        assert "at least 12 characters" in str(exc_info.value)
+
+    def test_validate_password_complexity_no_uppercase(self, mock_db, mock_auth_manager):
+        """Test password validation without uppercase."""
+        service = UserManagementService(mock_db)
+
+        with pytest.raises(ValidationError) as exc_info:
+            service._validate_password_complexity("lowercase123!")
+
+        assert "uppercase" in str(exc_info.value)
+
+    def test_validate_password_complexity_no_lowercase(self, mock_db, mock_auth_manager):
+        """Test password validation without lowercase."""
+        service = UserManagementService(mock_db)
+
+        with pytest.raises(ValidationError) as exc_info:
+            service._validate_password_complexity("UPPERCASE123!")
+
+        assert "lowercase" in str(exc_info.value)
+
+    def test_validate_password_complexity_no_digit(self, mock_db, mock_auth_manager):
+        """Test password validation without digit."""
+        service = UserManagementService(mock_db)
+
+        with pytest.raises(ValidationError) as exc_info:
+            service._validate_password_complexity("NoDigitsExtraChars!")
+
+        assert "digit" in str(exc_info.value)
+
+    def test_validate_password_complexity_no_special(self, mock_db, mock_auth_manager):
+        """Test password validation without special character."""
+        service = UserManagementService(mock_db)
+
+        with pytest.raises(ValidationError) as exc_info:
+            service._validate_password_complexity("NoSpecial123")
+
+        assert "special character" in str(exc_info.value)
+
+
+class TestCreateUser:
+    """Tests for create_user method."""
+
+    @patch("app.services.user_management.settings")
+    def test_create_user_success(self, mock_settings, mock_db, mock_auth_manager, mock_user_model):
+        """Test successful user creation."""
+        mock_settings.smtp_server = "smtp.example.com"
+        mock_settings.require_email_verification = True
+        mock_settings.smtp_from_email = "noreply@example.com"
+        mock_settings.base_url = "https://example.com"
+        mock_db.add.return_value = None
+        mock_db.query.return_value.filter.return_value.first.return_value = None
+        mock_user_model.user_id = "user123"
+
+        with patch("app.services.user_management.User", return_value=mock_user_model):
+            service = UserManagementService(mock_db)
+
+            user = service.create_user("testuser", "test@example.com", "SecurePass123!")
+
+            assert user.user_id == "user123"
+            assert user.username == "testuser"
+            assert user.email == "test@example.com"
+            mock_db.commit.assert_called_once()
+
+    @patch("app.services.user_management.settings")
+    def test_create_user_default_roles(
+        self, mock_settings, mock_db, mock_auth_manager, mock_user_model
+    ):
+        """Test user creation with default roles."""
+        mock_settings.smtp_server = "smtp.example.com"
+        mock_settings.require_email_verification = False
+        mock_settings.smtp_from_email = "noreply@example.com"
+        mock_settings.base_url = "https://example.com"
+        mock_db.add.return_value = None
+        mock_db.query.return_value.filter.return_value.first.return_value = None
+        mock_user_model.user_id = "user123"
+        mock_user_model.roles = ["viewer"]
+
+        with patch("app.services.user_management.User", return_value=mock_user_model):
+            service = UserManagementService(mock_db)
+
+            user = service.create_user("testuser", "test@example.com", "SecurePass123!")
+
+            assert user.roles == ["viewer"]
+
+    @patch("app.services.user_management.settings")
+    def test_create_user_with_roles(
+        self, mock_settings, mock_db, mock_auth_manager, mock_user_model
+    ):
+        """Test user creation with custom roles."""
+        mock_settings.smtp_server = "smtp.example.com"
+        mock_settings.require_email_verification = False
+        mock_settings.smtp_from_email = "noreply@example.com"
+        mock_settings.base_url = "https://example.com"
+        mock_db.add.return_value = None
+        mock_db.query.return_value.filter.return_value.first.return_value = None
+        mock_user_model.user_id = "user123"
+        mock_user_model.roles = ["admin"]
+
+        with patch("app.services.user_management.User", return_value=mock_user_model):
+            service = UserManagementService(mock_db)
+
+            user = service.create_user(
+                "testuser", "test@example.com", "SecurePass123!", roles=["admin"]
+            )
+
+            assert user.roles == ["admin"]
+
+    @patch("app.services.user_management.settings")
+    def test_create_user_duplicate(self, mock_settings, mock_db, mock_auth_manager):
+        """Test user creation with duplicate username/email."""
+        mock_settings.smtp_server = "smtp.example.com"
+        mock_settings.require_email_verification = False
+        mock_settings.smtp_from_email = "noreply@example.com"
+        mock_settings.base_url = "https://example.com"
+        mock_db.add.side_effect = IntegrityError("INSERT", {}, Exception("Duplicate"))
+
+        service = UserManagementService(mock_db)
+
+        with pytest.raises(ValidationError) as exc_info:
+            service.create_user("existinguser", "test@example.com", "SecurePass123!")
+
+        assert "already exists" in str(exc_info.value)
+        mock_db.rollback.assert_called_once()
+
+    @patch("app.services.user_management.settings")
+    def test_create_user_db_error(self, mock_settings, mock_db, mock_auth_manager):
+        """Test user creation with database error."""
+        mock_settings.smtp_server = "smtp.example.com"
+        mock_settings.require_email_verification = False
+        mock_settings.smtp_from_email = "noreply@example.com"
+        mock_settings.base_url = "https://example.com"
+        mock_db.add.side_effect = Exception("Database error")
+
+        service = UserManagementService(mock_db)
+
+        with pytest.raises(Exception) as exc_info:
+            service.create_user("testuser", "test@example.com", "SecurePass123!")
+
+        assert "Database error" in str(exc_info.value)
+        mock_db.rollback.assert_called_once()
+
+    @patch("app.services.user_management.settings")
+    def test_create_user_no_smtp(self, mock_settings, mock_db, mock_auth_manager, mock_user_model):
+        """Test user creation without SMTP."""
+        mock_settings.smtp_server = None
+        mock_settings.require_email_verification = True
+        mock_settings.smtp_from_email = "noreply@example.com"
+        mock_settings.base_url = "https://example.com"
+        mock_db.add.return_value = None
+        mock_db.query.return_value.filter.return_value.first.return_value = None
+        mock_user_model.user_id = "user123"
+        mock_user_model.is_active = False
+
+        with patch("app.services.user_management.User", return_value=mock_user_model):
+            service = UserManagementService(mock_db)
+
+            user = service.create_user("testuser", "test@example.com", "SecurePass123!")
+
+            assert user.is_active is False  # Not activated without SMTP
+
+
+class TestCreateDefaultUser:
+    """Tests for create_default_user method."""
+
+    def test_create_default_user_success(self, mock_db, mock_auth_manager, mock_user_model):
+        """Test successful default user creation."""
+        mock_db.add.return_value = None
+        mock_user_model.user_id = "user123"
+        mock_user_model.username = "admin"
+        mock_user_model.email = "admin@example.com"
+        mock_user_model.roles = ["user"]
+        mock_user_model.is_active = True
+        mock_user_model.email_verification_token = None
+
+        service = UserManagementService(mock_db)
+
+        # Patch User class to return our mock_user_model
+        with patch("app.services.user_management.User", return_value=mock_user_model):
+            user = service.create_default_user("admin", "admin@example.com", "SecurePass123!")
+
+            assert user.user_id == "user123"
+            assert user.username == "admin"
+            assert user.is_active is True  # Pre-activated
+            assert user.email_verification_token is None
+
+    def test_create_default_user_duplicate(self, mock_db, mock_auth_manager):
+        """Test default user creation with duplicate."""
+        mock_db.add.side_effect = IntegrityError("INSERT", {}, Exception("Duplicate"))
+
+        service = UserManagementService(mock_db)
+
+        with pytest.raises(ValidationError) as exc_info:
+            service.create_default_user("admin", "admin@example.com", "SecurePass123!")
+
+        assert "already exists" in str(exc_info.value)
+        mock_db.rollback.assert_called_once()
+
+    def test_create_default_user_error(self, mock_db, mock_auth_manager):
+        """Test default user creation with error."""
+        mock_db.add.side_effect = Exception("Database error")
+
+        service = UserManagementService(mock_db)
+
+        with pytest.raises(Exception) as exc_info:
+            service.create_default_user("admin", "admin@example.com", "SecurePass123!")
+
+        assert "Database error" in str(exc_info)
+        mock_db.rollback.assert_called_once()
+
+
+class TestListUsers:
+    """Tests for list_users method."""
+
+    def test_list_users_all(self, mock_db, mock_auth_manager, mock_user_model):
+        """Test listing all users."""
+        mock_query = MagicMock()
+        mock_query.filter.return_value = mock_query
+        mock_query.offset.return_value = mock_query
+        mock_query.limit.return_value = mock_query
+        mock_query.all.return_value = [mock_user_model]
+        mock_db.query.return_value = mock_query
+
+        service = UserManagementService(mock_db)
+
+        users = service.list_users(skip=0, limit=10, active_only=False)
+
+        assert len(users) == 1
+        assert users[0].user_id == "user123"
+
+    def test_list_users_active_only(self, mock_db, mock_auth_manager, mock_user_model):
+        """Test listing active users only."""
+        mock_query = MagicMock()
+        mock_query.filter.return_value = mock_query
+        mock_query.offset.return_value = mock_query
+        mock_query.limit.return_value = mock_query
+        mock_query.all.return_value = [mock_user_model]
+        mock_db.query.return_value = mock_query
+
+        service = UserManagementService(mock_db)
+
+        users = service.list_users(skip=0, limit=10, active_only=True)
+
+        assert len(users) == 1
+
+    def test_list_users_pagination(self, mock_db, mock_auth_manager, mock_user_model):
+        """Test user listing with pagination."""
+        mock_query = MagicMock()
+        mock_query.filter.return_value = mock_query
+        mock_query.offset.return_value = mock_query
+        mock_query.limit.return_value = mock_query
+        mock_query.all.return_value = [mock_user_model]
+        mock_db.query.return_value = mock_query
+
+        service = UserManagementService(mock_db)
+
+        users = service.list_users(skip=10, limit=10, active_only=True)
+
+        mock_query.offset.assert_called_once_with(10)
+        mock_query.limit.assert_called_once_with(10)
+
+
+class TestGetUser:
+    """Tests for get_user method."""
+
+    def test_get_user_success(self, mock_db, mock_auth_manager, mock_user_model):
+        """Test successful user retrieval."""
+        mock_db.query.return_value.filter.return_value.filter.return_value.first.return_value = (
+            mock_user_model
+        )
+
+        service = UserManagementService(mock_db)
+
+        user = service.get_user("user123")
+
+        assert user.user_id == "user123"
+
+    def test_get_user_not_found(self, mock_db, mock_auth_manager):
+        """Test get_user when user not found."""
+        mock_db.query.return_value.filter.return_value.filter.return_value.first.return_value = None
+
+        service = UserManagementService(mock_db)
+
+        with pytest.raises(UserNotFoundError) as exc_info:
+            service.get_user("user123")
+
+        assert "not found" in str(exc_info.value).lower()
+
+    def test_get_user_deleted(self, mock_db, mock_auth_manager, mock_user_model):
+        """Test get_user when user is deleted."""
+        # When a user is deleted, the query should return None because of the filter
+        mock_query = MagicMock()
+        mock_query.filter.return_value = mock_query
+        mock_query.first.return_value = None
+        mock_db.query.return_value = mock_query
+
+        service = UserManagementService(mock_db)
+
+        with pytest.raises(UserNotFoundError) as exc_info:
+            service.get_user("user123")
+
+        assert "not found" in str(exc_info.value).lower()
+
+
+class TestUpdateUser:
+    """Tests for update_user method."""
+
+    def test_update_user_email(self, mock_db, mock_auth_manager, mock_user_model):
+        """Test updating user email."""
+        mock_db.query.return_value.filter.return_value.filter.return_value.first.return_value = (
+            mock_user_model
+        )
+        mock_db.query.return_value.filter.return_value.filter.return_value.first.return_value = (
+            mock_user_model
+        )
+
+        service = UserManagementService(mock_db)
+
+        user = service.update_user("user123", email="newemail@example.com")
 
         assert user.email == "newemail@example.com"
-        assert user.name == "New Name"
+        mock_db.commit.assert_called_once()
 
-    def test_user_deletion(self, service):
-        """Test user deletion."""
-        user_id = "user123"
+    def test_update_user_password(self, mock_db, mock_auth_manager, mock_user_model):
+        """Test updating user password."""
+        mock_db.query.return_value.filter.return_value.filter.return_value.first.return_value = (
+            mock_user_model
+        )
+        mock_db.query.return_value.filter.return_value.filter.return_value.first.return_value = (
+            mock_user_model
+        )
 
-        result = service.delete_user(user_id)
+        service = UserManagementService(mock_db)
+
+        user = service.update_user("user123", password="NewSecure123!")
+
+        assert user.password_hash == "hashed_password"
+        mock_db.commit.assert_called_once()
+
+    def test_update_user_roles(self, mock_db, mock_auth_manager, mock_user_model):
+        """Test updating user roles."""
+        mock_db.query.return_value.filter.return_value.filter.return_value.first.return_value = (
+            mock_user_model
+        )
+        mock_db.query.return_value.filter.return_value.filter.return_value.first.return_value = (
+            mock_user_model
+        )
+
+        service = UserManagementService(mock_db)
+
+        user = service.update_user("user123", roles=["admin"])
+
+        assert user.roles == ["admin"]
+        mock_db.commit.assert_called_once()
+
+    def test_update_user_is_active(self, mock_db, mock_auth_manager, mock_user_model):
+        """Test updating user active status."""
+        mock_db.query.return_value.filter.return_value.filter.return_value.first.return_value = (
+            mock_user_model
+        )
+        mock_db.query.return_value.filter.return_value.filter.return_value.first.return_value = (
+            mock_user_model
+        )
+
+        service = UserManagementService(mock_db)
+
+        user = service.update_user("user123", is_active=False)
+
+        assert user.is_active is False
+        mock_db.commit.assert_called_once()
+
+    def test_update_user_not_found(self, mock_db, mock_auth_manager):
+        """Test update_user when user not found."""
+        mock_db.query.return_value.filter.return_value.filter.return_value.first.return_value = None
+
+        service = UserManagementService(mock_db)
+
+        with pytest.raises(UserNotFoundError) as exc_info:
+            service.update_user("user123", email="newemail@example.com")
+
+        assert "not found" in str(exc_info.value).lower()
+
+    def test_update_user_duplicate_email(self, mock_db, mock_auth_manager, mock_user_model):
+        """Test update_user with duplicate email."""
+        mock_db.query.return_value.filter.return_value.filter.return_value.first.return_value = (
+            mock_user_model
+        )
+        mock_db.query.return_value.filter.return_value.filter.return_value.first.return_value = (
+            mock_user_model
+        )
+        mock_db.commit.side_effect = IntegrityError("UPDATE", {}, Exception("Duplicate"))
+
+        service = UserManagementService(mock_db)
+
+        with pytest.raises(ValidationError) as exc_info:
+            service.update_user("user123", email="existing@example.com")
+
+        assert "already exists" in str(exc_info.value)
+        mock_db.rollback.assert_called_once()
+
+    def test_update_user_db_error(self, mock_db, mock_auth_manager, mock_user_model):
+        """Test update_user with database error."""
+        mock_db.query.return_value.filter.return_value.filter.return_value.first.return_value = (
+            mock_user_model
+        )
+        mock_db.commit.side_effect = Exception("Database error")
+
+        service = UserManagementService(mock_db)
+
+        with pytest.raises(Exception) as exc_info:
+            service.update_user("user123", email="newemail@example.com")
+
+        assert "Database error" in str(exc_info)
+        mock_db.rollback.assert_called_once()
+
+
+class TestRequestPasswordReset:
+    """Tests for request_password_reset method."""
+
+    def test_request_password_reset_success(self, mock_db, mock_auth_manager, mock_user_model):
+        """Test successful password reset request."""
+        mock_db.query.return_value.filter.return_value.filter.return_value.first.return_value = (
+            mock_user_model
+        )
+
+        service = UserManagementService(mock_db)
+
+        service.request_password_reset("test@example.com")
+
+        assert mock_user_model.password_reset_token is not None
+        assert mock_user_model.password_reset_expires_at is not None
+        mock_db.commit.assert_called_once()
+
+    def test_request_password_reset_not_found(self, mock_db, mock_auth_manager):
+        """Test password reset request when user not found."""
+        mock_db.query.return_value.filter.return_value.filter.return_value.first.return_value = None
+
+        service = UserManagementService(mock_db)
+
+        with pytest.raises(UserNotFoundError) as exc_info:
+            service.request_password_reset("notfound@example.com")
+
+        assert "not found" in str(exc_info.value).lower()
+
+    @patch("app.services.user_management.settings")
+    def test_request_password_reset_send_email(
+        self, mock_settings, mock_db, mock_auth_manager, mock_user_model
+    ):
+        """Test password reset request sends email."""
+        mock_settings.smtp_server = "smtp.example.com"
+        mock_settings.smtp_from_email = "noreply@example.com"
+        mock_settings.base_url = "https://example.com"
+        mock_db.query.return_value.filter.return_value.filter.return_value.first.return_value = (
+            mock_user_model
+        )
+
+        service = UserManagementService(mock_db)
+
+        with patch.object(service, "_send_password_reset_email") as mock_send:
+            service.request_password_reset("test@example.com")
+            mock_send.assert_called_once()
+
+    def test_request_password_reset_error(self, mock_db, mock_auth_manager, mock_user_model):
+        """Test password reset request with error."""
+        mock_db.query.return_value.filter.return_value.filter.return_value.first.return_value = (
+            mock_user_model
+        )
+        mock_db.commit.side_effect = Exception("Database error")
+
+        service = UserManagementService(mock_db)
+
+        with pytest.raises(Exception) as exc_info:
+            service.request_password_reset("test@example.com")
+
+        assert "Database error" in str(exc_info)
+        mock_db.rollback.assert_called_once()
+
+
+class TestConfirmPasswordReset:
+    """Tests for confirm_password_reset method."""
+
+    def test_confirm_password_reset_success(self, mock_db, mock_auth_manager, mock_user_model):
+        """Test successful password reset confirmation."""
+        mock_user_model.password_reset_token = "hashed_token"
+        mock_user_model.password_reset_expires_at = datetime.now(timezone.utc) + timedelta(hours=1)
+        mock_db.query.return_value.filter.return_value.filter.return_value.filter.return_value.first.return_value = (
+            mock_user_model
+        )
+
+        service = UserManagementService(mock_db)
+
+        service.confirm_password_reset("valid_token", "NewSecure123!")
+
+        assert mock_user_model.password_hash == "hashed_password"
+        assert mock_user_model.password_reset_token is None
+        mock_db.commit.assert_called_once()
+
+    def test_confirm_password_reset_invalid_token(self, mock_db, mock_auth_manager):
+        """Test password reset confirmation with invalid token."""
+        mock_db.query.return_value.filter.return_value.filter.return_value.filter.return_value.first.return_value = (
+            None
+        )
+
+        service = UserManagementService(mock_db)
+
+        with pytest.raises(ValidationError) as exc_info:
+            service.confirm_password_reset("invalid_token", "NewSecure123!")
+
+        assert "Invalid or expired" in str(exc_info.value)
+
+    def test_confirm_password_reset_expired_token(
+        self, mock_db, mock_auth_manager, mock_user_model
+    ):
+        """Test password reset confirmation with expired token."""
+        mock_user_model.password_reset_token = "hashed_token"
+        mock_user_model.password_reset_expires_at = datetime.now(timezone.utc) - timedelta(hours=1)
+        mock_db.query.return_value.filter.return_value.filter.return_value.filter.return_value.first.return_value = (
+            None
+        )
+
+        service = UserManagementService(mock_db)
+
+        with pytest.raises(ValidationError) as exc_info:
+            service.confirm_password_reset("expired_token", "NewSecure123!")
+
+        assert "Invalid or expired" in str(exc_info.value)
+
+    def test_confirm_password_reset_invalid_password(
+        self, mock_db, mock_auth_manager, mock_user_model
+    ):
+        """Test password reset confirmation with invalid password."""
+        mock_db.query.return_value.filter.return_value.filter.return_value.filter.return_value.first.return_value = (
+            mock_user_model
+        )
+
+        service = UserManagementService(mock_db)
+
+        with pytest.raises(ValidationError) as exc_info:
+            service.confirm_password_reset("valid_token", "short")
+
+        assert "Password must be" in str(exc_info.value)
+
+    def test_confirm_password_reset_error(self, mock_db, mock_auth_manager, mock_user_model):
+        """Test password reset confirmation with error."""
+        mock_user_model.password_reset_token = "hashed_token"
+        mock_user_model.password_reset_expires_at = datetime.now(timezone.utc) + timedelta(hours=1)
+        mock_db.query.return_value.filter.return_value.filter.return_value.filter.return_value.first.return_value = (
+            mock_user_model
+        )
+        mock_db.commit.side_effect = Exception("Database error")
+
+        service = UserManagementService(mock_db)
+
+        with pytest.raises(Exception) as exc_info:
+            service.confirm_password_reset("valid_token", "NewSecure123!")
+
+        assert "Database error" in str(exc_info)
+        mock_db.rollback.assert_called_once()
+
+
+class TestResetPassword:
+    """Tests for reset_password method."""
+
+    def test_reset_password_with_new_password(self, mock_db, mock_auth_manager, mock_user_model):
+        """Test reset password with new password."""
+        mock_db.query.return_value.filter.return_value.filter.return_value.first.return_value = (
+            mock_user_model
+        )
+
+        service = UserManagementService(mock_db)
+
+        result = service.reset_password("user123", "NewSecure123!")
+
+        assert result == "Password reset successfully"
+        assert mock_user_model.password_hash == "hashed_password"
+        mock_db.commit.assert_called_once()
+
+    @patch("app.services.user_management.settings")
+    def test_reset_password_send_token(
+        self, mock_settings, mock_db, mock_auth_manager, mock_user_model
+    ):
+        """Test reset password sends token when no password provided."""
+        mock_settings.smtp_server = "smtp.example.com"
+        mock_settings.smtp_from_email = "noreply@example.com"
+        mock_settings.base_url = "https://example.com"
+        mock_db.query.return_value.filter.return_value.filter.return_value.first.return_value = (
+            mock_user_model
+        )
+
+        service = UserManagementService(mock_db)
+        with patch.object(service, "_send_password_reset_email") as mock_send:
+            result = service.reset_password("user123")
+
+            assert "reset initiated" in result.lower()
+            mock_send.assert_called_once()
+
+    def test_reset_password_not_found(self, mock_db, mock_auth_manager):
+        """Test reset password when user not found."""
+        mock_db.query.return_value.filter.return_value.filter.return_value.first.return_value = None
+
+        service = UserManagementService(mock_db)
+
+        with pytest.raises(UserNotFoundError) as exc_info:
+            service.reset_password("user123", "NewSecure123!")
+
+        assert "not found" in str(exc_info.value).lower()
+
+    def test_reset_password_error(self, mock_db, mock_auth_manager, mock_user_model):
+        """Test reset password with error."""
+        mock_db.query.return_value.filter.return_value.filter.return_value.first.return_value = (
+            mock_user_model
+        )
+        mock_db.commit.side_effect = Exception("Database error")
+
+        service = UserManagementService(mock_db)
+
+        with pytest.raises(Exception) as exc_info:
+            service.reset_password("user123", "NewSecure123!")
+
+        assert "Database error" in str(exc_info)
+        mock_db.rollback.assert_called_once()
+
+
+class TestSendPasswordResetEmail:
+    """Tests for _send_password_reset_email method."""
+
+    @patch("app.services.user_management.settings")
+    def test_send_password_reset_email_no_smtp(self, mock_settings, mock_db, mock_auth_manager):
+        """Test send password reset email when SMTP not configured."""
+        mock_settings.smtp_server = None
+
+        service = UserManagementService(mock_db)
+
+        service._send_password_reset_email("test@example.com", "reset_token")
+
+        # Should not raise, just log warning
+
+    @patch("app.services.user_management.settings")
+    @patch("smtplib.SMTP")
+    @patch("ssl.create_default_context")
+    def test_send_password_reset_email_success(
+        self, mock_ssl, mock_smtp, mock_settings, mock_db, mock_auth_manager
+    ):
+        """Test successful password reset email sending."""
+        mock_settings.smtp_server = "smtp.example.com"
+        mock_settings.smtp_port = 587
+        mock_settings.smtp_from_email = "noreply@example.com"
+        mock_settings.smtp_username = "user"
+        mock_settings.smtp_password = "pass"
+        mock_settings.base_url = "https://example.com"
+
+        mock_server = MagicMock()
+        mock_smtp.return_value = mock_server
+
+        service = UserManagementService(mock_db)
+
+        service._send_password_reset_email("test@example.com", "reset_token")
+
+        mock_server.starttls.assert_called_once()
+        mock_server.login.assert_called_once()
+        mock_server.sendmail.assert_called_once()
+        mock_server.quit.assert_called_once()
+
+    @patch("app.services.user_management.settings")
+    @patch("smtplib.SMTP")
+    @patch("ssl.create_default_context")
+    def test_send_password_reset_email_error(
+        self, mock_ssl, mock_smtp, mock_settings, mock_db, mock_auth_manager
+    ):
+        """Test password reset email sending with error."""
+        mock_settings.smtp_server = "smtp.example.com"
+        mock_settings.smtp_port = 587
+        mock_settings.smtp_from_email = "noreply@example.com"
+        mock_settings.smtp_username = "user"
+        mock_settings.smtp_password = "pass"
+        mock_settings.base_url = "https://example.com"
+
+        mock_server = MagicMock()
+        mock_smtp.return_value = mock_server
+        mock_server.sendmail.side_effect = Exception("SMTP error")
+
+        service = UserManagementService(mock_db)
+
+        service._send_password_reset_email("test@example.com", "reset_token")
+
+        # Should not raise, just log error
+
+
+class TestSendVerificationEmail:
+    """Tests for _send_verification_email method."""
+
+    @patch("app.services.user_management.settings")
+    def test_send_verification_email_no_smtp(self, mock_settings, mock_db, mock_auth_manager):
+        """Test send verification email when SMTP not configured."""
+        mock_settings.smtp_server = None
+
+        service = UserManagementService(mock_db)
+
+        service._send_verification_email("test@example.com", "verification_token")
+
+        # Should not raise, just log warning
+
+    @patch("app.services.user_management.settings")
+    @patch("smtplib.SMTP")
+    @patch("ssl.create_default_context")
+    def test_send_verification_email_success(
+        self, mock_ssl, mock_smtp, mock_settings, mock_db, mock_auth_manager
+    ):
+        """Test successful verification email sending."""
+        mock_settings.smtp_server = "smtp.example.com"
+        mock_settings.smtp_port = 587
+        mock_settings.smtp_from_email = "noreply@example.com"
+        mock_settings.base_url = "https://example.com"
+
+        mock_server = MagicMock()
+        mock_smtp.return_value = mock_server
+
+        service = UserManagementService(mock_db)
+
+        service._send_verification_email("test@example.com", "verification_token")
+
+        mock_server.starttls.assert_called_once()
+        mock_server.sendmail.assert_called_once()
+        mock_server.quit.assert_called_once()
+
+    @patch("app.services.user_management.settings")
+    @patch("smtplib.SMTP")
+    @patch("ssl.create_default_context")
+    def test_send_verification_email_error(
+        self, mock_ssl, mock_smtp, mock_settings, mock_db, mock_auth_manager
+    ):
+        """Test verification email sending with error."""
+        mock_settings.smtp_server = "smtp.example.com"
+        mock_settings.smtp_port = 587
+        mock_settings.smtp_from_email = "noreply@example.com"
+        mock_settings.base_url = "https://example.com"
+
+        mock_server = MagicMock()
+        mock_smtp.return_value = mock_server
+        mock_server.sendmail.side_effect = Exception("SMTP error")
+
+        service = UserManagementService(mock_db)
+
+        service._send_verification_email("test@example.com", "verification_token")
+
+        # Should not raise, just log error
+
+
+class TestDeleteUser:
+    """Tests for delete_user method."""
+
+    def test_delete_user_success(self, mock_db, mock_auth_manager, mock_user_model):
+        """Test successful user deletion."""
+        mock_db.query.return_value.filter.return_value.filter.return_value.first.return_value = (
+            mock_user_model
+        )
+
+        service = UserManagementService(mock_db)
+
+        result = service.delete_user("user123")
 
         assert result is True
-
-    def test_user_soft_delete(self, service):
-        """Test user soft delete."""
-        user_id = "user123"
-
-        result = service.soft_delete_user(user_id)
-
-        assert result is True
-
-    def test_user_search(self, service):
-        """Test user search functionality."""
-        query = "test"
-
-        users = service.search_users(query)
-
-        assert isinstance(users, list)
-
-    def test_user_filtering(self, service):
-        """Test user filtering."""
-        filters = {"role": "admin", "status": "active"}
-
-        users = service.filter_users(filters)
-
-        assert isinstance(users, list)
-
-    def test_permission_checks(self, service):
-        """Test permission checking."""
-        user_id = "user123"
-        permission = "session_read"
-
-        has_permission = service.check_permission(user_id, permission)
-
-        assert isinstance(has_permission, bool)
-
-    def test_bulk_operations(self, service):
-        """Test bulk user operations."""
-        user_ids = ["user1", "user2", "user3"]
-        operation = "activate"
-
-        results = service.bulk_user_operation(user_ids, operation)
-
-        assert len(results) == 3
-
-    def test_user_export(self, service):
-        """Test user export functionality."""
-        user_ids = ["user1", "user2", "user3"]
-
-        exported = service.export_users(user_ids)
-
-        assert exported is not None
-
-    def test_user_import(self, service):
-        """Test user import functionality."""
-        users_data = [
-            {"username": "user1", "email": "user1@example.com"},
-            {"username": "user2", "email": "user2@example.com"},
-        ]
-
-        imported = service.import_users(users_data)
-
-        assert len(imported) == 2
-
-    def test_password_reset(self, service):
-        """Test password reset."""
-        user_id = "user123"
-        new_password = "NewPassword123"
-
-        result = service.reset_password(user_id, new_password)
-
-        assert result is True
-
-    def test_email_verification(self, service):
-        """Test email verification."""
-        user_id = "user123"
-        token = "verification_token"
-
-        result = service.verify_email(user_id, token)
-
-        assert result is True
-
-    def test_role_assignment(self, service):
-        """Test role assignment."""
-        user_id = "user123"
-        roles = ["user", "admin"]
-
-        result = service.assign_roles(user_id, roles)
-
-        assert result is True
-
-    def test_role_removal(self, service):
-        """Test role removal."""
-        user_id = "user123"
-        roles = ["admin"]
-
-        result = service.remove_roles(user_id, roles)
-
-        assert result is True
-
-    def test_user_activity_tracking(self, service):
-        """Test user activity tracking."""
-        user_id = "user123"
-        activity = {"action": "login", "timestamp": "2024-01-01"}
-
-        service.track_user_activity(user_id, activity)
-
-        # Should not raise any errors
-
-    def test_user_session_management(self, service):
-        """Test user session management."""
-        user_id = "user123"
-
-        sessions = service.get_user_sessions(user_id)
-
-        assert isinstance(sessions, list)
-
-    def test_user_preferences(self, service):
-        """Test user preferences management."""
-        user_id = "user123"
-        preferences = {"theme": "dark", "language": "en"}
-
-        service.set_user_preferences(user_id, preferences)
-
-        # Should not raise any errors
-
-    def test_user_notifications(self, service):
-        """Test user notifications."""
-        user_id = "user123"
-        notification = {"message": "Test notification", "type": "info"}
-
-        service.send_notification(user_id, notification)
-
-        # Should not raise any errors
-
-    def test_user_analytics(self, service):
-        """Test user analytics."""
-        user_id = "user123"
-
-        analytics = service.get_user_analytics(user_id)
-
-        assert analytics is not None
-
-    def test_user_audit_log(self, service):
-        """Test user audit logging."""
-        user_id = "user123"
-        action = "profile_update"
-
-        service.log_user_action(user_id, action)
-
-        # Should not raise any errors
-
-    def test_user_compliance(self, service):
-        """Test user compliance checks."""
-        user_id = "user123"
-
-        is_compliant = service.check_user_compliance(user_id)
-
-        assert isinstance(is_compliant, bool)
-
-    def test_user_deactivation(self, service):
-        """Test user deactivation."""
-        user_id = "user123"
-
-        result = service.deactivate_user(user_id)
-
-        assert result is True
-
-    def test_user_reactivation(self, service):
-        """Test user reactivation."""
-        user_id = "user123"
-
-        result = service.reactivate_user(user_id)
-
-        assert result is True
-
-    def test_user_merge(self, service):
-        """Test user account merging."""
-        primary_user = "user123"
-        secondary_user = "user456"
-
-        result = service.merge_users(primary_user, secondary_user)
-
-        assert result is True
-
-    def test_user_duplicate_detection(self, service):
-        """Test duplicate user detection."""
-        email = "test@example.com"
-
-        is_duplicate = service.check_duplicate_user(email)
-
-        assert isinstance(is_duplicate, bool)
-
-    def test_user_validation(self, service):
-        """Test user data validation."""
-        user_data = {
-            "username": "testuser",
-            "email": "test@example.com",
-            "password": "SecurePassword123",
-        }
-
-        is_valid = service.validate_user_data(user_data)
-
-        assert is_valid is True
-
-    def test_user_sanitization(self, service):
-        """Test user data sanitization."""
-        user_data = {"username": "test<script>", "email": "test@example.com"}
-
-        sanitized = service.sanitize_user_data(user_data)
-
-        assert "<script>" not in sanitized["username"]
-
-    def test_user_encryption(self, service):
-        """Test user data encryption."""
-        data = "sensitive_data"
-
-        encrypted = service.encrypt_user_data(data)
-
-        assert encrypted != data
-
-    def test_user_decryption(self, service):
-        """Test user data decryption."""
-        encrypted_data = "encrypted_data"
-
-        decrypted = service.decrypt_user_data(encrypted_data)
-
-        assert decrypted is not None
-
-    def test_user_backup(self, service):
-        """Test user data backup."""
-        user_id = "user123"
-
-        backup = service.backup_user_data(user_id)
-
-        assert backup is not None
-
-    def test_user_restore(self, service):
-        """Test user data restore."""
-        user_id = "user123"
-        backup_data = {"username": "testuser", "email": "test@example.com"}
-
-        restored = service.restore_user_data(user_id, backup_data)
-
-        assert restored is True
-
-    def test_user_migration(self, service):
-        """Test user data migration."""
-        old_data = {"username": "testuser"}
-        new_schema = {"username": str, "email": str}
-
-        migrated = service.migrate_user_data(old_data, new_schema)
-
-        assert migrated is not None
-
-    def test_user_synchronization(self, service):
-        """Test user data synchronization."""
-        user_id = "user123"
-        source = "external_system"
-
-        synced = service.synchronize_user_data(user_id, source)
-
-        assert synced is True
-
-    def test_user_cache_invalidation(self, service):
-        """Test user cache invalidation."""
-        user_id = "user123"
-
-        service.invalidate_user_cache(user_id)
-
-        # Should not raise any errors
-
-    def test_user_rate_limiting(self, service):
-        """Test user rate limiting."""
-        user_id = "user123"
-        action = "profile_update"
-
-        is_allowed = service.check_user_rate_limit(user_id, action)
-
-        assert isinstance(is_allowed, bool)
-
-    def test_user_throttling(self, service):
-        """Test user throttling."""
-        user_id = "user123"
-
-        delay = service.get_throttle_delay(user_id)
-
-        assert delay >= 0
-
-    def test_user_blacklisting(self, service):
-        """Test user blacklisting."""
-        user_id = "user123"
-
-        is_blacklisted = service.check_user_blacklist(user_id)
-
-        assert isinstance(is_blacklisted, bool)
-
-    def test_user_whitelisting(self, service):
-        """Test user whitelisting."""
-        user_id = "user123"
-
-        is_whitelisted = service.check_user_whitelist(user_id)
-
-        assert isinstance(is_whitelisted, bool)
-
-    def test_user_2fa(self, service):
-        """Test two-factor authentication."""
-        user_id = "user123"
-        code = "123456"
-
-        is_valid = service.verify_2fa_code(user_id, code)
-
-        assert isinstance(is_valid, bool)
-
-    def test_user_password_history(self, service):
-        """Test password history."""
-        user_id = "user123"
-        passwords = ["password1", "password2", "password3"]
-
-        service.update_password_history(user_id, passwords)
-
-        # Should not raise any errors
-
-    def test_user_password_policy(self, service):
-        """Test password policy enforcement."""
-        password = "SecurePassword123"
-
-        meets_policy = service.check_password_policy(password)
-
-        assert meets_policy is True
-
-    def test_user_account_recovery(self, service):
-        """Test account recovery."""
-        email = "test@example.com"
-
-        recovery = service.initiate_account_recovery(email)
-
-        assert recovery is not None
-
-    def test_user_account_lock(self, service):
-        """Test account locking."""
-        user_id = "user123"
-
-        service.lock_account(user_id)
-
-        # Should not raise any errors
-
-    def test_user_account_unlock(self, service):
-        """Test account unlocking."""
-        user_id = "user123"
-
-        service.unlock_account(user_id)
-
-        # Should not raise any errors
-
-    def test_user_data_retention(self, service):
-        """Test data retention policy."""
-        user_id = "user123"
-        policy = "30_days"
-
-        service.apply_retention_policy(user_id, policy)
-
-        # Should not raise any errors
-
-    def test_user_data_purge(self, service):
-        """Test data purging."""
-        user_id = "user123"
-
-        service.purge_user_data(user_id)
-
-        # Should not raise any errors
-
-    def test_user_anonymization(self, service):
-        """Test user data anonymization."""
-        user_id = "user123"
-
-        anonymized = service.anonymize_user_data(user_id)
-
-        assert anonymized is True
-
-    def test_user_export_compliance(self, service):
-        """Test export compliance (GDPR)."""
-        user_id = "user123"
-
-        export = service.generate_compliant_export(user_id)
-
-        assert export is not None
-
-    def test_user_import_compliance(self, service):
-        """Test import compliance."""
-        import_data = [{"username": "user1", "email": "user1@example.com"}]
-
-        imported = service.import_with_compliance(import_data)
-
-        assert imported is not None
-
-    def test_user_consent_management(self, service):
-        """Test consent management."""
-        user_id = "user123"
-        consent_type = "data_processing"
-
-        consent = service.get_user_consent(user_id, consent_type)
-
-        assert isinstance(consent, bool)
-
-    def test_user_right_to_be_forgotten(self, service):
-        """Test right to be forgotten (GDPR)."""
-        user_id = "user123"
-
-        result = service.process_right_to_be_forgotten(user_id)
-
-        assert result is True
-
-    def test_user_data_portability(self, service):
-        """Test data portability."""
-        user_id = "user123"
-
-        portable_data = service.generate_portable_data(user_id)
-
-        assert portable_data is not None
-
-    def test_user_access_logs(self, service):
-        """Test access logs."""
-        user_id = "user123"
-
-        logs = service.get_access_logs(user_id)
-
-        assert isinstance(logs, list)
-
-    def test_user_security_audit(self, service):
-        """Test security audit."""
-        user_id = "user123"
-
-        audit = service.perform_security_audit(user_id)
-
-        assert audit is not None
-
-    def test_user_compliance_report(self, service):
-        """Test compliance report generation."""
-        user_id = "user123"
-
-        report = service.generate_compliance_report(user_id)
-
-        assert report is not None
+        assert mock_user_model.is_deleted is True
+        mock_db.commit.assert_called_once()
+
+    def test_delete_user_not_found(self, mock_db, mock_auth_manager):
+        """Test delete user when user not found."""
+        mock_db.query.return_value.filter.return_value.filter.return_value.first.return_value = None
+
+        service = UserManagementService(mock_db)
+
+        with pytest.raises(UserNotFoundError) as exc_info:
+            service.delete_user("user123")
+
+        assert "not found" in str(exc_info.value).lower()
+
+    def test_delete_user_error(self, mock_db, mock_auth_manager, mock_user_model):
+        """Test delete user with error."""
+        mock_db.query.return_value.filter.return_value.filter.return_value.first.return_value = (
+            mock_user_model
+        )
+        mock_db.commit.side_effect = Exception("Database error")
+
+        service = UserManagementService(mock_db)
+
+        with pytest.raises(Exception) as exc_info:
+            service.delete_user("user123")
+
+        assert "Database error" in str(exc_info)
+        mock_db.rollback.assert_called_once()
+
+
+class TestGetUserStats:
+    """Tests for get_user_stats method."""
+
+    def test_get_user_stats(self, mock_db, mock_user_model):
+        """Test getting user statistics."""
+        # Setup mocks for multiple queries
+        mock_queries = []
+        for _ in range(5):
+            mq = MagicMock()
+            mq.filter.return_value = mq
+            mock_queries.append(mq)
+
+        # 1. total_users count
+        mock_queries[0].count.return_value = 5
+        # 2. active_users count
+        mock_queries[1].count.return_value = 3
+        # 3. users for role counts
+        mock_queries[2].all.return_value = [mock_user_model]
+        # 4. total_sessions count
+        mock_queries[3].count.return_value = 10
+        # 5. active_sessions count
+        mock_queries[4].count.return_value = 5
+
+        mock_db.query.side_effect = mock_queries
+
+        service = UserManagementService(mock_db)
+        stats = service.get_user_stats()
+
+        assert stats["total_users"] == 5
+        assert stats["active_users"] == 3
+        assert stats["inactive_users"] == 2
+        assert "role_counts" in stats
+        assert stats["total_sessions"] == 10
+        assert stats["active_sessions"] == 5
+
+    def test_get_user_stats_empty(self, mock_db):
+        """Test getting user stats when no users."""
+        mock_query = MagicMock()
+        mock_query.filter.return_value = mock_query
+        mock_query.count.return_value = 0
+        mock_query.all.return_value = []
+        mock_db.query.return_value = mock_query
+
+        service = UserManagementService(mock_db)
+        stats = service.get_user_stats()
+
+        assert stats["total_users"] == 0
+        assert stats["active_users"] == 0
+        assert stats["inactive_users"] == 0
+        assert stats["role_counts"] == {}
+
+
+class TestGetUserManagementService:
+    """Tests for get_user_management_service function."""
+
+    def test_get_user_management_service(self, mock_db):
+        """Test getting user management service instance."""
+        from app.services.user_management import get_user_management_service
+
+        service = get_user_management_service(mock_db)
+
+        assert isinstance(service, UserManagementService)
+        assert service.db == mock_db

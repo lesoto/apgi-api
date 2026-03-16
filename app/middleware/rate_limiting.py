@@ -13,7 +13,6 @@ from fastapi import Request
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.responses import JSONResponse
 
-from app.config import settings
 from typing import Optional
 
 from app.middleware.logging import StructuredLogger

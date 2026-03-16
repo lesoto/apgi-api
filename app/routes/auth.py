@@ -209,6 +209,15 @@ async def logout(
     """
     auth_manager = AuthManager(db)
 
+    # Verify token belongs to user before revoking
+    try:
+        payload = await auth_manager.verify_token(request.refresh_token, expected_type="refresh")
+        if payload.user_id != current_user.user_id:
+            raise InvalidTokenError("Token does not belong to current user")
+    except Exception:
+        # Ignore verification errors on logout, just don't revoke
+        return None
+
     # Revoke the refresh token
     await auth_manager.revoke_refresh_token(request.refresh_token)
 

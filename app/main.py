@@ -33,7 +33,6 @@ from app.middleware.api_versioning import APIVersioningMiddleware
 from app.middleware.authentication import AuthenticationMiddleware
 from app.middleware.cors_config import configure_cors
 from app.middleware.csrf import CSRFMiddleware
-from app.middleware.deprecation import DeprecationMiddleware
 from app.middleware.metrics import PrometheusMetricsMiddleware
 from app.middleware.request_size_limit import RequestSizeLimitMiddleware
 from app.middleware.schema_validation import ResponseSchemaValidationMiddleware
@@ -225,9 +224,9 @@ All endpoints except `/health`, `/docs`, and `/openapi.json` require authenticat
 - JSON is the primary data exchange format
 - Binary data (exports) uses appropriate MIME types
 """,
-        docs_url="/docs" if settings.environment == "development" else None,
-        redoc_url="/redoc" if settings.environment == "development" else None,
-        openapi_url="/openapi.json" if settings.environment == "development" else None,
+        docs_url="/docs" if settings.environment in ["development", "staging"] else None,
+        redoc_url="/redoc" if settings.environment in ["development", "staging"] else None,
+        openapi_url="/openapi.json" if settings.environment in ["development", "staging"] else None,
         lifespan=lifespan,
     )
 
@@ -288,9 +287,6 @@ All endpoints except `/health`, `/docs`, and `/openapi.json` require authenticat
     # Add security input validation middleware - skip in test mode
     if not test_mode:
         app.add_middleware(SecurityValidationMiddleware, enabled=True)
-
-    # Add deprecation middleware
-    app.add_middleware(DeprecationMiddleware, deprecated_endpoints={})
 
     # Add rate limiting middleware (will be enabled if Redis is available)
     app.add_middleware(

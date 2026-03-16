@@ -5,12 +5,13 @@ Handles user CRUD operations and user-related business logic.
 """
 
 import logging
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from typing import List, Optional
 
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
+from app.config import settings
 from app.database.models import Session as SessionModel, User
 from app.exceptions import UserNotFoundError, ValidationError
 from app.services.auth_manager import AuthManager
@@ -86,12 +87,9 @@ class UserManagementService:
 
         # Generate email verification token
         import secrets
-        from datetime import timedelta
 
         verification_token = secrets.token_urlsafe(32)
         verification_expires = datetime.now(timezone.utc) + timedelta(hours=24)
-
-        from app.config import settings
 
         smtp_available = bool(settings.smtp_server)
 
@@ -100,8 +98,10 @@ class UserManagementService:
             email=email,
             password_hash=hashed_password,
             roles=roles,
-            is_active=not smtp_available,  # Auto-activate if SMTP unavailable
-            email_verification_token=verification_token if smtp_available else None,
+            is_active=not settings.require_email_verification,  # Dependent on configuration, not SMTP
+            email_verification_token=verification_token
+            if settings.require_email_verification
+            else None,
             email_verification_expires_at=verification_expires if smtp_available else None,
         )
 
@@ -111,10 +111,14 @@ class UserManagementService:
             self.db.refresh(user)
 
             # Send verification email only if SMTP is configured
-            if smtp_available:
+            if smtp_available and settings.require_email_verification:
                 self._send_verification_email(user.email, verification_token)  # type: ignore[arg-type]
+            elif not settings.require_email_verification:
+                logger.warning(f"Email verification disabled - user {username} auto-activated")
             else:
-                logger.warning(f"SMTP not configured - user {username} auto-activated")
+                logger.warning(
+                    f"SMTP not configured but email verification is required. User {username} remains inactive."
+                )
 
             return user
         except IntegrityError:
@@ -281,7 +285,6 @@ class UserManagementService:
         # Generate reset token
         import secrets
         import hashlib
-        from datetime import timedelta
 
         reset_token = secrets.token_urlsafe(32)
         reset_token_hash = hashlib.sha256(reset_token.encode()).hexdigest()
@@ -364,7 +367,6 @@ class UserManagementService:
             email: User's email address
             reset_token: Password reset token
         """
-        from app.config import settings
         import smtplib
         from email.mime.text import MIMEText
         from email.mime.multipart import MIMEMultipart
@@ -404,6 +406,7 @@ APGI API Team
 
             # Send email
             import ssl as _ssl
+
             server = smtplib.SMTP(settings.smtp_server, settings.smtp_port)
             server.starttls(context=_ssl.create_default_context())
             if settings.smtp_username and settings.smtp_password:
@@ -436,12 +439,26 @@ APGI API Team
 
         user = self.get_user(user_id)
 
+        if new_password:
+            user.password_hash = self.auth_manager.hash_password(new_password)  # type: ignore[assignment]
+            user.updated_at = datetime.now(timezone.utc)  # type: ignore[assignment]
+            try:
+                self.auth_manager.revoke_all_user_tokens(str(user.user_id))
+            except Exception as e:
+                logger.error(f"Failed to revoke tokens for user {user.user_id}: {e}")
+            try:
+                self.db.commit()
+                return "Password reset successfully"
+            except Exception as e:
+                self.db.rollback()
+                logger.error(f"Failed to reset password for user {user_id}: {e}")
+                raise
+
         # Generate a secure reset token
         reset_token = secrets.token_urlsafe(32)
 
         # Store the hashed reset token with expiration (24 hours)
         import hashlib
-        from datetime import datetime, timedelta
 
         token_hash = hashlib.sha256(reset_token.encode()).hexdigest()
         setattr(user, "password_reset_token", token_hash)
@@ -452,74 +469,13 @@ APGI API Team
             self.db.commit()
 
             # Send password reset link via email
-            self._send_password_reset_link_email(str(user.email), reset_token)
+            self._send_password_reset_email(str(user.email), reset_token)
 
             return "Password reset initiated. Check your email for the reset link."
         except Exception as e:
             self.db.rollback()
             logger.error(f"Failed to reset password for user {user_id}: {e}")
             raise
-
-    def _send_password_reset_link_email(self, email: str, reset_token: str) -> None:
-        """
-        Send password reset email with reset link.
-
-        Args:
-            email: User's email address
-            reset_token: Password reset token
-        """
-        from app.config import settings
-        import smtplib
-        from email.mime.text import MIMEText
-        from email.mime.multipart import MIMEMultipart
-
-        if not settings.smtp_server:
-            logger.warning("SMTP server not configured, cannot send password reset email")
-            return
-
-        try:
-            # Create message
-            msg = MIMEMultipart()
-            msg["From"] = settings.smtp_from_email
-            msg["To"] = email
-            msg["Subject"] = "Reset Your APGI API Password"
-
-            # Email body with reset link
-            reset_url = f"{settings.base_url}/reset-password?token={reset_token}"
-            body = f"""
-Hello,
-
-A password reset has been initiated for your APGI API account.
-
-Please reset your password by clicking the link below:
-
-{reset_url}
-
-This link will expire in 24 hours.
-
-If you did not request this password reset, please contact support immediately.
-
-Best regards,
-APGI API Team
-            """
-
-            msg.attach(MIMEText(body, "plain"))
-
-            # Send email
-            import ssl as _ssl
-            server = smtplib.SMTP(settings.smtp_server, settings.smtp_port)
-            server.starttls(context=_ssl.create_default_context())
-            if settings.smtp_username and settings.smtp_password:
-                server.login(settings.smtp_username, settings.smtp_password)
-            server.sendmail(settings.smtp_from_email, email, msg.as_string())
-            server.quit()
-
-            logger.info(f"Password reset link email sent to {email}")
-
-        except Exception as e:
-            logger.error(f"Failed to send password reset link email to {email}: {e}")
-            # Don't raise exception to avoid breaking password reset
-            logger.warning(f"Password reset link email not delivered to {email}: SMTP error")
 
     def _send_verification_email(self, email: str, verification_token: str) -> None:
         """
@@ -529,7 +485,6 @@ APGI API Team
             email: User's email address
             verification_token: Verification token
         """
-        from app.config import settings
         import smtplib
         from email.mime.text import MIMEText
         from email.mime.multipart import MIMEMultipart
@@ -568,6 +523,7 @@ APGI API Team
 
             # Send email
             import ssl as _ssl
+
             server = smtplib.SMTP(settings.smtp_server, settings.smtp_port)
             server.starttls(context=_ssl.create_default_context())
             if settings.smtp_username and settings.smtp_password:
@@ -626,7 +582,7 @@ APGI API Team
         users = self.db.query(User).filter(User.is_deleted.is_(False)).all()
         role_counts: dict[tuple[str, ...], int] = {}
         for user in users:
-            roles_list = list(user.roles or [])  # type: ignore[arg-type]
+            roles_list = list(getattr(user, "roles", []) or [])
             roles_tuple = tuple(sorted(roles_list))
             role_counts[roles_tuple] = role_counts.get(roles_tuple, 0) + 1
         role_counts_str: dict[str, int] = {str(k): v for k, v in role_counts.items()}

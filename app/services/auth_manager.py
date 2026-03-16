@@ -19,60 +19,9 @@ from sqlalchemy.orm import Session
 from app.config import settings
 from app.database.models import RefreshToken, User
 from app.exceptions import AuthenticationError, ExpiredTokenError, InvalidTokenError
+from app.models.schemas import TokenPayload
 
 logger = logging.getLogger(__name__)
-
-
-class TokenPayload:
-    """JWT token payload data."""
-
-    def __init__(
-        self,
-        user_id: str,
-        username: str,
-        roles: List[str],
-        exp: datetime,
-        token_type: str = "access",
-        jti: Optional[str] = None,
-        permissions: Optional[List[str]] = None,
-    ):
-        self.user_id = user_id
-        self.username = username
-        self.roles = roles
-        self.exp = exp
-        self.token_type = token_type
-        self.jti = jti
-        self.permissions = permissions
-
-    def to_dict(self) -> Dict[str, Any]:
-        """Convert to dictionary for JWT encoding."""
-        data = {
-            "user_id": self.user_id,
-            "username": self.username,
-            "roles": self.roles,
-            "exp": int(self.exp.timestamp()),
-            "token_type": self.token_type,
-        }
-        if self.jti:
-            data["jti"] = self.jti
-        if self.permissions:
-            data["permissions"] = self.permissions
-        return data
-
-    @classmethod
-    def from_dict(cls, data: Dict[str, Any]) -> "TokenPayload":
-        """Create from dictionary after JWT decoding."""
-        from datetime import timezone
-
-        return cls(
-            user_id=data["user_id"],
-            username=data["username"],
-            roles=data["roles"],
-            exp=datetime.fromtimestamp(data["exp"], tz=timezone.utc),
-            token_type=data.get("token_type", "access"),
-            jti=data.get("jti"),
-            permissions=data.get("permissions"),
-        )
 
 
 class AuthManager:
@@ -383,7 +332,7 @@ class AuthManager:
 
         # Check if account is active (email verified)
         if not user.is_active:
-            raise AuthenticationError("Account is not activated. Please verify your email first.")
+            raise AuthenticationError("Account is pending activation")
 
         # Verify password
         if not self.verify_password(password, user.password_hash):  # type: ignore[arg-type]
@@ -465,11 +414,17 @@ class AuthManager:
         from datetime import timezone
 
         token_hash = self.hash_password(refresh_token)
+        import hashlib
+
+        token_sha256 = hashlib.sha256(refresh_token.encode("utf-8")).hexdigest()
         expires_at = datetime.now(timezone.utc) + timedelta(days=refresh_expire_days)
 
         try:
             db_refresh_token = RefreshToken(
-                user_id=user.user_id, token_hash=token_hash, expires_at=expires_at
+                user_id=user.user_id,
+                token_hash=token_hash,
+                token_sha256=token_sha256,
+                expires_at=expires_at,
             )
             self.db.add(db_refresh_token)
             self.db.commit()
@@ -522,24 +477,23 @@ class AuthManager:
         # Verify refresh token
         payload = await self.verify_token(refresh_token, expected_type="refresh")
 
-        # Look up all non-revoked tokens for this user (to prevent timing attacks)
-        db_tokens = (
+        import hashlib
+
+        sha = hashlib.sha256(refresh_token.encode("utf-8")).hexdigest()
+        db_token = (
             self.db.query(RefreshToken)
             .filter(
                 and_(
                     RefreshToken.user_id == payload.user_id,
                     RefreshToken.revoked.is_(False),
+                    RefreshToken.token_sha256 == sha,
                 )
             )
-            .all()
+            .first()
         )
 
-        # Find the specific token by bcrypt check
-        db_token = None
-        for candidate_token in db_tokens:
-            if self.verify_password(refresh_token, candidate_token.token_hash):  # type: ignore[arg-type]
-                db_token = candidate_token
-                break
+        if db_token and not self.verify_password(refresh_token, db_token.token_hash):
+            db_token = None
 
         if not db_token:
             raise AuthenticationError("Invalid or revoked refresh token")
@@ -562,11 +516,17 @@ class AuthManager:
 
         # Store new refresh token in database
         token_hash = self.hash_password(new_refresh_token)
+        import hashlib
+
+        token_sha256 = hashlib.sha256(new_refresh_token.encode("utf-8")).hexdigest()
         expires_at = datetime.now(timezone.utc) + timedelta(days=self.refresh_token_expire_days)
 
         try:
             new_db_refresh_token = RefreshToken(
-                user_id=payload.user_id, token_hash=token_hash, expires_at=expires_at
+                user_id=payload.user_id,
+                token_hash=token_hash,
+                token_sha256=token_sha256,
+                expires_at=expires_at,
             )
             self.db.add(new_db_refresh_token)
 
@@ -606,24 +566,23 @@ class AuthManager:
             # Verify token to get user_id
             payload = await self.verify_token(refresh_token, expected_type="refresh")
 
-            # Look up all non-revoked tokens for this user (to prevent timing attacks)
-            db_tokens = (
+            import hashlib
+
+            sha = hashlib.sha256(refresh_token.encode("utf-8")).hexdigest()
+            db_token = (
                 self.db.query(RefreshToken)
                 .filter(
                     and_(
                         RefreshToken.user_id == payload.user_id,
                         RefreshToken.revoked.is_(False),
+                        RefreshToken.token_sha256 == sha,
                     )
                 )
-                .all()
+                .first()
             )
 
-            # Find the specific token by bcrypt check
-            db_token = None
-            for candidate_token in db_tokens:
-                if self.verify_password(refresh_token, candidate_token.token_hash):  # type: ignore[arg-type]
-                    db_token = candidate_token
-                    break
+            if db_token and not self.verify_password(refresh_token, db_token.token_hash):
+                db_token = None
 
             try:
                 if db_token:

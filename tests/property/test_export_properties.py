@@ -7,7 +7,7 @@ and content-type headers.
 """
 
 import json
-from typing import cast
+from typing import cast, Dict, Optional, Any
 from hypothesis import given, strategies as st, assume, settings
 from unittest.mock import Mock, AsyncMock
 import sys
@@ -32,7 +32,7 @@ def create_export_endpoint():
     app = FastAPI()
 
     # Global mock service that tests can override
-    mock_service_holder = {"service": None}
+    mock_service_holder: Dict[str, Optional[Any]] = {"service": None}
 
     def get_data_export_service():
         if mock_service_holder["service"] is None:
@@ -120,7 +120,7 @@ def test_property_19_export_authorization_different_user(
         raise ValueError(f"Session {session_id} not found or access denied")
 
     mock_service.export_session_data = AsyncMock(side_effect=mock_export)
-    mock_service_holder["service"] = mock_service  # type: ignore[assignment]
+    mock_service_holder["service"] = mock_service
 
     client = TestClient(app)
 

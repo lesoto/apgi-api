@@ -141,12 +141,19 @@ class SecurityValidationMiddleware(BaseHTTPMiddleware):
         try:
             # Get request data based on method
             if request.method.upper() in ["POST", "PUT", "PATCH"]:
-                if hasattr(request, "_json"):
-                    data = await request.json()
+                content_type = request.headers.get("content-type", "")
+                if "application/json" in content_type:
+                    try:
+                        data = await request.json()
+                    except Exception:
+                        data = {}
                 else:
                     # Form data
-                    form_data = await request.form()
-                    data = dict(form_data) if form_data else {}
+                    try:
+                        form_data = await request.form()
+                        data = dict(form_data) if form_data else {}
+                    except Exception:
+                        data = {}
             else:
                 # GET requests - query parameters
                 query_params = request.query_params

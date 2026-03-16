@@ -3,6 +3,7 @@ Unit tests for cache service.
 """
 
 import pytest
+from unittest.mock import Mock
 from app.services.cache_service import CacheService
 
 
@@ -12,7 +13,8 @@ class TestCacheService:
     @pytest.fixture
     def cache_service(self):
         """Create cache service instance."""
-        return CacheService()
+        mock_redis_client = Mock()
+        return CacheService(redis_client=mock_redis_client)
 
     def test_cache_initialization(self, cache_service):
         """Test cache service initialization."""

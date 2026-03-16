@@ -10,7 +10,6 @@ from typing import Optional
 # Make OpenTelemetry imports conditional to handle compatibility issues
 try:
     from opentelemetry import trace
-    from opentelemetry.exporter.jaeger.thrift import JaegerExporter
     from opentelemetry.exporter.otlp.proto.grpc.trace_exporter import OTLPSpanExporter
     from opentelemetry.instrumentation.fastapi import FastAPIInstrumentor
     from opentelemetry.instrumentation.sqlalchemy import SQLAlchemyInstrumentor
@@ -20,10 +19,23 @@ try:
     from opentelemetry.sdk.resources import Resource, SERVICE_NAME, SERVICE_VERSION
 
     OPENTELEMETRY_AVAILABLE = True
+
+    # Try to import JaegerExporter conditionally
+    try:
+        from opentelemetry.exporter.jaeger.thrift import JaegerExporter
+
+        JAEGER_EXPORTER_AVAILABLE = True
+    except ImportError as jaeger_error:
+        logger = logging.getLogger(__name__)
+        logger.warning(f"JaegerExporter not available: {jaeger_error}")
+        JAEGER_EXPORTER_AVAILABLE = False
+        JaegerExporter = None
+
 except Exception as e:
     logger = logging.getLogger(__name__)
     logger.warning(f"OpenTelemetry not available: {e}")
     OPENTELEMETRY_AVAILABLE = False
+    JAEGER_EXPORTER_AVAILABLE = False
 
 from app.config import settings
 
@@ -75,7 +87,7 @@ def configure_distributed_tracing(
             logger.info("Console trace exporter enabled")
 
         # Jaeger exporter
-        if jaeger_endpoint:
+        if jaeger_endpoint and JAEGER_EXPORTER_AVAILABLE:
             jaeger_exporter = JaegerExporter(
                 agent_host_name=(
                     jaeger_endpoint.split(":")[0] if ":" in jaeger_endpoint else jaeger_endpoint
@@ -85,6 +97,10 @@ def configure_distributed_tracing(
             jaeger_processor = BatchSpanProcessor(jaeger_exporter)
             tracer_provider.add_span_processor(jaeger_processor)  # type: ignore[attr-defined]
             logger.info(f"Jaeger trace exporter configured at {jaeger_endpoint}")
+        elif jaeger_endpoint and not JAEGER_EXPORTER_AVAILABLE:
+            logger.warning(
+                f"Jaeger endpoint configured but JaegerExporter not available, skipping Jaeger export"
+            )
 
         # OTLP gRPC exporter
         if otlp_endpoint:

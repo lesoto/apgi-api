@@ -1,396 +1,413 @@
 """
-Unit tests for rate limiting middleware.
+Unit tests for app/middleware/rate_limiting.py
+
+Tests the actual RateLimitingMiddleware ASGI interface, not a fictional API.
 """
 
 import pytest
-from unittest.mock import AsyncMock
-from app.middleware.rate_limiting import RateLimitingMiddleware
+from unittest.mock import AsyncMock, MagicMock, patch
+from starlette.testclient import TestClient
+from fastapi import FastAPI
 
 
-class TestRateLimitingMiddleware:
-    """Test rate limiting middleware."""
+# ---------------------------------------------------------------------------
+# Helpers
+# ---------------------------------------------------------------------------
 
-    @pytest.fixture
-    def mock_app(self):
-        """Mock ASGI app."""
 
-        async def app(scope, receive, send):
-            await send({"type": "http.response.start", "status": 200, "headers": []})
-            await send({"type": "http.response.body", "body": b"OK"})
+def make_scope(path: str = "/v1/sessions", method: str = "GET") -> dict:
+    """Build a minimal ASGI HTTP scope dict."""
+    return {
+        "type": "http",
+        "method": method,
+        "path": path,
+        "query_string": b"",
+        "headers": [],
+        "server": ("127.0.0.1", 8000),
+        "client": ("127.0.0.1", 50000),
+    }
 
-        return app
 
-    @pytest.fixture
-    def middleware(self, mock_app):
-        """Create middleware instance."""
-        return RateLimitingMiddleware(mock_app, enabled=True)
+# ---------------------------------------------------------------------------
+# Initialization tests
+# ---------------------------------------------------------------------------
 
-    @pytest.fixture
-    def disabled_middleware(self, mock_app):
-        """Create disabled middleware instance."""
-        return RateLimitingMiddleware(mock_app, enabled=False)
 
-    @pytest.mark.asyncio
-    async def test_dispatch_enabled(self, middleware):
-        """Test dispatch when rate limiting is enabled."""
-        scope = {"type": "http", "method": "GET", "path": "/test"}
-        receive = AsyncMock()
-        send = AsyncMock()
+class TestRateLimitingMiddlewareInit:
+    """Test middleware initialization."""
 
-        await middleware(scope, receive, send)
+    def test_init_enabled_default(self):
+        """Middleware can be created with enabled=True."""
+        from app.middleware.rate_limiting import RateLimitingMiddleware
 
-    @pytest.mark.asyncio
-    async def test_dispatch_disabled(self, disabled_middleware):
-        """Test dispatch when rate limiting is disabled."""
-        scope = {"type": "http", "method": "GET", "path": "/test"}
-        receive = AsyncMock()
-        send = AsyncMock()
+        mock_app = AsyncMock()
+        mw = RateLimitingMiddleware(mock_app, enabled=True)
 
-        await disabled_middleware(scope, receive, send)
+        assert mw.enabled is True
+        assert mw.redis_client is None
+        assert mw.rate_limiter is None
 
-    @pytest.mark.asyncio
-    async def test_token_bucket_algorithm(self, middleware):
-        """Test token bucket rate limiting algorithm."""
-        user_id = "user123"
-        limit = 100
-        window = 60
+    def test_init_disabled(self):
+        """Middleware can be created with enabled=False."""
+        from app.middleware.rate_limiting import RateLimitingMiddleware
 
-        for i in range(100):
-            is_allowed = middleware.check_rate_limit(user_id, limit, window)
-            assert is_allowed is True
+        mock_app = AsyncMock()
+        mw = RateLimitingMiddleware(mock_app, enabled=False)
 
-        is_allowed = middleware.check_rate_limit(user_id, limit, window)
-        assert is_allowed is False
+        assert mw.enabled is False
 
-    @pytest.mark.asyncio
-    async def test_sliding_window_rate_limiting(self, middleware):
-        """Test sliding window rate limiting."""
-        user_id = "user123"
-        limit = 10
-        window = 10
+    def test_init_with_redis_client(self):
+        """When a redis_client is provided, rate_limiter is initialised."""
+        from app.middleware.rate_limiting import RateLimitingMiddleware
 
-        for i in range(10):
-            is_allowed = middleware.check_rate_limit(user_id, limit, window)
-            assert is_allowed is True
+        mock_app = AsyncMock()
+        mock_redis = MagicMock()
 
-        is_allowed = middleware.check_rate_limit(user_id, limit, window)
-        assert is_allowed is False
+        with patch("app.middleware.rate_limiting.RateLimiter") as MockRL:
+            mw = RateLimitingMiddleware(mock_app, redis_client=mock_redis, enabled=True)
 
-    @pytest.mark.asyncio
-    async def test_distributed_rate_limiting(self, middleware):
-        """Test distributed rate limit coordination."""
-        user_id = "user123"
-        limit = 50
-        window = 60
+        MockRL.assert_called_once_with(mock_redis)
+        assert mw.redis_client is mock_redis
 
-        is_allowed = middleware.check_distributed_rate_limit(user_id, limit, window)
-        assert is_allowed is True
+    def test_set_redis_client(self):
+        """set_redis_client() updates the singleton instance."""
+        from app.middleware.rate_limiting import RateLimitingMiddleware
 
-    @pytest.mark.asyncio
-    async def test_admin_bypass(self, middleware):
-        """Test admin bypass for rate limiting."""
-        user_id = "admin123"
-        limit = 10
-        window = 60
+        mock_app = AsyncMock()
+        mw = RateLimitingMiddleware(mock_app, enabled=True)
 
-        is_admin = True
-        is_allowed = middleware.check_rate_limit(user_id, limit, window, is_admin=is_admin)
-        assert is_allowed is True
+        mock_redis = MagicMock()
+        with patch("app.middleware.rate_limiting.RateLimiter") as MockRL:
+            RateLimitingMiddleware.set_redis_client(mock_redis)
 
-    @pytest.mark.asyncio
-    async def test_rate_limit_exemption_rules(self, middleware):
-        """Test rate limit exemption rules."""
-        user_id = "user123"
-        limit = 10
-        window = 60
+        MockRL.assert_called_once_with(mock_redis)
 
-        exemption_rules = {"user123": True}
-        is_allowed = middleware.check_rate_limit(
-            user_id, limit, window, exemption_rules=exemption_rules
+    def test_endpoint_rates_configured(self):
+        """Default endpoint_rates dictionary is present."""
+        from app.middleware.rate_limiting import RateLimitingMiddleware
+
+        mock_app = AsyncMock()
+        mw = RateLimitingMiddleware(mock_app)
+
+        assert "auth:attempt" in mw.endpoint_rates
+        assert "global" in mw.endpoint_rates
+
+
+# ---------------------------------------------------------------------------
+# _get_client_id() tests
+# ---------------------------------------------------------------------------
+
+
+class TestGetClientId:
+    """Test the _get_client_id private method."""
+
+    def _make_mw(self):
+        from app.middleware.rate_limiting import RateLimitingMiddleware
+
+        return RateLimitingMiddleware(AsyncMock(), enabled=True)
+
+    def test_returns_user_id_when_authenticated(self):
+        """Returns 'user:<id>' when request.state.user is set."""
+        mw = self._make_mw()
+
+        class _User:
+            user_id = "abc123"
+
+        class _State:
+            user = _User()
+
+        class _Request:
+            state = _State()
+            client = MagicMock()
+            headers = {}
+
+        result = mw._get_client_id(_Request())
+        assert result == "user:abc123"
+
+    def test_returns_ip_when_no_user(self):
+        """Falls back to 'ip:<addr>' when no state.user."""
+        mw = self._make_mw()
+
+        request = MagicMock()
+        # Make hasattr return False for 'user'
+        del request.state.user
+        request.client.host = "10.0.0.1"
+        request.headers = {}
+
+        result = mw._get_client_id(request)
+        assert result.startswith("ip:")
+
+    def test_returns_ip_unknown_when_no_client(self):
+        """Falls back to 'ip:unknown' when no client info."""
+        mw = self._make_mw()
+
+        request = MagicMock()
+        del request.state.user
+        request.client = None
+        request.headers = {}
+
+        result = mw._get_client_id(request)
+        assert result == "ip:unknown"
+
+
+# ---------------------------------------------------------------------------
+# _get_endpoint_identifier() tests
+# ---------------------------------------------------------------------------
+
+
+class TestGetEndpointIdentifier:
+    """Test endpoint identification for rate limit categories."""
+
+    def _make_mw(self):
+        from app.middleware.rate_limiting import RateLimitingMiddleware
+
+        return RateLimitingMiddleware(AsyncMock(), enabled=True)
+
+    def _req(self, path, method="GET"):
+        request = MagicMock()
+        request.url.path = path
+        request.method = method
+        return request
+
+    def test_auth_path(self):
+        mw = self._make_mw()
+        assert mw._get_endpoint_identifier(self._req("/v1/auth/login")) == "auth:attempt"
+
+    def test_register_path(self):
+        mw = self._make_mw()
+        assert mw._get_endpoint_identifier(self._req("/v1/users/register")) == "auth:attempt"
+
+    def test_reset_password_path(self):
+        mw = self._make_mw()
+        assert (
+            mw._get_endpoint_identifier(self._req("/v1/users/reset-password"))
+            == "users:reset-password"
         )
-        assert is_allowed is True
 
-    @pytest.mark.asyncio
-    async def test_ip_based_rate_limiting(self, middleware):
-        """Test IP-based rate limiting."""
-        ip_address = "192.168.1.1"
-        limit = 100
-        window = 60
+    def test_session_create_post(self):
+        mw = self._make_mw()
+        assert mw._get_endpoint_identifier(self._req("/v1/sessions", "POST")) == "session:create"
 
-        for i in range(100):
-            is_allowed = middleware.check_ip_rate_limit(ip_address, limit, window)
-            assert is_allowed is True
-
-        is_allowed = middleware.check_ip_rate_limit(ip_address, limit, window)
-        assert is_allowed is False
-
-    @pytest.mark.asyncio
-    async def test_user_based_rate_limiting(self, middleware):
-        """Test user-based rate limiting."""
-        user_id = "user123"
-        limit = 50
-        window = 60
-
-        for i in range(50):
-            is_allowed = middleware.check_user_rate_limit(user_id, limit, window)
-            assert is_allowed is True
-
-        is_allowed = middleware.check_user_rate_limit(user_id, limit, window)
-        assert is_allowed is False
-
-    @pytest.mark.asyncio
-    async def test_rate_limit_reset(self, middleware):
-        """Test rate limit reset after window expires."""
-        user_id = "user123"
-        limit = 10
-        window = 1
-
-        for i in range(10):
-            is_allowed = middleware.check_rate_limit(user_id, limit, window)
-            assert is_allowed is True
-
-        is_allowed = middleware.check_rate_limit(user_id, limit, window)
-        assert is_allowed is False
-
-        # Wait for window to expire (simulated)
-        import asyncio
-
-        await asyncio.sleep(1.1)
-
-        is_allowed = middleware.check_rate_limit(user_id, limit, window)
-        assert is_allowed is True
-
-    @pytest.mark.asyncio
-    async def test_rate_limit_headers(self, middleware):
-        """Test rate limit headers in response."""
-        user_id = "user123"
-        limit = 100
-        window = 60
-
-        headers = middleware.get_rate_limit_headers(user_id, limit, window)
-
-        assert "X-RateLimit-Limit" in headers
-        assert "X-RateLimit-Remaining" in headers
-        assert "X-RateLimit-Reset" in headers
-
-    @pytest.mark.asyncio
-    async def test_rate_limit_with_burst(self, middleware):
-        """Test rate limit with burst allowance."""
-        user_id = "user123"
-        limit = 10
-        window = 60
-        burst = 5
-
-        for i in range(15):
-            is_allowed = middleware.check_rate_limit_with_burst(user_id, limit, window, burst)
-            if i < 15:
-                assert is_allowed is True
-
-    @pytest.mark.asyncio
-    async def test_rate_limit_priority_queue(self, middleware):
-        """Test rate limit with priority queue."""
-        user_id = "user123"
-        limit = 10
-        window = 60
-        priority = "high"
-
-        for i in range(15):
-            is_allowed = middleware.check_rate_limit_with_priority(user_id, limit, window, priority)
-            if i < 15:
-                assert is_allowed is True
-
-    @pytest.mark.asyncio
-    async def test_rate_limit_multiple_endpoints(self, middleware):
-        """Test rate limiting for multiple endpoints."""
-        user_id = "user123"
-        endpoint1_limit = 100
-        endpoint2_limit = 50
-
-        for i in range(100):
-            is_allowed1 = middleware.check_endpoint_rate_limit(
-                user_id, "/api/endpoint1", endpoint1_limit, 60
-            )
-            assert is_allowed1 is True
-
-        is_allowed2 = middleware.check_endpoint_rate_limit(
-            user_id, "/api/endpoint2", endpoint2_limit, 60
+    def test_session_tasks_post(self):
+        mw = self._make_mw()
+        assert (
+            mw._get_endpoint_identifier(self._req("/v1/sessions/123/tasks", "POST"))
+            == "task:execute"
         )
-        assert is_allowed2 is True
+
+    def test_session_read_get(self):
+        mw = self._make_mw()
+        assert mw._get_endpoint_identifier(self._req("/v1/sessions", "GET")) == "session:read"
+
+    def test_session_delete(self):
+        mw = self._make_mw()
+        assert (
+            mw._get_endpoint_identifier(self._req("/v1/sessions/123", "DELETE")) == "session:delete"
+        )
+
+    def test_session_export_other_method(self):
+        """Non-GET/POST/DELETE to sessions path with 'export' returns 'data:export'."""
+        mw = self._make_mw()
+        # The export branch is only reachable after POST/GET/DELETE checks – use PUT
+        assert (
+            mw._get_endpoint_identifier(self._req("/v1/sessions/123/export", "PUT"))
+            == "data:export"
+        )
+
+    def test_tasks_path(self):
+        mw = self._make_mw()
+        assert mw._get_endpoint_identifier(self._req("/v1/tasks")) == "task:execute"
+
+    def test_unknown_path_returns_global(self):
+        mw = self._make_mw()
+        assert mw._get_endpoint_identifier(self._req("/v1/unknown/path")) == "global"
+
+
+# ---------------------------------------------------------------------------
+# _should_skip_rate_limiting() tests
+# ---------------------------------------------------------------------------
+
+
+class TestShouldSkipRateLimiting:
+    """Test skip-list logic."""
+
+    def _make_mw(self):
+        from app.middleware.rate_limiting import RateLimitingMiddleware
+
+        return RateLimitingMiddleware(AsyncMock(), enabled=True)
+
+    def _req(self, path):
+        request = MagicMock()
+        request.url.path = path
+        return request
+
+    def test_health_path_skipped(self):
+        mw = self._make_mw()
+        assert mw._should_skip_rate_limiting(self._req("/health")) is True
+
+    def test_health_ready_skipped(self):
+        mw = self._make_mw()
+        assert mw._should_skip_rate_limiting(self._req("/health/ready")) is True
+
+    def test_metrics_path_skipped(self):
+        mw = self._make_mw()
+        assert mw._should_skip_rate_limiting(self._req("/metrics")) is True
+
+    def test_docs_skipped(self):
+        mw = self._make_mw()
+        assert mw._should_skip_rate_limiting(self._req("/docs")) is True
+
+    def test_api_path_not_skipped(self):
+        mw = self._make_mw()
+        assert mw._should_skip_rate_limiting(self._req("/v1/sessions")) is False
+
+
+# ---------------------------------------------------------------------------
+# dispatch() tests
+# ---------------------------------------------------------------------------
+
+
+class TestDispatch:
+    """Test the middleware dispatch method."""
 
     @pytest.mark.asyncio
-    async def test_rate_limit_block_duration(self, middleware):
-        """Test rate limit block duration."""
-        user_id = "user123"
-        limit = 10
-        window = 60
-        block_duration = 300
+    async def test_disabled_middleware_passes_through(self):
+        """When middleware is disabled, passes request to next handler."""
+        from app.middleware.rate_limiting import RateLimitingMiddleware
 
-        for i in range(11):
-            middleware.check_rate_limit(user_id, limit, window)
+        response_mock = MagicMock()
+        response_mock.headers = {}
+        call_next = AsyncMock(return_value=response_mock)
 
-        is_blocked = middleware.is_user_blocked(user_id)
-        assert is_blocked is True
+        request = MagicMock()
+        request.url.path = "/v1/sessions"
 
-    @pytest.mark.asyncio
-    async def test_rate_limit_whitelist(self, middleware):
-        """Test rate limit whitelist."""
-        user_id = "user123"
-        limit = 10
-        window = 60
-        whitelist = {"user123"}
+        mw = RateLimitingMiddleware(AsyncMock(), enabled=False)
+        result = await mw.dispatch(request, call_next)
 
-        for i in range(20):
-            is_allowed = middleware.check_rate_limit(user_id, limit, window, whitelist=whitelist)
-            assert is_allowed is True
+        call_next.assert_called_once_with(request)
+        assert result is response_mock
 
     @pytest.mark.asyncio
-    async def test_rate_limit_blacklist(self, middleware):
-        """Test rate limit blacklist."""
-        user_id = "user123"
-        limit = 10
-        window = 60
-        blacklist = {"user123"}
+    async def test_no_rate_limiter_passes_through(self):
+        """When rate_limiter is None, passes request through with default headers."""
+        from app.middleware.rate_limiting import RateLimitingMiddleware
 
-        is_allowed = middleware.check_rate_limit(user_id, limit, window, blacklist=blacklist)
-        assert is_allowed is False
+        response_mock = MagicMock()
+        response_mock.headers = {}
+        call_next = AsyncMock(return_value=response_mock)
 
-    @pytest.mark.asyncio
-    async def test_rate_limit_tiered_limits(self, middleware):
-        """Test tiered rate limits based on user tier."""
-        user_id = "user123"
-        user_tier = "premium"
-        tier_limits = {"free": 100, "premium": 1000, "enterprise": 10000}
+        request = MagicMock()
+        request.url.path = "/v1/sessions"
 
-        limit = tier_limits[user_tier]
-        for i in range(limit):
-            is_allowed = middleware.check_tiered_rate_limit(user_id, user_tier, tier_limits, 60)
-            assert is_allowed is True
+        mw = RateLimitingMiddleware(AsyncMock(), enabled=True)
+        # rate_limiter is None by default (no redis_client provided)
+        result = await mw.dispatch(request, call_next)
+
+        call_next.assert_called_once_with(request)
+        # Default rate limit headers added
+        assert "X-RateLimit-Limit" in response_mock.headers
 
     @pytest.mark.asyncio
-    async def test_rate_limit_geographic(self, middleware):
-        """Test geographic rate limiting."""
-        ip_address = "192.168.1.1"
-        country = "US"
-        limit = 100
-        window = 60
+    async def test_skipped_path_passes_through(self):
+        """Health-check paths bypass rate limiting."""
+        from app.middleware.rate_limiting import RateLimitingMiddleware
 
-        is_allowed = middleware.check_geographic_rate_limit(ip_address, country, limit, window)
-        assert is_allowed is True
+        response_mock = MagicMock()
+        response_mock.headers = {}
+        call_next = AsyncMock(return_value=response_mock)
 
-    @pytest.mark.asyncio
-    async def test_rate_limit_anomaly_detection(self, middleware):
-        """Test rate limit anomaly detection."""
-        user_id = "user123"
-        limit = 10
-        window = 60
+        request = MagicMock()
+        request.url.path = "/health"
 
-        # Normal usage pattern
-        for i in range(10):
-            middleware.check_rate_limit(user_id, limit, window)
+        mock_redis = MagicMock()
+        with patch("app.middleware.rate_limiting.RateLimiter"):
+            mw = RateLimitingMiddleware(AsyncMock(), redis_client=mock_redis, enabled=True)
 
-        # Anomalous burst
-        has_anomaly = middleware.detect_anomaly(user_id)
-        assert has_anomaly is False
+        result = await mw.dispatch(request, call_next)
+        call_next.assert_called_once_with(request)
 
     @pytest.mark.asyncio
-    async def test_rate_limit_adaptive(self, middleware):
-        """Test adaptive rate limiting."""
-        user_id = "user123"
-        base_limit = 100
-        window = 60
+    async def test_allowed_request_passes_through(self):
+        """An allowed request is forwarded and gets rate-limit headers."""
+        from app.middleware.rate_limiting import RateLimitingMiddleware
 
-        # Adaptive limit increases for trusted users
-        adaptive_limit = middleware.get_adaptive_limit(user_id, base_limit)
-        assert adaptive_limit >= base_limit
+        response_mock = MagicMock()
+        response_mock.headers = {}
+        call_next = AsyncMock(return_value=response_mock)
 
-    @pytest.mark.asyncio
-    async def test_rate_limit_cleanup(self, middleware):
-        """Test rate limit data cleanup."""
-        user_id = "user123"
+        request = MagicMock()
+        request.url.path = "/v1/sessions"
+        request.method = "GET"
+        del request.state.user  # force IP-based fallback
+        request.client.host = "127.0.0.1"
+        request.headers = {}
 
-        middleware.cleanup_user_data(user_id)
+        mock_rate_limiter = MagicMock()
+        mock_rate_limiter.check_rate_limit = AsyncMock(return_value=(True, 59, 60))
 
-        # Should not raise any errors
+        mock_redis = MagicMock()
+        with patch("app.middleware.rate_limiting.RateLimiter", return_value=mock_rate_limiter):
+            mw = RateLimitingMiddleware(AsyncMock(), redis_client=mock_redis, enabled=True)
 
-    @pytest.mark.asyncio
-    async def test_rate_limit_stats(self, middleware):
-        """Test rate limit statistics."""
-        user_id = "user123"
+        result = await mw.dispatch(request, call_next)
 
-        stats = middleware.get_user_stats(user_id)
-
-        assert "requests" in stats
-        assert "blocked" in stats
-        assert "limit" in stats
+        call_next.assert_called_once_with(request)
+        assert "X-RateLimit-Limit" in response_mock.headers
+        assert "X-RateLimit-Remaining" in response_mock.headers
 
     @pytest.mark.asyncio
-    async def test_rate_limit_global_stats(self, middleware):
-        """Test global rate limit statistics."""
-        stats = middleware.get_global_stats()
+    async def test_rate_limited_request_returns_429(self):
+        """A rate-limited request returns HTTP 429."""
+        from app.middleware.rate_limiting import RateLimitingMiddleware
+        from starlette.responses import JSONResponse
 
-        assert "total_requests" in stats
-        assert "total_blocked" in stats
-        assert "active_users" in stats
+        call_next = AsyncMock()
 
-    @pytest.mark.asyncio
-    async def test_rate_limit_config_update(self, middleware):
-        """Test dynamic rate limit config update."""
-        new_config = {"default_limit": 200, "default_window": 120}
+        request = MagicMock()
+        request.url.path = "/v1/sessions"
+        request.method = "POST"
+        del request.state.user
+        request.client.host = "10.0.0.1"
+        request.headers = {}
+        request.state.request_id = "req-123"
 
-        middleware.update_config(new_config)
+        mock_rate_limiter = MagicMock()
+        mock_rate_limiter.check_rate_limit = AsyncMock(return_value=(False, 0, 60))
 
-        # Should not raise any errors
+        mock_redis = MagicMock()
+        with patch("app.middleware.rate_limiting.RateLimiter", return_value=mock_rate_limiter):
+            mw = RateLimitingMiddleware(AsyncMock(), redis_client=mock_redis, enabled=True)
 
-    @pytest.mark.asyncio
-    async def test_rate_limit_health_check(self, middleware):
-        """Test rate limiter health check."""
-        is_healthy = middleware.health_check()
+        result = await mw.dispatch(request, call_next)
 
-        assert is_healthy is True
-
-    @pytest.mark.asyncio
-    async def test_rate_limit_with_backpressure(self, middleware):
-        """Test rate limiting with backpressure signaling."""
-        user_id = "user123"
-        limit = 10
-        window = 60
-
-        backpressure = middleware.check_backpressure(user_id, limit, window)
-        assert backpressure["pressure"] >= 0
+        assert isinstance(result, JSONResponse)
+        assert result.status_code == 429
+        call_next.assert_not_called()
 
     @pytest.mark.asyncio
-    async def test_rate_limit_circuit_breaker(self, middleware):
-        """Test circuit breaker for rate limiting."""
-        endpoint = "/api/test"
-        failure_threshold = 5
+    async def test_rate_limiter_exception_continues(self):
+        """If rate limiter raises, request still passes through."""
+        from app.middleware.rate_limiting import RateLimitingMiddleware
 
-        for i in range(failure_threshold):
-            middleware.record_failure(endpoint)
+        response_mock = MagicMock()
+        response_mock.headers = {}
+        call_next = AsyncMock(return_value=response_mock)
 
-        is_open = middleware.is_circuit_breaker_open(endpoint)
-        assert is_open is True
+        request = MagicMock()
+        request.url.path = "/v1/sessions"
+        request.method = "GET"
+        del request.state.user
+        request.client.host = "10.0.0.1"
+        request.headers = {}
 
-    @pytest.mark.asyncio
-    async def test_rate_limit_retry_after(self, middleware):
-        """Test retry-after header calculation."""
-        user_id = "user123"
-        limit = 10
-        window = 60
+        mock_rate_limiter = MagicMock()
+        mock_rate_limiter.check_rate_limit = AsyncMock(side_effect=RuntimeError("redis down"))
 
-        for i in range(11):
-            middleware.check_rate_limit(user_id, limit, window)
+        mock_redis = MagicMock()
+        with patch("app.middleware.rate_limiting.RateLimiter", return_value=mock_rate_limiter):
+            mw = RateLimitingMiddleware(AsyncMock(), redis_client=mock_redis, enabled=True)
 
-        retry_after = middleware.get_retry_after(user_id)
-        assert retry_after > 0
-
-    def test_middleware_initialization(self, mock_app):
-        """Test middleware initialization."""
-        middleware = RateLimitingMiddleware(mock_app, enabled=True)
-
-        assert middleware.enabled is True
-
-    def test_middleware_initialization_disabled(self, mock_app):
-        """Test middleware initialization with disabled rate limiting."""
-        middleware = RateLimitingMiddleware(mock_app, enabled=False)
-
-        assert middleware.enabled is False
+        # Should not raise
+        result = await mw.dispatch(request, call_next)
+        call_next.assert_called_once_with(request)

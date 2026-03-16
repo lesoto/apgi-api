@@ -103,7 +103,6 @@ async def register_user(
             user_id=str(user.user_id),
             username=str(user.username),
             email=str(user.email),
-            roles=list(cast(List[str], user.roles or [])),
             created_at=cast(datetime, user.created_at),
             message="User created successfully. Please check your email to verify your account.",
         )
@@ -211,7 +210,6 @@ async def create_default_user(
             user_id=user.user_id,  # type: ignore[arg-type]
             username=user.username,  # type: ignore[arg-type]
             email=user.email,  # type: ignore[arg-type]
-            roles=user.roles,  # type: ignore[arg-type]
             created_at=user.created_at,  # type: ignore[arg-type]
             message="Default user created successfully",
         )
