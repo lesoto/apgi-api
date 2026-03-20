@@ -215,7 +215,8 @@ class TestVerifyToken:
     @pytest.mark.asyncio
     async def test_tampered_token_raises_invalid_error(self, auth_manager):
         """Tampered signature must raise InvalidTokenError (requirement 9.1)."""
-        import base64, json
+        import base64
+        import json
 
         token = auth_manager.create_access_token("uid1", "alice", [])
         header, payload_b64, sig = token.split(".")

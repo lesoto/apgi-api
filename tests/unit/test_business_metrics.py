@@ -57,7 +57,6 @@ def _make_mock_db():
 
 
 class TestGenerateCacheKey:
-
     def test_returns_string(self, service):
         key = service._generate_cache_key("test_method", "arg1", kwarg1="val1")
         assert isinstance(key, str)
@@ -80,7 +79,6 @@ class TestGenerateCacheKey:
 
 
 class TestGetCachedOrCompute:
-
     @pytest.mark.asyncio
     async def test_returns_cached_value_when_available(self, service, mock_cache):
         mock_cache.get_query_result.return_value = {"cached": True}
@@ -108,7 +106,6 @@ class TestGetCachedOrCompute:
 
 
 class TestGetOverviewMetrics:
-
     @pytest.mark.asyncio
     async def test_returns_overview_dict(self, service, mock_cache):
         mock_db = _make_mock_db()
@@ -167,7 +164,6 @@ class TestGetOverviewMetrics:
 
 
 class TestGetSessionMetrics:
-
     def test_returns_session_metrics_dict(self, service):
         mock_db = _make_mock_db()
         with patch("app.services.business_metrics.get_db_context") as mock_ctx:
@@ -211,7 +207,6 @@ class TestGetSessionMetrics:
 
 
 class TestGetTaskMetrics:
-
     def test_returns_task_metrics_dict(self, service):
         mock_db = _make_mock_db()
         with patch("app.services.business_metrics.get_db_context") as mock_ctx:
@@ -248,7 +243,6 @@ class TestGetTaskMetrics:
 
 
 class TestGetUserMetrics:
-
     def test_returns_user_metrics_dict(self, service):
         mock_db = _make_mock_db()
         with patch("app.services.business_metrics.get_db_context") as mock_ctx:
@@ -275,7 +269,6 @@ class TestGetUserMetrics:
 
 
 class TestGetTemplateMetrics:
-
     def test_returns_template_metrics_dict(self, service):
         mock_db = _make_mock_db()
         with patch("app.services.business_metrics.get_db_context") as mock_ctx:
@@ -301,7 +294,6 @@ class TestGetTemplateMetrics:
 
 
 class TestGetDashboardData:
-
     def test_returns_all_sections(self, service):
         mock_db = _make_mock_db()
         with (
@@ -339,7 +331,6 @@ class TestGetDashboardData:
 
 
 class TestMetricValue:
-
     def test_basic_creation(self):
         mv = MetricValue(value=42, label="Test", description="A test metric")
         assert mv.value == 42
@@ -357,7 +348,6 @@ class TestMetricValue:
 
 
 class TestTimeSeriesPoint:
-
     def test_basic_creation(self):
         ts = TimeSeriesPoint(timestamp=datetime.now(timezone.utc), value=1.5)
         assert ts.value == 1.5

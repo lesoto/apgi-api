@@ -21,6 +21,8 @@ from sqlalchemy import (
     Text,
     UniqueConstraint,
 )
+import sqlalchemy as sa
+from sqlalchemy.dialects.postgresql import ARRAY
 from sqlalchemy.orm import declarative_base, relationship, Mapped, mapped_column
 from sqlalchemy.sql import func
 
@@ -75,7 +77,9 @@ class User(Base):  # type: ignore[misc, valid-type]
         String(255), unique=True, nullable=False, index=True, comment="User email address"
     )
     password_hash = Column(String(255), nullable=False, comment="Hashed password")
-    roles = Column(JSON, nullable=False, default=lambda: [], comment="User roles for RBAC")
+    roles = Column(
+        ARRAY(sa.Text()), nullable=False, default=lambda: [], comment="User roles for RBAC"
+    )
     is_active = Column(
         Boolean, nullable=False, default=True, comment="Whether the user account is active"
     )

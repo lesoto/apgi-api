@@ -11,7 +11,7 @@ import asyncio
 import socket
 import pytest
 from datetime import datetime, timezone
-from unittest.mock import AsyncMock, MagicMock, patch, call
+from unittest.mock import AsyncMock, MagicMock, patch
 
 
 # ---------------------------------------------------------------------------
@@ -28,6 +28,7 @@ def db():
 @pytest.fixture
 def manager():
     from app.services.webhook_manager import WebhookManager
+
     return WebhookManager()
 
 
@@ -72,31 +73,37 @@ class TestValidateWebhookUrl:
 
     def test_valid_https_url_resolves(self):
         from app.services.webhook_manager import WebhookManager
+
         # example.com resolves to a public IP — should not raise
         WebhookManager._validate_webhook_url("https://example.com/webhook")
 
     def test_valid_http_url_resolves(self):
         from app.services.webhook_manager import WebhookManager
+
         WebhookManager._validate_webhook_url("http://example.com/webhook")
 
     def test_ftp_scheme_rejected(self):
         from app.services.webhook_manager import WebhookManager
+
         with pytest.raises(ValueError, match="Only HTTP and HTTPS URLs are allowed"):
             WebhookManager._validate_webhook_url("ftp://example.com/webhook")
 
     def test_missing_scheme_rejected(self):
         from app.services.webhook_manager import WebhookManager
+
         with pytest.raises(ValueError):
             WebhookManager._validate_webhook_url("example.com/webhook")
 
     def test_missing_hostname_rejected(self):
         from app.services.webhook_manager import WebhookManager
+
         with pytest.raises(ValueError):
             WebhookManager._validate_webhook_url("https:///path")
 
     @patch("socket.getaddrinfo")
     def test_private_192_168_blocked(self, mock_gai):
         from app.services.webhook_manager import WebhookManager
+
         mock_gai.return_value = [(None, None, None, None, ("192.168.1.100", 0))]
         with pytest.raises(ValueError, match="private/internal IP"):
             WebhookManager._validate_webhook_url("http://internal.corp/hook")
@@ -104,6 +111,7 @@ class TestValidateWebhookUrl:
     @patch("socket.getaddrinfo")
     def test_private_10_x_blocked(self, mock_gai):
         from app.services.webhook_manager import WebhookManager
+
         mock_gai.return_value = [(None, None, None, None, ("10.0.0.5", 0))]
         with pytest.raises(ValueError, match="private/internal IP"):
             WebhookManager._validate_webhook_url("http://internal.corp/hook")
@@ -111,6 +119,7 @@ class TestValidateWebhookUrl:
     @patch("socket.getaddrinfo")
     def test_private_172_16_blocked(self, mock_gai):
         from app.services.webhook_manager import WebhookManager
+
         mock_gai.return_value = [(None, None, None, None, ("172.16.0.1", 0))]
         with pytest.raises(ValueError, match="private/internal IP"):
             WebhookManager._validate_webhook_url("http://internal.corp/hook")
@@ -118,6 +127,7 @@ class TestValidateWebhookUrl:
     @patch("socket.getaddrinfo")
     def test_loopback_127_blocked(self, mock_gai):
         from app.services.webhook_manager import WebhookManager
+
         mock_gai.return_value = [(None, None, None, None, ("127.0.0.1", 0))]
         with pytest.raises(ValueError, match="private/internal IP"):
             WebhookManager._validate_webhook_url("http://localhost/hook")
@@ -125,6 +135,7 @@ class TestValidateWebhookUrl:
     @patch("socket.getaddrinfo")
     def test_cloud_metadata_169_254_169_254_blocked(self, mock_gai):
         from app.services.webhook_manager import WebhookManager
+
         mock_gai.return_value = [(None, None, None, None, ("169.254.169.254", 0))]
         with pytest.raises(ValueError, match="cloud metadata"):
             WebhookManager._validate_webhook_url("http://metadata/hook")
@@ -132,6 +143,7 @@ class TestValidateWebhookUrl:
     @patch("socket.getaddrinfo")
     def test_cloud_metadata_169_254_169_253_blocked(self, mock_gai):
         from app.services.webhook_manager import WebhookManager
+
         mock_gai.return_value = [(None, None, None, None, ("169.254.169.253", 0))]
         with pytest.raises(ValueError, match="cloud metadata"):
             WebhookManager._validate_webhook_url("http://metadata/hook")
@@ -139,6 +151,7 @@ class TestValidateWebhookUrl:
     @patch("socket.getaddrinfo")
     def test_dns_resolution_failure_raises(self, mock_gai):
         from app.services.webhook_manager import WebhookManager
+
         mock_gai.side_effect = socket.gaierror("Name or service not known")
         with pytest.raises(ValueError, match="Could not resolve hostname"):
             WebhookManager._validate_webhook_url("http://nonexistent.invalid/hook")
@@ -146,6 +159,7 @@ class TestValidateWebhookUrl:
     @patch("socket.getaddrinfo")
     def test_no_valid_ip_raises(self, mock_gai):
         from app.services.webhook_manager import WebhookManager
+
         # Return an entry with an invalid IP string so all IPs are skipped
         mock_gai.return_value = [(None, None, None, None, ("not-an-ip", 0))]
         with pytest.raises(ValueError):
@@ -154,6 +168,7 @@ class TestValidateWebhookUrl:
     @patch("socket.getaddrinfo")
     def test_returns_resolved_ip_string(self, mock_gai):
         from app.services.webhook_manager import WebhookManager
+
         mock_gai.return_value = [(None, None, None, None, ("93.184.216.34", 0))]
         ip = WebhookManager._validate_webhook_url("http://example.com/hook")
         assert ip == "93.184.216.34"
@@ -170,8 +185,10 @@ class TestCreateWebhookDelivery:
     @pytest.mark.asyncio
     async def test_success_returns_uuid_string(self, manager, db):
         with (
-            patch("app.services.webhook_manager.WebhookManager._validate_webhook_url",
-                  return_value="93.184.216.34"),
+            patch(
+                "app.services.webhook_manager.WebhookManager._validate_webhook_url",
+                return_value="93.184.216.34",
+            ),
             patch("app.services.webhook_manager.WebhookDelivery") as MockDelivery,
         ):
             mock_obj = MagicMock()
@@ -190,23 +207,21 @@ class TestCreateWebhookDelivery:
     @pytest.mark.asyncio
     async def test_invalid_url_raises_before_db(self, manager, db):
         with pytest.raises(ValueError):
-            await manager.create_webhook_delivery(
-                db, "task-1", "ftp://bad.url/hook", {}
-            )
+            await manager.create_webhook_delivery(db, "task-1", "ftp://bad.url/hook", {})
         db.add.assert_not_called()
 
     @pytest.mark.asyncio
     async def test_db_commit_error_rolls_back(self, manager, db):
         db.commit.side_effect = Exception("DB unavailable")
         with (
-            patch("app.services.webhook_manager.WebhookManager._validate_webhook_url",
-                  return_value="93.184.216.34"),
+            patch(
+                "app.services.webhook_manager.WebhookManager._validate_webhook_url",
+                return_value="93.184.216.34",
+            ),
             patch("app.services.webhook_manager.WebhookDelivery"),
         ):
             with pytest.raises(Exception, match="DB unavailable"):
-                await manager.create_webhook_delivery(
-                    db, "task-1", "https://example.com/hook", {}
-                )
+                await manager.create_webhook_delivery(db, "task-1", "https://example.com/hook", {})
         db.rollback.assert_called_once()
 
     @pytest.mark.asyncio
@@ -219,10 +234,14 @@ class TestCreateWebhookDelivery:
             return MagicMock()
 
         with (
-            patch("app.services.webhook_manager.WebhookManager._validate_webhook_url",
-                  return_value="1.2.3.4"),
-            patch("app.services.webhook_manager.WebhookDelivery",
-                  side_effect=lambda **kw: captured.update(kw) or MagicMock()),
+            patch(
+                "app.services.webhook_manager.WebhookManager._validate_webhook_url",
+                return_value="1.2.3.4",
+            ),
+            patch(
+                "app.services.webhook_manager.WebhookDelivery",
+                side_effect=lambda **kw: captured.update(kw) or MagicMock(),
+            ),
         ):
             await manager.create_webhook_delivery(
                 db, "task-1", "https://example.com/hook", {"x": 1}
@@ -361,6 +380,7 @@ class TestDeliverWebhookSuccess:
     @patch("aiohttp.ClientSession")
     async def test_response_body_truncated_when_too_large(self, MockSession, manager, db):
         from app.services.webhook_manager import WebhookManager
+
         d = _make_delivery(attempts=0, retry_count=5)
         db.query.return_value.filter.return_value.first.return_value = d
 
@@ -408,9 +428,7 @@ class TestDeliverWebhookRetry:
 
     @pytest.mark.asyncio
     @patch("aiohttp.ClientSession")
-    async def test_http_500_with_retries_remaining_schedules_retry(
-        self, MockSession, manager, db
-    ):
+    async def test_http_500_with_retries_remaining_schedules_retry(self, MockSession, manager, db):
         d = _make_delivery(attempts=0, retry_count=5)
         db.query.return_value.filter.return_value.first.return_value = d
 
@@ -430,9 +448,7 @@ class TestDeliverWebhookRetry:
 
     @pytest.mark.asyncio
     @patch("aiohttp.ClientSession")
-    async def test_http_404_with_retries_remaining_schedules_retry(
-        self, MockSession, manager, db
-    ):
+    async def test_http_404_with_retries_remaining_schedules_retry(self, MockSession, manager, db):
         d = _make_delivery(attempts=2, retry_count=5)
         db.query.return_value.filter.return_value.first.return_value = d
 
@@ -543,9 +559,7 @@ class TestDeliverWebhookExceptions:
 
     @pytest.mark.asyncio
     @patch("aiohttp.ClientSession")
-    async def test_network_error_last_attempt_marks_dead_letter(
-        self, MockSession, manager, db
-    ):
+    async def test_network_error_last_attempt_marks_dead_letter(self, MockSession, manager, db):
         d = _make_delivery(attempts=4, retry_count=5)
         db.query.return_value.filter.return_value.first.return_value = d
 
@@ -626,9 +640,7 @@ class TestDeliverWebhookHttps:
     @pytest.mark.asyncio
     @patch("aiohttp.TCPConnector")
     @patch("aiohttp.ClientSession")
-    async def test_https_url_creates_ssl_connector(
-        self, MockSession, MockConnector, manager, db
-    ):
+    async def test_https_url_creates_ssl_connector(self, MockSession, MockConnector, manager, db):
         d = _make_delivery(
             attempts=0,
             retry_count=5,
@@ -651,9 +663,7 @@ class TestDeliverWebhookHttps:
     @pytest.mark.asyncio
     @patch("aiohttp.TCPConnector")
     @patch("aiohttp.ClientSession")
-    async def test_http_url_creates_plain_connector(
-        self, MockSession, MockConnector, manager, db
-    ):
+    async def test_http_url_creates_plain_connector(self, MockSession, MockConnector, manager, db):
         d = _make_delivery(
             attempts=0,
             retry_count=5,

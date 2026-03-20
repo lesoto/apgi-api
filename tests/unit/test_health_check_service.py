@@ -1,7 +1,7 @@
 """
 Unit tests for HealthCheckService.
 
-Tests healthy, degraded, and unhealthy paths for Redis, database, and Celery.
+Covers health check logic, dependency checks, and metrics collection.
 Requirements: 2.10
 """
 
@@ -59,7 +59,6 @@ def _make_mock_celery_control(workers_up=True):
 
 
 class TestPerformHealthCheck:
-
     @pytest.mark.asyncio
     async def test_all_healthy(self, service, mock_redis):
         mock_engine = _make_mock_engine()
@@ -177,7 +176,6 @@ class TestPerformHealthCheck:
     @pytest.mark.asyncio
     async def test_redis_degraded_when_slow(self, service, mock_redis):
         """When Redis responds but slowly, status should be degraded."""
-        import time
 
         async def slow_ping():
             return True
@@ -223,7 +221,6 @@ class TestPerformHealthCheck:
 
 
 class TestPerformReadinessCheck:
-
     @pytest.mark.asyncio
     async def test_all_ready(self, service, mock_redis):
         mock_engine = _make_mock_engine()

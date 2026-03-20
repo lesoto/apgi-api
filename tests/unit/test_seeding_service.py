@@ -6,8 +6,7 @@ Requirements: 2.7
 """
 
 import pytest
-from unittest.mock import MagicMock, patch, call
-
+from unittest.mock import MagicMock, patch
 from app.services.seeding_service import DatabaseSeedingService
 
 
@@ -41,7 +40,6 @@ def _patch_db(mock_db):
 
 
 class TestSeedUsers:
-
     def test_seed_users_with_admin(self, seeding_service, mock_db):
         with (
             patch("app.services.seeding_service.get_db_context") as mock_ctx,
@@ -95,7 +93,6 @@ class TestSeedUsers:
 
 
 class TestSeedSessionTemplates:
-
     def test_seed_templates_basic(self, seeding_service, mock_db):
         user_ids = ["user_001", "user_002"]
         with patch("app.services.seeding_service.get_db_context") as mock_ctx:
@@ -132,7 +129,6 @@ class TestSeedSessionTemplates:
 
 
 class TestSeedSessions:
-
     def test_seed_sessions_basic(self, seeding_service, mock_db):
         user_ids = ["user_001", "user_002"]
         with patch("app.services.seeding_service.get_db_context") as mock_ctx:
@@ -175,7 +171,6 @@ class TestSeedSessions:
 
 
 class TestSeedTasks:
-
     def test_seed_tasks_basic(self, seeding_service, mock_db):
         session_ids = ["session_001", "session_002"]
         with patch("app.services.seeding_service.get_db_context") as mock_ctx:
@@ -201,7 +196,6 @@ class TestSeedTasks:
 
 
 class TestSeedTaskDependencies:
-
     def test_seed_dependencies_basic(self, seeding_service, mock_db):
         task_ids = ["task_001", "task_002", "task_003"]
         with patch("app.services.seeding_service.get_db_context") as mock_ctx:
@@ -230,7 +224,6 @@ class TestSeedTaskDependencies:
 
 
 class TestClearAllData:
-
     def test_clear_all_data_returns_counts(self, seeding_service, mock_db):
         mock_db.query.return_value.delete.return_value = 3
         mock_db.query.return_value.filter.return_value.delete.return_value = 5
@@ -271,7 +264,6 @@ class TestClearAllData:
 
 
 class TestSeedAll:
-
     def test_seed_all_returns_summary(self, seeding_service, mock_db):
         with (
             patch("app.services.seeding_service.get_db_context") as mock_ctx,
@@ -299,7 +291,6 @@ class TestSeedAll:
 
 
 class TestGenerateTaskParameters:
-
     @pytest.mark.parametrize(
         "task_type,expected_keys",
         [
@@ -327,7 +318,6 @@ class TestGenerateTaskParameters:
 
 
 class TestGenerateTaskResult:
-
     @pytest.mark.parametrize(
         "task_type,expected_keys",
         [

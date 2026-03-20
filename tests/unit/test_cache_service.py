@@ -1,13 +1,14 @@
 """
 Unit tests for CacheService.
 
-Tests get/set/delete/invalidate using an AsyncMock redis client.
-Validates Requirements 2.4.
+Covers cache operations, TTL handling, and Redis interactions.
+Requirements: 2.8
 """
 
 import json
+
 import pytest
-from unittest.mock import AsyncMock, MagicMock, patch, call
+from unittest.mock import AsyncMock, patch
 
 from app.services.cache_service import (
     CacheService,

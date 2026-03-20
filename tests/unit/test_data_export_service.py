@@ -1,15 +1,127 @@
-"""
-Unit tests for DataExportService.
-
-Tests export generation, streaming, different formats, and edge cases.
-Requirements: 2.6
-"""
+"""Unit tests for data_export.py."""
 
 import json
 import pytest
-from unittest.mock import MagicMock, AsyncMock, patch
-
+from unittest.mock import patch, MagicMock, AsyncMock
+from datetime import datetime
 from app.services.data_export import DataExportService
+
+
+class TestDataExportService:
+    """Test DataExportService functionality."""
+
+    @pytest.fixture
+    def export_service(self):
+        return DataExportService()
+
+    def test_export_user_data_basic(self, export_service):
+        """Test basic user data export."""
+        with patch("app.services.data_export.get_db_context") as mock_db_context:
+            mock_db = MagicMock()
+            mock_db_context.return_value.__enter__.return_value = mock_db
+            mock_db.query.return_value.join.return_value.all.return_value = [
+                MagicMock(user_id="user1", username="user1", email="user1@example.com"),
+                MagicMock(user_id="user2", username="user2", email="user2@example.com"),
+            ]
+
+            # Export user data
+            result = export_service.export_user_data(["user1", "user2"])
+
+            # Verify export structure
+            assert "users" in result
+            assert len(result["users"]) == 2
+            assert result["users"][0]["username"] == "user1"
+            assert result["users"][1]["username"] == "user2"
+            assert "export_timestamp" in result
+            assert isinstance(result["export_timestamp"], datetime)
+
+    def test_export_task_data_basic(self, export_service):
+        """Test basic task data export."""
+        with patch("app.services.data_export.get_db_context") as mock_db_context:
+            mock_db = MagicMock()
+            mock_db_context.return_value.__enter__.return_value = mock_db
+            mock_db.query.return_value.join.return_value.all.return_value = [
+                MagicMock(task_id="task1", title="Task 1", status="completed"),
+                MagicMock(task_id="task2", title="Task 2", status="pending"),
+            ]
+
+            # Export task data
+            result = export_service.export_task_data(["task1", "task2"])
+
+            # Verify export structure
+            assert "tasks" in result
+            assert len(result["tasks"]) == 2
+            assert result["tasks"][0]["title"] == "Task 1"
+            assert result["tasks"][1]["title"] == "Task 2"
+            assert "export_timestamp" in result
+
+    def test_export_session_data_basic(self, export_service):
+        """Test basic session data export."""
+        with patch("app.services.data_export.get_db_context") as mock_db_context:
+            mock_db = MagicMock()
+            mock_db_context.return_value.__enter__.return_value = mock_db
+            mock_db.query.return_value.join.return_value.all.return_value = [
+                MagicMock(session_id="session1", user_id="user1", created_at=datetime.now()),
+                MagicMock(session_id="session2", user_id="user2", created_at=datetime.now()),
+            ]
+
+            # Export session data
+            result = export_service.export_session_data(["session1", "session2"])
+
+            # Verify export structure
+            assert "sessions" in result
+            assert len(result["sessions"]) == 2
+            assert result["sessions"][0]["user_id"] == "user1"
+            assert result["sessions"][1]["user_id"] == "user2"
+            assert "export_timestamp" in result
+
+    def test_export_empty_lists(self, export_service):
+        """Test export with empty lists."""
+        with patch("app.services.data_export.get_db_context") as mock_db_context:
+            mock_db = MagicMock()
+            mock_db_context.return_value.__enter__.return_value = mock_db
+
+            # Export empty data
+            result = export_service.export_user_data([])
+
+            # Verify empty export
+            assert result["users"] == []
+            assert "export_timestamp" in result
+
+    def test_export_format_json(self, export_service):
+        """Test export format is JSON serializable."""
+        with patch("app.services.data_export.get_db_context") as mock_db_context:
+            mock_db = MagicMock()
+            mock_db_context.return_value.__enter__.return_value = mock_db
+            mock_db.query.return_value.join.return_value.all.return_value = [
+                MagicMock(user_id="user1", username="user1", email="user1@example.com")
+            ]
+
+            # Export and verify JSON serializable
+            result = export_service.export_user_data(["user1"])
+
+            # Should not raise exception when serializing to JSON
+            import json
+
+            json_str = json.dumps(result)
+            assert isinstance(json_str, str)
+
+    def test_export_includes_metadata(self, export_service):
+        """Test export includes metadata."""
+        with patch("app.services.data_export.get_db_context") as mock_db_context:
+            mock_db = MagicMock()
+            mock_db_context.return_value.__enter__.return_value = mock_db
+            mock_db.query.return_value.join.return_value.all.return_value = [
+                MagicMock(user_id="user1", username="user1", email="user1@example.com")
+            ]
+
+            # Export user data
+            result = export_service.export_user_data(["user1"])
+
+            # Verify metadata fields
+            assert "export_version" in result
+            assert "total_records" in result
+            assert result["total_records"] == 1
 
 
 @pytest.fixture
@@ -46,7 +158,6 @@ def _make_mock_session(history=None):
 
 
 class TestExportSessionData:
-
     @pytest.mark.asyncio
     async def test_json_export_returns_bytes_and_content_type(self, service, mock_session_manager):
         mock_session_manager.get_session.return_value = _make_mock_session()
@@ -157,7 +268,6 @@ class TestExportSessionData:
 
 
 class TestExtractTimeSeries:
-
     def test_no_history_returns_empty(self, service):
         result = service._extract_time_series({}, None, None, None)
         assert result == []
@@ -228,7 +338,6 @@ class TestExtractTimeSeries:
 
 
 class TestExportHelpers:
-
     def test_export_json_returns_bytes(self, service):
         data = {"session_id": "s1", "data": []}
         result, ct = service._export_json(data)
@@ -422,7 +531,7 @@ class TestCsvEscaping:
         }
         text = service._export_csv(export_data).decode("utf-8")
         # Header should have a_var before z_var (sorted)
-        header_line = [l for l in text.split("\n") if l.startswith("time,")][0]
+        header_line = [line for line in text.split("\n") if line.startswith("time,")][0]
         assert header_line == "time,a_var,z_var"
 
 
@@ -432,7 +541,6 @@ class TestCsvEscaping:
 
 
 class TestGenerateSummaryStats:
-
     @pytest.mark.asyncio
     async def test_returns_correct_stats(self, service, mock_session_manager):
         history = {"time": [0, 1, 2], "var1": [1, 2, 3], "var2": [4, 5, 6]}
@@ -474,7 +582,6 @@ class TestGenerateSummaryStats:
 
 
 class TestExportTimeSeries:
-
     @pytest.mark.asyncio
     async def test_basic_export(self, service, mock_session_manager):
         history = {"time": [0, 1, 2], "var1": [1, 2, 3]}
@@ -549,7 +656,6 @@ class TestExportTimeSeries:
 
 
 class TestGetEventAnalysis:
-
     @pytest.mark.asyncio
     async def test_returns_event_analysis(self, service, mock_session_manager):
         mock_session_manager.get_session.return_value = _make_mock_session()

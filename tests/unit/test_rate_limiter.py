@@ -6,7 +6,7 @@ Validates Requirements 2.11.
 """
 
 import pytest
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import MagicMock, AsyncMock
 from app.services.rate_limiter import RateLimiter
 
 

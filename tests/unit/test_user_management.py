@@ -1,9 +1,12 @@
-"""Unit tests for user management service."""
+"""Unit tests for UserManagementService.
+
+Covers user CRUD operations, role management, and user validation.
+Requirements: 2.9
+"""
 
 import pytest
-from unittest.mock import MagicMock, patch
-from datetime import datetime, timezone, timedelta
-from sqlalchemy.orm import Session
+from datetime import datetime, timedelta, timezone
+from unittest.mock import patch, MagicMock
 from sqlalchemy.exc import IntegrityError
 from app.services.user_management import UserManagementService
 from app.exceptions import UserNotFoundError, ValidationError

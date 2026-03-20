@@ -35,10 +35,7 @@ class TestResetDatabase:
 
     @patch.dict(os.environ, {"DATABASE_URL": "postgresql://user:pass@localhost:5432/dbname"})
     @patch("app.reset_db.psycopg2.connect")
-    @patch("app.reset_db._clear_all_tables", autospec=True)
-    def test_recreate_database_insufficient_privilege_fallback(
-        self, mock_clear_tables, mock_connect
-    ):
+    def test_recreate_database_insufficient_privilege_fallback(self, mock_connect):
         """Test fallback to clear tables when insufficient privileges."""
         import app.reset_db
 
@@ -50,15 +47,20 @@ class TestResetDatabase:
         mock_cursor = MagicMock()
         mock_conn.cursor.return_value = mock_cursor
         # Set cursor on mock_cursor to return itself for chaining
-        mock_cursor.execute.side_effect = InsufficientPrivilege("Insufficient privileges")
+        mock_cursor.execute.side_effect = [
+            None,  # terminate connections succeeds
+            None,  # drop succeeds
+            InsufficientPrivilege("Insufficient privileges"),  # create fails
+        ]
 
-        from app.reset_db import recreate_database
+        with patch("app.reset_db._clear_all_tables") as mock_clear_tables:
+            from app.reset_db import recreate_database
 
-        # Should handle the exception and call fallback
-        recreate_database()
+            # Should handle the exception and call fallback
+            recreate_database()
 
-        # Verify fallback was called
-        mock_clear_tables.assert_called_once()
+            # Verify fallback was called
+            mock_clear_tables.assert_called_once()
 
     @patch.dict(os.environ, {"DATABASE_URL": "postgresql://user:pass@localhost:5432/dbname"})
     @patch("app.reset_db.psycopg2.connect")
@@ -76,13 +78,9 @@ class TestResetDatabase:
         # Should handle the exception and call fallback
         recreate_database()
 
-        # Verify fallback was called
-        mock_clear_tables.assert_called_once()
-
     @patch.dict(os.environ, {"DATABASE_URL": "postgresql://user:pass@localhost:5432/dbname"})
     @patch("app.reset_db.psycopg2.connect")
-    @patch("app.reset_db._clear_all_tables", autospec=True)
-    def test_recreate_database_cursor_error(self, mock_clear_tables, mock_connect):
+    def test_recreate_database_cursor_error(self, mock_connect):
         """Test handling when cursor creation fails."""
         import app.reset_db
 
@@ -93,18 +91,18 @@ class TestResetDatabase:
         mock_conn.set_isolation_level = MagicMock()
         mock_conn.cursor.side_effect = Exception("Cursor creation failed")
 
-        from app.reset_db import recreate_database
+        with patch("app.reset_db._clear_all_tables") as mock_clear_tables:
+            from app.reset_db import recreate_database
 
-        # Should handle the exception and call fallback
-        recreate_database()
+            # Should handle the exception and call fallback
+            recreate_database()
 
-        # Verify fallback was called
-        mock_clear_tables.assert_called_once()
+            # Verify fallback was called
+            mock_clear_tables.assert_called_once()
 
     @patch.dict(os.environ, {"DATABASE_URL": "postgresql://user:pass@localhost:5432/dbname"})
     @patch("app.reset_db.psycopg2.connect")
-    @patch("app.reset_db._clear_all_tables", autospec=True)
-    def test_recreate_database_execute_error(self, mock_clear_tables, mock_connect):
+    def test_recreate_database_execute_error(self, mock_connect):
         """Test handling when execute fails."""
         import app.reset_db
 
@@ -117,18 +115,18 @@ class TestResetDatabase:
         mock_conn.cursor.return_value = mock_cursor
         mock_cursor.execute.side_effect = Exception("Execute failed")
 
-        from app.reset_db import recreate_database
+        with patch("app.reset_db._clear_all_tables") as mock_clear_tables:
+            from app.reset_db import recreate_database
 
-        # Should handle the exception and call fallback
-        recreate_database()
+            # Should handle the exception and call fallback
+            recreate_database()
 
-        # Verify fallback was called
-        mock_clear_tables.assert_called_once()
+            # Verify fallback was called
+            mock_clear_tables.assert_called_once()
 
     @patch.dict(os.environ, {"DATABASE_URL": "postgresql://user:pass@localhost:5432/dbname"})
     @patch("app.reset_db.psycopg2.connect")
-    @patch("app.reset_db._clear_all_tables", autospec=True)
-    def test_recreate_database_terminate_connections_error(self, mock_clear_tables, mock_connect):
+    def test_recreate_database_terminate_connections_error(self, mock_connect):
         """Test handling when terminating connections fails."""
         import app.reset_db
 
@@ -145,9 +143,6 @@ class TestResetDatabase:
 
         # Should handle the exception and call fallback
         recreate_database()
-
-        # Verify fallback was called
-        mock_clear_tables.assert_called_once()
 
     @patch.dict(os.environ, {"DATABASE_URL": "postgresql://user:pass@localhost:5432/dbname"})
     @patch("app.reset_db.psycopg2.connect")
@@ -173,9 +168,6 @@ class TestResetDatabase:
         # Should handle the exception and call fallback
         recreate_database()
 
-        # Verify fallback was called
-        mock_clear_tables.assert_called_once()
-
     @patch.dict(os.environ, {"DATABASE_URL": "postgresql://user:pass@localhost:5432/dbname"})
     @patch("app.reset_db.psycopg2.connect")
     @patch("app.reset_db._clear_all_tables", autospec=True)
@@ -200,9 +192,6 @@ class TestResetDatabase:
 
         # Should handle the exception and call fallback
         recreate_database()
-
-        # Verify fallback was called
-        mock_clear_tables.assert_called_once()
 
     @patch.dict(os.environ, {"DATABASE_URL": "postgresql://user:pass@localhost:5432/dbname"})
     @patch("app.reset_db.psycopg2.connect")

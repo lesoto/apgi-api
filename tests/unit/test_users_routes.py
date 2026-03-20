@@ -66,6 +66,7 @@ def viewer_client(db):
 
 # ── POST /v1/users/register ──────────────────────────────────────────────────
 
+
 def test_register_user_happy_path(client, db):
     mock_user = MagicMock()
     mock_user.user_id = "user-123"
@@ -104,6 +105,7 @@ def test_register_user_exception(client, db):
 
 # ── GET /v1/users/verify-email ───────────────────────────────────────────────
 
+
 def test_verify_email_valid_token(client, db):
     mock_user = MagicMock()
     mock_user.user_id = "user-123"
@@ -120,6 +122,7 @@ def test_verify_email_invalid_token(client, db):
 
 # ── POST /v1/users/create-default ───────────────────────────────────────────
 
+
 def test_create_default_user_happy_path(client, db):
     mock_user = MagicMock()
     mock_user.user_id = "admin-1"
@@ -135,6 +138,7 @@ def test_create_default_user_happy_path(client, db):
 
 # ── GET /v1/users/ ───────────────────────────────────────────────────────────
 
+
 def test_list_users_happy_path(client, db):
     mock_user = MagicMock()
     mock_user.user_id = "user-123"
@@ -149,8 +153,12 @@ def test_list_users_happy_path(client, db):
     with patch("app.routes.users.get_user_management_service") as mock_svc:
         mock_svc.return_value.list_users.return_value = [mock_user]
         mock_svc.return_value.get_user_stats.return_value = {
-            "total_users": 1, "active_users": 1, "inactive_users": 0,
-            "role_counts": {}, "total_sessions": 0, "active_sessions": 0,
+            "total_users": 1,
+            "active_users": 1,
+            "inactive_users": 0,
+            "role_counts": {},
+            "total_sessions": 0,
+            "active_sessions": 0,
         }
         resp = client.get("/v1/users/")
     assert resp.status_code == 200
@@ -167,6 +175,7 @@ def test_list_users_per_page_too_large(client, db):
 
 
 # ── GET /v1/users/me ─────────────────────────────────────────────────────────
+
 
 def test_get_me_happy_path(client, db):
     mock_user = MagicMock()
@@ -194,18 +203,23 @@ def test_get_me_not_found(client, db):
 
 # ── GET /v1/users/stats ──────────────────────────────────────────────────────
 
+
 def test_get_user_stats_happy_path(client, db):
     with patch("app.routes.users.get_user_management_service") as mock_svc:
         mock_svc.return_value.get_user_stats.return_value = {
-            "total_users": 10, "active_users": 8, "inactive_users": 2,
+            "total_users": 10,
+            "active_users": 8,
+            "inactive_users": 2,
             "role_counts": {"admin": 1, "viewer": 9},
-            "total_sessions": 5, "active_sessions": 2,
+            "total_sessions": 5,
+            "active_sessions": 2,
         }
         resp = client.get("/v1/users/stats")
     assert resp.status_code == 200
 
 
 # ── GET /v1/users/{user_id} ──────────────────────────────────────────────────
+
 
 def test_get_user_happy_path(client, db):
     mock_user = MagicMock()
@@ -232,6 +246,7 @@ def test_get_user_not_found(client, db):
 
 
 # ── PATCH /v1/users/{user_id} ────────────────────────────────────────────────
+
 
 def test_patch_user_own_user(client, db):
     mock_user = MagicMock()
@@ -264,6 +279,7 @@ def test_patch_user_not_found(client, db):
 
 # ── PUT /v1/users/{user_id} ──────────────────────────────────────────────────
 
+
 def test_put_user_own_user(client, db):
     mock_user = MagicMock()
     mock_user.user_id = "user-123"
@@ -288,6 +304,7 @@ def test_put_user_forbidden(viewer_client, db):
 
 # ── POST /v1/users/reset-password ────────────────────────────────────────────
 
+
 def test_reset_password_happy_path(client, db):
     with patch("app.routes.users.get_user_management_service") as mock_svc:
         mock_svc.return_value.request_password_reset.return_value = None
@@ -297,6 +314,7 @@ def test_reset_password_happy_path(client, db):
 
 def test_reset_password_user_not_found_still_200(client, db):
     from app.exceptions import UserNotFoundError
+
     with patch("app.routes.users.get_user_management_service") as mock_svc:
         mock_svc.return_value.request_password_reset.side_effect = UserNotFoundError("user-123")
         resp = client.post("/v1/users/reset-password", json={"email": "missing@example.com"})
@@ -304,6 +322,7 @@ def test_reset_password_user_not_found_still_200(client, db):
 
 
 # ── POST /v1/users/reset-password/confirm ────────────────────────────────────
+
 
 def test_confirm_password_reset_happy_path(client, db):
     with patch("app.routes.users.get_user_management_service") as mock_svc:
@@ -317,6 +336,7 @@ def test_confirm_password_reset_happy_path(client, db):
 
 def test_confirm_password_reset_validation_error(client, db):
     from app.exceptions import ValidationError
+
     with patch("app.routes.users.get_user_management_service") as mock_svc:
         mock_svc.return_value.confirm_password_reset.side_effect = ValidationError("bad token")
         resp = client.post(
@@ -327,6 +347,7 @@ def test_confirm_password_reset_validation_error(client, db):
 
 
 # ── POST /v1/users/{user_id}/reset-password ──────────────────────────────────
+
 
 def test_reset_user_password_own_user(client, db):
     with patch("app.routes.users.get_user_management_service") as mock_svc:
@@ -348,6 +369,7 @@ def test_reset_user_password_forbidden(viewer_client, db):
 
 def test_reset_user_password_not_found(client, db):
     from app.exceptions import UserNotFoundError
+
     with patch("app.routes.users.get_user_management_service") as mock_svc:
         mock_svc.return_value.reset_password.side_effect = UserNotFoundError("user-123")
         resp = client.post(
@@ -359,14 +381,16 @@ def test_reset_user_password_not_found(client, db):
 
 # ── POST /v1/users/mfa/enroll ────────────────────────────────────────────────
 
+
 def test_mfa_enroll_happy_path(client, db):
     mock_user = MagicMock()
     mock_user.mfa_secret = None
     mock_user.mfa_backup_codes = None
     mock_user.mfa_enabled = False
 
-    with patch("app.routes.users.get_user_management_service") as mock_svc, \
-         patch("app.routes.users.AuthManager") as mock_auth:
+    with patch("app.routes.users.get_user_management_service") as mock_svc, patch(
+        "app.routes.users.AuthManager"
+    ) as mock_auth:
         mock_svc.return_value.get_user.return_value = mock_user
         mock_auth.return_value.generate_mfa_secret.return_value = "JBSWY3DPEHPK3PXP"
         mock_auth.return_value.get_mfa_qr_url.return_value = "otpauth://totp/..."
@@ -376,13 +400,15 @@ def test_mfa_enroll_happy_path(client, db):
 
 # ── POST /v1/users/mfa/enable ────────────────────────────────────────────────
 
+
 def test_mfa_enable_happy_path(client, db):
     mock_user = MagicMock()
     mock_user.mfa_secret = "JBSWY3DPEHPK3PXP"
     mock_user.mfa_enabled = False
 
-    with patch("app.routes.users.get_user_management_service") as mock_svc, \
-         patch("app.routes.users.AuthManager") as mock_auth:
+    with patch("app.routes.users.get_user_management_service") as mock_svc, patch(
+        "app.routes.users.AuthManager"
+    ) as mock_auth:
         mock_svc.return_value.get_user.return_value = mock_user
         mock_auth.return_value.verify_mfa_code.return_value = True
         resp = client.post("/v1/users/mfa/enable", json={"code": "123456"})
@@ -403,8 +429,9 @@ def test_mfa_enable_invalid_code(client, db):
     mock_user = MagicMock()
     mock_user.mfa_secret = "JBSWY3DPEHPK3PXP"
 
-    with patch("app.routes.users.get_user_management_service") as mock_svc, \
-         patch("app.routes.users.AuthManager") as mock_auth:
+    with patch("app.routes.users.get_user_management_service") as mock_svc, patch(
+        "app.routes.users.AuthManager"
+    ) as mock_auth:
         mock_svc.return_value.get_user.return_value = mock_user
         mock_auth.return_value.verify_mfa_code.return_value = False
         resp = client.post("/v1/users/mfa/enable", json={"code": "000000"})
@@ -413,13 +440,15 @@ def test_mfa_enable_invalid_code(client, db):
 
 # ── POST /v1/users/mfa/disable ───────────────────────────────────────────────
 
+
 def test_mfa_disable_happy_path(client, db):
     mock_user = MagicMock()
     mock_user.mfa_enabled = True
     mock_user.password_hash = "hashed"
 
-    with patch("app.routes.users.get_user_management_service") as mock_svc, \
-         patch("app.routes.users.AuthManager") as mock_auth:
+    with patch("app.routes.users.get_user_management_service") as mock_svc, patch(
+        "app.routes.users.AuthManager"
+    ) as mock_auth:
         mock_svc.return_value.get_user.return_value = mock_user
         mock_auth.return_value.verify_password.return_value = True
         resp = client.post("/v1/users/mfa/disable", json={"password": "Password1"})
@@ -441,8 +470,9 @@ def test_mfa_disable_wrong_password(client, db):
     mock_user.mfa_enabled = True
     mock_user.password_hash = "hashed"
 
-    with patch("app.routes.users.get_user_management_service") as mock_svc, \
-         patch("app.routes.users.AuthManager") as mock_auth:
+    with patch("app.routes.users.get_user_management_service") as mock_svc, patch(
+        "app.routes.users.AuthManager"
+    ) as mock_auth:
         mock_svc.return_value.get_user.return_value = mock_user
         mock_auth.return_value.verify_password.return_value = False
         resp = client.post("/v1/users/mfa/disable", json={"password": "wrongpass"})
@@ -451,8 +481,10 @@ def test_mfa_disable_wrong_password(client, db):
 
 # ── POST /v1/users/mfa/backup-code/verify ────────────────────────────────────
 
+
 def test_mfa_backup_code_verify_happy_path(client, db):
     import hashlib
+
     code = "ABCDEF1234567890"
     hashed = hashlib.sha256(code.encode()).hexdigest()
 

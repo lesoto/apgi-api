@@ -9,6 +9,7 @@ from unittest.mock import patch
 from sqlalchemy import create_engine, inspect, text
 from sqlalchemy.orm import Session, sessionmaker
 
+from app.config import settings
 from app.database.connection import (
     close_db,
     get_db,
@@ -203,6 +204,13 @@ class TestConnectionPooling:
         """Test that connection pool has correct size settings."""
         pool = engine.pool
 
+        # SQLite uses StaticPool which doesn't have size() method or _max_overflow
+        # These pool attributes only apply to PostgreSQL's QueuePool
+        if settings.database_url.startswith("sqlite"):
+            # Skip pool size checks for SQLite
+            pytest.skip("Pool size checks not applicable for SQLite StaticPool")
+            return
+
         # Verify pool size (should be 20 as configured in connection.py)
         assert pool.size() == 20, "Pool size should be 20"  # type: ignore[attr-defined]
 
@@ -213,6 +221,12 @@ class TestConnectionPooling:
     def test_connection_pool_pre_ping_enabled(self):
         """Test that pre_ping is enabled for connection verification."""
         # Pre-ping is configured at engine level
+        # SQLite uses StaticPool which doesn't have _pre_ping attribute
+        if settings.database_url.startswith("sqlite"):
+            # Skip pre-ping checks for SQLite
+            pytest.skip("Pre-ping checks not applicable for SQLite StaticPool")
+            return
+
         # We can verify it's set by checking the engine's dialect settings
         assert engine.pool._pre_ping is True, "Pre-ping should be enabled"
 

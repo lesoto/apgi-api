@@ -8,8 +8,7 @@ Validates: Requirements 2.12
 """
 
 import pytest
-from unittest.mock import MagicMock, Mock, patch, AsyncMock
-from datetime import datetime, timezone
+from unittest.mock import patch, MagicMock, Mock, AsyncMock
 
 from app.services.authorization import (
     Role,
@@ -33,6 +32,7 @@ from app.exceptions import AuthorizationError, InvalidTokenError
 # Helpers
 # ---------------------------------------------------------------------------
 
+
 def make_user(user_id="u1", roles=None, permissions=None):
     """Create a minimal TokenPayload-like mock."""
     user = Mock()
@@ -45,6 +45,7 @@ def make_user(user_id="u1", roles=None, permissions=None):
 # ---------------------------------------------------------------------------
 # Role and Permission Enum Tests
 # ---------------------------------------------------------------------------
+
 
 class TestRoleEnum:
     def test_role_values(self):
@@ -104,21 +105,30 @@ class TestPermissionEnum:
 # ROLE_PERMISSIONS mapping tests
 # ---------------------------------------------------------------------------
 
+
 class TestRolePermissionsMapping:
     """Verify the ROLE_PERMISSIONS mapping is correct for each role."""
 
     # --- ADMIN ---
     def test_admin_has_all_session_permissions(self):
         admin_perms = ROLE_PERMISSIONS[Role.ADMIN]
-        for p in [Permission.SESSION_CREATE, Permission.SESSION_READ,
-                  Permission.SESSION_UPDATE, Permission.SESSION_DELETE,
-                  Permission.SESSION_CONTROL]:
+        for p in [
+            Permission.SESSION_CREATE,
+            Permission.SESSION_READ,
+            Permission.SESSION_UPDATE,
+            Permission.SESSION_DELETE,
+            Permission.SESSION_CONTROL,
+        ]:
             assert p in admin_perms
 
     def test_admin_has_all_template_permissions(self):
         admin_perms = ROLE_PERMISSIONS[Role.ADMIN]
-        for p in [Permission.TEMPLATE_CREATE, Permission.TEMPLATE_READ,
-                  Permission.TEMPLATE_UPDATE, Permission.TEMPLATE_DELETE]:
+        for p in [
+            Permission.TEMPLATE_CREATE,
+            Permission.TEMPLATE_READ,
+            Permission.TEMPLATE_UPDATE,
+            Permission.TEMPLATE_DELETE,
+        ]:
             assert p in admin_perms
 
     def test_admin_has_all_task_permissions(self):
@@ -138,22 +148,35 @@ class TestRolePermissionsMapping:
 
     def test_admin_has_all_user_permissions(self):
         admin_perms = ROLE_PERMISSIONS[Role.ADMIN]
-        for p in [Permission.USER_CREATE, Permission.USER_READ,
-                  Permission.USER_UPDATE, Permission.USER_DELETE, Permission.USER_ADMIN]:
+        for p in [
+            Permission.USER_CREATE,
+            Permission.USER_READ,
+            Permission.USER_UPDATE,
+            Permission.USER_DELETE,
+            Permission.USER_ADMIN,
+        ]:
             assert p in admin_perms
 
     # --- RESEARCHER ---
     def test_researcher_has_session_permissions(self):
         researcher_perms = ROLE_PERMISSIONS[Role.RESEARCHER]
-        for p in [Permission.SESSION_CREATE, Permission.SESSION_READ,
-                  Permission.SESSION_UPDATE, Permission.SESSION_DELETE,
-                  Permission.SESSION_CONTROL]:
+        for p in [
+            Permission.SESSION_CREATE,
+            Permission.SESSION_READ,
+            Permission.SESSION_UPDATE,
+            Permission.SESSION_DELETE,
+            Permission.SESSION_CONTROL,
+        ]:
             assert p in researcher_perms
 
     def test_researcher_has_template_permissions(self):
         researcher_perms = ROLE_PERMISSIONS[Role.RESEARCHER]
-        for p in [Permission.TEMPLATE_CREATE, Permission.TEMPLATE_READ,
-                  Permission.TEMPLATE_UPDATE, Permission.TEMPLATE_DELETE]:
+        for p in [
+            Permission.TEMPLATE_CREATE,
+            Permission.TEMPLATE_READ,
+            Permission.TEMPLATE_UPDATE,
+            Permission.TEMPLATE_DELETE,
+        ]:
             assert p in researcher_perms
 
     def test_researcher_has_task_permissions(self):
@@ -189,20 +212,31 @@ class TestRolePermissionsMapping:
 
     def test_viewer_lacks_write_permissions(self):
         viewer_perms = ROLE_PERMISSIONS[Role.VIEWER]
-        for p in [Permission.SESSION_CREATE, Permission.SESSION_UPDATE,
-                  Permission.SESSION_DELETE, Permission.SESSION_CONTROL,
-                  Permission.TEMPLATE_CREATE, Permission.TEMPLATE_UPDATE,
-                  Permission.TEMPLATE_DELETE, Permission.TASK_CREATE,
-                  Permission.TASK_DELETE, Permission.DATA_EXPORT,
-                  Permission.SYSTEM_ADMIN, Permission.USER_MANAGE,
-                  Permission.USER_CREATE, Permission.USER_UPDATE,
-                  Permission.USER_DELETE, Permission.USER_ADMIN]:
+        for p in [
+            Permission.SESSION_CREATE,
+            Permission.SESSION_UPDATE,
+            Permission.SESSION_DELETE,
+            Permission.SESSION_CONTROL,
+            Permission.TEMPLATE_CREATE,
+            Permission.TEMPLATE_UPDATE,
+            Permission.TEMPLATE_DELETE,
+            Permission.TASK_CREATE,
+            Permission.TASK_DELETE,
+            Permission.DATA_EXPORT,
+            Permission.SYSTEM_ADMIN,
+            Permission.USER_MANAGE,
+            Permission.USER_CREATE,
+            Permission.USER_UPDATE,
+            Permission.USER_DELETE,
+            Permission.USER_ADMIN,
+        ]:
             assert p not in viewer_perms
 
 
 # ---------------------------------------------------------------------------
 # get_permissions_for_roles
 # ---------------------------------------------------------------------------
+
 
 class TestGetPermissionsForRoles:
     def test_empty_roles_returns_empty_set(self):
@@ -236,9 +270,11 @@ class TestGetPermissionsForRoles:
 
     def test_all_roles_returns_union(self):
         result = get_permissions_for_roles(["admin", "researcher", "viewer"])
-        expected = (ROLE_PERMISSIONS[Role.ADMIN]
-                    | ROLE_PERMISSIONS[Role.RESEARCHER]
-                    | ROLE_PERMISSIONS[Role.VIEWER])
+        expected = (
+            ROLE_PERMISSIONS[Role.ADMIN]
+            | ROLE_PERMISSIONS[Role.RESEARCHER]
+            | ROLE_PERMISSIONS[Role.VIEWER]
+        )
         assert result == expected
 
     def test_duplicate_roles_handled(self):
@@ -253,6 +289,7 @@ class TestGetPermissionsForRoles:
 # ---------------------------------------------------------------------------
 # has_permission
 # ---------------------------------------------------------------------------
+
 
 class TestHasPermission:
     # Admin can do everything
@@ -316,6 +353,7 @@ class TestHasPermission:
 # has_any_role
 # ---------------------------------------------------------------------------
 
+
 class TestHasAnyRole:
     def test_admin_matches_admin_requirement(self):
         assert has_any_role(["admin"], [Role.ADMIN]) is True
@@ -354,6 +392,7 @@ class TestHasAnyRole:
 # ---------------------------------------------------------------------------
 # check_permission
 # ---------------------------------------------------------------------------
+
 
 class TestCheckPermission:
     """Tests for check_permission() — the core authorization gate."""
@@ -494,6 +533,7 @@ class TestCheckPermission:
 # log_audit_event
 # ---------------------------------------------------------------------------
 
+
 class TestLogAuditEvent:
     def test_with_db_adds_and_commits(self):
         mock_db = MagicMock()
@@ -551,6 +591,7 @@ class TestLogAuditEvent:
 # ---------------------------------------------------------------------------
 # check_resource_ownership
 # ---------------------------------------------------------------------------
+
 
 class TestCheckResourceOwnership:
     def test_owner_is_granted(self):
@@ -616,6 +657,7 @@ class TestCheckResourceOwnership:
 # get_current_user (async FastAPI dependency)
 # ---------------------------------------------------------------------------
 
+
 class TestGetCurrentUser:
     @pytest.mark.asyncio
     async def test_returns_middleware_user_if_set(self):
@@ -631,8 +673,10 @@ class TestGetCurrentUser:
     @pytest.mark.asyncio
     async def test_raises_invalid_token_if_no_credentials(self):
         """No middleware user and no credentials → InvalidTokenError."""
+
         class _State:
             pass
+
         class _Request:
             state = _State()
 
@@ -646,6 +690,7 @@ class TestGetCurrentUser:
     async def test_raises_invalid_token_if_empty_credentials(self):
         class _State:
             pass
+
         class _Request:
             state = _State()
 
@@ -660,8 +705,10 @@ class TestGetCurrentUser:
     @pytest.mark.asyncio
     async def test_jwt_auth_success(self):
         """Valid JWT token → returns TokenPayload from AuthManager."""
+
         class _State:
             pass
+
         class _Request:
             state = _State()
 
@@ -684,6 +731,7 @@ class TestGetCurrentUser:
     async def test_expired_token_raises_invalid_token_error(self):
         class _State:
             pass
+
         class _Request:
             state = _State()
 
@@ -705,6 +753,7 @@ class TestGetCurrentUser:
     async def test_invalid_token_format_raises_invalid_token_error(self):
         class _State:
             pass
+
         class _Request:
             state = _State()
 
@@ -725,6 +774,7 @@ class TestGetCurrentUser:
     async def test_malformed_token_raises_invalid_token_error(self):
         class _State:
             pass
+
         class _Request:
             state = _State()
 
@@ -745,6 +795,7 @@ class TestGetCurrentUser:
     async def test_wrong_token_type_raises_invalid_token_error(self):
         class _State:
             pass
+
         class _Request:
             state = _State()
 
@@ -765,6 +816,7 @@ class TestGetCurrentUser:
     async def test_generic_auth_error_raises_invalid_token_error(self):
         class _State:
             pass
+
         class _Request:
             state = _State()
 
@@ -785,6 +837,7 @@ class TestGetCurrentUser:
 # ---------------------------------------------------------------------------
 # require_permission dependency factory
 # ---------------------------------------------------------------------------
+
 
 class TestRequirePermission:
     def test_returns_callable(self):
@@ -847,6 +900,7 @@ class TestRequirePermission:
 # require_role dependency factory
 # ---------------------------------------------------------------------------
 
+
 class TestRequireRole:
     def test_returns_callable(self):
         dep = require_role(Role.ADMIN)
@@ -906,6 +960,7 @@ class TestRequireRole:
 # require_any_role dependency factory
 # ---------------------------------------------------------------------------
 
+
 class TestRequireAnyRole:
     def test_returns_callable(self):
         dep = require_any_role([Role.ADMIN, Role.RESEARCHER])
@@ -955,4 +1010,3 @@ class TestRequireAnyRole:
             user = make_user(roles=[role.value])
             result = await checker(current_user=user)
             assert result is user
-

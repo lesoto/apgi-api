@@ -1,12 +1,99 @@
-"""
-Tests for ResponseSchemaValidationMiddleware
-
-Coverage: 11% -> 100% target
-"""
+"""Unit tests for schema_validation.py middleware."""
 
 import json
 import pytest
-from unittest.mock import AsyncMock, Mock
+from unittest.mock import patch, MagicMock, Mock, AsyncMock
+from app.middleware.schema_validation import ResponseSchemaValidationMiddleware
+
+
+class TestResponseSchemaValidationMiddleware:
+    """Test ResponseSchemaValidationMiddleware functionality."""
+
+    @pytest.fixture
+    def validation_middleware():
+        return ResponseSchemaValidationMiddleware()
+
+    def test_valid_json_schema(self, validation_middleware):
+        """Test valid JSON schema validation."""
+        with patch("app.middleware.schema_validation.json.loads") as mock_loads:
+            mock_loads.return_value = {"valid": "data"}
+
+            # Create mock ASGI scope
+            mock_scope = MagicMock()
+            mock_scope.receive = MagicMock(return_value={"type": "http.request"})
+            mock_scope.receive.return_value = {"type": "http.response", "body": {"valid": "data"}}
+
+            # Process valid request
+            result = validation_middleware.process_request(mock_scope)
+
+            # Should pass validation
+            assert result["body"] == {"valid": "data"}
+
+    def test_invalid_json_schema(self, validation_middleware):
+        """Test invalid JSON schema validation."""
+        with patch("app.middleware.schema_validation.json.loads") as mock_loads:
+            mock_loads.side_effect = ValueError("Invalid JSON")
+
+            # Create mock ASGI scope
+            mock_scope = MagicMock()
+            mock_scope.receive = MagicMock(return_value={"type": "http.request"})
+            mock_scope.receive.return_value = {"type": "http.response", "body": "invalid"}
+
+            # Process invalid request
+            result = validation_middleware.process_request(mock_scope)
+
+            # Should return validation error
+            assert "error" in result["body"].lower()
+            assert result["status_code"] == 400
+
+    def test_missing_content_type(self, validation_middleware):
+        """Test missing content-type validation."""
+        with patch("app.middleware.schema_validation.json.loads") as mock_loads:
+            mock_loads.return_value = {"valid": "data"}
+
+            # Create mock ASGI scope with missing content-type
+            mock_scope = MagicMock()
+            mock_scope.receive = MagicMock(return_value={"type": "http.request"})
+            mock_scope.receive.return_value = {"type": "http.response", "body": {"valid": "data"}}
+
+            # Remove content-type from headers
+            mock_scope.receive.side_effect = [
+                {"type": "http.request", "headers": {}},
+                {"type": "http.response", "body": {"valid": "data"}},
+            ]
+
+            # Process request without content-type
+            result = validation_middleware.process_request(mock_scope)
+
+            # Should return validation error
+            assert "content-type" in result["body"].lower()
+            assert result["status_code"] == 400
+
+    def test_large_payload_validation(self, validation_middleware):
+        """Test large payload size validation."""
+        with patch("app.middleware.schema_validation.json.loads") as mock_loads:
+            mock_loads.return_value = {"valid": "data"}
+
+            # Create mock ASGI scope with large payload
+            mock_scope = MagicMock()
+            mock_scope.receive = MagicMock(
+                return_value={
+                    "type": "http.request",
+                    "headers": {"content-length": "10000000"},  # 10MB
+                }
+            )
+            mock_scope.receive.return_value = {
+                "type": "http.response",
+                "body": "x" * 1000000,  # Large payload
+            }
+
+            # Process large request
+            result = validation_middleware.process_request(mock_scope)
+
+            # Should return size validation error
+            assert "too large" in result["body"].lower()
+            assert result["status_code"] == 413
+
 
 from app.middleware.schema_validation import ResponseSchemaValidationMiddleware
 
@@ -430,7 +517,6 @@ class TestResponseSchemaValidationMiddleware:
 # ---------------------------------------------------------------------------
 import json as _json
 from unittest.mock import MagicMock as _MagicMock, AsyncMock as _AsyncMock
-from fastapi import Request as _Request, Response as _Response
 
 
 class TestSchemaValidationMiddlewareExtra:
