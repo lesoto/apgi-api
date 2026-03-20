@@ -73,7 +73,7 @@ async def get_dashboard_overview(
         Overview metrics for dashboard display
     """
     try:
-        return service.get_overview_metrics()
+        return await service.get_overview_metrics()
     except Exception as e:
         logger.exception("Failed to get dashboard overview")
         raise HTTPException(

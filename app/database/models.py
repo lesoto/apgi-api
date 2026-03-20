@@ -77,8 +77,8 @@ class User(Base):  # type: ignore[misc, valid-type]
         String(255), unique=True, nullable=False, index=True, comment="User email address"
     )
     password_hash = Column(String(255), nullable=False, comment="Hashed password")
-    roles = Column(
-        ARRAY(sa.Text()), nullable=False, default=lambda: [], comment="User roles for RBAC"
+    roles: Mapped[list[str]] = mapped_column(
+        ARRAY(sa.Text()), nullable=False, default=list, comment="User roles for RBAC"
     )
     is_active = Column(
         Boolean, nullable=False, default=True, comment="Whether the user account is active"
@@ -220,7 +220,7 @@ class Session(Base):  # type: ignore[misc, valid-type]
         comment="Full APGI system state for persistence",
     )
     state: Mapped[SessionState] = mapped_column(
-        SQLEnum(SessionState),
+        SQLEnum(SessionState, values_callable=lambda x: [e.value for e in x]),
         nullable=False,
         default=SessionState.CREATED,
         index=True,
@@ -240,7 +240,9 @@ class Session(Base):  # type: ignore[misc, valid-type]
         comment="Last update timestamp",
     )
     description = Column(Text, nullable=True, comment="Human-readable session description")
-    tags = Column(JSON, nullable=True, default=lambda: [], comment="Session tags for organization")
+    tags: Mapped[list[str]] = mapped_column(
+        ARRAY(String), nullable=True, default=list, comment="Session tags for organization"
+    )
     is_deleted = Column(Boolean, nullable=False, default=False, comment="Soft delete flag")
 
     # Relationships

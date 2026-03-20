@@ -34,10 +34,10 @@ else:
         settings.database_url,
         echo=False,  # Set to True for SQL query logging
         pool_pre_ping=True,  # Verify connections before using
-        pool_size=getattr(settings, "pool_size", 20),  # Configurable pool size
-        max_overflow=getattr(settings, "max_overflow", 30),  # Configurable overflow
-        pool_timeout=getattr(settings, "pool_timeout", 30),  # Configurable timeout
-        pool_recycle=getattr(settings, "pool_recycle", 3600),  # Configurable recycle
+        pool_size=settings.pool_size,  # Configurable pool size
+        max_overflow=settings.max_overflow,  # Configurable overflow
+        pool_timeout=settings.pool_timeout,  # Configurable timeout
+        pool_recycle=settings.pool_recycle,  # Configurable recycle
         echo_pool=False,  # Disable pool logging in production
     )
 
@@ -118,25 +118,35 @@ def create_default_user():
         secure_username = generate_secure_username("default")
         secure_password = generate_secure_password()
 
-        # Write credentials to secure file (never print to stdout/stderr)
+        # Write credentials to secure temporary file with proper cleanup
         import pathlib
         import tempfile
 
-        # Use temp directory instead of /run/secrets for non-container environments
-        secrets_dir = pathlib.Path(tempfile.gettempdir()) / "apgi_api_secrets"
-        secrets_file = secrets_dir / "default_user"
-        secrets_file.parent.mkdir(parents=True, exist_ok=True)
-        secrets_content = f"""Generated default user credentials - STORE SECURELY
+        # Use NamedTemporaryFile with delete=True for automatic cleanup
+        # Use mode='w+' to write text and keep file open for logging
+        with tempfile.NamedTemporaryFile(
+            mode="w+",
+            prefix="apgi_default_user_",
+            suffix=".txt",
+            delete=True,
+            encoding="utf-8",
+        ) as temp_file:
+            secrets_content = f"""Generated default user credentials - STORE SECURELY
 Username: {secure_username}
 Password: {secure_password}
 NOTE: These credentials allow full system access - change immediately
 """
-        secrets_file.write_text(secrets_content)
-        secrets_file.chmod(0o600)  # Owner read/write only
+            temp_file.write(secrets_content)
+            temp_file.flush()
 
-        logger.warning(
-            f"Default user created: {secure_username} - credentials written to {secrets_file}"
-        )
+            # Get the file path before it's deleted
+            secrets_file_path = pathlib.Path(temp_file.name)
+            secrets_file_path.chmod(0o600)
+
+            logger.warning(
+                f"Default user created: {secure_username} - credentials written to temporary file: {secrets_file_path}"
+                f" (File will be automatically cleaned up when closed)"
+            )
 
         # Import here to avoid circular import
         from app.services.auth_manager import AuthManager

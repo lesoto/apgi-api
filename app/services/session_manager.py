@@ -12,18 +12,17 @@ import uuid
 import time
 from datetime import datetime, timezone
 from enum import Enum
-from typing import Any, Dict, Optional, Tuple, cast
+from typing import Any, Dict, Optional, Tuple
 from collections import OrderedDict
 
 import redis.asyncio as redis
 from sqlalchemy import select, func
 
 from app.database.models import Session as SessionModel
-from app.database.models import SessionState
 from app.database.models import SessionTemplate
 from app.models.schemas import SessionCreateRequest
 from app.config import settings
-from app import APGISystem  # type: ignore[import-untyped]
+from app import APGISystem
 
 logger = logging.getLogger(__name__)
 
@@ -140,6 +139,9 @@ class SimulationSession:
             for key, value in override.items():
                 if key in base and isinstance(base[key], dict) and isinstance(value, dict):
                     deep_merge(base[key], value)
+                elif key in base and isinstance(base[key], dict):
+                    # Base is dict but override is not - can't merge, replace
+                    base[key] = value
                 else:
                     base[key] = value
 
@@ -150,7 +152,7 @@ class SimulationSession:
 
     def _capture_state(self) -> Dict[str, Any]:
         """Capture complete system state for pause/resume."""
-        state = cast(Dict[str, Any], self.apgi_system.get_state())
+        state = self.apgi_system.get_state()
 
         # Explicitly capture subsystem states for full restoration
         state["allostasis"] = self.apgi_system.allostasis.save_state()
@@ -350,7 +352,7 @@ class SimulationSession:
             ignition_thresholds = history.setdefault("ignition_thresholds", [])
             ignition_thresholds.append(ignition_data.get("threshold", 2.0))
 
-            return cast(Dict[str, Any], state)
+            return state
 
     async def get_state(self) -> Dict[str, Any]:
         """
@@ -372,7 +374,7 @@ class SimulationSession:
                 "updated_at": self.updated_at.isoformat() + "Z",
             }
 
-            return cast(Dict[str, Any], state)
+            return state
 
         return state
 
@@ -566,9 +568,10 @@ class SessionManager:
                     user_id=user_id,
                     template_id=template_id,
                     config=config,
-                    state=SessionState.CREATED.value,
+                    state="created",
                     description=config.get("description"),
                     tags=[],
+                    is_deleted=False,
                 )
                 db_session.add(db_model)
                 db_session.commit()

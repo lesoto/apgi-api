@@ -280,6 +280,12 @@ All endpoints except `/health`, `/docs`, and `/openapi.json` require authenticat
             token_expiry_minutes=60,
         )
 
+    # Add rate limiting middleware BEFORE authentication to protect against brute-force attacks
+    # This ensures unauthenticated requests (e.g., login attempts) are rate-limited before auth processing
+    app.add_middleware(
+        RateLimitingMiddleware, redis_client=None, enabled=settings.rate_limit_enabled
+    )
+
     # Add authentication middleware (extracts and verifies JWT tokens) - skip in test mode
     if not test_mode:
         app.add_middleware(AuthenticationMiddleware)
@@ -287,11 +293,6 @@ All endpoints except `/health`, `/docs`, and `/openapi.json` require authenticat
     # Add security input validation middleware - skip in test mode
     if not test_mode:
         app.add_middleware(SecurityValidationMiddleware, enabled=True)
-
-    # Add rate limiting middleware (will be enabled if Redis is available)
-    app.add_middleware(
-        RateLimitingMiddleware, redis_client=None, enabled=settings.rate_limit_enabled
-    )
 
     # Add security headers middleware
     app.add_middleware(SecurityHeadersMiddleware)

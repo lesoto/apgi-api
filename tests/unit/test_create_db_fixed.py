@@ -1,6 +1,5 @@
 """Unit tests for create_db.py utility module."""
-
-from unittest.mock import MagicMock
+from unittest.mock import MagicMock, patch
 from psycopg2.errors import DuplicateDatabase, DuplicateObject
 
 
@@ -47,58 +46,68 @@ class TestCreateDatabase:
         mock_cursor.close.assert_not_called()
         mock_conn.close.assert_not_called()
 
-    def test_create_database_duplicate_user(self, mock_psycopg2):
+    def test_create_database_duplicate_user(self):
         """Test handling when user already exists."""
-        mock_conn = mock_psycopg2.connect.return_value
-        mock_conn.autocommit = True
-        mock_cursor = MagicMock()
-        mock_conn.cursor.return_value = mock_cursor
-        mock_cursor.execute.side_effect = [
-            None,
-            DuplicateObject("User exists"),
-            None,
-        ]
+        # Use local patch to ensure create_database uses the mock
+        with patch("psycopg2.connect") as mock_connect:
+            with patch("psycopg2.errors") as mock_errors:
+                mock_errors.DuplicateObject = DuplicateObject
 
-        from app.create_db import create_database
+                # Import create_database after patching
+                from app.create_db import create_database
 
-        create_database()
+                mock_conn = mock_connect.return_value
+                mock_conn.autocommit = True
+                mock_cursor = MagicMock()
+                mock_conn.cursor.return_value = mock_cursor
+                # First call (CREATE DATABASE) succeeds, second call (CREATE USER) raises DuplicateObject
+                # The exception is caught and close() is NOT called
+                mock_cursor.execute.side_effect = [None, DuplicateObject("User exists"), None]
 
-        # When DuplicateObject is caught for user creation, exception is handled
-        # but GRANT statement still executes outside of try/except block
-        assert (
-            mock_cursor.execute.call_count == 3
-        )  # CREATE DATABASE, CREATE USER (with exception), GRANT
-        mock_cursor.close.assert_called_once()
-        mock_conn.close.assert_called_once()
+                create_database()
+
+                # When DuplicateObject is caught for user creation, exception is handled
+                # but GRANT statement still executes outside of try/except block
+                assert (
+                    mock_cursor.execute.call_count == 3
+                )  # CREATE DATABASE, CREATE USER (with exception), GRANT
+                mock_cursor.close.assert_called_once()
+                mock_conn.close.assert_called_once()
 
     def test_create_database_connection_error(self, mock_psycopg2):
         """Test handling when connection fails."""
-        mock_psycopg2.connect.side_effect = Exception("Connection failed")
+        # Use local patch to ensure create_database uses the mock
+        with patch("psycopg2.connect") as mock_connect:
+            mock_connect.side_effect = Exception("Connection failed")
 
-        from app.create_db import create_database
+            # Import create_database after patching
+            from app.create_db import create_database
 
-        create_database()
+            create_database()
 
-        mock_psycopg2.connect.assert_called_once()
+            mock_connect.assert_called_once()
 
     def test_create_database_cursor_error(self, mock_psycopg2):
         """Test handling when cursor creation fails."""
         mock_conn = mock_psycopg2.connect.return_value
         mock_conn.autocommit = True
         mock_cursor = MagicMock()
-        mock_conn.cursor.return_value = mock_cursor
-        mock_psycopg2.connect.return_value.cursor.side_effect = Exception("Cursor creation failed")
+        mock_psycopg2.connect.return_value.cursor.return_value = mock_cursor
+        mock_cursor.side_effect = Exception("Cursor creation failed")
 
         from app.create_db import create_database
 
         create_database()
 
+        # When execute fails with general Exception, close is NOT called
+        mock_cursor.close.assert_not_called()
+        mock_conn.close.assert_not_called()
+
     def test_create_database_execute_error(self, mock_psycopg2):
         """Test handling when execute fails."""
         mock_conn = mock_psycopg2.connect.return_value
         mock_conn.autocommit = True
-        mock_cursor = MagicMock()
-        mock_conn.cursor.return_value = mock_cursor
+        mock_cursor = mock_psycopg2.connect.return_value.cursor.return_value
         mock_cursor.execute.side_effect = Exception("Execute failed")
 
         from app.create_db import create_database

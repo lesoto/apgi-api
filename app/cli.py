@@ -75,7 +75,7 @@ def worker(queues: str, concurrency: int, loglevel: str, hostname: str):
             worker_args.append(f"--hostname={hostname}")
 
         # Start the worker
-        logger.info(f"Starting Celery worker with args: {worker_args}")
+        click.echo("Starting Celery worker")
         celery_app.start(worker_args)
 
     except Exception as e:
@@ -124,6 +124,7 @@ def seed(users: int, templates: int, sessions: int, tasks: int, clear: bool, ver
         )
 
         logger.info("Database seeding completed successfully")
+        click.echo("Database seeding completed successfully")
         if verbose:
             for key, value in result.items():
                 if isinstance(value, list) and len(value) > 5:

@@ -16,6 +16,7 @@ os.environ.setdefault("DATABASE_URL", "sqlite:///:memory:")
 os.environ.setdefault("REDIS_URL", "redis://localhost:6379/1")
 
 # ── Hypothesis profiles ──────────────────────────────────────────────────────
+import hypothesis  # noqa: E402
 from hypothesis import settings, HealthCheck  # noqa: E402
 
 settings.register_profile(
@@ -23,6 +24,7 @@ settings.register_profile(
     max_examples=100,
     deadline=None,
     suppress_health_check=[HealthCheck.too_slow, HealthCheck.filter_too_much],
+    phases=[hypothesis.Phase.generate, hypothesis.Phase.shrink],
 )
 
 settings.register_profile(
@@ -30,12 +32,14 @@ settings.register_profile(
     max_examples=20,
     deadline=None,
     suppress_health_check=[HealthCheck.too_slow],
+    phases=[hypothesis.Phase.generate, hypothesis.Phase.shrink],
 )
 
 settings.register_profile(
     "thorough",
     max_examples=1000,
     deadline=None,
+    phases=[hypothesis.Phase.generate, hypothesis.Phase.shrink],
 )
 
 # Load "ci" when running in CI, otherwise "dev" for faster local iteration.

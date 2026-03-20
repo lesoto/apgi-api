@@ -29,7 +29,26 @@ class APGISystem:
     """Mock APGI System implementation."""
 
     def __init__(self, config_path: Optional[Dict[str, Any]] = None):
-        self.config: Dict[str, Any] = config_path or {}
+        # Handle config_path being a string (file path) or dict
+        if isinstance(config_path, str):
+            # Load config from file path
+            import os
+
+            if os.path.exists(config_path):
+                import yaml
+
+                try:
+                    with open(config_path, "r") as f:
+                        loaded = yaml.safe_load(f)
+                        self.config: Dict[str, Any] = loaded if loaded else {}
+                except Exception:
+                    self.config = {}
+            else:
+                self.config = {}
+        elif isinstance(config_path, dict):
+            self.config = config_path
+        else:
+            self.config = {}
         self.time = 0.0
         self.history: Dict[str, Any] = {}
         self.allostasis = MockSubSystem("allostasis")

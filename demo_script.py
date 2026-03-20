@@ -152,7 +152,7 @@ class APIDemo:
         except Exception:
             # Use the actual credentials as fallback
             login_data = {
-                "username": "default_e88ff98b168b8ef7",
+                "username": "default_453f0163d1d998ad",
                 "password": "GShnY46?a$s6Ug%:HG!aquBkVgSliTv!",
                 "remember_me": False,
             }
@@ -259,12 +259,12 @@ class APIDemo:
         # 7. Metrics Dashboard
         print("\n7. METRICS DASHBOARD")
 
-        self.make_request("GET", "/v1/metrics/dashboard")
-        self.make_request("GET", "/v1/metrics/overview")
-        self.make_request("GET", "/v1/metrics/sessions")
-        self.make_request("GET", "/v1/metrics/tasks")
-        self.make_request("GET", "/v1/metrics/users")
-        self.make_request("GET", "/v1/metrics/templates")
+        self.make_request("GET", "/v1/dashboard")
+        self.make_request("GET", "/v1/dashboard/overview")
+        self.make_request("GET", "/v1/dashboard/sessions")
+        self.make_request("GET", "/v1/dashboard/tasks")
+        self.make_request("GET", "/v1/dashboard/users")
+        self.make_request("GET", "/v1/dashboard/templates")
 
         # 8. Token Management
         print("\n8. TOKEN MANAGEMENT")
