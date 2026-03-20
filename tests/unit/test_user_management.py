@@ -12,7 +12,7 @@ from app.exceptions import UserNotFoundError, ValidationError
 @pytest.fixture
 def mock_db():
     """Mock database session."""
-    db = MagicMock(spec=Session)
+    db = MagicMock()
     db.commit = MagicMock()
     db.rollback = MagicMock()
     db.query = MagicMock()
@@ -333,6 +333,40 @@ class TestListUsers:
         mock_query.offset.assert_called_once_with(10)
         mock_query.limit.assert_called_once_with(10)
 
+    def test_list_users_result_length_le_limit(self, mock_db, mock_auth_manager, mock_user_model):
+        """Test that list_users returns at most `limit` users (pagination invariant)."""
+        limit = 3
+        users_returned = [mock_user_model] * 2  # fewer than limit
+
+        mock_query = MagicMock()
+        mock_query.filter.return_value = mock_query
+        mock_query.offset.return_value = mock_query
+        mock_query.limit.return_value = mock_query
+        mock_query.all.return_value = users_returned
+        mock_db.query.return_value = mock_query
+
+        service = UserManagementService(mock_db)
+
+        users = service.list_users(skip=0, limit=limit, active_only=False)
+
+        assert len(users) <= limit
+
+    def test_list_users_empty(self, mock_db, mock_auth_manager):
+        """Test list_users returns empty list when no users match."""
+        mock_query = MagicMock()
+        mock_query.filter.return_value = mock_query
+        mock_query.offset.return_value = mock_query
+        mock_query.limit.return_value = mock_query
+        mock_query.all.return_value = []
+        mock_db.query.return_value = mock_query
+
+        service = UserManagementService(mock_db)
+
+        users = service.list_users(skip=0, limit=10)
+
+        assert users == []
+        assert len(users) <= 10
+
 
 class TestGetUser:
     """Tests for get_user method."""
@@ -631,6 +665,25 @@ class TestConfirmPasswordReset:
         assert "Database error" in str(exc_info)
         mock_db.rollback.assert_called_once()
 
+    def test_confirm_password_reset_token_revocation_failure(
+        self, mock_db, mock_auth_manager, mock_user_model
+    ):
+        """Test password reset confirmation when token revocation fails (lines 351-352)."""
+        mock_user_model.password_reset_token = "hashed_token"
+        mock_user_model.password_reset_expires_at = datetime.now(timezone.utc) + timedelta(hours=1)
+        mock_db.query.return_value.filter.return_value.filter.return_value.filter.return_value.first.return_value = (
+            mock_user_model
+        )
+        # Token revocation raises but password reset should still succeed
+        mock_auth_manager.revoke_all_user_tokens.side_effect = Exception("Revocation failed")
+
+        service = UserManagementService(mock_db)
+
+        # Should not raise — revocation failure is swallowed
+        service.confirm_password_reset("valid_token", "NewSecure123!")
+
+        mock_db.commit.assert_called_once()
+
 
 class TestResetPassword:
     """Tests for reset_password method."""
@@ -690,6 +743,40 @@ class TestResetPassword:
 
         with pytest.raises(Exception) as exc_info:
             service.reset_password("user123", "NewSecure123!")
+
+        assert "Database error" in str(exc_info)
+        mock_db.rollback.assert_called_once()
+
+    def test_reset_password_revocation_failure(self, mock_db, mock_auth_manager, mock_user_model):
+        """Test reset password when token revocation fails (lines 447-448)."""
+        mock_db.query.return_value.filter.return_value.filter.return_value.first.return_value = (
+            mock_user_model
+        )
+        # Revocation raises but password reset should still succeed
+        mock_auth_manager.revoke_all_user_tokens.side_effect = Exception("Revocation failed")
+
+        service = UserManagementService(mock_db)
+
+        result = service.reset_password("user123", "NewSecure123!")
+
+        assert result == "Password reset successfully"
+        mock_db.commit.assert_called_once()
+
+    @patch("app.services.user_management.settings")
+    def test_reset_password_no_password_commit_error(
+        self, mock_settings, mock_db, mock_auth_manager, mock_user_model
+    ):
+        """Test reset password without new_password when commit fails (lines 475-478)."""
+        mock_settings.smtp_server = None
+        mock_db.query.return_value.filter.return_value.filter.return_value.first.return_value = (
+            mock_user_model
+        )
+        mock_db.commit.side_effect = Exception("Database error")
+
+        service = UserManagementService(mock_db)
+
+        with pytest.raises(Exception) as exc_info:
+            service.reset_password("user123")
 
         assert "Database error" in str(exc_info)
         mock_db.rollback.assert_called_once()

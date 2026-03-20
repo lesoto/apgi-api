@@ -183,8 +183,11 @@ class TestAuthenticationMiddleware:
             "token_type": "access",
         }
 
-        with patch("jwt.decode", return_value=mock_payload), patch(
-            "app.services.auth_manager.TokenPayload.from_dict", return_value=mock_user_payload
+        with (
+            patch("jwt.decode", return_value=mock_payload),
+            patch(
+                "app.services.auth_manager.TokenPayload.from_dict", return_value=mock_user_payload
+            ),
         ):
             result = auth_middleware._decode_and_validate_token("valid.jwt.token")
 

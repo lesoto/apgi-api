@@ -1,98 +1,72 @@
 """
-Shared test fixtures and configuration for standalone API tests.
-
-This module provides common fixtures used across unit, property-based,
-and integration tests for the standalone API.
+Root conftest.py — sets all required environment variables BEFORE any app import,
+registers Hypothesis profiles, and provides shared SQLite in-memory fixtures.
 """
 
 import os
-import pytest  # noqa: F401
-from hypothesis import settings, HealthCheck
-from unittest.mock import patch, MagicMock
-from sqlalchemy import create_engine
-from sqlalchemy.orm import sessionmaker
 
-# Test database URL using SQLite in-memory database
-TEST_DATABASE_URL = "sqlite:///:memory:"
+# ── Environment variables ────────────────────────────────────────────────────
+# These MUST be set before any app module is imported so that app.config.Settings()
+# can construct without raising ValueError.
+os.environ.setdefault("JWT_SECRET_KEY", "test-secret-key-that-is-long-enough-32chars!")
+os.environ.setdefault("CURSOR_SIGNING_KEY", "test-cursor-key-that-is-long-enough-32chars!")
+os.environ.setdefault("WEBHOOK_SECRET_KEY", "test-webhook-key-that-is-long-enough-32c!")
+os.environ.setdefault("ENVIRONMENT", "development")
+os.environ.setdefault("DATABASE_URL", "sqlite:///:memory:")
+os.environ.setdefault("REDIS_URL", "redis://localhost:6379/1")
+
+# ── Hypothesis profiles ──────────────────────────────────────────────────────
+from hypothesis import settings, HealthCheck  # noqa: E402
+
+settings.register_profile(
+    "ci",
+    max_examples=100,
+    deadline=None,
+    suppress_health_check=[HealthCheck.too_slow, HealthCheck.filter_too_much],
+)
+
+settings.register_profile(
+    "dev",
+    max_examples=20,
+    deadline=None,
+    suppress_health_check=[HealthCheck.too_slow],
+)
+
+settings.register_profile(
+    "thorough",
+    max_examples=1000,
+    deadline=None,
+)
+
+# Load "ci" when running in CI, otherwise "dev" for faster local iteration.
+settings.load_profile("ci" if os.getenv("CI") else "dev")
+
+# ── Shared fixtures ──────────────────────────────────────────────────────────
+import pytest  # noqa: E402
+from sqlalchemy import create_engine  # noqa: E402
+from sqlalchemy.orm import sessionmaker  # noqa: E402
+
+_TEST_DATABASE_URL = "sqlite:///:memory:"
 
 
-@pytest.fixture
+@pytest.fixture(scope="function")
 def test_db_engine():
-    """Create a test database engine using SQLite in-memory database."""
+    """SQLite in-memory engine, one per test function."""
     engine = create_engine(
-        TEST_DATABASE_URL, echo=False, connect_args={"check_same_thread": False}  # SQLite specific
+        _TEST_DATABASE_URL,
+        echo=False,
+        connect_args={"check_same_thread": False},
     )
-    return engine
+    yield engine
+    engine.dispose()
 
 
-@pytest.fixture
+@pytest.fixture(scope="function")
 def test_db_session(test_db_engine):
-    """Create a test database session."""
-    TestSessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=test_db_engine)
-    session = TestSessionLocal()
+    """SQLAlchemy session bound to the in-memory SQLite engine."""
+    Session = sessionmaker(autocommit=False, autoflush=False, bind=test_db_engine)
+    session = Session()
     try:
         yield session
     finally:
         session.close()
-
-
-@pytest.fixture
-def mock_database_connection():
-    """Mock database connection for tests that don't need actual DB."""
-    with (
-        patch("app.database.connection.engine") as mock_engine,
-        patch("app.database.connection.SessionLocal") as mock_session,
-    ):
-        # Mock engine
-        mock_engine.return_value = MagicMock()
-
-        # Mock session
-        mock_session_instance = MagicMock()
-        mock_session.return_value = mock_session_instance
-
-        yield mock_engine, mock_session, mock_session_instance
-
-
-@pytest.fixture
-def test_environment():
-    """Set test environment variables."""
-    original_env = {}
-    test_vars = {
-        "ENVIRONMENT": "development",
-        "DATABASE_URL": TEST_DATABASE_URL,
-        "REDIS_URL": "redis://localhost:6379/1",  # Different DB for tests
-        "JWT_SECRET_KEY": "test_secret_key_that_is_long_enough_for_testing_32chars",
-        "LOG_LEVEL": "DEBUG",
-    }
-
-    # Store original values and set test values
-    for key, value in test_vars.items():
-        original_env[key] = os.environ.get(key)
-        os.environ[key] = value
-
-    yield test_vars
-
-    # Restore original values
-    for key, original_value in original_env.items():
-        if original_value is None:
-            os.environ.pop(key, None)
-        else:
-            os.environ[key] = original_value
-
-
-# Configure Hypothesis profiles for property-based testing
-settings.register_profile(
-    "ci", max_examples=100, deadline=None, suppress_health_check=[HealthCheck.too_slow]
-)
-
-settings.register_profile(
-    "dev", max_examples=20, deadline=None, suppress_health_check=[HealthCheck.too_slow]
-)
-
-settings.register_profile(
-    "thorough", max_examples=1000, deadline=None, suppress_health_check=[HealthCheck.too_slow]
-)
-
-# Load the appropriate profile (default to 'dev' for faster local testing)
-# Use 'ci' profile in CI environment for full 100 iterations
-settings.load_profile("dev")

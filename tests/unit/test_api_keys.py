@@ -84,8 +84,8 @@ class TestCreateAPIKey:
         mock_created_key.expires_at = datetime.now(timezone.utc) + timedelta(days=365)
         mock_created_key.created_at = datetime.now(timezone.utc)
 
-        mock_db_session.refresh.side_effect = (
-            lambda obj: setattr(obj, "key_id", "new_key_123") if hasattr(obj, "name") else None
+        mock_db_session.refresh.side_effect = lambda obj: (
+            setattr(obj, "key_id", "new_key_123") if hasattr(obj, "name") else None
         )
 
         with patch("app.routes.api_keys.AuthManager") as mock_auth_manager_class:

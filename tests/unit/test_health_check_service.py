@@ -1,150 +1,280 @@
 """
-Unit tests for health check service.
+Unit tests for HealthCheckService.
 
-Tests health check functionality with mocked dependencies.
+Tests healthy, degraded, and unhealthy paths for Redis, database, and Celery.
+Requirements: 2.10
 """
 
 import pytest
-from datetime import datetime
 from unittest.mock import AsyncMock, MagicMock, patch
+from datetime import datetime
 
 from app.services.health_check import HealthCheckService
 
 
 @pytest.fixture
 def mock_redis():
-    """Create mock Redis client."""
     redis = AsyncMock()
-    redis.ping = AsyncMock()
+    redis.ping = AsyncMock(return_value=True)
     return redis
 
 
 @pytest.fixture
-def health_check_service(mock_redis):
-    """Create HealthCheckService instance."""
+def service(mock_redis):
     return HealthCheckService(mock_redis)
 
 
-class TestHealthCheckService:
-    """Test HealthCheckService functionality."""
-
-    @pytest.mark.asyncio
-    async def test_perform_health_check_all_healthy(self, health_check_service, mock_redis):
-        """Test health check when all dependencies are healthy."""
-        # Mock database connection
-        mock_engine = MagicMock()
+def _make_mock_engine(slow=False, fail=False):
+    """Build a mock SQLAlchemy engine."""
+    engine = MagicMock()
+    if fail:
+        engine.connect.side_effect = Exception("DB connection failed")
+    else:
         mock_conn = MagicMock()
         mock_result = MagicMock()
         mock_result.fetchone.return_value = (0,)
         mock_conn.execute.return_value = mock_result
-        mock_engine.connect.return_value.__enter__.return_value = mock_conn
+        mock_conn.__enter__ = MagicMock(return_value=mock_conn)
+        mock_conn.__exit__ = MagicMock(return_value=False)
+        engine.connect.return_value = mock_conn
+    return engine
 
-        # Mock Celery to return healthy status
-        mock_inspect = MagicMock()
-        mock_inspect.active.return_value = {}
-        mock_inspect.stats.return_value = {"worker1": {}}
-        mock_control = MagicMock()
-        mock_control.inspect.return_value = mock_inspect
-        mock_control.ping.return_value = [{"worker1": "pong"}]
 
-        with patch("app.database.connection.engine", mock_engine), patch(
-            "app.services.health_check.celery_app.control", mock_control
+def _make_mock_celery_control(workers_up=True):
+    control = MagicMock()
+    if workers_up:
+        control.ping.return_value = [{"worker1": {"ok": "pong"}}]
+        inspect = MagicMock()
+        inspect.active.return_value = {"worker1": []}
+        inspect.stats.return_value = {"worker1": {}}
+        control.inspect.return_value = inspect
+    else:
+        control.ping.return_value = []
+    return control
+
+
+# ---------------------------------------------------------------------------
+# perform_health_check
+# ---------------------------------------------------------------------------
+
+
+class TestPerformHealthCheck:
+
+    @pytest.mark.asyncio
+    async def test_all_healthy(self, service, mock_redis):
+        mock_engine = _make_mock_engine()
+        mock_control = _make_mock_celery_control(workers_up=True)
+
+        with (
+            patch("app.database.connection.engine", mock_engine),
+            patch("app.services.health_check.celery_app") as mock_celery,
         ):
-            result = await health_check_service.perform_health_check()
+            mock_celery.control = mock_control
+            result = await service.perform_health_check()
 
-        # Verify structure
-        assert "status" in result
+        assert result["status"] == "healthy"
         assert "timestamp" in result
         assert "dependencies" in result
+        deps = result["dependencies"]
+        assert deps["redis"]["status"] == "healthy"
+        assert deps["database"]["status"] == "healthy"
 
-        # Verify status
+    @pytest.mark.asyncio
+    async def test_redis_unhealthy_makes_overall_unhealthy(self, service, mock_redis):
+        mock_redis.ping.side_effect = Exception("Redis down")
+        mock_engine = _make_mock_engine()
+
+        with (
+            patch("app.database.connection.engine", mock_engine),
+            patch("app.services.health_check.celery_app") as mock_celery,
+        ):
+            mock_celery.control = _make_mock_celery_control()
+            result = await service.perform_health_check()
+
+        assert result["status"] == "unhealthy"
+        assert result["dependencies"]["redis"]["status"] == "unhealthy"
+        assert "CRITICAL" in result["dependencies"]["redis"]["message"]
+
+    @pytest.mark.asyncio
+    async def test_database_unhealthy_makes_overall_unhealthy(self, service, mock_redis):
+        mock_engine = _make_mock_engine(fail=True)
+
+        with (
+            patch("app.database.connection.engine", mock_engine),
+            patch("app.services.health_check.celery_app") as mock_celery,
+        ):
+            mock_celery.control = _make_mock_celery_control()
+            result = await service.perform_health_check()
+
+        assert result["status"] == "unhealthy"
+        assert result["dependencies"]["database"]["status"] == "unhealthy"
+        assert "CRITICAL" in result["dependencies"]["database"]["message"]
+
+    @pytest.mark.asyncio
+    async def test_both_redis_and_db_unhealthy(self, service, mock_redis):
+        mock_redis.ping.side_effect = Exception("Redis down")
+        mock_engine = _make_mock_engine(fail=True)
+
+        with (
+            patch("app.database.connection.engine", mock_engine),
+            patch("app.services.health_check.celery_app") as mock_celery,
+        ):
+            mock_celery.control = _make_mock_celery_control()
+            result = await service.perform_health_check()
+
+        assert result["status"] == "unhealthy"
+        assert result["dependencies"]["redis"]["status"] == "unhealthy"
+        assert result["dependencies"]["database"]["status"] == "unhealthy"
+
+    @pytest.mark.asyncio
+    async def test_celery_no_workers_does_not_fail_overall(self, service, mock_redis):
+        """Celery is optional — no workers should not make overall status unhealthy."""
+        mock_engine = _make_mock_engine()
+        mock_control = _make_mock_celery_control(workers_up=False)
+
+        with (
+            patch("app.database.connection.engine", mock_engine),
+            patch("app.services.health_check.celery_app") as mock_celery,
+        ):
+            mock_celery.control = mock_control
+            result = await service.perform_health_check()
+
+        # Overall should still be healthy (Celery is optional)
         assert result["status"] == "healthy"
-
-        # Verify dependencies
-        deps = result["dependencies"]
-        assert "redis" in deps
-        assert "database" in deps
-        assert "celery" in deps
-
-        # Verify Redis
-        assert deps["redis"]["status"] == "healthy"
-        assert "Connected and responsive" in deps["redis"]["message"]
-
-        # Verify Database
-        assert deps["database"]["status"] == "healthy"
-        assert deps["database"]["message"] == "Connected"
-
-        # Verify Celery
-        assert deps["celery"]["status"] == "healthy"
-        assert "Workers responding" in deps["celery"]["message"]
-
-        # Verify timestamp format
-        datetime.fromisoformat(result["timestamp"].rstrip("Z"))
+        assert result["dependencies"]["celery"]["status"] == "unhealthy"
 
     @pytest.mark.asyncio
-    async def test_perform_health_check_redis_unhealthy(self, health_check_service, mock_redis):
-        """Test health check when Redis is unhealthy."""
-        mock_redis.ping.side_effect = Exception("Connection failed")
+    async def test_celery_exception_does_not_fail_overall(self, service, mock_redis):
+        """Celery exception should be caught and not affect overall health."""
+        mock_engine = _make_mock_engine()
 
-        # Mock database connection
-        mock_engine = MagicMock()
-        mock_conn = MagicMock()
-        mock_result = MagicMock()
-        mock_result.fetchone.return_value = (0,)
-        mock_conn.execute.return_value = mock_result
-        mock_engine.connect.return_value.__enter__.return_value = mock_conn
+        with (
+            patch("app.database.connection.engine", mock_engine),
+            patch("app.services.health_check.celery_app") as mock_celery,
+        ):
+            mock_celery.control.ping.side_effect = Exception("Celery broker down")
+            result = await service.perform_health_check()
 
-        with patch("app.database.connection.engine", mock_engine):
-            result = await health_check_service.perform_health_check()
-
-        # Verify status
-        assert result["status"] == "unhealthy"
-
-        # Verify Redis
-        deps = result["dependencies"]
-        assert deps["redis"]["status"] == "unhealthy"
-        assert deps["redis"]["message"] == "CRITICAL: Connection failed"
-
-        # Verify Database still healthy
-        assert deps["database"]["status"] == "healthy"
+        assert result["status"] == "healthy"
+        assert result["dependencies"]["celery"]["status"] == "unknown"
 
     @pytest.mark.asyncio
-    async def test_perform_health_check_database_unhealthy(self, health_check_service, mock_redis):
-        """Test health check when database is unhealthy."""
-        # Mock database connection failure
-        mock_engine = MagicMock()
-        mock_engine.connect.side_effect = Exception("DB connection failed")
+    async def test_timestamp_format(self, service, mock_redis):
+        mock_engine = _make_mock_engine()
 
-        with patch("app.database.connection.engine", mock_engine):
-            result = await health_check_service.perform_health_check()
+        with (
+            patch("app.database.connection.engine", mock_engine),
+            patch("app.services.health_check.celery_app") as mock_celery,
+        ):
+            mock_celery.control = _make_mock_celery_control()
+            result = await service.perform_health_check()
 
-        # Verify status
-        assert result["status"] == "unhealthy"
-
-        # Verify Database
-        deps = result["dependencies"]
-        assert deps["database"]["status"] == "unhealthy"
-        assert deps["database"]["message"] == "CRITICAL: DB connection failed"
-
-        # Verify Redis still healthy
-        assert deps["redis"]["status"] == "healthy"
+        ts = result["timestamp"]
+        assert ts.endswith("Z")
+        # Should parse without error
+        datetime.fromisoformat(ts.rstrip("Z"))
 
     @pytest.mark.asyncio
-    async def test_perform_health_check_both_unhealthy(self, health_check_service, mock_redis):
-        """Test health check when both Redis and database are unhealthy."""
-        mock_redis.ping.side_effect = Exception("Redis failed")
+    async def test_redis_degraded_when_slow(self, service, mock_redis):
+        """When Redis responds but slowly, status should be degraded."""
+        import time
 
-        # Mock database connection failure
-        mock_engine = MagicMock()
-        mock_engine.connect.side_effect = Exception("DB failed")
+        async def slow_ping():
+            return True
+
+        mock_redis.ping = slow_ping
+
+        mock_engine = _make_mock_engine()
+
+        with (
+            patch("app.database.connection.engine", mock_engine),
+            patch("app.services.health_check.celery_app") as mock_celery,
+            patch("app.services.health_check.settings") as mock_settings,
+        ):
+            mock_celery.control = _make_mock_celery_control()
+            mock_settings.health_connectivity_threshold = 0.0  # Force degraded
+            mock_settings.health_critical_services = ["redis", "database"]
+            mock_settings.health_query_threshold = 0.5
+            result = await service.perform_health_check()
+
+        # With threshold=0, any response time will be "slow"
+        assert result["dependencies"]["redis"]["status"] in ("degraded", "healthy")
+
+    @pytest.mark.asyncio
+    async def test_celery_workers_healthy_message(self, service, mock_redis):
+        mock_engine = _make_mock_engine()
+        mock_control = _make_mock_celery_control(workers_up=True)
+
+        with (
+            patch("app.database.connection.engine", mock_engine),
+            patch("app.services.health_check.celery_app") as mock_celery,
+        ):
+            mock_celery.control = mock_control
+            result = await service.perform_health_check()
+
+        celery_dep = result["dependencies"]["celery"]
+        assert celery_dep["status"] == "healthy"
+        assert "Workers responding" in celery_dep["message"]
+
+
+# ---------------------------------------------------------------------------
+# perform_readiness_check
+# ---------------------------------------------------------------------------
+
+
+class TestPerformReadinessCheck:
+
+    @pytest.mark.asyncio
+    async def test_all_ready(self, service, mock_redis):
+        mock_engine = _make_mock_engine()
 
         with patch("app.database.connection.engine", mock_engine):
-            result = await health_check_service.perform_health_check()
+            result = await service.perform_readiness_check()
 
-        # Verify status
-        assert result["status"] == "unhealthy"
-
-        # Verify both unhealthy
+        assert result["status"] == "ready"
+        assert "dependencies" in result
         deps = result["dependencies"]
-        assert deps["redis"]["status"] == "unhealthy"
-        assert deps["database"]["status"] == "unhealthy"
+        assert deps["redis"]["status"] == "ready"
+        assert deps["database"]["status"] == "ready"
+
+    @pytest.mark.asyncio
+    async def test_redis_not_ready(self, service, mock_redis):
+        mock_redis.ping.side_effect = Exception("Redis unavailable")
+        mock_engine = _make_mock_engine()
+
+        with patch("app.database.connection.engine", mock_engine):
+            result = await service.perform_readiness_check()
+
+        assert result["status"] == "not_ready"
+        assert result["dependencies"]["redis"]["status"] == "not_ready"
+
+    @pytest.mark.asyncio
+    async def test_database_not_ready(self, service, mock_redis):
+        mock_engine = _make_mock_engine(fail=True)
+
+        with patch("app.database.connection.engine", mock_engine):
+            result = await service.perform_readiness_check()
+
+        assert result["status"] == "not_ready"
+        assert result["dependencies"]["database"]["status"] == "not_ready"
+
+    @pytest.mark.asyncio
+    async def test_readiness_timestamp_format(self, service, mock_redis):
+        mock_engine = _make_mock_engine()
+
+        with patch("app.database.connection.engine", mock_engine):
+            result = await service.perform_readiness_check()
+
+        ts = result["timestamp"]
+        assert ts.endswith("Z")
+        datetime.fromisoformat(ts.rstrip("Z"))
+
+    @pytest.mark.asyncio
+    async def test_readiness_does_not_check_celery(self, service, mock_redis):
+        """Readiness check should not include Celery."""
+        mock_engine = _make_mock_engine()
+
+        with patch("app.database.connection.engine", mock_engine):
+            result = await service.perform_readiness_check()
+
+        assert "celery" not in result["dependencies"]

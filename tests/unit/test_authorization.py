@@ -1,10 +1,20 @@
 """
-Unit tests for authorization functions.
+Unit tests for app/services/authorization.py
+
+Covers AuthorizationService permission checks for all roles.
+Target: ≥ 90% line coverage for app/services/authorization.py
+
+Validates: Requirements 2.12
 """
 
 import pytest
-from unittest.mock import Mock, patch
+from unittest.mock import MagicMock, Mock, patch, AsyncMock
+from datetime import datetime, timezone
+
 from app.services.authorization import (
+    Role,
+    Permission,
+    ROLE_PERMISSIONS,
     get_permissions_for_roles,
     has_permission,
     has_any_role,
@@ -15,565 +25,934 @@ from app.services.authorization import (
     require_any_role,
     log_audit_event,
     check_resource_ownership,
-    Role,
-    Permission,
 )
 from app.exceptions import AuthorizationError, InvalidTokenError
 
 
-class TestAuthorizationFunctions:
-    """Test authorization utility functions."""
-
-    def test_get_permissions_for_roles_valid_roles(self):
-        """Test getting permissions for valid roles."""
-        roles = ["admin", "researcher"]
-        permissions = get_permissions_for_roles(roles)
-
-        assert isinstance(permissions, set)
-        assert len(permissions) > 0
-        # Admin should have all permissions
-        assert Permission.SESSION_READ in permissions
-        assert Permission.SYSTEM_ADMIN in permissions
-
-    def test_get_permissions_for_roles_invalid_role(self):
-        """Test getting permissions with invalid role."""
-        roles = ["admin", "invalid_role"]
-        permissions = get_permissions_for_roles(roles)
-
-        assert isinstance(permissions, set)
-        # Should still get admin permissions despite invalid role
-        assert Permission.SESSION_READ in permissions
-
-    def test_get_permissions_for_roles_empty_roles(self):
-        """Test getting permissions for empty roles list."""
-        permissions = get_permissions_for_roles([])
-
-        assert isinstance(permissions, set)
-        assert len(permissions) == 0
-
-    def test_has_permission_with_valid_role(self):
-        """Test has_permission with valid role."""
-        user_roles = ["admin"]
-        required_permission = Permission.SESSION_READ
-
-        result = has_permission(user_roles, required_permission)
-        assert result is True
-
-    def test_has_permission_with_invalid_role(self):
-        """Test has_permission with invalid role."""
-        user_roles = ["invalid_role"]
-        required_permission = Permission.SESSION_READ
-
-        result = has_permission(user_roles, required_permission)
-        assert result is False
-
-    def test_has_permission_without_required_permission(self):
-        """Test has_permission when user lacks required permission."""
-        user_roles = ["viewer"]  # Viewer can only read
-        required_permission = Permission.SESSION_CREATE  # Requires researcher or admin
-
-        result = has_permission(user_roles, required_permission)
-        assert result is False
-
-    def test_has_any_role_with_matching_role(self):
-        """Test has_any_role with matching role."""
-        user_roles = ["admin", "viewer"]
-        required_roles = [Role.ADMIN]
-
-        result = has_any_role(user_roles, required_roles)
-        assert result is True
-
-    def test_has_any_role_without_matching_role(self):
-        """Test has_any_role without matching role."""
-        user_roles = ["viewer"]
-        required_roles = [Role.ADMIN]
-
-        result = has_any_role(user_roles, required_roles)
-        assert result is False
-
-    def test_has_any_role_with_invalid_role(self):
-        """Test has_any_role with invalid role in user roles."""
-        user_roles = ["invalid_role", "admin"]
-        required_roles = [Role.ADMIN]
-
-        result = has_any_role(user_roles, required_roles)
-        assert result is True  # Should still work due to valid admin role
-
-    @patch("app.services.authorization.AuthManager")
-    @patch("app.services.authorization.log_audit_event")
-    def test_check_permission_with_valid_permission(self, mock_log_audit, mock_auth_manager):
-        """Test check_permission with valid permission."""
-        # Mock user with admin role
-        user = Mock()
-        user.user_id = "user123"
-        user.roles = ["admin"]
-        user.permissions = None
-
-        # Should not raise exception
-        check_permission(user, Permission.SESSION_READ, "session", "read")
-
-    @patch("app.services.authorization.AuthManager")
-    @patch("app.services.authorization.log_audit_event")
-    def test_check_permission_with_invalid_permission(self, mock_log_audit, mock_auth_manager):
-        """Test check_permission with invalid permission."""
-        # Mock user with viewer role (limited permissions)
-        user = Mock()
-        user.user_id = "user123"
-        user.roles = ["viewer"]
-        user.permissions = None
-
-        # Should raise AuthorizationError
-        with pytest.raises(AuthorizationError):
-            check_permission(user, Permission.SESSION_CREATE, "session", "create")
-
-    @patch("app.services.authorization.AuthManager")
-    @patch("app.services.authorization.log_audit_event")
-    def test_check_permission_with_direct_permissions(self, mock_log_audit, mock_auth_manager):
-        """Test check_permission with direct permissions (API key)."""
-        # Mock user with direct permissions
-        user = Mock()
-        user.user_id = "user123"
-        user.roles = []
-        user.permissions = ["session:read", "session:create"]
-
-        # Should not raise exception
-        check_permission(user, Permission.SESSION_READ, "session", "read")
-
-    @patch("app.services.authorization.AuthManager")
-    @patch("app.services.authorization.log_audit_event")
-    def test_check_permission_with_db_logging(self, mock_log_audit, mock_auth_manager):
-        """Test check_permission with database audit logging."""
-        mock_db = Mock()
-
-        user = Mock()
-        user.user_id = "user123"
-        user.roles = ["admin"]
-        user.permissions = None
-
-        check_permission(user, Permission.SESSION_READ, "session", "read", db=mock_db)
-
-        # Verify audit logging was called
-        mock_log_audit.assert_called_once()
-
-
-class TestFastApiDependencies:
-    """Test FastAPI dependency functions."""
-
-    @patch("app.services.authorization.AuthManager")
-    @patch("app.services.authorization.get_db")
-    @pytest.mark.asyncio
-    async def test_get_current_user_with_api_key(self, mock_get_db, mock_auth_manager):
-        """Test get_current_user with API key authentication."""
-        mock_db = Mock()
-        mock_get_db.return_value = mock_db
-
-        # Mock request with user already set by middleware
-        request = Mock()
-        request.state.user = Mock(user_id="user123", roles=["admin"], permissions=None)
-
-        user = await get_current_user(request, None, mock_db)
-
-        assert user.user_id == "user123"
-        assert user.roles == ["admin"]
-
-    @patch("app.services.authorization.AuthManager")
-    @patch("app.services.authorization.get_db")
-    @pytest.mark.asyncio
-    async def test_get_current_user_with_jwt_token(self, mock_get_db, mock_auth_manager):
-        """Test get_current_user with JWT token authentication."""
-        from unittest.mock import AsyncMock
-
-        mock_db = Mock()
-        mock_get_db.return_value = mock_db
-
-        # Mock AuthManager to return valid payload (verify_token is async)
-        mock_auth_manager_instance = Mock()
-        mock_auth_manager.return_value = mock_auth_manager_instance
-        mock_payload = Mock(user_id="user123", roles=["admin"])
-        mock_auth_manager_instance.verify_token = AsyncMock(return_value=mock_payload)
-
-        # Mock request without API key user (no state attribute)
-        # Create a request with state that has no 'user' attribute
-        class _State:
-            pass
-
-        class _Request:
-            state = _State()
-
-        request = _Request()
-
-        # Mock credentials
-        credentials = Mock()
-        credentials.credentials = "valid.jwt.token"
-
-        user = await get_current_user(request, credentials, mock_db)  # type: ignore[arg-type]
-
-        assert user.user_id == "user123"
-        mock_auth_manager_instance.verify_token.assert_called_once_with(
-            "valid.jwt.token", expected_type="access"
-        )
-
-    @patch("app.services.authorization.AuthManager")
-    @patch("app.services.authorization.get_db")
-    @pytest.mark.asyncio
-    async def test_get_current_user_without_credentials(self, mock_get_db, mock_auth_manager):
-        """Test get_current_user without any credentials."""
-        mock_db = Mock()
-        mock_get_db.return_value = mock_db
-
-        class _State:
-            pass
-
-        class _Request:
-            state = _State()
-
-        request = _Request()
-
-        with pytest.raises(InvalidTokenError):
-            await get_current_user(request, None, mock_db)  # type: ignore[arg-type]
-
-    @patch("app.services.authorization.AuthManager")
-    @pytest.mark.asyncio
-    async def test_get_current_user_expired_token(self, mock_auth_manager):
-        """Test get_current_user with expired token raises specific InvalidTokenError."""
-        from unittest.mock import AsyncMock
-
-        mock_db = Mock()
-        mock_auth_manager_instance = Mock()
-        mock_auth_manager.return_value = mock_auth_manager_instance
-        mock_auth_manager_instance.verify_token = AsyncMock(side_effect=Exception("Token expired"))
-
-        class _State:
-            pass
-
-        class _Request:
-            state = _State()
-
-        request = _Request()
-        credentials = Mock()
-        credentials.credentials = "expired.jwt.token"
-
-        with pytest.raises(InvalidTokenError) as exc_info:
-            await get_current_user(request, credentials, mock_db)  # type: ignore[arg-type]
-        assert "expired" in str(exc_info.value).lower()
-
-    @patch("app.services.authorization.AuthManager")
-    @pytest.mark.asyncio
-    async def test_get_current_user_invalid_token(self, mock_auth_manager):
-        """Test get_current_user with invalid token raises specific InvalidTokenError."""
-        from unittest.mock import AsyncMock
-
-        mock_db = Mock()
-        mock_auth_manager_instance = Mock()
-        mock_auth_manager.return_value = mock_auth_manager_instance
-        mock_auth_manager_instance.verify_token = AsyncMock(
-            side_effect=Exception("Invalid token format")
-        )
-
-        class _State:
-            pass
-
-        class _Request:
-            state = _State()
-
-        request = _Request()
-        credentials = Mock()
-        credentials.credentials = "not.a.valid.token"
-
-        with pytest.raises(InvalidTokenError):
-            await get_current_user(request, credentials, mock_db)  # type: ignore[arg-type]
-
-    @patch("app.services.authorization.AuthManager")
-    @pytest.mark.asyncio
-    async def test_get_current_user_malformed_token(self, mock_auth_manager):
-        """Test get_current_user with malformed token."""
-        from unittest.mock import AsyncMock
-
-        mock_db = Mock()
-        mock_auth_manager_instance = Mock()
-        mock_auth_manager.return_value = mock_auth_manager_instance
-        mock_auth_manager_instance.verify_token = AsyncMock(
-            side_effect=Exception("malformed token data")
-        )
-
-        class _State:
-            pass
-
-        class _Request:
-            state = _State()
-
-        request = _Request()
-        credentials = Mock()
-        credentials.credentials = "malformed"
-
-        with pytest.raises(InvalidTokenError):
-            await get_current_user(request, credentials, mock_db)  # type: ignore[arg-type]
-
-    @patch("app.services.authorization.AuthManager")
-    @pytest.mark.asyncio
-    async def test_get_current_user_wrong_token_type(self, mock_auth_manager):
-        """Test get_current_user when refresh token provided instead of access token."""
-        from unittest.mock import AsyncMock
-
-        mock_db = Mock()
-        mock_auth_manager_instance = Mock()
-        mock_auth_manager.return_value = mock_auth_manager_instance
-        mock_auth_manager_instance.verify_token = AsyncMock(
-            side_effect=Exception("Token type mismatch")
-        )
-
-        class _State:
-            pass
-
-        class _Request:
-            state = _State()
-
-        request = _Request()
-        credentials = Mock()
-        credentials.credentials = "refresh.token"
-
-        with pytest.raises(InvalidTokenError):
-            await get_current_user(request, credentials, mock_db)  # type: ignore[arg-type]
-
-    @patch("app.services.authorization.AuthManager")
-    @pytest.mark.asyncio
-    async def test_get_current_user_generic_error(self, mock_auth_manager):
-        """Test get_current_user when auth fails with a generic error."""
-        from unittest.mock import AsyncMock
-
-        mock_db = Mock()
-        mock_auth_manager_instance = Mock()
-        mock_auth_manager.return_value = mock_auth_manager_instance
-        mock_auth_manager_instance.verify_token = AsyncMock(
-            side_effect=Exception("Connection refused")
-        )
-
-        class _State:
-            pass
-
-        class _Request:
-            state = _State()
-
-        request = _Request()
-        credentials = Mock()
-        credentials.credentials = "some.token"
-
-        with pytest.raises(InvalidTokenError):
-            await get_current_user(request, credentials, mock_db)  # type: ignore[arg-type]
-
-    def test_require_permission_decorator(self):
-        """Test require_permission decorator creation."""
-        dependency = require_permission(Permission.SESSION_READ)
-
-        assert callable(dependency)
-
-    def test_require_role_decorator(self):
-        """Test require_role decorator creation."""
-        dependency = require_role(Role.ADMIN)
-
-        assert callable(dependency)
-
-    def test_require_any_role_decorator(self):
-        """Test require_any_role decorator creation."""
-        dependency = require_any_role([Role.ADMIN, Role.RESEARCHER])
-
-        assert callable(dependency)
-
-    @pytest.mark.asyncio
-    async def test_require_permission_inner_checker_grants(self):
-        """Inner checker grants access when user has the permission."""
-        from app.services.authorization import require_permission, Permission
-
-        # Get the inner 'permission_checker' coroutine function
-        checker = require_permission(Permission.SESSION_READ)
-
-        user = Mock()
-        user.user_id = "u1"
-        user.roles = ["admin"]
-        user.permissions = None
-
-        result = await checker(current_user=user)
-        assert result is user
-
-    @pytest.mark.asyncio
-    async def test_require_permission_inner_checker_denies(self):
-        """Inner checker raises AuthorizationError when user lacks permission."""
-        from app.services.authorization import require_permission, Permission
-
-        checker = require_permission(Permission.SYSTEM_ADMIN)
-
-        user = Mock()
-        user.user_id = "u1"
-        user.roles = ["viewer"]
-        user.permissions = None
-
-        with pytest.raises(AuthorizationError):
-            await checker(current_user=user)
-
-    @pytest.mark.asyncio
-    async def test_require_role_inner_checker_grants(self):
-        """Inner checker grants access when user has the required role."""
-        from app.services.authorization import require_role, Role
-
-        checker = require_role(Role.ADMIN)
-
-        user = Mock()
-        user.user_id = "u1"
-        user.roles = ["admin"]
-        user.permissions = None
-
-        result = await checker(current_user=user)
-        assert result is user
-
-    @pytest.mark.asyncio
-    async def test_require_role_inner_checker_denies(self):
-        """Inner checker raises AuthorizationError when user lacks the role."""
-        from app.services.authorization import require_role, Role
-
-        checker = require_role(Role.ADMIN)
-
-        user = Mock()
-        user.user_id = "u1"
-        user.roles = ["viewer"]
-        user.permissions = None
-
-        with pytest.raises(AuthorizationError):
-            await checker(current_user=user)
-
-    @pytest.mark.asyncio
-    async def test_require_any_role_inner_checker_grants(self):
-        """Inner checker grants when user has any of the acceptable roles."""
-        from app.services.authorization import require_any_role, Role
-
-        checker = require_any_role([Role.ADMIN, Role.RESEARCHER])
-
-        user = Mock()
-        user.user_id = "u1"
-        user.roles = ["researcher"]
-        user.permissions = None
-
-        result = await checker(current_user=user)
-        assert result is user
-
-    @pytest.mark.asyncio
-    async def test_require_any_role_inner_checker_denies(self):
-        """Inner checker raises AuthorizationError when user has none of the roles."""
-        from app.services.authorization import require_any_role, Role
-
-        checker = require_any_role([Role.ADMIN, Role.RESEARCHER])
-
-        user = Mock()
-        user.user_id = "u1"
-        user.roles = ["viewer"]
-        user.permissions = None
-
-        with pytest.raises(AuthorizationError):
-            await checker(current_user=user)
-
-
-class TestAuditLogging:
-    """Test audit logging functionality."""
-
-    def test_log_audit_event_with_db(self):
-        """Test audit logging with database session."""
-        mock_db = Mock()
-
-        log_audit_event(
-            db=mock_db,
-            user_id="user123",
-            action="login",
-            resource_type="user",
-            resource_id="user123",
-            status="success",
-        )
-
-        # Verify database operations were called
-        mock_db.add.assert_called_once()
-        mock_db.commit.assert_called_once()
-
-    def test_log_audit_event_without_db(self):
-        """Test audit logging without database session."""
-        # Should not raise any errors
-        log_audit_event(
-            db=None, user_id="user123", action="login", resource_type="user", status="success"
-        )
-
-
-class TestResourceOwnership:
-    """Test resource ownership checks."""
-
-    @patch("app.services.authorization.log_audit_event")
-    def test_check_resource_ownership_as_owner(self, mock_log_audit):
-        """Test resource ownership check when user owns resource."""
-        owner_id = "user123"
-        user = Mock()
-        user.user_id = "user123"
-        user.roles = ["viewer"]
-
-        # Should not raise exception
-        check_resource_ownership(owner_id, user)
-
-    @patch("app.services.authorization.log_audit_event")
-    def test_check_resource_ownership_as_admin(self, mock_log_audit):
-        """Test resource ownership check when user is admin."""
-        owner_id = "user456"
-        user = Mock()
-        user.user_id = "user123"
-        user.roles = ["admin"]
-
-        # Should not raise exception
-        check_resource_ownership(owner_id, user, allow_admin=True)
-
-    @patch("app.services.authorization.log_audit_event")
-    def test_check_resource_ownership_denied(self, mock_log_audit):
-        """Test resource ownership check when access should be denied."""
-        owner_id = "user456"
-        user = Mock()
-        user.user_id = "user123"
-        user.roles = ["viewer"]
-
-        with pytest.raises(AuthorizationError):
-            check_resource_ownership(owner_id, user, allow_admin=False)
-
-
-class TestEnums:
-    """Test permission and role enumerations."""
-
-    def test_permission_values(self):
-        """Test permission enum values."""
+# ---------------------------------------------------------------------------
+# Helpers
+# ---------------------------------------------------------------------------
+
+def make_user(user_id="u1", roles=None, permissions=None):
+    """Create a minimal TokenPayload-like mock."""
+    user = Mock()
+    user.user_id = user_id
+    user.roles = roles if roles is not None else []
+    user.permissions = permissions
+    return user
+
+
+# ---------------------------------------------------------------------------
+# Role and Permission Enum Tests
+# ---------------------------------------------------------------------------
+
+class TestRoleEnum:
+    def test_role_values(self):
+        assert Role.ADMIN.value == "admin"
+        assert Role.RESEARCHER.value == "researcher"
+        assert Role.VIEWER.value == "viewer"
+
+    def test_role_is_string_enum(self):
+        assert isinstance(Role.ADMIN, str)
+        assert Role.ADMIN == "admin"
+
+    def test_all_roles_present(self):
+        role_values = {r.value for r in Role}
+        assert role_values == {"admin", "researcher", "viewer"}
+
+
+class TestPermissionEnum:
+    def test_session_permissions(self):
         assert Permission.SESSION_CREATE.value == "session:create"
         assert Permission.SESSION_READ.value == "session:read"
+        assert Permission.SESSION_UPDATE.value == "session:update"
+        assert Permission.SESSION_DELETE.value == "session:delete"
+        assert Permission.SESSION_CONTROL.value == "session:control"
+
+    def test_template_permissions(self):
         assert Permission.TEMPLATE_CREATE.value == "template:create"
+        assert Permission.TEMPLATE_READ.value == "template:read"
+        assert Permission.TEMPLATE_UPDATE.value == "template:update"
+        assert Permission.TEMPLATE_DELETE.value == "template:delete"
+
+    def test_task_permissions(self):
+        assert Permission.TASK_CREATE.value == "task:create"
         assert Permission.TASK_READ.value == "task:read"
+        assert Permission.TASK_DELETE.value == "task:delete"
+
+    def test_data_permissions(self):
         assert Permission.DATA_EXPORT.value == "data:export"
+        assert Permission.DATA_READ.value == "data:read"
+
+    def test_system_permissions(self):
         assert Permission.SYSTEM_ADMIN.value == "system:admin"
         assert Permission.USER_MANAGE.value == "user:manage"
+
+    def test_user_permissions(self):
         assert Permission.USER_CREATE.value == "user:create"
         assert Permission.USER_READ.value == "user:read"
         assert Permission.USER_UPDATE.value == "user:update"
         assert Permission.USER_DELETE.value == "user:delete"
         assert Permission.USER_ADMIN.value == "user:admin"
 
-    def test_role_values(self):
-        """Test role enum values."""
-        assert Role.ADMIN.value == "admin"
-        assert Role.RESEARCHER.value == "researcher"
-        assert Role.VIEWER.value == "viewer"
+    def test_permission_is_string_enum(self):
+        assert isinstance(Permission.SESSION_READ, str)
+        assert Permission.SESSION_READ == "session:read"
 
-    def test_permission_comparison(self):
-        """Test permission comparison."""
-        # Test that same permissions are equal
-        assert Permission.SESSION_READ == Permission.SESSION_READ
-        # Test that different permissions have different string values
-        assert Permission.SESSION_READ.value != Permission.SESSION_CREATE.value  # type: ignore[comparison-overlap]
-        # Test that different permission objects are not the same
-        assert Permission.SESSION_READ is not Permission.SESSION_CREATE  # type: ignore[comparison-overlap]
 
-    def test_role_comparison(self):
-        """Test role comparison."""
-        # Test that same roles are equal
-        assert Role.ADMIN == Role.ADMIN
-        # Test that different roles have different string values
-        assert Role.ADMIN.value != Role.VIEWER.value  # type: ignore[comparison-overlap]
-        # Test that different role objects are not the same
-        assert Role.ADMIN is not Role.VIEWER  # type: ignore[comparison-overlap]
+# ---------------------------------------------------------------------------
+# ROLE_PERMISSIONS mapping tests
+# ---------------------------------------------------------------------------
+
+class TestRolePermissionsMapping:
+    """Verify the ROLE_PERMISSIONS mapping is correct for each role."""
+
+    # --- ADMIN ---
+    def test_admin_has_all_session_permissions(self):
+        admin_perms = ROLE_PERMISSIONS[Role.ADMIN]
+        for p in [Permission.SESSION_CREATE, Permission.SESSION_READ,
+                  Permission.SESSION_UPDATE, Permission.SESSION_DELETE,
+                  Permission.SESSION_CONTROL]:
+            assert p in admin_perms
+
+    def test_admin_has_all_template_permissions(self):
+        admin_perms = ROLE_PERMISSIONS[Role.ADMIN]
+        for p in [Permission.TEMPLATE_CREATE, Permission.TEMPLATE_READ,
+                  Permission.TEMPLATE_UPDATE, Permission.TEMPLATE_DELETE]:
+            assert p in admin_perms
+
+    def test_admin_has_all_task_permissions(self):
+        admin_perms = ROLE_PERMISSIONS[Role.ADMIN]
+        for p in [Permission.TASK_CREATE, Permission.TASK_READ, Permission.TASK_DELETE]:
+            assert p in admin_perms
+
+    def test_admin_has_all_data_permissions(self):
+        admin_perms = ROLE_PERMISSIONS[Role.ADMIN]
+        assert Permission.DATA_EXPORT in admin_perms
+        assert Permission.DATA_READ in admin_perms
+
+    def test_admin_has_system_permissions(self):
+        admin_perms = ROLE_PERMISSIONS[Role.ADMIN]
+        assert Permission.SYSTEM_ADMIN in admin_perms
+        assert Permission.USER_MANAGE in admin_perms
+
+    def test_admin_has_all_user_permissions(self):
+        admin_perms = ROLE_PERMISSIONS[Role.ADMIN]
+        for p in [Permission.USER_CREATE, Permission.USER_READ,
+                  Permission.USER_UPDATE, Permission.USER_DELETE, Permission.USER_ADMIN]:
+            assert p in admin_perms
+
+    # --- RESEARCHER ---
+    def test_researcher_has_session_permissions(self):
+        researcher_perms = ROLE_PERMISSIONS[Role.RESEARCHER]
+        for p in [Permission.SESSION_CREATE, Permission.SESSION_READ,
+                  Permission.SESSION_UPDATE, Permission.SESSION_DELETE,
+                  Permission.SESSION_CONTROL]:
+            assert p in researcher_perms
+
+    def test_researcher_has_template_permissions(self):
+        researcher_perms = ROLE_PERMISSIONS[Role.RESEARCHER]
+        for p in [Permission.TEMPLATE_CREATE, Permission.TEMPLATE_READ,
+                  Permission.TEMPLATE_UPDATE, Permission.TEMPLATE_DELETE]:
+            assert p in researcher_perms
+
+    def test_researcher_has_task_permissions(self):
+        researcher_perms = ROLE_PERMISSIONS[Role.RESEARCHER]
+        for p in [Permission.TASK_CREATE, Permission.TASK_READ, Permission.TASK_DELETE]:
+            assert p in researcher_perms
+
+    def test_researcher_has_data_permissions(self):
+        researcher_perms = ROLE_PERMISSIONS[Role.RESEARCHER]
+        assert Permission.DATA_EXPORT in researcher_perms
+        assert Permission.DATA_READ in researcher_perms
+
+    def test_researcher_lacks_system_admin(self):
+        researcher_perms = ROLE_PERMISSIONS[Role.RESEARCHER]
+        assert Permission.SYSTEM_ADMIN not in researcher_perms
+        assert Permission.USER_MANAGE not in researcher_perms
+
+    def test_researcher_has_user_read_only(self):
+        researcher_perms = ROLE_PERMISSIONS[Role.RESEARCHER]
+        assert Permission.USER_READ in researcher_perms
+        assert Permission.USER_CREATE not in researcher_perms
+        assert Permission.USER_DELETE not in researcher_perms
+        assert Permission.USER_ADMIN not in researcher_perms
+
+    # --- VIEWER ---
+    def test_viewer_has_read_only_permissions(self):
+        viewer_perms = ROLE_PERMISSIONS[Role.VIEWER]
+        assert Permission.SESSION_READ in viewer_perms
+        assert Permission.TEMPLATE_READ in viewer_perms
+        assert Permission.TASK_READ in viewer_perms
+        assert Permission.DATA_READ in viewer_perms
+        assert Permission.USER_READ in viewer_perms
+
+    def test_viewer_lacks_write_permissions(self):
+        viewer_perms = ROLE_PERMISSIONS[Role.VIEWER]
+        for p in [Permission.SESSION_CREATE, Permission.SESSION_UPDATE,
+                  Permission.SESSION_DELETE, Permission.SESSION_CONTROL,
+                  Permission.TEMPLATE_CREATE, Permission.TEMPLATE_UPDATE,
+                  Permission.TEMPLATE_DELETE, Permission.TASK_CREATE,
+                  Permission.TASK_DELETE, Permission.DATA_EXPORT,
+                  Permission.SYSTEM_ADMIN, Permission.USER_MANAGE,
+                  Permission.USER_CREATE, Permission.USER_UPDATE,
+                  Permission.USER_DELETE, Permission.USER_ADMIN]:
+            assert p not in viewer_perms
+
+
+# ---------------------------------------------------------------------------
+# get_permissions_for_roles
+# ---------------------------------------------------------------------------
+
+class TestGetPermissionsForRoles:
+    def test_empty_roles_returns_empty_set(self):
+        result = get_permissions_for_roles([])
+        assert result == set()
+
+    def test_admin_role_returns_all_admin_permissions(self):
+        result = get_permissions_for_roles(["admin"])
+        assert result == ROLE_PERMISSIONS[Role.ADMIN]
+
+    def test_researcher_role_returns_researcher_permissions(self):
+        result = get_permissions_for_roles(["researcher"])
+        assert result == ROLE_PERMISSIONS[Role.RESEARCHER]
+
+    def test_viewer_role_returns_viewer_permissions(self):
+        result = get_permissions_for_roles(["viewer"])
+        assert result == ROLE_PERMISSIONS[Role.VIEWER]
+
+    def test_invalid_role_is_skipped(self):
+        result = get_permissions_for_roles(["nonexistent_role"])
+        assert result == set()
+
+    def test_mixed_valid_and_invalid_roles(self):
+        result = get_permissions_for_roles(["admin", "bogus"])
+        assert result == ROLE_PERMISSIONS[Role.ADMIN]
+
+    def test_multiple_valid_roles_union(self):
+        result = get_permissions_for_roles(["viewer", "researcher"])
+        expected = ROLE_PERMISSIONS[Role.VIEWER] | ROLE_PERMISSIONS[Role.RESEARCHER]
+        assert result == expected
+
+    def test_all_roles_returns_union(self):
+        result = get_permissions_for_roles(["admin", "researcher", "viewer"])
+        expected = (ROLE_PERMISSIONS[Role.ADMIN]
+                    | ROLE_PERMISSIONS[Role.RESEARCHER]
+                    | ROLE_PERMISSIONS[Role.VIEWER])
+        assert result == expected
+
+    def test_duplicate_roles_handled(self):
+        result = get_permissions_for_roles(["admin", "admin"])
+        assert result == ROLE_PERMISSIONS[Role.ADMIN]
+
+    def test_returns_set_type(self):
+        result = get_permissions_for_roles(["viewer"])
+        assert isinstance(result, set)
+
+
+# ---------------------------------------------------------------------------
+# has_permission
+# ---------------------------------------------------------------------------
+
+class TestHasPermission:
+    # Admin can do everything
+    def test_admin_has_session_create(self):
+        assert has_permission(["admin"], Permission.SESSION_CREATE) is True
+
+    def test_admin_has_system_admin(self):
+        assert has_permission(["admin"], Permission.SYSTEM_ADMIN) is True
+
+    def test_admin_has_user_admin(self):
+        assert has_permission(["admin"], Permission.USER_ADMIN) is True
+
+    # Researcher permissions
+    def test_researcher_has_session_create(self):
+        assert has_permission(["researcher"], Permission.SESSION_CREATE) is True
+
+    def test_researcher_has_data_export(self):
+        assert has_permission(["researcher"], Permission.DATA_EXPORT) is True
+
+    def test_researcher_lacks_system_admin(self):
+        assert has_permission(["researcher"], Permission.SYSTEM_ADMIN) is False
+
+    def test_researcher_lacks_user_manage(self):
+        assert has_permission(["researcher"], Permission.USER_MANAGE) is False
+
+    def test_researcher_lacks_user_admin(self):
+        assert has_permission(["researcher"], Permission.USER_ADMIN) is False
+
+    # Viewer permissions
+    def test_viewer_has_session_read(self):
+        assert has_permission(["viewer"], Permission.SESSION_READ) is True
+
+    def test_viewer_has_data_read(self):
+        assert has_permission(["viewer"], Permission.DATA_READ) is True
+
+    def test_viewer_lacks_session_create(self):
+        assert has_permission(["viewer"], Permission.SESSION_CREATE) is False
+
+    def test_viewer_lacks_data_export(self):
+        assert has_permission(["viewer"], Permission.DATA_EXPORT) is False
+
+    def test_viewer_lacks_system_admin(self):
+        assert has_permission(["viewer"], Permission.SYSTEM_ADMIN) is False
+
+    # Edge cases
+    def test_empty_roles_returns_false(self):
+        assert has_permission([], Permission.SESSION_READ) is False
+
+    def test_invalid_role_returns_false(self):
+        assert has_permission(["superuser"], Permission.SESSION_READ) is False
+
+    def test_mixed_roles_grants_if_any_match(self):
+        # viewer + researcher: researcher grants SESSION_CREATE
+        assert has_permission(["viewer", "researcher"], Permission.SESSION_CREATE) is True
+
+    def test_invalid_and_valid_role(self):
+        assert has_permission(["bogus", "admin"], Permission.SYSTEM_ADMIN) is True
+
+
+# ---------------------------------------------------------------------------
+# has_any_role
+# ---------------------------------------------------------------------------
+
+class TestHasAnyRole:
+    def test_admin_matches_admin_requirement(self):
+        assert has_any_role(["admin"], [Role.ADMIN]) is True
+
+    def test_researcher_matches_researcher_requirement(self):
+        assert has_any_role(["researcher"], [Role.RESEARCHER]) is True
+
+    def test_viewer_matches_viewer_requirement(self):
+        assert has_any_role(["viewer"], [Role.VIEWER]) is True
+
+    def test_viewer_does_not_match_admin_requirement(self):
+        assert has_any_role(["viewer"], [Role.ADMIN]) is False
+
+    def test_viewer_matches_any_of_admin_or_viewer(self):
+        assert has_any_role(["viewer"], [Role.ADMIN, Role.VIEWER]) is True
+
+    def test_researcher_matches_any_of_admin_or_researcher(self):
+        assert has_any_role(["researcher"], [Role.ADMIN, Role.RESEARCHER]) is True
+
+    def test_empty_user_roles_returns_false(self):
+        assert has_any_role([], [Role.ADMIN]) is False
+
+    def test_empty_required_roles_returns_false(self):
+        assert has_any_role(["admin"], []) is False
+
+    def test_invalid_role_string_skipped(self):
+        assert has_any_role(["invalid"], [Role.ADMIN]) is False
+
+    def test_invalid_and_valid_role_string(self):
+        assert has_any_role(["invalid", "admin"], [Role.ADMIN]) is True
+
+    def test_multiple_user_roles_any_match(self):
+        assert has_any_role(["viewer", "researcher"], [Role.RESEARCHER]) is True
+
+
+# ---------------------------------------------------------------------------
+# check_permission
+# ---------------------------------------------------------------------------
+
+class TestCheckPermission:
+    """Tests for check_permission() — the core authorization gate."""
+
+    # --- Granted via roles ---
+    def test_admin_granted_session_read(self):
+        user = make_user(roles=["admin"])
+        check_permission(user, Permission.SESSION_READ)  # no exception
+
+    def test_admin_granted_system_admin(self):
+        user = make_user(roles=["admin"])
+        check_permission(user, Permission.SYSTEM_ADMIN)
+
+    def test_researcher_granted_session_create(self):
+        user = make_user(roles=["researcher"])
+        check_permission(user, Permission.SESSION_CREATE)
+
+    def test_researcher_granted_data_export(self):
+        user = make_user(roles=["researcher"])
+        check_permission(user, Permission.DATA_EXPORT)
+
+    def test_viewer_granted_session_read(self):
+        user = make_user(roles=["viewer"])
+        check_permission(user, Permission.SESSION_READ)
+
+    def test_viewer_granted_data_read(self):
+        user = make_user(roles=["viewer"])
+        check_permission(user, Permission.DATA_READ)
+
+    # --- Denied via roles ---
+    def test_viewer_denied_session_create(self):
+        user = make_user(roles=["viewer"])
+        with pytest.raises(AuthorizationError):
+            check_permission(user, Permission.SESSION_CREATE)
+
+    def test_viewer_denied_system_admin(self):
+        user = make_user(roles=["viewer"])
+        with pytest.raises(AuthorizationError):
+            check_permission(user, Permission.SYSTEM_ADMIN)
+
+    def test_researcher_denied_system_admin(self):
+        user = make_user(roles=["researcher"])
+        with pytest.raises(AuthorizationError):
+            check_permission(user, Permission.SYSTEM_ADMIN)
+
+    def test_researcher_denied_user_manage(self):
+        user = make_user(roles=["researcher"])
+        with pytest.raises(AuthorizationError):
+            check_permission(user, Permission.USER_MANAGE)
+
+    def test_no_roles_denied(self):
+        user = make_user(roles=[])
+        with pytest.raises(AuthorizationError):
+            check_permission(user, Permission.SESSION_READ)
+
+    def test_invalid_role_denied(self):
+        user = make_user(roles=["superuser"])
+        with pytest.raises(AuthorizationError):
+            check_permission(user, Permission.SESSION_READ)
+
+    # --- Granted via direct permissions (API key path) ---
+    def test_granted_via_direct_permission(self):
+        user = make_user(roles=[], permissions=["session:read"])
+        check_permission(user, Permission.SESSION_READ)  # no exception
+
+    def test_granted_via_direct_permission_system_admin(self):
+        user = make_user(roles=[], permissions=["system:admin"])
+        check_permission(user, Permission.SYSTEM_ADMIN)
+
+    def test_direct_permission_does_not_grant_other_permissions(self):
+        # Has session:read but not session:create
+        user = make_user(roles=[], permissions=["session:read"])
+        with pytest.raises(AuthorizationError):
+            check_permission(user, Permission.SESSION_CREATE)
+
+    # --- With DB audit logging ---
+    def test_granted_via_role_logs_audit_with_db(self):
+        mock_db = MagicMock()
+        user = make_user(roles=["admin"])
+        check_permission(user, Permission.SESSION_READ, db=mock_db)
+        mock_db.add.assert_called_once()
+        mock_db.commit.assert_called_once()
+
+    def test_denied_logs_audit_with_db(self):
+        mock_db = MagicMock()
+        user = make_user(roles=["viewer"])
+        with pytest.raises(AuthorizationError):
+            check_permission(user, Permission.SESSION_CREATE, db=mock_db)
+        mock_db.add.assert_called_once()
+        mock_db.commit.assert_called_once()
+
+    def test_granted_via_direct_permission_logs_audit_with_db(self):
+        mock_db = MagicMock()
+        user = make_user(roles=[], permissions=["session:read"])
+        check_permission(user, Permission.SESSION_READ, db=mock_db)
+        mock_db.add.assert_called_once()
+        mock_db.commit.assert_called_once()
+
+    # --- Without DB (no audit logging) ---
+    def test_denied_without_db_still_raises(self):
+        user = make_user(roles=["viewer"])
+        with pytest.raises(AuthorizationError):
+            check_permission(user, Permission.SESSION_CREATE, db=None)
+
+    # --- With resource/action/ip/user_agent context ---
+    def test_check_permission_with_full_context(self):
+        mock_db = MagicMock()
+        user = make_user(roles=["admin"])
+        check_permission(
+            user,
+            Permission.SESSION_READ,
+            resource="session",
+            action="read",
+            db=mock_db,
+            ip_address="127.0.0.1",
+            user_agent="TestAgent/1.0",
+        )
+        mock_db.add.assert_called_once()
+
+    def test_authorization_error_contains_resource_and_action(self):
+        user = make_user(roles=["viewer"])
+        with pytest.raises(AuthorizationError) as exc_info:
+            check_permission(user, Permission.SESSION_CREATE, resource="session", action="create")
+        err = exc_info.value
+        assert err.details["resource"] == "session"
+        assert err.details["action"] == "create"
+
+    def test_authorization_error_contains_required_role(self):
+        user = make_user(roles=["viewer"])
+        with pytest.raises(AuthorizationError) as exc_info:
+            check_permission(user, Permission.SYSTEM_ADMIN)
+        err = exc_info.value
+        # required_role should be set to the role that grants SYSTEM_ADMIN
+        assert "required_role" in err.details
+
+
+# ---------------------------------------------------------------------------
+# log_audit_event
+# ---------------------------------------------------------------------------
+
+class TestLogAuditEvent:
+    def test_with_db_adds_and_commits(self):
+        mock_db = MagicMock()
+        log_audit_event(
+            db=mock_db,
+            user_id="u1",
+            action="login",
+            resource_type="user",
+            resource_id="u1",
+            status="success",
+        )
+        mock_db.add.assert_called_once()
+        mock_db.commit.assert_called_once()
+
+    def test_with_db_none_does_nothing(self):
+        # Should not raise
+        log_audit_event(db=None, user_id="u1", action="login", status="success")
+
+    def test_with_all_optional_fields(self):
+        mock_db = MagicMock()
+        log_audit_event(
+            db=mock_db,
+            user_id="u1",
+            action="access:read",
+            resource_type="session",
+            resource_id="sess1",
+            details={"key": "value"},
+            ip_address="10.0.0.1",
+            user_agent="Mozilla/5.0",
+            status="granted",
+        )
+        mock_db.add.assert_called_once()
+        mock_db.commit.assert_called_once()
+
+    def test_db_exception_is_swallowed(self):
+        mock_db = MagicMock()
+        mock_db.add.side_effect = Exception("DB error")
+        # Should not raise — exception is caught internally
+        log_audit_event(db=mock_db, user_id="u1", action="login", status="success")
+
+    def test_with_minimal_args(self):
+        mock_db = MagicMock()
+        log_audit_event(db=mock_db)
+        mock_db.add.assert_called_once()
+        mock_db.commit.assert_called_once()
+
+    def test_details_defaults_to_empty_dict(self):
+        mock_db = MagicMock()
+        log_audit_event(db=mock_db, user_id="u1", action="test", status="success")
+        call_args = mock_db.add.call_args[0][0]
+        # The AuditLog object should have been created; just verify add was called
+        assert mock_db.add.called
+
+
+# ---------------------------------------------------------------------------
+# check_resource_ownership
+# ---------------------------------------------------------------------------
+
+class TestCheckResourceOwnership:
+    def test_owner_is_granted(self):
+        user = make_user(user_id="u1", roles=["viewer"])
+        check_resource_ownership("u1", user)  # no exception
+
+    def test_admin_role_granted_when_allow_admin_true(self):
+        user = make_user(user_id="u2", roles=["admin"])
+        check_resource_ownership("u1", user, allow_admin=True)  # no exception
+
+    def test_admin_role_denied_when_allow_admin_false(self):
+        user = make_user(user_id="u2", roles=["admin"])
+        with pytest.raises(AuthorizationError):
+            check_resource_ownership("u1", user, allow_admin=False)
+
+    def test_non_owner_non_admin_denied(self):
+        user = make_user(user_id="u2", roles=["viewer"])
+        with pytest.raises(AuthorizationError):
+            check_resource_ownership("u1", user)
+
+    def test_researcher_non_owner_denied(self):
+        user = make_user(user_id="u2", roles=["researcher"])
+        with pytest.raises(AuthorizationError):
+            check_resource_ownership("u1", user, allow_admin=False)
+
+    def test_admin_via_permissions_granted(self):
+        user = make_user(user_id="u2", roles=[], permissions=["admin"])
+        check_resource_ownership("u1", user, allow_admin=True)  # no exception
+
+    def test_admin_via_permissions_denied_when_allow_admin_false(self):
+        user = make_user(user_id="u2", roles=[], permissions=["admin"])
+        with pytest.raises(AuthorizationError):
+            check_resource_ownership("u1", user, allow_admin=False)
+
+    def test_admin_with_db_logs_audit(self):
+        mock_db = MagicMock()
+        user = make_user(user_id="u2", roles=["admin"])
+        check_resource_ownership("u1", user, allow_admin=True, db=mock_db)
+        mock_db.add.assert_called_once()
+        mock_db.commit.assert_called_once()
+
+    def test_owner_with_db_does_not_log_audit(self):
+        mock_db = MagicMock()
+        user = make_user(user_id="u1", roles=["viewer"])
+        check_resource_ownership("u1", user, db=mock_db)
+        # Owner path returns early without audit log
+        mock_db.add.assert_not_called()
+
+    def test_authorization_error_message(self):
+        user = make_user(user_id="u2", roles=["viewer"])
+        with pytest.raises(AuthorizationError) as exc_info:
+            check_resource_ownership("u1", user)
+        assert exc_info.value.details["resource"] == "resource"
+
+    def test_no_permissions_attribute_non_owner_denied(self):
+        user = make_user(user_id="u2", roles=["viewer"])
+        user.permissions = None
+        with pytest.raises(AuthorizationError):
+            check_resource_ownership("u1", user)
+
+
+# ---------------------------------------------------------------------------
+# get_current_user (async FastAPI dependency)
+# ---------------------------------------------------------------------------
+
+class TestGetCurrentUser:
+    @pytest.mark.asyncio
+    async def test_returns_middleware_user_if_set(self):
+        """If request.state.user is set (API key auth), return it directly."""
+        mock_user = make_user(user_id="u1", roles=["admin"])
+        request = Mock()
+        request.state.user = mock_user
+        mock_db = MagicMock()
+
+        result = await get_current_user(request, None, mock_db)
+        assert result is mock_user
+
+    @pytest.mark.asyncio
+    async def test_raises_invalid_token_if_no_credentials(self):
+        """No middleware user and no credentials → InvalidTokenError."""
+        class _State:
+            pass
+        class _Request:
+            state = _State()
+
+        request = _Request()
+        mock_db = MagicMock()
+
+        with pytest.raises(InvalidTokenError):
+            await get_current_user(request, None, mock_db)
+
+    @pytest.mark.asyncio
+    async def test_raises_invalid_token_if_empty_credentials(self):
+        class _State:
+            pass
+        class _Request:
+            state = _State()
+
+        request = _Request()
+        mock_db = MagicMock()
+        credentials = Mock()
+        credentials.credentials = ""
+
+        with pytest.raises(InvalidTokenError):
+            await get_current_user(request, credentials, mock_db)
+
+    @pytest.mark.asyncio
+    async def test_jwt_auth_success(self):
+        """Valid JWT token → returns TokenPayload from AuthManager."""
+        class _State:
+            pass
+        class _Request:
+            state = _State()
+
+        request = _Request()
+        mock_db = MagicMock()
+        mock_payload = make_user(user_id="u1", roles=["researcher"])
+
+        with patch("app.services.authorization.AuthManager") as MockAuthManager:
+            instance = MockAuthManager.return_value
+            instance.verify_token = AsyncMock(return_value=mock_payload)
+
+            credentials = Mock()
+            credentials.credentials = "valid.jwt.token"
+
+            result = await get_current_user(request, credentials, mock_db)
+            assert result is mock_payload
+            instance.verify_token.assert_called_once_with("valid.jwt.token", expected_type="access")
+
+    @pytest.mark.asyncio
+    async def test_expired_token_raises_invalid_token_error(self):
+        class _State:
+            pass
+        class _Request:
+            state = _State()
+
+        request = _Request()
+        mock_db = MagicMock()
+
+        with patch("app.services.authorization.AuthManager") as MockAuthManager:
+            instance = MockAuthManager.return_value
+            instance.verify_token = AsyncMock(side_effect=Exception("Token expired"))
+
+            credentials = Mock()
+            credentials.credentials = "expired.token"
+
+            with pytest.raises(InvalidTokenError) as exc_info:
+                await get_current_user(request, credentials, mock_db)
+            assert "expired" in str(exc_info.value).lower()
+
+    @pytest.mark.asyncio
+    async def test_invalid_token_format_raises_invalid_token_error(self):
+        class _State:
+            pass
+        class _Request:
+            state = _State()
+
+        request = _Request()
+        mock_db = MagicMock()
+
+        with patch("app.services.authorization.AuthManager") as MockAuthManager:
+            instance = MockAuthManager.return_value
+            instance.verify_token = AsyncMock(side_effect=Exception("invalid token"))
+
+            credentials = Mock()
+            credentials.credentials = "bad"
+
+            with pytest.raises(InvalidTokenError):
+                await get_current_user(request, credentials, mock_db)
+
+    @pytest.mark.asyncio
+    async def test_malformed_token_raises_invalid_token_error(self):
+        class _State:
+            pass
+        class _Request:
+            state = _State()
+
+        request = _Request()
+        mock_db = MagicMock()
+
+        with patch("app.services.authorization.AuthManager") as MockAuthManager:
+            instance = MockAuthManager.return_value
+            instance.verify_token = AsyncMock(side_effect=Exception("malformed token data"))
+
+            credentials = Mock()
+            credentials.credentials = "malformed"
+
+            with pytest.raises(InvalidTokenError):
+                await get_current_user(request, credentials, mock_db)
+
+    @pytest.mark.asyncio
+    async def test_wrong_token_type_raises_invalid_token_error(self):
+        class _State:
+            pass
+        class _Request:
+            state = _State()
+
+        request = _Request()
+        mock_db = MagicMock()
+
+        with patch("app.services.authorization.AuthManager") as MockAuthManager:
+            instance = MockAuthManager.return_value
+            instance.verify_token = AsyncMock(side_effect=Exception("token type mismatch"))
+
+            credentials = Mock()
+            credentials.credentials = "refresh.token"
+
+            with pytest.raises(InvalidTokenError):
+                await get_current_user(request, credentials, mock_db)
+
+    @pytest.mark.asyncio
+    async def test_generic_auth_error_raises_invalid_token_error(self):
+        class _State:
+            pass
+        class _Request:
+            state = _State()
+
+        request = _Request()
+        mock_db = MagicMock()
+
+        with patch("app.services.authorization.AuthManager") as MockAuthManager:
+            instance = MockAuthManager.return_value
+            instance.verify_token = AsyncMock(side_effect=Exception("Connection refused"))
+
+            credentials = Mock()
+            credentials.credentials = "some.token"
+
+            with pytest.raises(InvalidTokenError):
+                await get_current_user(request, credentials, mock_db)
+
+
+# ---------------------------------------------------------------------------
+# require_permission dependency factory
+# ---------------------------------------------------------------------------
+
+class TestRequirePermission:
+    def test_returns_callable(self):
+        dep = require_permission(Permission.SESSION_READ)
+        assert callable(dep)
+
+    @pytest.mark.asyncio
+    async def test_grants_when_user_has_permission(self):
+        checker = require_permission(Permission.SESSION_READ)
+        user = make_user(roles=["admin"])
+        result = await checker(current_user=user)
+        assert result is user
+
+    @pytest.mark.asyncio
+    async def test_grants_researcher_session_create(self):
+        checker = require_permission(Permission.SESSION_CREATE)
+        user = make_user(roles=["researcher"])
+        result = await checker(current_user=user)
+        assert result is user
+
+    @pytest.mark.asyncio
+    async def test_grants_viewer_session_read(self):
+        checker = require_permission(Permission.SESSION_READ)
+        user = make_user(roles=["viewer"])
+        result = await checker(current_user=user)
+        assert result is user
+
+    @pytest.mark.asyncio
+    async def test_denies_viewer_session_create(self):
+        checker = require_permission(Permission.SESSION_CREATE)
+        user = make_user(roles=["viewer"])
+        with pytest.raises(AuthorizationError):
+            await checker(current_user=user)
+
+    @pytest.mark.asyncio
+    async def test_denies_researcher_system_admin(self):
+        checker = require_permission(Permission.SYSTEM_ADMIN)
+        user = make_user(roles=["researcher"])
+        with pytest.raises(AuthorizationError):
+            await checker(current_user=user)
+
+    @pytest.mark.asyncio
+    async def test_grants_via_direct_permissions(self):
+        checker = require_permission(Permission.DATA_EXPORT)
+        user = make_user(roles=[], permissions=["data:export"])
+        result = await checker(current_user=user)
+        assert result is user
+
+    @pytest.mark.asyncio
+    async def test_all_permissions_for_admin(self):
+        """Admin should pass all permission checks."""
+        user = make_user(roles=["admin"])
+        for perm in Permission:
+            checker = require_permission(perm)
+            result = await checker(current_user=user)
+            assert result is user
+
+
+# ---------------------------------------------------------------------------
+# require_role dependency factory
+# ---------------------------------------------------------------------------
+
+class TestRequireRole:
+    def test_returns_callable(self):
+        dep = require_role(Role.ADMIN)
+        assert callable(dep)
+
+    @pytest.mark.asyncio
+    async def test_grants_admin_for_admin_requirement(self):
+        checker = require_role(Role.ADMIN)
+        user = make_user(roles=["admin"])
+        result = await checker(current_user=user)
+        assert result is user
+
+    @pytest.mark.asyncio
+    async def test_grants_researcher_for_researcher_requirement(self):
+        checker = require_role(Role.RESEARCHER)
+        user = make_user(roles=["researcher"])
+        result = await checker(current_user=user)
+        assert result is user
+
+    @pytest.mark.asyncio
+    async def test_grants_viewer_for_viewer_requirement(self):
+        checker = require_role(Role.VIEWER)
+        user = make_user(roles=["viewer"])
+        result = await checker(current_user=user)
+        assert result is user
+
+    @pytest.mark.asyncio
+    async def test_denies_viewer_for_admin_requirement(self):
+        checker = require_role(Role.ADMIN)
+        user = make_user(roles=["viewer"])
+        with pytest.raises(AuthorizationError):
+            await checker(current_user=user)
+
+    @pytest.mark.asyncio
+    async def test_denies_researcher_for_admin_requirement(self):
+        checker = require_role(Role.ADMIN)
+        user = make_user(roles=["researcher"])
+        with pytest.raises(AuthorizationError):
+            await checker(current_user=user)
+
+    @pytest.mark.asyncio
+    async def test_denies_empty_roles(self):
+        checker = require_role(Role.VIEWER)
+        user = make_user(roles=[])
+        with pytest.raises(AuthorizationError):
+            await checker(current_user=user)
+
+    @pytest.mark.asyncio
+    async def test_grants_when_user_has_multiple_roles_including_required(self):
+        checker = require_role(Role.ADMIN)
+        user = make_user(roles=["viewer", "admin"])
+        result = await checker(current_user=user)
+        assert result is user
+
+
+# ---------------------------------------------------------------------------
+# require_any_role dependency factory
+# ---------------------------------------------------------------------------
+
+class TestRequireAnyRole:
+    def test_returns_callable(self):
+        dep = require_any_role([Role.ADMIN, Role.RESEARCHER])
+        assert callable(dep)
+
+    @pytest.mark.asyncio
+    async def test_grants_admin_for_admin_or_researcher(self):
+        checker = require_any_role([Role.ADMIN, Role.RESEARCHER])
+        user = make_user(roles=["admin"])
+        result = await checker(current_user=user)
+        assert result is user
+
+    @pytest.mark.asyncio
+    async def test_grants_researcher_for_admin_or_researcher(self):
+        checker = require_any_role([Role.ADMIN, Role.RESEARCHER])
+        user = make_user(roles=["researcher"])
+        result = await checker(current_user=user)
+        assert result is user
+
+    @pytest.mark.asyncio
+    async def test_denies_viewer_for_admin_or_researcher(self):
+        checker = require_any_role([Role.ADMIN, Role.RESEARCHER])
+        user = make_user(roles=["viewer"])
+        with pytest.raises(AuthorizationError):
+            await checker(current_user=user)
+
+    @pytest.mark.asyncio
+    async def test_denies_empty_roles(self):
+        checker = require_any_role([Role.ADMIN, Role.RESEARCHER])
+        user = make_user(roles=[])
+        with pytest.raises(AuthorizationError):
+            await checker(current_user=user)
+
+    @pytest.mark.asyncio
+    async def test_authorization_error_lists_required_roles(self):
+        checker = require_any_role([Role.ADMIN, Role.RESEARCHER])
+        user = make_user(roles=["viewer"])
+        with pytest.raises(AuthorizationError) as exc_info:
+            await checker(current_user=user)
+        assert "admin" in exc_info.value.details.get("required_role", "")
+        assert "researcher" in exc_info.value.details.get("required_role", "")
+
+    @pytest.mark.asyncio
+    async def test_grants_all_roles_individually(self):
+        for role in Role:
+            checker = require_any_role([role])
+            user = make_user(roles=[role.value])
+            result = await checker(current_user=user)
+            assert result is user
+

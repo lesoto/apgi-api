@@ -296,3 +296,447 @@ class TestTaskRoutes:
 
         assert exc_info.value.status_code == 503
         assert "Task executor not initialized" in exc_info.value.detail
+
+
+# ---------------------------------------------------------------------------
+# Tests merged from test_tasks_routes.py
+# ---------------------------------------------------------------------------
+from datetime import datetime, timezone
+from sqlalchemy.orm import Session
+from fastapi import status
+
+
+@pytest.fixture
+def mock_db_session():
+    """Mock database session."""
+    db = MagicMock(spec=Session)
+    db.commit = MagicMock()
+    db.rollback = MagicMock()
+    db.query = MagicMock()
+    db.add = MagicMock()
+    db.delete = MagicMock()
+    db.refresh = MagicMock()
+    return db
+
+
+@pytest.fixture
+def mock_task_model():
+    """Mock task model."""
+    task = MagicMock()
+    task.task_id = "task123"
+    task.session_id = "session123"
+    task.status = "completed"
+    task.result_data = {"result": "success"}
+    task.created_at = datetime.now(timezone.utc)
+    return task
+
+
+@pytest.fixture
+def mock_session_model():
+    """Mock session model."""
+    session = MagicMock()
+    session.session_id = "session123"
+    session.user_id = "user123"
+    return session
+
+
+class TestGetTaskResult:
+    """Tests for get_task_result endpoint."""
+
+    @pytest.mark.asyncio
+    async def test_get_task_result_success(
+        self, mock_db_session, mock_current_user, mock_task_model, mock_session_model
+    ):
+        """Test successful task result retrieval."""
+        mock_db_session.query.return_value.join.return_value.filter.return_value.filter.return_value.first.return_value = (
+            mock_task_model
+        )
+
+        from app.routes.tasks import get_task_result
+
+        result = await get_task_result("task123", mock_db_session, mock_current_user)
+
+        assert result.task_id == "task123"
+        assert result.result == {"result": "success"}
+
+    @pytest.mark.asyncio
+    async def test_get_task_result_not_found(self, mock_db_session, mock_current_user):
+        """Test get_task_result when task not found."""
+        mock_db_session.query.return_value.join.return_value.filter.return_value.filter.return_value.first.return_value = (
+            None
+        )
+
+        from app.routes.tasks import get_task_result
+
+        with pytest.raises(HTTPException) as exc_info:
+            await get_task_result("task123", mock_db_session, mock_current_user)
+
+        assert exc_info.value.status_code == status.HTTP_404_NOT_FOUND
+
+    @pytest.mark.asyncio
+    async def test_get_task_result_not_completed(
+        self, mock_db_session, mock_current_user, mock_task_model
+    ):
+        """Test get_task_result when task not completed."""
+        mock_task_model.status = "running"
+        mock_db_session.query.return_value.join.return_value.filter.return_value.filter.return_value.first.return_value = (
+            mock_task_model
+        )
+
+        from app.routes.tasks import get_task_result
+
+        with pytest.raises(HTTPException) as exc_info:
+            await get_task_result("task123", mock_db_session, mock_current_user)
+
+        assert exc_info.value.status_code == status.HTTP_409_CONFLICT
+
+    @pytest.mark.asyncio
+    async def test_get_task_result_no_data(
+        self, mock_db_session, mock_current_user, mock_task_model
+    ):
+        """Test get_task_result when no result data."""
+        mock_task_model.status = "completed"
+        mock_task_model.result_data = None
+        mock_db_session.query.return_value.join.return_value.filter.return_value.filter.return_value.first.return_value = (
+            mock_task_model
+        )
+
+        from app.routes.tasks import get_task_result
+
+        with pytest.raises(HTTPException) as exc_info:
+            await get_task_result("task123", mock_db_session, mock_current_user)
+
+        assert exc_info.value.status_code == status.HTTP_404_NOT_FOUND
+
+    @pytest.mark.asyncio
+    async def test_get_task_result_error(self, mock_db_session, mock_current_user):
+        """Test get_task_result with internal error."""
+        mock_db_session.query.side_effect = Exception("Database error")
+
+        from app.routes.tasks import get_task_result
+
+        with pytest.raises(HTTPException) as exc_info:
+            await get_task_result("task123", mock_db_session, mock_current_user)
+
+        assert exc_info.value.status_code == status.HTTP_500_INTERNAL_SERVER_ERROR
+        mock_db_session.rollback.assert_called_once()
+
+
+class TestCancelTaskInSession:
+    """Tests for cancel_task_in_session endpoint."""
+
+    @pytest.mark.asyncio
+    @patch("app.routes.tasks.get_task_executor")
+    async def test_cancel_task_in_session_success(
+        self,
+        mock_get_executor,
+        mock_db_session,
+        mock_task_executor,
+        mock_current_user,
+        mock_session_model,
+        mock_task_model,
+    ):
+        """Test successful task cancellation in session."""
+        mock_get_executor.return_value = mock_task_executor
+        mock_task_executor.cancel_task.return_value = {"status": "cancelled"}
+
+        mock_db_session.query.return_value.filter.return_value.filter.return_value.first.side_effect = [
+            mock_session_model,
+            mock_task_model,
+        ]
+
+        from app.routes.tasks import cancel_task_in_session
+
+        result = await cancel_task_in_session(
+            "session123", "task123", mock_db_session, mock_task_executor, mock_current_user
+        )
+
+        assert result["status"] == "cancelled"
+
+    @pytest.mark.asyncio
+    @patch("app.routes.tasks.get_task_executor")
+    async def test_cancel_task_in_session_not_found(
+        self, mock_get_executor, mock_db_session, mock_task_executor, mock_current_user
+    ):
+        """Test cancel_task_in_session when session not found."""
+        mock_get_executor.return_value = mock_task_executor
+        mock_db_session.query.return_value.filter.return_value.filter.return_value.first.return_value = (
+            None
+        )
+
+        from app.routes.tasks import cancel_task_in_session
+
+        with pytest.raises(HTTPException) as exc_info:
+            await cancel_task_in_session(
+                "session123", "task123", mock_db_session, mock_task_executor, mock_current_user
+            )
+
+        assert exc_info.value.status_code == status.HTTP_404_NOT_FOUND
+
+    @pytest.mark.asyncio
+    @patch("app.routes.tasks.get_task_executor")
+    async def test_cancel_task_in_session_task_not_found(
+        self,
+        mock_get_executor,
+        mock_db_session,
+        mock_task_executor,
+        mock_current_user,
+        mock_session_model,
+    ):
+        """Test cancel_task_in_session when task not found."""
+        mock_get_executor.return_value = mock_task_executor
+        mock_db_session.query.return_value.filter.return_value.filter.return_value.first.side_effect = [
+            mock_session_model,
+            None,
+        ]
+
+        from app.routes.tasks import cancel_task_in_session
+
+        with pytest.raises(HTTPException) as exc_info:
+            await cancel_task_in_session(
+                "session123", "task123", mock_db_session, mock_task_executor, mock_current_user
+            )
+
+        assert exc_info.value.status_code == status.HTTP_404_NOT_FOUND
+
+    @pytest.mark.asyncio
+    @patch("app.routes.tasks.get_task_executor")
+    async def test_cancel_task_in_session_error(
+        self,
+        mock_get_executor,
+        mock_db_session,
+        mock_task_executor,
+        mock_current_user,
+        mock_session_model,
+        mock_task_model,
+    ):
+        """Test cancel_task_in_session with internal error."""
+        mock_get_executor.return_value = mock_task_executor
+        mock_task_executor.cancel_task.side_effect = Exception("Service error")
+        mock_db_session.query.return_value.filter.return_value.filter.return_value.first.side_effect = [
+            mock_session_model,
+            mock_task_model,
+        ]
+
+        from app.routes.tasks import cancel_task_in_session
+
+        with pytest.raises(HTTPException) as exc_info:
+            await cancel_task_in_session(
+                "session123", "task123", mock_db_session, mock_task_executor, mock_current_user
+            )
+
+        assert exc_info.value.status_code == status.HTTP_500_INTERNAL_SERVER_ERROR
+
+
+class TestCreateTaskDependency:
+    """Tests for create_task_dependency endpoint."""
+
+    @pytest.mark.asyncio
+    async def test_create_task_dependency_dependent_not_found(
+        self, mock_db_session, mock_current_user
+    ):
+        """Test create_task_dependency when dependent task not found."""
+        mock_db_session.query.return_value.join.return_value.filter.return_value.first.return_value = (
+            None
+        )
+
+        from app.routes.tasks import create_task_dependency, TaskDependencyCreateRequest
+
+        request = TaskDependencyCreateRequest(
+            prerequisite_task_id="task456", dependency_type="sequential"
+        )
+
+        with pytest.raises(HTTPException) as exc_info:
+            await create_task_dependency("task123", request, mock_db_session, mock_current_user)
+
+        assert exc_info.value.status_code == status.HTTP_404_NOT_FOUND
+
+    @pytest.mark.asyncio
+    async def test_create_task_dependency_prerequisite_not_found(
+        self, mock_db_session, mock_current_user, mock_task_model
+    ):
+        """Test create_task_dependency when prerequisite task not found."""
+        mock_db_session.query.return_value.join.return_value.filter.return_value.first.side_effect = [
+            mock_task_model,
+            None,
+        ]
+
+        from app.routes.tasks import create_task_dependency, TaskDependencyCreateRequest
+
+        request = TaskDependencyCreateRequest(
+            prerequisite_task_id="task456", dependency_type="sequential"
+        )
+
+        with pytest.raises(HTTPException) as exc_info:
+            await create_task_dependency("task123", request, mock_db_session, mock_current_user)
+
+        assert exc_info.value.status_code == status.HTTP_404_NOT_FOUND
+
+    @pytest.mark.asyncio
+    async def test_create_task_dependency_different_sessions(
+        self, mock_db_session, mock_current_user, mock_task_model
+    ):
+        """Test create_task_dependency when tasks in different sessions."""
+        mock_prereq_task = MagicMock()
+        mock_prereq_task.task_id = "task456"
+        mock_prereq_task.session_id = "session456"  # Different session
+
+        mock_db_session.query.return_value.join.return_value.filter.return_value.first.side_effect = [
+            mock_task_model,
+            mock_prereq_task,
+        ]
+
+        from app.routes.tasks import create_task_dependency, TaskDependencyCreateRequest
+
+        request = TaskDependencyCreateRequest(
+            prerequisite_task_id="task456", dependency_type="sequential"
+        )
+
+        with pytest.raises(HTTPException) as exc_info:
+            await create_task_dependency("task123", request, mock_db_session, mock_current_user)
+
+        assert exc_info.value.status_code == status.HTTP_400_BAD_REQUEST
+
+    @pytest.mark.asyncio
+    async def test_create_task_dependency_self_dependency(
+        self, mock_db_session, mock_current_user, mock_task_model
+    ):
+        """Test create_task_dependency with self dependency."""
+        mock_db_session.query.return_value.join.return_value.filter.return_value.first.side_effect = [
+            mock_task_model,
+            mock_task_model,
+        ]
+
+        from app.routes.tasks import create_task_dependency, TaskDependencyCreateRequest
+
+        request = TaskDependencyCreateRequest(
+            prerequisite_task_id="task123", dependency_type="sequential"
+        )
+
+        with pytest.raises(HTTPException) as exc_info:
+            await create_task_dependency("task123", request, mock_db_session, mock_current_user)
+
+        assert exc_info.value.status_code == status.HTTP_400_BAD_REQUEST
+
+    @pytest.mark.asyncio
+    async def test_create_task_dependency_already_exists(
+        self, mock_db_session, mock_current_user, mock_task_model
+    ):
+        """Test create_task_dependency when dependency already exists."""
+        mock_prereq_task = MagicMock()
+        mock_prereq_task.task_id = "task456"
+        mock_prereq_task.session_id = "session123"
+
+        mock_db_session.query.return_value.join.return_value.filter.return_value.first.side_effect = [
+            mock_task_model,
+            mock_prereq_task,
+        ]
+        mock_db_session.query.return_value.filter.return_value.first.return_value = MagicMock()
+
+        from app.routes.tasks import create_task_dependency, TaskDependencyCreateRequest
+
+        request = TaskDependencyCreateRequest(
+            prerequisite_task_id="task456", dependency_type="sequential"
+        )
+
+        with pytest.raises(HTTPException) as exc_info:
+            await create_task_dependency("task123", request, mock_db_session, mock_current_user)
+
+        assert exc_info.value.status_code == status.HTTP_409_CONFLICT
+
+    @pytest.mark.asyncio
+    async def test_create_task_dependency_error(
+        self, mock_db_session, mock_current_user, mock_task_model
+    ):
+        """Test create_task_dependency with internal error."""
+        mock_db_session.query.side_effect = Exception("Database error")
+
+        from app.routes.tasks import create_task_dependency, TaskDependencyCreateRequest
+
+        request = TaskDependencyCreateRequest(
+            prerequisite_task_id="task456", dependency_type="sequential"
+        )
+
+        with pytest.raises(HTTPException) as exc_info:
+            await create_task_dependency("task123", request, mock_db_session, mock_current_user)
+
+        assert exc_info.value.status_code == status.HTTP_500_INTERNAL_SERVER_ERROR
+        mock_db_session.rollback.assert_called_once()
+
+
+class TestListTaskDependencies:
+    """Tests for list_task_dependencies endpoint."""
+
+    @pytest.mark.asyncio
+    async def test_list_task_dependencies_not_found(self, mock_db_session, mock_current_user):
+        """Test list_task_dependencies when task not found."""
+        mock_db_session.query.return_value.join.return_value.filter.return_value.first.return_value = (
+            None
+        )
+
+        from app.routes.tasks import list_task_dependencies
+
+        with pytest.raises(HTTPException) as exc_info:
+            await list_task_dependencies("task123", mock_db_session, mock_current_user)
+
+        assert exc_info.value.status_code == status.HTTP_404_NOT_FOUND
+
+    @pytest.mark.asyncio
+    async def test_list_task_dependencies_error(self, mock_db_session, mock_current_user):
+        """Test list_task_dependencies with internal error."""
+        mock_db_session.query.side_effect = Exception("Database error")
+
+        from app.routes.tasks import list_task_dependencies
+
+        with pytest.raises(HTTPException) as exc_info:
+            await list_task_dependencies("task123", mock_db_session, mock_current_user)
+
+        assert exc_info.value.status_code == status.HTTP_500_INTERNAL_SERVER_ERROR
+
+
+class TestDeleteTaskDependency:
+    """Tests for delete_task_dependency endpoint."""
+
+    @pytest.mark.asyncio
+    async def test_delete_task_dependency_task_not_found(self, mock_db_session, mock_current_user):
+        """Test delete_task_dependency when task not found."""
+        mock_db_session.query.return_value.join.return_value.filter.return_value.first.return_value = (
+            None
+        )
+
+        from app.routes.tasks import delete_task_dependency
+
+        with pytest.raises(HTTPException) as exc_info:
+            await delete_task_dependency("task123", 1, mock_db_session, mock_current_user)
+
+        assert exc_info.value.status_code == status.HTTP_404_NOT_FOUND
+
+    @pytest.mark.asyncio
+    async def test_delete_task_dependency_not_found(
+        self, mock_db_session, mock_current_user, mock_task_model
+    ):
+        """Test delete_task_dependency when dependency not found."""
+        mock_db_session.query.return_value.join.return_value.filter.return_value.first.return_value = (
+            mock_task_model
+        )
+        mock_db_session.query.return_value.filter.return_value.first.return_value = None
+
+        from app.routes.tasks import delete_task_dependency
+
+        with pytest.raises(HTTPException) as exc_info:
+            await delete_task_dependency("task123", 1, mock_db_session, mock_current_user)
+
+        assert exc_info.value.status_code == status.HTTP_404_NOT_FOUND
+
+    @pytest.mark.asyncio
+    async def test_delete_task_dependency_error(self, mock_db_session, mock_current_user):
+        """Test delete_task_dependency with internal error."""
+        mock_db_session.query.side_effect = Exception("Database error")
+
+        from app.routes.tasks import delete_task_dependency
+
+        with pytest.raises(HTTPException) as exc_info:
+            await delete_task_dependency("task123", 1, mock_db_session, mock_current_user)
+
+        assert exc_info.value.status_code == status.HTTP_500_INTERNAL_SERVER_ERROR
+        mock_db_session.rollback.assert_called_once()

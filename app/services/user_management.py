@@ -99,9 +99,9 @@ class UserManagementService:
             password_hash=hashed_password,
             roles=roles,
             is_active=not settings.require_email_verification,  # Dependent on configuration, not SMTP
-            email_verification_token=verification_token
-            if settings.require_email_verification
-            else None,
+            email_verification_token=(
+                verification_token if settings.require_email_verification else None
+            ),
             email_verification_expires_at=verification_expires if smtp_available else None,
         )
 

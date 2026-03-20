@@ -50,12 +50,12 @@ class APIVersioningMiddleware(BaseHTTPMiddleware):
             if "sunset" in deprecation_info:
                 response.headers["Sunset"] = deprecation_info["sunset"]
             if "replacement" in deprecation_info:
-                response.headers[
-                    "Link"
-                ] = f'<{deprecation_info["replacement"]}>; rel="successor-version"'
-            response.headers[
-                "Warning"
-            ] = f'199 - "Endpoint is deprecated and will be removed on {deprecation_info.get("sunset", "TBD")}"'
+                response.headers["Link"] = (
+                    f'<{deprecation_info["replacement"]}>; rel="successor-version"'
+                )
+            response.headers["Warning"] = (
+                f'199 - "Endpoint is deprecated and will be removed on {deprecation_info.get("sunset", "TBD")}"'
+            )
 
         # Add content type version info for JSON responses
         if response.headers.get("content-type", "").startswith("application/json"):

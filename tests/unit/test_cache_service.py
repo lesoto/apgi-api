@@ -1,770 +1,447 @@
 """
-Unit tests for cache service.
+Unit tests for CacheService.
+
+Tests get/set/delete/invalidate using an AsyncMock redis client.
+Validates Requirements 2.4.
 """
 
+import json
 import pytest
-from unittest.mock import Mock
-from app.services.cache_service import CacheService
+from unittest.mock import AsyncMock, MagicMock, patch, call
 
+from app.services.cache_service import (
+    CacheService,
+    init_cache_service,
+    get_cache_service,
+)
 
-class TestCacheService:
-    """Test cache service."""
 
-    @pytest.fixture
-    def cache_service(self):
-        """Create cache service instance."""
-        mock_redis_client = Mock()
-        return CacheService(redis_client=mock_redis_client)
+@pytest.fixture
+def mock_redis():
+    """Async Redis client mock."""
+    client = AsyncMock()
 
-    def test_cache_initialization(self, cache_service):
-        """Test cache service initialization."""
-        assert cache_service is not None
+    # scan_iter is an async generator — default to empty
+    async def _empty_scan(pattern):
+        return
+        yield  # make it an async generator
 
-    def test_set_cache_value(self, cache_service):
-        """Test setting a cache value."""
-        key = "test_key"
-        value = "test_value"
+    client.scan_iter = _empty_scan
+    return client
+
 
-        cache_service.set(key, value)
+@pytest.fixture
+def service(mock_redis):
+    """CacheService instance with AsyncMock redis."""
+    return CacheService(mock_redis, default_ttl=3600)
 
-        # Should not raise any errors
 
-    def test_get_cache_value(self, cache_service):
-        """Test getting a cache value."""
-        key = "test_key"
-        value = "test_value"
+# ---------------------------------------------------------------------------
+# Initialisation
+# ---------------------------------------------------------------------------
 
-        cache_service.set(key, value)
-        retrieved = cache_service.get(key)
 
-        assert retrieved == value
-
-    def test_get_nonexistent_cache_value(self, cache_service):
-        """Test getting a nonexistent cache value."""
-        key = "nonexistent_key"
-
-        retrieved = cache_service.get(key)
-
-        assert retrieved is None
-
-    def test_delete_cache_value(self, cache_service):
-        """Test deleting a cache value."""
-        key = "test_key"
-        value = "test_value"
-
-        cache_service.set(key, value)
-        cache_service.delete(key)
-
-        retrieved = cache_service.get(key)
-        assert retrieved is None
-
-    def test_cache_exists(self, cache_service):
-        """Test checking if cache key exists."""
-        key = "test_key"
-        value = "test_value"
-
-        cache_service.set(key, value)
-        exists = cache_service.exists(key)
-
-        assert exists is True
-
-    def test_cache_not_exists(self, cache_service):
-        """Test checking if cache key does not exist."""
-        key = "nonexistent_key"
-
-        exists = cache_service.exists(key)
-
-        assert exists is False
-
-    def test_cache_expiration(self, cache_service):
-        """Test cache expiration."""
-        key = "test_key"
-        value = "test_value"
-        ttl = 1  # 1 second
-
-        cache_service.set(key, value, ttl=ttl)
-
-        # Immediately check - should exist
-        exists = cache_service.exists(key)
-        assert exists is True
-
-    def test_cache_clear(self, cache_service):
-        """Test clearing all cache."""
-        cache_service.set("key1", "value1")
-        cache_service.set("key2", "value2")
-
-        cache_service.clear()
-
-        assert cache_service.exists("key1") is False
-        assert cache_service.exists("key2") is False
-
-    def test_cache_get_many(self, cache_service):
-        """Test getting multiple cache values."""
-        cache_service.set("key1", "value1")
-        cache_service.set("key2", "value2")
-        cache_service.set("key3", "value3")
-
-        values = cache_service.get_many(["key1", "key2", "key3"])
-
-        assert values["key1"] == "value1"
-        assert values["key2"] == "value2"
-        assert values["key3"] == "value3"
-
-    def test_cache_set_many(self, cache_service):
-        """Test setting multiple cache values."""
-        data = {"key1": "value1", "key2": "value2", "key3": "value3"}
-
-        cache_service.set_many(data)
-
-        assert cache_service.get("key1") == "value1"
-        assert cache_service.get("key2") == "value2"
-        assert cache_service.get("key3") == "value3"
-
-    def test_cache_delete_many(self, cache_service):
-        """Test deleting multiple cache values."""
-        cache_service.set("key1", "value1")
-        cache_service.set("key2", "value2")
-        cache_service.set("key3", "value3")
-
-        cache_service.delete_many(["key1", "key2"])
-
-        assert cache_service.exists("key1") is False
-        assert cache_service.exists("key2") is False
-        assert cache_service.exists("key3") is True
-
-    def test_cache_increment(self, cache_service):
-        """Test incrementing a cache value."""
-        key = "counter"
-        cache_service.set(key, 5)
-
-        incremented = cache_service.increment(key)
-
-        assert incremented == 6
-
-    def test_cache_decrement(self, cache_service):
-        """Test decrementing a cache value."""
-        key = "counter"
-        cache_service.set(key, 5)
-
-        decremented = cache_service.decrement(key)
-
-        assert decremented == 4
-
-    def test_cache_append(self, cache_service):
-        """Test appending to a cache value."""
-        key = "list"
-        cache_service.set(key, [1, 2, 3])
-
-        cache_service.append(key, 4)
-
-        value = cache_service.get(key)
-        assert 4 in value
-
-    def test_cache_prepend(self, cache_service):
-        """Test prepending to a cache value."""
-        key = "list"
-        cache_service.set(key, [2, 3])
-
-        cache_service.prepend(key, 1)
-
-        value = cache_service.get(key)
-        assert value[0] == 1
-
-    def test_cache_get_or_set(self, cache_service):
-        """Test get or set cache value."""
-        key = "test_key"
-        default_value = "default"
-
-        value = cache_service.get_or_set(key, default_value)
-
-        assert value == default_value
-
-    def test_cache_get_or_set_with_callback(self, cache_service):
-        """Test get or set with callback."""
-        key = "test_key"
-
-        def callback():
-            return "computed_value"
-
-        value = cache_service.get_or_set(key, callback)
-
-        assert value == "computed_value"
-
-    def test_cache_key_pattern(self, cache_service):
-        """Test finding keys by pattern."""
-        cache_service.set("user:1:name", "Alice")
-        cache_service.set("user:2:name", "Bob")
-        cache_service.set("session:1:data", "data")
-
-        keys = cache_service.keys("user:*")
-
-        assert "user:1:name" in keys
-        assert "user:2:name" in keys
-        assert "session:1:data" not in keys
-
-    def test_cache_stats(self, cache_service):
-        """Test getting cache statistics."""
-        stats = cache_service.get_stats()
-
-        assert "hits" in stats
-        assert "misses" in stats
-        assert "size" in stats
-
-    def test_cache_flush(self, cache_service):
-        """Test flushing cache."""
-        cache_service.set("key1", "value1")
-        cache_service.set("key2", "value2")
-
-        cache_service.flush()
-
-        assert cache_service.exists("key1") is False
-        assert cache_service.exists("key2") is False
-
-    def test_cache_size(self, cache_service):
-        """Test getting cache size."""
-        cache_service.set("key1", "value1")
-        cache_service.set("key2", "value2")
-
-        size = cache_service.size()
-
-        assert size == 2
-
-    def test_cache_keys(self, cache_service):
-        """Test getting all cache keys."""
-        cache_service.set("key1", "value1")
-        cache_service.set("key2", "value2")
-
-        keys = cache_service.keys()
-
-        assert "key1" in keys
-        assert "key2" in keys
-
-    def test_cache_values(self, cache_service):
-        """Test getting all cache values."""
-        cache_service.set("key1", "value1")
-        cache_service.set("key2", "value2")
-
-        values = cache_service.values()
-
-        assert "value1" in values
-        assert "value2" in values
-
-    def test_cache_items(self, cache_service):
-        """Test getting all cache items."""
-        cache_service.set("key1", "value1")
-        cache_service.set("key2", "value2")
-
-        items = cache_service.items()
-
-        assert ("key1", "value1") in items
-        assert ("key2", "value2") in items
-
-    def test_cache_pop(self, cache_service):
-        """Test popping a cache value."""
-        key = "test_key"
-        value = "test_value"
-
-        cache_service.set(key, value)
-        popped = cache_service.pop(key)
-
-        assert popped == value
-        assert cache_service.exists(key) is False
-
-    def test_cache_update(self, cache_service):
-        """Test updating cache values."""
-        cache_service.set("key1", "value1")
-
-        cache_service.update({"key1": "new_value1", "key2": "value2"})
-
-        assert cache_service.get("key1") == "new_value1"
-        assert cache_service.get("key2") == "value2"
-
-    def test_cache_rename(self, cache_service):
-        """Test renaming a cache key."""
-        old_key = "old_key"
-        new_key = "new_key"
-        value = "test_value"
-
-        cache_service.set(old_key, value)
-        cache_service.rename(old_key, new_key)
-
-        assert cache_service.exists(old_key) is False
-        assert cache_service.get(new_key) == value
-
-    def test_cache_touch(self, cache_service):
-        """Test touching a cache key to update TTL."""
-        key = "test_key"
-        value = "test_value"
-        ttl = 10
-
-        cache_service.set(key, value, ttl=ttl)
-        cache_service.touch(key, ttl)
-
-        # Should not raise any errors
-
-    def test_cache_expire(self, cache_service):
-        """Test expiring a cache key."""
-        key = "test_key"
-        value = "test_value"
-
-        cache_service.set(key, value)
-        cache_service.expire(key, 1)
-
-        # Should not raise any errors
-
-    def test_cache_ttl(self, cache_service):
-        """Test getting TTL for a cache key."""
-        key = "test_key"
-        value = "test_value"
-        ttl = 10
-
-        cache_service.set(key, value, ttl=ttl)
-        remaining_ttl = cache_service.ttl(key)
-
-        assert remaining_ttl > 0
-
-    def test_cache_persist(self, cache_service):
-        """Test persisting a cache key (removing TTL)."""
-        key = "test_key"
-        value = "test_value"
-
-        cache_service.set(key, value, ttl=10)
-        cache_service.persist(key)
-
-        # Should not raise any errors
-
-    def test_cache_type(self, cache_service):
-        """Test getting the type of a cache value."""
-        key = "test_key"
-        value = "test_value"
-
-        cache_service.set(key, value)
-        value_type = cache_service.type(key)
-
-        assert value_type == "string"
-
-    def test_cache_random_key(self, cache_service):
-        """Test getting a random cache key."""
-        cache_service.set("key1", "value1")
-        cache_service.set("key2", "value2")
-
-        random_key = cache_service.random_key()
-
-        assert random_key in ["key1", "key2"]
-
-    def test_cache_scan(self, cache_service):
-        """Test scanning cache keys."""
-        cache_service.set("key1", "value1")
-        cache_service.set("key2", "value2")
-        cache_service.set("key3", "value3")
-
-        keys = cache_service.scan(match="key*")
-
-        assert "key1" in keys
-        assert "key2" in keys
-        assert "key3" in keys
-
-    def test_cache_distributed_lock(self, cache_service):
-        """Test distributed lock."""
-        lock_key = "lock_key"
-        lock_value = "lock_value"
-
-        acquired = cache_service.acquire_lock(lock_key, lock_value, ttl=10)
-
-        assert acquired is True
-
-        cache_service.release_lock(lock_key, lock_value)
-
-    def test_cache_semaphore(self, cache_service):
-        """Test semaphore pattern."""
-        semaphore_key = "semaphore_key"
-        limit = 5
-
-        acquired = cache_service.acquire_semaphore(semaphore_key, limit)
-
-        assert acquired is True
-
-        cache_service.release_semaphore(semaphore_key)
-
-    def test_cache_pub_sub(self, cache_service):
-        """Test pub/sub pattern."""
-        channel = "test_channel"
-        message = "test_message"
-
-        cache_service.publish(channel, message)
-
-        # Should not raise any errors
-
-    def test_cache_subscribe(self, cache_service):
-        """Test subscribing to a channel."""
-        channel = "test_channel"
-
-        cache_service.subscribe(channel)
-
-        # Should not raise any errors
-
-    def test_cache_unsubscribe(self, cache_service):
-        """Test unsubscribing from a channel."""
-        channel = "test_channel"
-
-        cache_service.unsubscribe(channel)
-
-        # Should not raise any errors
-
-    def test_cache_transaction(self, cache_service):
-        """Test cache transaction."""
-
-        def transaction(pipe):
-            pipe.set("key1", "value1")
-            pipe.set("key2", "value2")
-
-        cache_service.transaction(transaction)
-
-        assert cache_service.get("key1") == "value1"
-        assert cache_service.get("key2") == "value2"
-
-    def test_cache_pipeline(self, cache_service):
-        """Test cache pipeline."""
-
-        def pipeline(pipe):
-            pipe.set("key1", "value1")
-            pipe.set("key2", "value2")
-
-        cache_service.pipeline(pipeline)
-
-        assert cache_service.get("key1") == "value1"
-        assert cache_service.get("key2") == "value2"
-
-    def test_cache_lua_script(self, cache_service):
-        """Test executing Lua script."""
-        script = "return redis.call('SET', KEYS[1], ARGV[1])"
-
-        cache_service.eval(script, 1, "test_key", "test_value")
-
-        # Should not raise any errors
-
-    def test_cache_info(self, cache_service):
-        """Test getting cache info."""
-        info = cache_service.info()
-
-        assert info is not None
-
-    def test_cache_config(self, cache_service):
-        """Test getting cache config."""
-        config = cache_service.config()
-
-        assert config is not None
-
-    def test_cache_slowlog(self, cache_service):
-        """Test getting slow log."""
-        slowlog = cache_service.slowlog()
-
-        assert isinstance(slowlog, list)
-
-    def test_cache_monitor(self, cache_service):
-        """Test cache monitoring."""
-        monitor = cache_service.monitor()
-
-        assert monitor is not None
-
-    def test_cache_client_list(self, cache_service):
-        """Test getting client list."""
-        clients = cache_service.client_list()
-
-        assert isinstance(clients, list)
-
-    def test_cache_client_info(self, cache_service):
-        """Test getting client info."""
-        info = cache_service.client_info()
-
-        assert info is not None
-
-    def test_cache_ping(self, cache_service):
-        """Test cache ping."""
-        pong = cache_service.ping()
-
-        assert pong is True
-
-    def test_cache_echo(self, cache_service):
-        """Test cache echo."""
-        message = "test_message"
-
-        echoed = cache_service.echo(message)
-
-        assert echoed == message
-
-    def test_cache_quit(self, cache_service):
-        """Test cache quit."""
-        cache_service.quit()
-
-        # Should not raise any errors
-
-    def test_cache_shutdown(self, cache_service):
-        """Test cache shutdown."""
-        cache_service.shutdown()
-
-        # Should not raise any errors
-
-    def test_cache_save(self, cache_service):
-        """Test cache save."""
-        cache_service.save()
-
-        # Should not raise any errors
-
-    def test_cache_bgsave(self, cache_service):
-        """Test cache background save."""
-        cache_service.bgsave()
-
-        # Should not raise any errors
-
-    def test_cache_lastsave(self, cache_service):
-        """Test getting last save time."""
-        lastsave = cache_service.lastsave()
-
-        assert lastsave is not None
-
-    def test_cache_dbsize(self, cache_service):
-        """Test getting database size."""
-        size = cache_service.dbsize()
-
-        assert size >= 0
-
-    def test_cache_debug_object(self, cache_service):
-        """Test debug object."""
-        key = "test_key"
-        value = "test_value"
-
-        cache_service.set(key, value)
-        debug = cache_service.debug_object(key)
-
-        assert debug is not None
-
-    def test_cache_debug_segfault(self, cache_service):
-        """Test debug segfault."""
-        # This is a dangerous command, just test it exists
-        # cache_service.debug_segfault()
-        pass
-
-    def test_cache_memory_usage(self, cache_service):
-        """Test getting memory usage."""
-        usage = cache_service.memory_usage()
-
-        assert usage is not None
-
-    def test_cache_memory_stats(self, cache_service):
-        """Test getting memory stats."""
-        stats = cache_service.memory_stats()
-
-        assert stats is not None
-
-    def test_cache_memory_purge(self, cache_service):
-        """Test memory purge."""
-        cache_service.memory_purge()
-
-        # Should not raise any errors
-
-    def test_cache_replication_info(self, cache_service):
-        """Test getting replication info."""
-        info = cache_service.replication_info()
-
-        assert info is not None
-
-    def test_cache_role(self, cache_service):
-        """Test getting role."""
-        role = cache_service.role()
-
-        assert role in ["master", "slave"]
-
-    def test_cache_sync(self, cache_service):
-        """Test cache sync."""
-        cache_service.sync()
-
-        # Should not raise any errors
-
-    def test_cache_sync_unblock(self, cache_service):
-        """Test cache sync unblock."""
-        cache_service.sync_unblock()
-
-        # Should not raise any errors
-
-    def test_cache_readonly(self, cache_service):
-        """Test setting readonly mode."""
-        cache_service.readonly(True)
-
-        # Should not raise any errors
-
-    def test_cache_readwrite(self, cache_service):
-        """Test setting readwrite mode."""
-        cache_service.readwrite()
-
-        # Should not raise any errors
-
-    def test_cache_cluster_nodes(self, cache_service):
-        """Test getting cluster nodes."""
-        nodes = cache_service.cluster_nodes()
-
-        assert isinstance(nodes, list)
-
-    def test_cache_cluster_meet(self, cache_service):
-        """Test cluster meet."""
-        ip = "127.0.0.1"
-        port = 6379
-
-        cache_service.cluster_meet(ip, port)
-
-        # Should not raise any errors
-
-    def test_cache_cluster_slots(self, cache_service):
-        """Test getting cluster slots."""
-        slots = cache_service.cluster_slots()
-
-        assert isinstance(slots, list)
-
-    def test_cache_cluster_info(self, cache_service):
-        """Test getting cluster info."""
-        info = cache_service.cluster_info()
-
-        assert info is not None
-
-    def test_cache_cluster_reset(self, cache_service):
-        """Test cluster reset."""
-        cache_service.cluster_reset()
-
-        # Should not raise any errors
-
-    def test_cache_cluster_failover(self, cache_service):
-        """Test cluster failover."""
-        cache_service.cluster_failover()
-
-        # Should not raise any errors
-
-    def test_cache_cluster_addslots(self, cache_service):
-        """Test cluster add slots."""
-        node_id = "node123"
-        slots = [1, 2, 3]
-
-        cache_service.cluster_addslots(node_id, slots)
-
-        # Should not raise any errors
-
-    def test_cache_cluster_delslots(self, cache_service):
-        """Test cluster delete slots."""
-        node_id = "node123"
-        slots = [1, 2, 3]
-
-        cache_service.cluster_delslots(node_id, slots)
-
-        # Should not raise any errors
-
-    def test_cache_cluster_setslot(self, cache_service):
-        """Test cluster set slot."""
-        slot = 1
-        node_id = "node123"
-
-        cache_service.cluster_setslot(slot, node_id)
-
-        # Should not raise any errors
-
-    def test_cache_cluster_getkeysinslot(self, cache_service):
-        """Test getting keys in slot."""
-        slot = 1
-
-        keys = cache_service.cluster_getkeysinslot(slot)
-
-        assert isinstance(keys, list)
-
-    def test_cache_cluster_keyslot(self, cache_service):
-        """Test getting key slot."""
-        key = "test_key"
-
-        slot = cache_service.cluster_keyslot(key)
-
-        assert isinstance(slot, int)
-
-    def test_cache_cluster_countkeysinslot(self, cache_service):
-        """Test counting keys in slot."""
-        slot = 1
-
-        count = cache_service.cluster_countkeysinslot(slot)
-
-        assert count >= 0
-
-    def test_cache_cluster_saveconfig(self, cache_service):
-        """Test cluster save config."""
-        cache_service.cluster_saveconfig()
-
-        # Should not raise any errors
-
-    def test_cache_cluster_nodes_info(self, cache_service):
-        """Test cluster nodes info."""
-        node_id = "node123"
-
-        info = cache_service.cluster_nodes_info(node_id)
-
-        assert info is not None
-
-    def test_cache_cluster_replicate(self, cache_service):
-        """Test cluster replicate."""
-        target_node_id = "target123"
-
-        cache_service.cluster_replicate(target_node_id)
-
-        # Should not raise any errors
-
-    def test_cache_cluster_forget(self, cache_service):
-        """Test cluster forget."""
-        node_id = "node123"
-
-        cache_service.cluster_forget(node_id)
-
-        # Should not raise any errors
-
-    def test_cache_cluster_flushslots(self, cache_service):
-        """Test cluster flush slots."""
-        cache_service.cluster_flushslots()
-
-        # Should not raise any errors
-
-    def test_cache_cluster_bgsave(self, cache_service):
-        """Test cluster background save."""
-        cache_service.cluster_bgsave()
-
-        # Should not raise any errors
-
-    def test_cache_cluster_slots_assigned(self, cache_service):
-        """Test cluster slots assigned."""
-        assigned = cache_service.cluster_slots_assigned()
-
-        assert isinstance(assigned, list)
-
-    def test_cache_cluster_slots_importing(self, cache_service):
-        """Test cluster slots importing."""
-        importing = cache_service.cluster_slots_importing()
-
-        assert isinstance(importing, list)
-
-    def test_cache_cluster_set_config_epoch(self, cache_service):
-        """Test cluster set config epoch."""
-        epoch = 123
-
-        cache_service.cluster_set_config_epoch(epoch)
-
-        # Should not raise any errors
-
-    def test_cache_cluster_info_replication(self, cache_service):
-        """Test cluster info replication."""
-        info = cache_service.cluster_info_replication()
-
-        assert info is not None
-
-    def test_cache_cluster_info_nodes(self, cache_service):
-        """Test cluster info nodes."""
-        nodes = cache_service.cluster_info_nodes()
-
-        assert isinstance(nodes, list)
-
-    def test_cache_cluster_info_cluster(self, cache_service):
-        """Test cluster info cluster."""
-        info = cache_service.cluster_info_cluster()
-
-        assert info is not None
+class TestInit:
+    def test_stores_redis_and_ttl(self, mock_redis):
+        svc = CacheService(mock_redis, default_ttl=1800)
+        assert svc.redis is mock_redis
+        assert svc.default_ttl == 1800
+
+    def test_default_ttl_is_3600(self, mock_redis):
+        svc = CacheService(mock_redis)
+        assert svc.default_ttl == 3600
+
+    def test_prefixes_defined(self, service):
+        assert service.prefixes["session"] == "session:"
+        assert service.prefixes["user"] == "user:"
+        assert service.prefixes["auth"] == "auth:"
+        assert service.prefixes["task"] == "task:"
+        assert service.prefixes["query"] == "query:"
+        assert service.prefixes["response"] == "response:"
+
+    def test_fernet_created(self, service):
+        assert service.fernet is not None
+
+
+# ---------------------------------------------------------------------------
+# Global helpers
+# ---------------------------------------------------------------------------
+
+
+class TestGlobalHelpers:
+    def test_init_cache_service_sets_global(self, mock_redis):
+        import app.services.cache_service as mod
+
+        mod.cache_service = None
+        result = init_cache_service(mock_redis, default_ttl=7200)
+        assert result is mod.cache_service
+        assert result.default_ttl == 7200
+
+    def test_get_cache_service_none_when_not_init(self):
+        import app.services.cache_service as mod
+
+        mod.cache_service = None
+        assert get_cache_service() is None
+
+    def test_get_cache_service_returns_instance(self, mock_redis):
+        init_cache_service(mock_redis)
+        assert get_cache_service() is not None
+
+
+# ---------------------------------------------------------------------------
+# _set_json / _get_json
+# ---------------------------------------------------------------------------
+
+
+class TestSetGetJson:
+    @pytest.mark.asyncio
+    async def test_set_json_calls_setex(self, service, mock_redis):
+        mock_redis.setex = AsyncMock(return_value=True)
+        result = await service._set_json("mykey", {"a": 1}, 60)
+        assert result is True
+        mock_redis.setex.assert_awaited_once()
+        args = mock_redis.setex.call_args[0]
+        assert args[0] == "mykey"
+        assert args[1] == 60
+        assert json.loads(args[2]) == {"a": 1}
+
+    @pytest.mark.asyncio
+    async def test_set_json_returns_false_on_exception(self, service, mock_redis):
+        mock_redis.setex = AsyncMock(side_effect=Exception("redis down"))
+        result = await service._set_json("k", {}, 60)
+        assert result is False
+
+    @pytest.mark.asyncio
+    async def test_get_json_returns_parsed_data(self, service, mock_redis):
+        mock_redis.get = AsyncMock(return_value=b'{"x": 42}')
+        result = await service._get_json("mykey")
+        assert result == {"x": 42}
+
+    @pytest.mark.asyncio
+    async def test_get_json_returns_none_when_missing(self, service, mock_redis):
+        mock_redis.get = AsyncMock(return_value=None)
+        result = await service._get_json("missing")
+        assert result is None
+
+    @pytest.mark.asyncio
+    async def test_get_json_returns_none_on_exception(self, service, mock_redis):
+        mock_redis.get = AsyncMock(side_effect=Exception("err"))
+        result = await service._get_json("k")
+        assert result is None
+
+
+# ---------------------------------------------------------------------------
+# _set_encrypted_json / _get_encrypted_json
+# ---------------------------------------------------------------------------
+
+
+class TestEncryptedJson:
+    @pytest.mark.asyncio
+    async def test_set_encrypted_json_encrypts_and_stores(self, service, mock_redis):
+        mock_redis.setex = AsyncMock(return_value=True)
+        result = await service._set_encrypted_json("ekey", {"secret": "val"}, 120)
+        assert result is True
+        mock_redis.setex.assert_awaited_once()
+        key, ttl, payload = mock_redis.setex.call_args[0]
+        assert key == "ekey"
+        assert ttl == 120
+        # payload should be bytes (encrypted)
+        assert isinstance(payload, bytes)
+
+    @pytest.mark.asyncio
+    async def test_set_encrypted_json_returns_false_on_error(self, service, mock_redis):
+        mock_redis.setex = AsyncMock(side_effect=Exception("fail"))
+        result = await service._set_encrypted_json("k", {}, 60)
+        assert result is False
+
+    @pytest.mark.asyncio
+    async def test_get_encrypted_json_round_trip(self, service, mock_redis):
+        """Encrypt then decrypt should return original data."""
+        data = {"user": "alice", "role": "admin"}
+        encrypted = service.fernet.encrypt(json.dumps(data).encode())
+        mock_redis.get = AsyncMock(return_value=encrypted)
+        result = await service._get_encrypted_json("ekey")
+        assert result == data
+
+    @pytest.mark.asyncio
+    async def test_get_encrypted_json_returns_none_when_missing(self, service, mock_redis):
+        mock_redis.get = AsyncMock(return_value=None)
+        result = await service._get_encrypted_json("missing")
+        assert result is None
+
+    @pytest.mark.asyncio
+    async def test_get_encrypted_json_returns_none_on_bad_data(self, service, mock_redis):
+        mock_redis.get = AsyncMock(return_value=b"not-valid-fernet-token")
+        result = await service._get_encrypted_json("k")
+        assert result is None
+
+
+# ---------------------------------------------------------------------------
+# Session state
+# ---------------------------------------------------------------------------
+
+
+class TestSessionState:
+    @pytest.mark.asyncio
+    async def test_set_session_state_uses_correct_key(self, service):
+        with patch.object(service, "_set_json", new=AsyncMock(return_value=True)) as m:
+            await service.set_session_state("sess1", {"k": "v"}, ttl=300)
+            m.assert_awaited_once_with("session:sess1:state", {"k": "v"}, 300)
+
+    @pytest.mark.asyncio
+    async def test_set_session_state_default_ttl(self, service):
+        with patch.object(service, "_set_json", new=AsyncMock(return_value=True)) as m:
+            await service.set_session_state("sess1", {})
+            _, _, ttl = m.call_args[0]
+            assert ttl == service.default_ttl
+
+    @pytest.mark.asyncio
+    async def test_get_session_state_uses_correct_key(self, service):
+        with patch.object(service, "_get_json", new=AsyncMock(return_value={"k": "v"})) as m:
+            result = await service.get_session_state("sess1")
+            m.assert_awaited_once_with("session:sess1:state")
+            assert result == {"k": "v"}
+
+    @pytest.mark.asyncio
+    async def test_get_session_state_returns_none_when_missing(self, service):
+        with patch.object(service, "_get_json", new=AsyncMock(return_value=None)):
+            result = await service.get_session_state("missing")
+            assert result is None
+
+
+# ---------------------------------------------------------------------------
+# Session metadata
+# ---------------------------------------------------------------------------
+
+
+class TestSessionMetadata:
+    @pytest.mark.asyncio
+    async def test_set_session_metadata_uses_correct_key(self, service):
+        with patch.object(service, "_set_json", new=AsyncMock(return_value=True)) as m:
+            await service.set_session_metadata("sess1", {"meta": True}, ttl=600)
+            key = m.call_args[0][0]
+            assert key == "session:sess1:metadata"
+
+    @pytest.mark.asyncio
+    async def test_get_session_metadata_uses_correct_key(self, service):
+        with patch.object(service, "_get_json", new=AsyncMock(return_value={"meta": True})) as m:
+            result = await service.get_session_metadata("sess1")
+            m.assert_awaited_once_with("session:sess1:metadata")
+            assert result == {"meta": True}
+
+
+# ---------------------------------------------------------------------------
+# User data (encrypted)
+# ---------------------------------------------------------------------------
+
+
+class TestUserData:
+    @pytest.mark.asyncio
+    async def test_set_user_data_uses_encrypted_json(self, service):
+        with patch.object(service, "_set_encrypted_json", new=AsyncMock(return_value=True)) as m:
+            await service.set_user_data("u1", {"email": "a@b.com"}, ttl=900)
+            key = m.call_args[0][0]
+            assert key == "user:u1:data"
+
+    @pytest.mark.asyncio
+    async def test_get_user_data_uses_encrypted_json(self, service):
+        with patch.object(
+            service, "_get_encrypted_json", new=AsyncMock(return_value={"email": "a@b.com"})
+        ) as m:
+            result = await service.get_user_data("u1")
+            m.assert_awaited_once_with("user:u1:data")
+            assert result == {"email": "a@b.com"}
+
+
+# ---------------------------------------------------------------------------
+# Auth token
+# ---------------------------------------------------------------------------
+
+
+class TestAuthToken:
+    @pytest.mark.asyncio
+    async def test_set_auth_token_uses_correct_key(self, service):
+        with patch.object(service, "_set_json", new=AsyncMock(return_value=True)) as m:
+            await service.set_auth_token("hash123", {"uid": "u1"}, ttl=3600)
+            m.assert_awaited_once_with("auth:hash123", {"uid": "u1"}, 3600)
+
+    @pytest.mark.asyncio
+    async def test_get_auth_token_uses_correct_key(self, service):
+        with patch.object(service, "_get_json", new=AsyncMock(return_value={"uid": "u1"})) as m:
+            result = await service.get_auth_token("hash123")
+            m.assert_awaited_once_with("auth:hash123")
+            assert result == {"uid": "u1"}
+
+
+# ---------------------------------------------------------------------------
+# Task result
+# ---------------------------------------------------------------------------
+
+
+class TestTaskResult:
+    @pytest.mark.asyncio
+    async def test_set_task_result_uses_correct_key(self, service):
+        with patch.object(service, "_set_json", new=AsyncMock(return_value=True)) as m:
+            await service.set_task_result("t1", {"out": "done"}, ttl=1800)
+            key = m.call_args[0][0]
+            assert key == "task:t1:result"
+
+    @pytest.mark.asyncio
+    async def test_get_task_result_uses_correct_key(self, service):
+        with patch.object(service, "_get_json", new=AsyncMock(return_value={"out": "done"})) as m:
+            result = await service.get_task_result("t1")
+            m.assert_awaited_once_with("task:t1:result")
+            assert result == {"out": "done"}
+
+
+# ---------------------------------------------------------------------------
+# Query result
+# ---------------------------------------------------------------------------
+
+
+class TestQueryResult:
+    @pytest.mark.asyncio
+    async def test_set_query_result_default_ttl_is_quarter(self, service):
+        with patch.object(service, "_set_json", new=AsyncMock(return_value=True)) as m:
+            await service.set_query_result("qhash", [1, 2, 3])
+            _, _, ttl = m.call_args[0]
+            assert ttl == service.default_ttl // 4
+
+    @pytest.mark.asyncio
+    async def test_set_query_result_custom_ttl(self, service):
+        with patch.object(service, "_set_json", new=AsyncMock(return_value=True)) as m:
+            await service.set_query_result("qhash", [1, 2, 3], ttl=500)
+            _, _, ttl = m.call_args[0]
+            assert ttl == 500
+
+    @pytest.mark.asyncio
+    async def test_get_query_result_uses_correct_key(self, service):
+        with patch.object(service, "_get_json", new=AsyncMock(return_value=[1, 2])) as m:
+            result = await service.get_query_result("qhash")
+            m.assert_awaited_once_with("query:qhash")
+            assert result == [1, 2]
+
+
+# ---------------------------------------------------------------------------
+# API response
+# ---------------------------------------------------------------------------
+
+
+class TestApiResponse:
+    @pytest.mark.asyncio
+    async def test_set_api_response_default_ttl_is_half(self, service):
+        with patch.object(service, "_set_json", new=AsyncMock(return_value=True)) as m:
+            await service.set_api_response("/v1/users", "p1", {"data": []})
+            _, _, ttl = m.call_args[0]
+            assert ttl == service.default_ttl // 2
+
+    @pytest.mark.asyncio
+    async def test_set_api_response_key_format(self, service):
+        with patch.object(service, "_set_json", new=AsyncMock(return_value=True)) as m:
+            await service.set_api_response("/v1/users", "p1", {}, ttl=100)
+            key = m.call_args[0][0]
+            assert key == "response:/v1/users:p1"
+
+    @pytest.mark.asyncio
+    async def test_get_api_response_uses_correct_key(self, service):
+        with patch.object(service, "_get_json", new=AsyncMock(return_value={"data": []})) as m:
+            result = await service.get_api_response("/v1/users", "p1")
+            m.assert_awaited_once_with("response:/v1/users:p1")
+            assert result == {"data": []}
+
+
+# ---------------------------------------------------------------------------
+# Cache invalidation
+# ---------------------------------------------------------------------------
+
+
+class TestCacheInvalidation:
+    @pytest.mark.asyncio
+    async def test_invalidate_session_cache_deletes_matching_keys(self, service, mock_redis):
+        keys = [b"session:s1:state", b"session:s1:metadata"]
+
+        async def _scan(pattern):
+            for k in keys:
+                yield k
+
+        mock_redis.scan_iter = _scan
+        mock_redis.delete = AsyncMock(return_value=2)
+
+        result = await service.invalidate_session_cache("s1")
+
+        assert result == 2
+        mock_redis.delete.assert_awaited_once_with(*keys)
+
+    @pytest.mark.asyncio
+    async def test_invalidate_session_cache_returns_0_when_no_keys(self, service, mock_redis):
+        async def _empty(pattern):
+            return
+            yield
+
+        mock_redis.scan_iter = _empty
+        mock_redis.delete = AsyncMock()
+
+        result = await service.invalidate_session_cache("s1")
+
+        assert result == 0
+        mock_redis.delete.assert_not_awaited()
+
+    @pytest.mark.asyncio
+    async def test_invalidate_user_cache_deletes_matching_keys(self, service, mock_redis):
+        keys = [b"user:u1:data"]
+
+        async def _scan(pattern):
+            for k in keys:
+                yield k
+
+        mock_redis.scan_iter = _scan
+        mock_redis.delete = AsyncMock(return_value=1)
+
+        result = await service.invalidate_user_cache("u1")
+
+        assert result == 1
+        mock_redis.delete.assert_awaited_once_with(*keys)
+
+    @pytest.mark.asyncio
+    async def test_invalidate_user_cache_returns_0_when_no_keys(self, service, mock_redis):
+        async def _empty(pattern):
+            return
+            yield
+
+        mock_redis.scan_iter = _empty
+        mock_redis.delete = AsyncMock()
+
+        result = await service.invalidate_user_cache("u1")
+
+        assert result == 0
+
+    @pytest.mark.asyncio
+    async def test_clear_expired_cache_returns_0(self, service):
+        """Redis handles expiry automatically; this method always returns 0."""
+        result = await service.clear_expired_cache()
+        assert result == 0
+
+
+# ---------------------------------------------------------------------------
+# Cache stats
+# ---------------------------------------------------------------------------
+
+
+class TestCacheStats:
+    @pytest.mark.asyncio
+    async def test_get_cache_stats_returns_key_counts(self, service, mock_redis):
+        async def _scan(pattern):
+            # yield 2 keys for every prefix
+            yield b"key1"
+            yield b"key2"
+
+        mock_redis.scan_iter = _scan
+        mock_redis.info = AsyncMock(return_value={"used_memory": 1024, "maxmemory": 0})
+
+        stats = await service.get_cache_stats()
+
+        # 6 prefixes × 2 keys each
+        for prefix_name in service.prefixes:
+            assert stats[f"{prefix_name}_keys"] == 2
+
+        assert stats["redis_used_memory"] == 1024

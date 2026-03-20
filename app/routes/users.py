@@ -5,7 +5,6 @@ API endpoints for user management including registration,
 password reset, and user administration.
 """
 
-
 import secrets
 import logging
 from datetime import datetime, timezone

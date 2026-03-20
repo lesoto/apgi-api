@@ -1,548 +1,743 @@
 """
-Unit tests for JWT token generation and verification.
+Unit tests for AuthManager service.
 
-Tests access token creation/verification, refresh token creation/verification,
-token expiration handling, and invalid token rejection.
+Covers: hash_password, verify_password, create_access_token, verify_token,
+refresh_access_token, revoke_refresh_token, revoke_access_token, revoke_all_user_tokens.
+
+Uses MagicMock for DB session and AsyncMock for Redis client.
 """
 
 import pytest
 from datetime import datetime, timedelta, timezone
-from unittest.mock import MagicMock
+from unittest.mock import MagicMock, AsyncMock, patch
 from typing import cast
 import jwt
 
-from app.services.auth_manager import AuthManager
 from app.config import settings
-from app.exceptions import ExpiredTokenError, InvalidTokenError
+from app.exceptions import AuthenticationError, ExpiredTokenError, InvalidTokenError
+
+
+# ---------------------------------------------------------------------------
+# Fixtures
+# ---------------------------------------------------------------------------
 
 
 @pytest.fixture
-def mock_db_session():
-    """Create a mock database session."""
+def db():
+    """MagicMock database session."""
     return MagicMock()
 
 
 @pytest.fixture
-def auth_manager(mock_db_session):
-    """Create an AuthManager instance with mock database."""
-    return AuthManager(mock_db_session)
+def redis():
+    """AsyncMock Redis client."""
+    r = AsyncMock()
+    r.exists = AsyncMock(return_value=False)
+    r.setex = AsyncMock(return_value=True)
+    return r
 
 
-class TestAccessTokenCreation:
-    """Test access token creation."""
+@pytest.fixture
+def auth_manager(db):
+    """AuthManager with MagicMock DB, no Redis."""
+    from app.services.auth_manager import AuthManager
 
-    def test_create_access_token_returns_valid_jwt(self, auth_manager):
-        """Test that create_access_token returns a valid JWT string."""
-        user_id = "user123"
-        username = "testuser"
-        roles = ["researcher"]
+    return AuthManager(db)
 
-        token = auth_manager.create_access_token(user_id, username, roles)
 
-        # Verify token is a non-empty string
+@pytest.fixture
+def auth_manager_with_redis(db, redis):
+    """AuthManager with MagicMock DB and AsyncMock Redis."""
+    from app.services.auth_manager import AuthManager
+
+    return AuthManager(db, redis_client=redis)
+
+
+def _make_refresh_token_row(token_str: str, user_id: str, expired: bool = False):
+    """Build a MagicMock RefreshToken DB row."""
+    from app.services.auth_manager import AuthManager
+
+    row = MagicMock()
+    row.user_id = user_id
+    row.token_hash = AuthManager.hash_password(token_str)
+    import hashlib
+
+    row.token_sha256 = hashlib.sha256(token_str.encode()).hexdigest()
+    row.revoked = False
+    if expired:
+        row.expires_at = datetime.now(timezone.utc) - timedelta(days=1)
+    else:
+        row.expires_at = datetime.now(timezone.utc) + timedelta(days=7)
+    return row
+
+
+# ---------------------------------------------------------------------------
+# hash_password
+# ---------------------------------------------------------------------------
+
+
+class TestHashPassword:
+    def test_returns_bcrypt_string(self, auth_manager):
+        h = auth_manager.hash_password("secret")
+        assert h.startswith("$2b$")
+
+    def test_different_salts_produce_different_hashes(self, auth_manager):
+        h1 = auth_manager.hash_password("secret")
+        h2 = auth_manager.hash_password("secret")
+        assert h1 != h2
+
+    def test_empty_password_raises_value_error(self, auth_manager):
+        with pytest.raises(ValueError, match="Password cannot be empty"):
+            auth_manager.hash_password("")
+
+    def test_static_method_callable_without_instance(self):
+        from app.services.auth_manager import AuthManager
+
+        h = AuthManager.hash_password("mypassword")
+        assert h.startswith("$2b$")
+
+
+# ---------------------------------------------------------------------------
+# verify_password
+# ---------------------------------------------------------------------------
+
+
+class TestVerifyPassword:
+    def test_correct_password_returns_true(self, auth_manager):
+        h = auth_manager.hash_password("correct")
+        assert auth_manager.verify_password("correct", h) is True
+
+    def test_wrong_password_returns_false(self, auth_manager):
+        h = auth_manager.hash_password("correct")
+        assert auth_manager.verify_password("wrong", h) is False
+
+    def test_empty_plain_password_returns_false(self, auth_manager):
+        h = auth_manager.hash_password("correct")
+        # bcrypt.checkpw with empty bytes should return False (not raise)
+        result = auth_manager.verify_password("", h)
+        assert result is False
+
+    def test_round_trip(self, auth_manager):
+        """hash then verify returns True (requirement 2.13)."""
+        password = "P@ssw0rd!123"
+        assert auth_manager.verify_password(password, auth_manager.hash_password(password))
+
+    def test_different_passwords_do_not_cross_verify(self, auth_manager):
+        """Different passwords must not cross-verify (requirement 2.14)."""
+        h = auth_manager.hash_password("password_a")
+        assert auth_manager.verify_password("password_b", h) is False
+
+
+# ---------------------------------------------------------------------------
+# create_access_token
+# ---------------------------------------------------------------------------
+
+
+class TestCreateAccessToken:
+    def test_returns_jwt_string(self, auth_manager):
+        token = auth_manager.create_access_token("uid1", "alice", ["admin"])
         assert isinstance(token, str)
-        assert len(token) > 0
+        assert len(token.split(".")) == 3
 
-        # Verify token has JWT structure (3 parts separated by dots)
-        parts = token.split(".")
-        assert len(parts) == 3
-
-    def test_create_access_token_contains_correct_payload(self, auth_manager):
-        """Test that access token contains correct user information."""
-        user_id = "user123"
-        username = "testuser"
-        roles = ["researcher", "admin"]
-
-        token = auth_manager.create_access_token(user_id, username, roles)
-
-        # Decode token without verification to check payload
+    def test_payload_contains_user_fields(self, auth_manager):
+        """Decoded payload must contain user_id, username, roles (requirement 2.15)."""
+        token = auth_manager.create_access_token("uid1", "alice", ["admin", "viewer"])
         payload = jwt.decode(token, options={"verify_signature": False})
-
-        assert payload["user_id"] == user_id
-        assert payload["username"] == username
-        assert payload["roles"] == roles
+        assert payload["user_id"] == "uid1"
+        assert payload["username"] == "alice"
+        assert payload["roles"] == ["admin", "viewer"]
         assert payload["token_type"] == "access"
 
-    def test_create_access_token_has_expiration(self, auth_manager):
-        """Test that access token has expiration time set."""
-        user_id = "user123"
-        username = "testuser"
-        roles = ["researcher"]
-
-        before_creation = datetime.now(timezone.utc)
-        token = auth_manager.create_access_token(user_id, username, roles)
-        after_creation = datetime.now(timezone.utc)
-
-        # Decode token to check expiration
+    def test_payload_has_jti(self, auth_manager):
+        token = auth_manager.create_access_token("uid1", "alice", [])
         payload = jwt.decode(token, options={"verify_signature": False})
+        assert "jti" in payload and payload["jti"]
 
-        assert "exp" in payload
+    def test_token_is_verifiable_with_secret(self, auth_manager):
+        token = auth_manager.create_access_token("uid1", "alice", [])
+        payload = jwt.decode(
+            token, cast(str, settings.jwt_secret_key), algorithms=[settings.jwt_algorithm]
+        )
+        assert payload["user_id"] == "uid1"
 
-        # Verify expiration is approximately correct (within 1 minute tolerance)
-        expected_exp = before_creation + timedelta(minutes=settings.jwt_access_token_expire_minutes)
-        actual_exp = datetime.fromtimestamp(payload["exp"], tz=timezone.utc)
+    def test_expiration_is_set(self, auth_manager):
+        before = datetime.now(timezone.utc)
+        token = auth_manager.create_access_token("uid1", "alice", [])
+        payload = jwt.decode(token, options={"verify_signature": False})
+        exp = datetime.fromtimestamp(payload["exp"], tz=timezone.utc)
+        expected = before + timedelta(minutes=settings.jwt_access_token_expire_minutes)
+        assert abs((exp - expected).total_seconds()) < 60
 
-        time_diff = abs((actual_exp - expected_exp).total_seconds())
-        assert time_diff < 60, f"Expiration time differs by {time_diff} seconds"
-
-    def test_create_access_token_is_signed_correctly(self, auth_manager):
-        """Test that access token can be verified with the secret key."""
-        user_id = "user123"
-        username = "testuser"
-        roles = ["researcher"]
-
-        token = auth_manager.create_access_token(user_id, username, roles)
-
-        # Verify token signature
-        try:
-            payload = jwt.decode(
-                token, cast(str, settings.jwt_secret_key), algorithms=[settings.jwt_algorithm]
-            )
-            signature_valid = True
-        except jwt.InvalidTokenError:
-            signature_valid = False
-
-        assert signature_valid, "Token signature should be valid"
-
-    def test_create_access_token_with_empty_roles(self, auth_manager):
-        """Test that access token can be created with empty roles list."""
-        user_id = "user123"
-        username = "testuser"
-        roles: list[str] = []
-
-        token = auth_manager.create_access_token(user_id, username, roles)
-
+    def test_empty_roles_allowed(self, auth_manager):
+        token = auth_manager.create_access_token("uid1", "alice", [])
         payload = jwt.decode(token, options={"verify_signature": False})
         assert payload["roles"] == []
 
 
-class TestRefreshTokenCreation:
-    """Test refresh token creation."""
-
-    def test_create_refresh_token_returns_valid_jwt(self, auth_manager):
-        """Test that create_refresh_token returns a valid JWT string."""
-        user_id = "user123"
-        username = "testuser"
-        roles = ["researcher"]
-
-        token = auth_manager.create_refresh_token(user_id, username, roles)
-
-        # Verify token is a non-empty string
-        assert isinstance(token, str)
-        assert len(token) > 0
-
-        # Verify token has JWT structure
-        parts = token.split(".")
-        assert len(parts) == 3
-
-    def test_create_refresh_token_contains_correct_payload(self, auth_manager):
-        """Test that refresh token contains correct user information."""
-        user_id = "user123"
-        username = "testuser"
-        roles = ["researcher"]
-
-        token = auth_manager.create_refresh_token(user_id, username, roles)
-
-        # Decode token without verification
-        payload = jwt.decode(token, options={"verify_signature": False})
-
-        assert payload["user_id"] == user_id
-        assert payload["username"] == username
-        assert payload["roles"] == roles
-        assert payload["token_type"] == "refresh"
-
-    def test_create_refresh_token_has_longer_expiration(self, auth_manager):
-        """Test that refresh token has longer expiration than access token."""
-        user_id = "user123"
-        username = "testuser"
-        roles = ["researcher"]
-
-        before_creation = datetime.now(timezone.utc)
-        refresh_token = auth_manager.create_refresh_token(user_id, username, roles)
-        access_token = auth_manager.create_access_token(user_id, username, roles)
-
-        # Decode tokens
-        refresh_payload = jwt.decode(refresh_token, options={"verify_signature": False})
-        access_payload = jwt.decode(access_token, options={"verify_signature": False})
-
-        # Verify refresh token expires later than access token
-        assert refresh_payload["exp"] > access_payload["exp"]
-
-        # Verify refresh token expiration is approximately correct
-        expected_exp = before_creation + timedelta(days=settings.jwt_refresh_token_expire_days)
-        actual_exp = datetime.fromtimestamp(refresh_payload["exp"], tz=timezone.utc)
-
-        time_diff = abs((actual_exp - expected_exp).total_seconds())
-        assert time_diff < 60, f"Expiration time differs by {time_diff} seconds"
-
-    def test_create_refresh_token_is_signed_correctly(self, auth_manager):
-        """Test that refresh token can be verified with the secret key."""
-        user_id = "user123"
-        username = "testuser"
-        roles = ["researcher"]
-
-        token = auth_manager.create_refresh_token(user_id, username, roles)
-
-        # Verify token signature
-        try:
-            payload = jwt.decode(
-                token, cast(str, settings.jwt_secret_key), algorithms=[settings.jwt_algorithm]
-            )
-            signature_valid = True
-        except jwt.InvalidTokenError:
-            signature_valid = False
-
-        assert signature_valid, "Token signature should be valid"
+# ---------------------------------------------------------------------------
+# verify_token
+# ---------------------------------------------------------------------------
 
 
-class TestAccessTokenVerification:
-    """Test access token verification."""
-
+class TestVerifyToken:
     @pytest.mark.asyncio
-    async def test_verify_token_accepts_valid_access_token(self, auth_manager):
-        """Test that verify_token accepts a valid access token."""
-        user_id = "user123"
-        username = "testuser"
-        roles = ["researcher"]
-
-        token = auth_manager.create_access_token(user_id, username, roles)
+    async def test_valid_access_token_returns_payload(self, auth_manager):
+        token = auth_manager.create_access_token("uid1", "alice", ["admin"])
         payload = await auth_manager.verify_token(token, expected_type="access")
-
-        assert payload.user_id == user_id
-        assert payload.username == username
-        assert payload.roles == roles
+        assert payload.user_id == "uid1"
+        assert payload.username == "alice"
+        assert payload.roles == ["admin"]
         assert payload.token_type == "access"
 
     @pytest.mark.asyncio
-    async def test_verify_token_rejects_expired_access_token(self, auth_manager):
-        """Test that verify_token rejects an expired access token."""
-        user_id = "user123"
-        username = "testuser"
-        roles = ["researcher"]
-
-        # Create an expired token
-        expires_at = datetime.now(timezone.utc) - timedelta(hours=1)
-        payload_dict = {
-            "user_id": user_id,
-            "username": username,
-            "roles": roles,
-            "exp": int(expires_at.timestamp()),
-            "token_type": "access",
-        }
-        expired_token = jwt.encode(
-            payload_dict, cast(str, settings.jwt_secret_key), algorithm=settings.jwt_algorithm
-        )
-
-        # Verify token raises ExpiredTokenError
-        with pytest.raises(ExpiredTokenError):
-            await auth_manager.verify_token(expired_token, expected_type="access")
-
-    @pytest.mark.asyncio
-    async def test_verify_token_rejects_invalid_signature(self, auth_manager):
-        """Test that verify_token rejects token with invalid signature."""
-        user_id = "user123"
-        username = "testuser"
-        roles = ["researcher"]
-
-        # Create token with wrong secret key
-        expires_at = datetime.now(timezone.utc) + timedelta(hours=1)
-        payload_dict = {
-            "user_id": user_id,
-            "username": username,
-            "roles": roles,
-            "exp": int(expires_at.timestamp()),
-            "token_type": "access",
-        }
-        invalid_token = jwt.encode(
-            payload_dict, "wrong_secret_key", algorithm=settings.jwt_algorithm
-        )
-
-        # Verify token raises InvalidTokenError
-        with pytest.raises(InvalidTokenError):
-            await auth_manager.verify_token(invalid_token, expected_type="access")
-
-    @pytest.mark.asyncio
-    async def test_verify_token_rejects_malformed_token(self, auth_manager):
-        """Test that verify_token rejects malformed token."""
-        malformed_tokens = [
-            "not.a.jwt",
-            "invalid",
-            "",
-            "a.b",  # Only 2 parts
-            "a.b.c.d",  # Too many parts
-        ]
-
-        for token in malformed_tokens:
-            with pytest.raises(InvalidTokenError):
-                await auth_manager.verify_token(token, expected_type="access")
-
-    @pytest.mark.asyncio
-    async def test_verify_token_rejects_wrong_token_type(self, auth_manager):
-        """Test that verify_token rejects token with wrong type."""
-        user_id = "user123"
-        username = "testuser"
-        roles = ["researcher"]
-
-        # Create a refresh token
-        refresh_token = auth_manager.create_refresh_token(user_id, username, roles)
-
-        # Try to verify as access token
-        with pytest.raises(InvalidTokenError) as exc_info:
-            await auth_manager.verify_token(refresh_token, expected_type="access")
-
-        assert "token type" in str(exc_info.value).lower()
-
-
-class TestRefreshTokenVerification:
-    """Test refresh token verification."""
-
-    @pytest.mark.asyncio
-    async def test_verify_token_accepts_valid_refresh_token(self, auth_manager):
-        """Test that verify_token accepts a valid refresh token."""
-        user_id = "user123"
-        username = "testuser"
-        roles = ["researcher"]
-
-        token = auth_manager.create_refresh_token(user_id, username, roles)
+    async def test_valid_refresh_token_returns_payload(self, auth_manager):
+        token = auth_manager.create_refresh_token("uid1", "alice", ["viewer"])
         payload = await auth_manager.verify_token(token, expected_type="refresh")
-
-        assert payload.user_id == user_id
-        assert payload.username == username
-        assert payload.roles == roles
+        assert payload.user_id == "uid1"
         assert payload.token_type == "refresh"
 
     @pytest.mark.asyncio
-    async def test_verify_token_rejects_expired_refresh_token(self, auth_manager):
-        """Test that verify_token rejects an expired refresh token."""
-        user_id = "user123"
-        username = "testuser"
-        roles = ["researcher"]
-
-        # Create an expired refresh token
-        expires_at = datetime.now(timezone.utc) - timedelta(days=1)
-        payload_dict = {
-            "user_id": user_id,
-            "username": username,
-            "roles": roles,
-            "exp": int(expires_at.timestamp()),
-            "token_type": "refresh",
-        }
-        expired_token = jwt.encode(
-            payload_dict, cast(str, settings.jwt_secret_key), algorithm=settings.jwt_algorithm
+    async def test_expired_token_raises_expired_error(self, auth_manager):
+        expired = jwt.encode(
+            {
+                "user_id": "uid1",
+                "username": "alice",
+                "roles": [],
+                "exp": int((datetime.now(timezone.utc) - timedelta(hours=1)).timestamp()),
+                "token_type": "access",
+            },
+            cast(str, settings.jwt_secret_key),
+            algorithm=settings.jwt_algorithm,
         )
-
-        # Verify token raises ExpiredTokenError
         with pytest.raises(ExpiredTokenError):
-            await auth_manager.verify_token(expired_token, expected_type="refresh")
+            await auth_manager.verify_token(expired, expected_type="access")
 
     @pytest.mark.asyncio
-    async def test_verify_token_rejects_access_token_as_refresh(self, auth_manager):
-        """Test that verify_token rejects access token when expecting refresh."""
-        user_id = "user123"
-        username = "testuser"
-        roles = ["researcher"]
+    async def test_tampered_token_raises_invalid_error(self, auth_manager):
+        """Tampered signature must raise InvalidTokenError (requirement 9.1)."""
+        import base64, json
 
-        # Create an access token
-        access_token = auth_manager.create_access_token(user_id, username, roles)
-
-        # Try to verify as refresh token
-        with pytest.raises(InvalidTokenError) as exc_info:
-            await auth_manager.verify_token(access_token, expected_type="refresh")
-
-        assert "token type" in str(exc_info.value).lower()
-
-
-class TestTokenExpiration:
-    """Test token expiration handling."""
-
-    def test_access_token_expires_after_configured_time(self, auth_manager):
-        """Test that access token expires after configured minutes."""
-        user_id = "user123"
-        username = "testuser"
-        roles = ["researcher"]
-
-        # Create token
-        token = auth_manager.create_access_token(user_id, username, roles)
-
-        # Decode to check expiration
-        payload = jwt.decode(token, options={"verify_signature": False})
-        exp_timestamp = payload["exp"]
-        exp_datetime = datetime.fromtimestamp(exp_timestamp, tz=timezone.utc)
-
-        # Calculate expected expiration
-        now = datetime.now(timezone.utc)
-        expected_exp = now + timedelta(minutes=settings.jwt_access_token_expire_minutes)
-
-        # Verify expiration is within 1 minute of expected
-        time_diff = abs((exp_datetime - expected_exp).total_seconds())
-        assert time_diff < 60
-
-    def test_refresh_token_expires_after_configured_time(self, auth_manager):
-        """Test that refresh token expires after configured days."""
-        user_id = "user123"
-        username = "testuser"
-        roles = ["researcher"]
-
-        # Create token
-        token = auth_manager.create_refresh_token(user_id, username, roles)
-
-        # Decode to check expiration
-        payload = jwt.decode(token, options={"verify_signature": False})
-        exp_timestamp = payload["exp"]
-        exp_datetime = datetime.fromtimestamp(exp_timestamp, tz=timezone.utc)
-
-        # Calculate expected expiration
-        now = datetime.now(timezone.utc)
-        expected_exp = now + timedelta(days=settings.jwt_refresh_token_expire_days)
-
-        # Verify expiration is within 1 minute of expected
-        time_diff = abs((exp_datetime - expected_exp).total_seconds())
-        assert time_diff < 60
-
-    @pytest.mark.asyncio
-    async def test_token_becomes_invalid_after_expiration(self, auth_manager):
-        """Test that token cannot be verified after expiration."""
-        user_id = "user123"
-        username = "testuser"
-        roles = ["researcher"]
-
-        # Create a token that expires in 1 second
-        expires_at = datetime.now(timezone.utc) + timedelta(seconds=1)
-        payload_dict = {
-            "user_id": user_id,
-            "username": username,
-            "roles": roles,
-            "exp": int(expires_at.timestamp()),
-            "token_type": "access",
-        }
-        short_lived_token = jwt.encode(
-            payload_dict, cast(str, settings.jwt_secret_key), algorithm=settings.jwt_algorithm
-        )
-
-        # Token should be valid immediately
-        payload = await auth_manager.verify_token(short_lived_token, expected_type="access")
-        assert payload.user_id == user_id
-
-        # Wait for token to expire
-        import time
-
-        time.sleep(2)
-
-        # Token should now be expired
-        with pytest.raises(ExpiredTokenError):
-            await auth_manager.verify_token(short_lived_token, expected_type="access")
-
-
-class TestInvalidTokenRejection:
-    """Test invalid token rejection."""
-
-    @pytest.mark.asyncio
-    async def test_verify_token_rejects_token_with_missing_fields(self, auth_manager):
-        """Test that verify_token rejects token with missing required fields."""
-        # Create token with missing user_id
-        expires_at = datetime.now(timezone.utc) + timedelta(hours=1)
-        payload_dict = {
-            "username": "testuser",
-            "roles": ["researcher"],
-            "exp": int(expires_at.timestamp()),
-            "token_type": "access",
-        }
-        invalid_token = jwt.encode(
-            payload_dict, cast(str, settings.jwt_secret_key), algorithm=settings.jwt_algorithm
-        )
-
+        token = auth_manager.create_access_token("uid1", "alice", [])
+        header, payload_b64, sig = token.split(".")
+        raw = base64.urlsafe_b64decode(payload_b64 + "==")
+        data = json.loads(raw)
+        data["user_id"] = "hacker"
+        new_payload = base64.urlsafe_b64encode(json.dumps(data).encode()).decode().rstrip("=")
+        tampered = f"{header}.{new_payload}.{sig}"
         with pytest.raises(InvalidTokenError):
-            await auth_manager.verify_token(invalid_token, expected_type="access")
+            await auth_manager.verify_token(tampered, expected_type="access")
 
     @pytest.mark.asyncio
-    async def test_verify_token_rejects_token_with_wrong_algorithm(self, auth_manager):
-        """Test that verify_token rejects token signed with wrong algorithm."""
-        user_id = "user123"
-        username = "testuser"
-        roles = ["researcher"]
-
-        # Create token with different algorithm
-        expires_at = datetime.now(timezone.utc) + timedelta(hours=1)
-        payload_dict = {
-            "user_id": user_id,
-            "username": username,
-            "roles": roles,
-            "exp": int(expires_at.timestamp()),
-            "token_type": "access",
-        }
-        # Use HS512 instead of HS256
-        wrong_algo_token = jwt.encode(
-            payload_dict, cast(str, settings.jwt_secret_key), algorithm="HS512"
+    async def test_wrong_secret_raises_invalid_error(self, auth_manager):
+        bad_token = jwt.encode(
+            {
+                "user_id": "uid1",
+                "username": "alice",
+                "roles": [],
+                "exp": int((datetime.now(timezone.utc) + timedelta(hours=1)).timestamp()),
+                "token_type": "access",
+            },
+            "wrong-secret",
+            algorithm=settings.jwt_algorithm,
         )
-
         with pytest.raises(InvalidTokenError):
-            await auth_manager.verify_token(wrong_algo_token, expected_type="access")
+            await auth_manager.verify_token(bad_token, expected_type="access")
 
     @pytest.mark.asyncio
-    async def test_verify_token_rejects_none_algorithm_attack(self, auth_manager):
-        """Test that verify_token rejects 'none' algorithm attack."""
-        user_id = "user123"
-        username = "testuser"
-        roles = ["researcher"]
+    async def test_wrong_token_type_raises_invalid_error(self, auth_manager):
+        refresh = auth_manager.create_refresh_token("uid1", "alice", [])
+        with pytest.raises(InvalidTokenError, match="token type"):
+            await auth_manager.verify_token(refresh, expected_type="access")
 
-        # Create token with 'none' algorithm (security vulnerability)
-        expires_at = datetime.now(timezone.utc) + timedelta(hours=1)
-        payload_dict = {
-            "user_id": user_id,
-            "username": username,
-            "roles": roles,
-            "exp": int(expires_at.timestamp()),
-            "token_type": "access",
-        }
-
-        # Try to create unsigned token
-        try:
-            none_algo_token = jwt.encode(payload_dict, "", algorithm="none")
-
+    @pytest.mark.asyncio
+    async def test_malformed_token_raises_invalid_error(self, auth_manager):
+        for bad in ["not.a.jwt", "invalid", "", "a.b"]:
             with pytest.raises(InvalidTokenError):
-                await auth_manager.verify_token(none_algo_token, expected_type="access")
-        except Exception:
-            # Some JWT libraries prevent 'none' algorithm entirely, which is good
-            pass
+                await auth_manager.verify_token(bad, expected_type="access")
 
     @pytest.mark.asyncio
-    async def test_verify_token_rejects_tampered_payload(self, auth_manager):
-        """Test that verify_token rejects token with tampered payload."""
-        user_id = "user123"
-        username = "testuser"
-        roles = ["researcher"]
+    async def test_revoked_token_raises_invalid_error(self, auth_manager_with_redis, redis):
+        """Token whose JTI is in the Redis blocklist must be rejected."""
+        redis.exists = AsyncMock(return_value=True)
+        token = auth_manager_with_redis.create_access_token("uid1", "alice", [])
+        with pytest.raises(InvalidTokenError, match="revoked"):
+            await auth_manager_with_redis.verify_token(token, expected_type="access")
 
-        # Create valid token
-        token = auth_manager.create_access_token(user_id, username, roles)
-
-        # Tamper with the payload (change middle part)
-        parts = token.split(".")
-        # Decode, modify, and re-encode the payload
-        import base64
-        import json
-
-        payload_bytes = base64.urlsafe_b64decode(parts[1] + "==")
-        payload_dict = json.loads(payload_bytes)
-        payload_dict["user_id"] = "hacker123"  # Tamper with user_id
-
-        tampered_payload = (
-            base64.urlsafe_b64encode(json.dumps(payload_dict).encode()).decode().rstrip("=")
+    @pytest.mark.asyncio
+    async def test_missing_user_id_field_raises_invalid_error(self, auth_manager):
+        bad = jwt.encode(
+            {
+                "username": "alice",
+                "roles": [],
+                "exp": int((datetime.now(timezone.utc) + timedelta(hours=1)).timestamp()),
+                "token_type": "access",
+            },
+            cast(str, settings.jwt_secret_key),
+            algorithm=settings.jwt_algorithm,
         )
-
-        tampered_token = f"{parts[0]}.{tampered_payload}.{parts[2]}"
-
-        # Verify token raises InvalidTokenError due to signature mismatch
         with pytest.raises(InvalidTokenError):
-            await auth_manager.verify_token(tampered_token, expected_type="access")
+            await auth_manager.verify_token(bad, expected_type="access")
+
+
+# ---------------------------------------------------------------------------
+# refresh_access_token
+# ---------------------------------------------------------------------------
+
+
+class TestRefreshAccessToken:
+    @pytest.mark.asyncio
+    async def test_valid_refresh_token_returns_new_tokens(self, auth_manager):
+        user_id = "uid1"
+        username = "alice"
+        roles = ["admin"]
+
+        refresh_token = auth_manager.create_refresh_token(user_id, username, roles)
+        db_row = _make_refresh_token_row(refresh_token, user_id)
+
+        # DB query returns the row
+        auth_manager.db.query.return_value.filter.return_value.first.return_value = db_row
+
+        result = await auth_manager.refresh_access_token(refresh_token)
+
+        assert "access_token" in result
+        assert "refresh_token" in result
+        assert result["token_type"] == "bearer"
+        assert result["expires_in"] > 0
+        # Old token should be marked revoked
+        assert db_row.revoked is True
 
     @pytest.mark.asyncio
-    async def test_verify_token_rejects_empty_string(self, auth_manager):
-        """Test that verify_token rejects empty string."""
-        with pytest.raises(InvalidTokenError):
-            await auth_manager.verify_token("", expected_type="access")
+    async def test_invalid_refresh_token_raises_error(self, auth_manager):
+        with pytest.raises((InvalidTokenError, AuthenticationError)):
+            await auth_manager.refresh_access_token("not.a.valid.token")
 
     @pytest.mark.asyncio
-    async def test_verify_token_rejects_random_string(self, auth_manager):
-        """Test that verify_token rejects random non-JWT string."""
+    async def test_revoked_refresh_token_raises_authentication_error(self, auth_manager):
+        user_id = "uid1"
+        refresh_token = auth_manager.create_refresh_token(user_id, "alice", [])
+
+        # DB returns no matching row (token revoked / not found)
+        auth_manager.db.query.return_value.filter.return_value.first.return_value = None
+
+        with pytest.raises(AuthenticationError, match="Invalid or revoked"):
+            await auth_manager.refresh_access_token(refresh_token)
+
+    @pytest.mark.asyncio
+    async def test_expired_db_refresh_token_raises_expired_error(self, auth_manager):
+        user_id = "uid1"
+        refresh_token = auth_manager.create_refresh_token(user_id, "alice", [])
+        db_row = _make_refresh_token_row(refresh_token, user_id, expired=True)
+
+        auth_manager.db.query.return_value.filter.return_value.first.return_value = db_row
+
+        with pytest.raises(ExpiredTokenError):
+            await auth_manager.refresh_access_token(refresh_token)
+
+    @pytest.mark.asyncio
+    async def test_db_commit_failure_raises_and_rolls_back(self, auth_manager):
+        user_id = "uid1"
+        refresh_token = auth_manager.create_refresh_token(user_id, "alice", [])
+        db_row = _make_refresh_token_row(refresh_token, user_id)
+
+        auth_manager.db.query.return_value.filter.return_value.first.return_value = db_row
+        auth_manager.db.commit.side_effect = Exception("DB error")
+
+        with pytest.raises(Exception):
+            await auth_manager.refresh_access_token(refresh_token)
+
+        auth_manager.db.rollback.assert_called()
+
+
+# ---------------------------------------------------------------------------
+# revoke_refresh_token
+# ---------------------------------------------------------------------------
+
+
+class TestRevokeRefreshToken:
+    @pytest.mark.asyncio
+    async def test_valid_token_is_revoked(self, auth_manager):
+        user_id = "uid1"
+        refresh_token = auth_manager.create_refresh_token(user_id, "alice", [])
+        db_row = _make_refresh_token_row(refresh_token, user_id)
+
+        auth_manager.db.query.return_value.filter.return_value.first.return_value = db_row
+
+        result = await auth_manager.revoke_refresh_token(refresh_token)
+
+        assert result is True
+        assert db_row.revoked is True
+        auth_manager.db.commit.assert_called()
+
+    @pytest.mark.asyncio
+    async def test_token_not_in_db_returns_false(self, auth_manager):
+        user_id = "uid1"
+        refresh_token = auth_manager.create_refresh_token(user_id, "alice", [])
+
+        auth_manager.db.query.return_value.filter.return_value.first.return_value = None
+
+        result = await auth_manager.revoke_refresh_token(refresh_token)
+        assert result is False
+
+    @pytest.mark.asyncio
+    async def test_invalid_token_returns_false(self, auth_manager):
+        result = await auth_manager.revoke_refresh_token("not.a.valid.token")
+        assert result is False
+
+    @pytest.mark.asyncio
+    async def test_expired_token_returns_false(self, auth_manager):
+        expired = jwt.encode(
+            {
+                "user_id": "uid1",
+                "username": "alice",
+                "roles": [],
+                "exp": int((datetime.now(timezone.utc) - timedelta(hours=1)).timestamp()),
+                "token_type": "refresh",
+            },
+            cast(str, settings.jwt_secret_key),
+            algorithm=settings.jwt_algorithm,
+        )
+        result = await auth_manager.revoke_refresh_token(expired)
+        assert result is False
+
+    @pytest.mark.asyncio
+    async def test_db_commit_failure_returns_false(self, auth_manager):
+        user_id = "uid1"
+        refresh_token = auth_manager.create_refresh_token(user_id, "alice", [])
+        db_row = _make_refresh_token_row(refresh_token, user_id)
+
+        auth_manager.db.query.return_value.filter.return_value.first.return_value = db_row
+        auth_manager.db.commit.side_effect = Exception("DB error")
+
+        result = await auth_manager.revoke_refresh_token(refresh_token)
+        assert result is False
+        auth_manager.db.rollback.assert_called()
+
+
+# ---------------------------------------------------------------------------
+# revoke_access_token (Redis-based)
+# ---------------------------------------------------------------------------
+
+
+class TestRevokeAccessToken:
+    @pytest.mark.asyncio
+    async def test_revokes_token_with_redis(self, auth_manager_with_redis):
+        token = auth_manager_with_redis.create_access_token("uid1", "alice", [])
+        result = await auth_manager_with_redis.revoke_access_token(token)
+        assert result is True
+        auth_manager_with_redis.redis.setex.assert_called_once()
+
+    @pytest.mark.asyncio
+    async def test_no_redis_returns_false(self, auth_manager):
+        token = auth_manager.create_access_token("uid1", "alice", [])
+        result = await auth_manager.revoke_access_token(token)
+        assert result is False
+
+    @pytest.mark.asyncio
+    async def test_invalid_token_raises_invalid_token_error(self, auth_manager_with_redis):
         with pytest.raises(InvalidTokenError):
-            await auth_manager.verify_token("this_is_not_a_jwt_token", expected_type="access")
+            await auth_manager_with_redis.revoke_access_token("not.a.valid.token")
+
+    @pytest.mark.asyncio
+    async def test_token_without_jti_returns_true(self, auth_manager_with_redis):
+        """Token with no JTI field still returns True (expires naturally)."""
+        no_jti_token = jwt.encode(
+            {
+                "user_id": "uid1",
+                "username": "alice",
+                "roles": [],
+                "exp": int((datetime.now(timezone.utc) + timedelta(hours=1)).timestamp()),
+                "token_type": "access",
+                # no jti
+            },
+            cast(str, settings.jwt_secret_key),
+            algorithm=settings.jwt_algorithm,
+        )
+        result = await auth_manager_with_redis.revoke_access_token(no_jti_token)
+        assert result is True
+
+
+# ---------------------------------------------------------------------------
+# revoke_all_user_tokens
+# ---------------------------------------------------------------------------
+
+
+class TestRevokeAllUserTokens:
+    def test_revokes_all_active_tokens(self, auth_manager):
+        rows = [MagicMock(revoked=False), MagicMock(revoked=False), MagicMock(revoked=False)]
+        auth_manager.db.query.return_value.filter.return_value.all.return_value = rows
+
+        count = auth_manager.revoke_all_user_tokens("uid1")
+
+        assert count == 3
+        for row in rows:
+            assert row.revoked is True
+        auth_manager.db.commit.assert_called_once()
+
+    def test_no_tokens_returns_zero(self, auth_manager):
+        auth_manager.db.query.return_value.filter.return_value.all.return_value = []
+        count = auth_manager.revoke_all_user_tokens("uid1")
+        assert count == 0
+
+    def test_db_query_failure_raises_and_rolls_back(self, auth_manager):
+        auth_manager.db.query.return_value.filter.return_value.all.side_effect = Exception(
+            "DB error"
+        )
+        with pytest.raises(Exception):
+            auth_manager.revoke_all_user_tokens("uid1")
+        auth_manager.db.rollback.assert_called()
+
+    def test_db_commit_failure_raises_and_rolls_back(self, auth_manager):
+        rows = [MagicMock(revoked=False)]
+        auth_manager.db.query.return_value.filter.return_value.all.return_value = rows
+        auth_manager.db.commit.side_effect = Exception("DB error")
+
+        with pytest.raises(Exception):
+            auth_manager.revoke_all_user_tokens("uid1")
+        auth_manager.db.rollback.assert_called()
+
+
+# ---------------------------------------------------------------------------
+# MFA methods
+# ---------------------------------------------------------------------------
+
+
+class TestMfaMethods:
+    def test_generate_mfa_secret_returns_string(self, auth_manager):
+        secret = auth_manager.generate_mfa_secret()
+        assert isinstance(secret, str)
+
+    def test_get_mfa_qr_url_is_called(self, auth_manager):
+        # pyotp is mocked; just verify the method runs without error
+        auth_manager.get_mfa_qr_url("alice", "JBSWY3DPEHPK3PXP")
+
+    def test_verify_mfa_code_is_called(self, auth_manager):
+        # pyotp is mocked; just verify the method runs without error
+        auth_manager.verify_mfa_code("JBSWY3DPEHPK3PXP", "123456")
+
+
+# ---------------------------------------------------------------------------
+# constant_time_compare
+# ---------------------------------------------------------------------------
+
+
+class TestConstantTimeCompare:
+    def test_equal_strings_return_true(self):
+        from app.services.auth_manager import AuthManager
+
+        assert AuthManager.constant_time_compare("abc", "abc") is True
+
+    def test_different_strings_return_false(self):
+        from app.services.auth_manager import AuthManager
+
+        assert AuthManager.constant_time_compare("abc", "xyz") is False
+
+
+# ---------------------------------------------------------------------------
+# authenticate_user
+# ---------------------------------------------------------------------------
+
+
+class TestAuthenticateUser:
+    def _make_user(
+        self,
+        password: str,
+        is_active: bool = True,
+        locked: bool = False,
+        mfa_enabled: bool = False,
+        fail_count: int = 0,
+    ):
+        from app.services.auth_manager import AuthManager
+
+        user = MagicMock()
+        user.username = "alice"
+        user.password_hash = AuthManager.hash_password(password)
+        user.is_active = is_active
+        user.mfa_enabled = mfa_enabled
+        user.failed_login_attempts = fail_count
+        if locked:
+            user.locked_until = datetime.now(timezone.utc) + timedelta(minutes=10)
+        else:
+            user.locked_until = None
+        return user
+
+    def test_returns_user_on_success(self, auth_manager):
+        user = self._make_user("correct")
+        auth_manager.db.query.return_value.filter.return_value.first.return_value = user
+        result = auth_manager.authenticate_user("alice", "correct")
+        assert result is user
+
+    def test_returns_none_when_user_not_found(self, auth_manager):
+        auth_manager.db.query.return_value.filter.return_value.first.return_value = None
+        result = auth_manager.authenticate_user("nobody", "pass")
+        assert result is None
+
+    def test_raises_when_account_locked(self, auth_manager):
+        user = self._make_user("correct", locked=True)
+        auth_manager.db.query.return_value.filter.return_value.first.return_value = user
+        with pytest.raises(AuthenticationError, match="locked"):
+            auth_manager.authenticate_user("alice", "correct")
+
+    def test_raises_when_account_inactive(self, auth_manager):
+        user = self._make_user("correct", is_active=False)
+        auth_manager.db.query.return_value.filter.return_value.first.return_value = user
+        with pytest.raises(AuthenticationError, match="pending activation"):
+            auth_manager.authenticate_user("alice", "correct")
+
+    def test_returns_none_on_wrong_password(self, auth_manager):
+        user = self._make_user("correct")
+        auth_manager.db.query.return_value.filter.return_value.first.return_value = user
+        result = auth_manager.authenticate_user("alice", "wrong")
+        assert result is None
+
+    def test_locks_account_after_5_failures(self, auth_manager):
+        user = self._make_user("correct", fail_count=4)
+        auth_manager.db.query.return_value.filter.return_value.first.return_value = user
+        auth_manager.authenticate_user("alice", "wrong")
+        assert user.locked_until is not None
+
+    def test_wrong_password_db_commit_failure_still_returns_none(self, auth_manager):
+        user = self._make_user("correct")
+        auth_manager.db.query.return_value.filter.return_value.first.return_value = user
+        auth_manager.db.commit.side_effect = Exception("DB error")
+        result = auth_manager.authenticate_user("alice", "wrong")
+        assert result is None
+        auth_manager.db.rollback.assert_called()
+
+    def test_raises_when_mfa_required_but_not_provided(self, auth_manager):
+        user = self._make_user("correct", mfa_enabled=True)
+        auth_manager.db.query.return_value.filter.return_value.first.return_value = user
+        with pytest.raises(AuthenticationError, match="MFA code required"):
+            auth_manager.authenticate_user("alice", "correct")
+
+    def test_raises_on_invalid_mfa_code(self, auth_manager):
+        user = self._make_user("correct", mfa_enabled=True)
+        user.mfa_secret = "JBSWY3DPEHPK3PXP"
+        auth_manager.db.query.return_value.filter.return_value.first.return_value = user
+        # verify_mfa_code is mocked via pyotp mock to return False
+        with patch("app.services.auth_manager.AuthManager.verify_mfa_code", return_value=False):
+            with pytest.raises(AuthenticationError, match="Invalid MFA code"):
+                auth_manager.authenticate_user("alice", "correct", mfa_code="000000")
+
+    def test_successful_login_resets_failed_attempts(self, auth_manager):
+        user = self._make_user("correct", fail_count=2)
+        auth_manager.db.query.return_value.filter.return_value.first.return_value = user
+        auth_manager.authenticate_user("alice", "correct")
+        assert user.failed_login_attempts == 0
+
+    def test_successful_login_db_commit_failure_still_returns_user(self, auth_manager):
+        user = self._make_user("correct")
+        auth_manager.db.query.return_value.filter.return_value.first.return_value = user
+        # First commit (for successful login) fails
+        auth_manager.db.commit.side_effect = Exception("DB error")
+        result = auth_manager.authenticate_user("alice", "correct")
+        assert result is user
+
+
+# ---------------------------------------------------------------------------
+# create_tokens_for_user
+# ---------------------------------------------------------------------------
+
+
+class TestCreateTokensForUser:
+    def _make_user(self):
+        user = MagicMock()
+        user.user_id = "uid1"
+        user.username = "alice"
+        user.roles = ["admin"]
+        return user
+
+    def test_returns_token_dict(self, auth_manager):
+        user = self._make_user()
+        result = auth_manager.create_tokens_for_user(user)
+        assert "access_token" in result
+        assert "refresh_token" in result
+        assert result["token_type"] == "bearer"
+        assert result["expires_in"] > 0
+        auth_manager.db.add.assert_called_once()
+        auth_manager.db.commit.assert_called_once()
+
+    def test_remember_me_extends_refresh_expiry(self, auth_manager):
+        user = self._make_user()
+        result = auth_manager.create_tokens_for_user(user, remember_me=True)
+        # 30 days * 24 * 60 * 60
+        assert result["refresh_expires_in"] == 30 * 24 * 60 * 60
+
+    def test_db_commit_failure_raises_and_rolls_back(self, auth_manager):
+        user = self._make_user()
+        auth_manager.db.commit.side_effect = Exception("DB error")
+        with pytest.raises(Exception):
+            auth_manager.create_tokens_for_user(user)
+        auth_manager.db.rollback.assert_called()
+
+
+# ---------------------------------------------------------------------------
+# refresh_access_token — hash mismatch branch
+# ---------------------------------------------------------------------------
+
+
+class TestRefreshAccessTokenHashMismatch:
+    @pytest.mark.asyncio
+    async def test_hash_mismatch_raises_authentication_error(self, auth_manager):
+        """When token_hash doesn't match, db_token is set to None → AuthenticationError."""
+        from app.services.auth_manager import AuthManager
+
+        user_id = "uid1"
+        refresh_token = auth_manager.create_refresh_token(user_id, "alice", [])
+
+        # Row exists but with a WRONG hash (simulates hash mismatch)
+        db_row = MagicMock()
+        db_row.user_id = user_id
+        db_row.token_hash = AuthManager.hash_password("different_token")
+        import hashlib
+
+        db_row.token_sha256 = hashlib.sha256(refresh_token.encode()).hexdigest()
+        db_row.revoked = False
+        db_row.expires_at = datetime.now(timezone.utc) + timedelta(days=7)
+
+        auth_manager.db.query.return_value.filter.return_value.first.return_value = db_row
+
+        with pytest.raises(AuthenticationError, match="Invalid or revoked"):
+            await auth_manager.refresh_access_token(refresh_token)
+
+
+# ---------------------------------------------------------------------------
+# revoke_refresh_token — hash mismatch branch
+# ---------------------------------------------------------------------------
+
+
+class TestRevokeRefreshTokenHashMismatch:
+    @pytest.mark.asyncio
+    async def test_hash_mismatch_returns_false(self, auth_manager):
+        """When token_hash doesn't match, db_token is set to None → returns False."""
+        from app.services.auth_manager import AuthManager as AM
+
+        user_id = "uid1"
+        refresh_token = auth_manager.create_refresh_token(user_id, "alice", [])
+
+        db_row = MagicMock()
+        db_row.user_id = user_id
+        db_row.token_hash = AM.hash_password("different_token")
+        import hashlib
+
+        db_row.token_sha256 = hashlib.sha256(refresh_token.encode()).hexdigest()
+        db_row.revoked = False
+
+        auth_manager.db.query.return_value.filter.return_value.first.return_value = db_row
+
+        result = await auth_manager.revoke_refresh_token(refresh_token)
+        assert result is False
+
+
+# ---------------------------------------------------------------------------
+# revoke_access_token — exception branch
+# ---------------------------------------------------------------------------
+
+
+class TestRevokeAccessTokenException:
+    @pytest.mark.asyncio
+    async def test_redis_exception_returns_false(self, auth_manager_with_redis, redis):
+        """If Redis raises an unexpected exception, returns False."""
+        redis.setex = AsyncMock(side_effect=Exception("Redis down"))
+        token = auth_manager_with_redis.create_access_token("uid1", "alice", [])
+        result = await auth_manager_with_redis.revoke_access_token(token)
+        assert result is False

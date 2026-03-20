@@ -1,191 +1,346 @@
 """
-Unit tests for database seeding service.
+Unit tests for DatabaseSeedingService.
 
-Tests seeding functionality for users, sessions, templates, tasks, and dependencies.
+Tests seed and rollback paths using a MagicMock DB session.
+Requirements: 2.7
 """
 
 import pytest
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock, patch, call
 
 from app.services.seeding_service import DatabaseSeedingService
 
 
 @pytest.fixture
 def seeding_service():
-    """Create DatabaseSeedingService instance."""
     return DatabaseSeedingService()
 
 
 @pytest.fixture
-def mock_db_session():
-    """Create mock database session."""
-    session = MagicMock()
-    session.add = MagicMock()
-    session.commit = MagicMock()
-    session.query.return_value.filter.return_value.first.return_value = None
-    session.query.return_value.filter.return_value.all.return_value = []
-    session.query.return_value.delete.return_value = 0
-    return session
+def mock_db():
+    db = MagicMock()
+    db.add = MagicMock()
+    db.commit = MagicMock()
+    db.rollback = MagicMock()
+    # Default: no existing records (unique-check queries return None)
+    db.query.return_value.filter.return_value.first.return_value = None
+    db.query.return_value.filter.return_value.all.return_value = []
+    db.query.return_value.delete.return_value = 0
+    return db
 
 
-class TestDatabaseSeedingService:
-    """Test DatabaseSeedingService functionality."""
+def _patch_db(mock_db):
+    """Return a context-manager patch for get_db_context."""
+    p = patch("app.services.seeding_service.get_db_context")
+    return p
 
-    def test_seed_users_with_admin(self, seeding_service, mock_db_session):
-        """Test seeding users including admin user."""
-        with patch("app.services.seeding_service.get_db_context") as mock_get_db, patch(
-            "app.services.seeding_service.AuthManager.hash_password", return_value="hashed_password"
+
+# ---------------------------------------------------------------------------
+# seed_users
+# ---------------------------------------------------------------------------
+
+
+class TestSeedUsers:
+
+    def test_seed_users_with_admin(self, seeding_service, mock_db):
+        with (
+            patch("app.services.seeding_service.get_db_context") as mock_ctx,
+            patch("app.services.seeding_service.AuthManager.hash_password", return_value="hashed"),
         ):
-            mock_get_db.return_value.__enter__.return_value = mock_db_session
+            mock_ctx.return_value.__enter__.return_value = mock_db
+            ids = seeding_service.seed_users(count=3, include_admin=True)
 
-            user_ids = seeding_service.seed_users(count=3, include_admin=True)
+        assert "admin_user" in ids
+        assert len(ids) == 4  # 3 regular + 1 admin
+        assert mock_db.add.call_count == 4
+        mock_db.commit.assert_called_once()
 
-            assert len(user_ids) == 4  # 3 regular users + 1 admin
-            assert "admin_user" in user_ids
-            assert mock_db_session.add.call_count == 4
-            assert mock_db_session.commit.called
-
-    def test_seed_users_without_admin(self, seeding_service, mock_db_session):
-        """Test seeding users without admin user."""
-        with patch("app.services.seeding_service.get_db_context") as mock_get_db, patch(
-            "app.services.seeding_service.AuthManager.hash_password", return_value="hashed_password"
+    def test_seed_users_without_admin(self, seeding_service, mock_db):
+        with (
+            patch("app.services.seeding_service.get_db_context") as mock_ctx,
+            patch("app.services.seeding_service.AuthManager.hash_password", return_value="hashed"),
         ):
-            mock_get_db.return_value.__enter__.return_value = mock_db_session
+            mock_ctx.return_value.__enter__.return_value = mock_db
+            ids = seeding_service.seed_users(count=2, include_admin=False)
 
-            user_ids = seeding_service.seed_users(count=2, include_admin=False)
+        assert "admin_user" not in ids
+        assert len(ids) == 2
+        assert mock_db.add.call_count == 2
 
-            assert len(user_ids) == 2
-            assert "admin_user" not in user_ids
-            assert mock_db_session.add.call_count == 2
+    def test_seed_users_zero_count(self, seeding_service, mock_db):
+        with (
+            patch("app.services.seeding_service.get_db_context") as mock_ctx,
+            patch("app.services.seeding_service.AuthManager.hash_password", return_value="hashed"),
+        ):
+            mock_ctx.return_value.__enter__.return_value = mock_db
+            ids = seeding_service.seed_users(count=0, include_admin=False)
 
-    def test_seed_session_templates(self, seeding_service, mock_db_session):
-        """Test seeding session templates."""
+        assert ids == []
+        mock_db.add.assert_not_called()
+
+    def test_seed_users_ids_format(self, seeding_service, mock_db):
+        with (
+            patch("app.services.seeding_service.get_db_context") as mock_ctx,
+            patch("app.services.seeding_service.AuthManager.hash_password", return_value="hashed"),
+        ):
+            mock_ctx.return_value.__enter__.return_value = mock_db
+            ids = seeding_service.seed_users(count=3, include_admin=False)
+
+        assert all(id_.startswith("user_") for id_ in ids)
+
+
+# ---------------------------------------------------------------------------
+# seed_session_templates
+# ---------------------------------------------------------------------------
+
+
+class TestSeedSessionTemplates:
+
+    def test_seed_templates_basic(self, seeding_service, mock_db):
         user_ids = ["user_001", "user_002"]
+        with patch("app.services.seeding_service.get_db_context") as mock_ctx:
+            mock_ctx.return_value.__enter__.return_value = mock_db
+            ids = seeding_service.seed_session_templates(user_ids, count=3)
 
-        with patch("app.services.seeding_service.get_db_context") as mock_get_db:
-            mock_get_db.return_value.__enter__.return_value = mock_db_session
+        assert len(ids) == 3
+        assert all(tid.startswith("template_") for tid in ids)
+        assert mock_db.add.call_count == 3
+        mock_db.commit.assert_called_once()
 
-            template_ids = seeding_service.seed_session_templates(user_ids, count=2)
+    def test_seed_templates_count_capped_by_configs(self, seeding_service, mock_db):
+        """count > number of template configs should be capped."""
+        user_ids = ["user_001"]
+        with patch("app.services.seeding_service.get_db_context") as mock_ctx:
+            mock_ctx.return_value.__enter__.return_value = mock_db
+            ids = seeding_service.seed_session_templates(user_ids, count=100)
 
-            assert len(template_ids) == 2
-            assert all(tid.startswith("template_") for tid in template_ids)
-            assert mock_db_session.add.call_count == 2
-            assert mock_db_session.commit.called
+        # Only 5 template configs exist
+        assert len(ids) == 5
 
-    def test_seed_sessions(self, seeding_service, mock_db_session):
-        """Test seeding sessions."""
+    def test_seed_templates_zero_count(self, seeding_service, mock_db):
+        with patch("app.services.seeding_service.get_db_context") as mock_ctx:
+            mock_ctx.return_value.__enter__.return_value = mock_db
+            ids = seeding_service.seed_session_templates(["user_001"], count=0)
+
+        assert ids == []
+        mock_db.add.assert_not_called()
+
+
+# ---------------------------------------------------------------------------
+# seed_sessions
+# ---------------------------------------------------------------------------
+
+
+class TestSeedSessions:
+
+    def test_seed_sessions_basic(self, seeding_service, mock_db):
         user_ids = ["user_001", "user_002"]
+        with patch("app.services.seeding_service.get_db_context") as mock_ctx:
+            mock_ctx.return_value.__enter__.return_value = mock_db
+            ids = seeding_service.seed_sessions(user_ids, count=4)
+
+        assert len(ids) == 4
+        assert all(sid.startswith("session_") for sid in ids)
+        assert mock_db.add.call_count == 4
+        mock_db.commit.assert_called_once()
+
+    def test_seed_sessions_with_templates(self, seeding_service, mock_db):
+        user_ids = ["user_001"]
         template_ids = ["template_001", "template_002"]
+        with patch("app.services.seeding_service.get_db_context") as mock_ctx:
+            mock_ctx.return_value.__enter__.return_value = mock_db
+            ids = seeding_service.seed_sessions(user_ids, template_ids, count=3)
 
-        with patch("app.services.seeding_service.get_db_context") as mock_get_db:
-            mock_get_db.return_value.__enter__.return_value = mock_db_session
+        assert len(ids) == 3
 
-            session_ids = seeding_service.seed_sessions(user_ids, template_ids, count=3)
+    def test_seed_sessions_without_templates(self, seeding_service, mock_db):
+        user_ids = ["user_001"]
+        with patch("app.services.seeding_service.get_db_context") as mock_ctx:
+            mock_ctx.return_value.__enter__.return_value = mock_db
+            ids = seeding_service.seed_sessions(user_ids, template_ids=None, count=2)
 
-            assert len(session_ids) == 3
-            assert all(sid.startswith("session_") for sid in session_ids)
-            assert mock_db_session.add.call_count == 3
-            assert mock_db_session.commit.called
+        assert len(ids) == 2
 
-    def test_seed_tasks(self, seeding_service, mock_db_session):
-        """Test seeding tasks."""
+    def test_seed_sessions_returns_ids(self, seeding_service, mock_db):
+        with patch("app.services.seeding_service.get_db_context") as mock_ctx:
+            mock_ctx.return_value.__enter__.return_value = mock_db
+            ids = seeding_service.seed_sessions(["user_001"], count=5)
+
+        assert ids == [f"session_{i:03d}" for i in range(5)]
+
+
+# ---------------------------------------------------------------------------
+# seed_tasks
+# ---------------------------------------------------------------------------
+
+
+class TestSeedTasks:
+
+    def test_seed_tasks_basic(self, seeding_service, mock_db):
         session_ids = ["session_001", "session_002"]
+        with patch("app.services.seeding_service.get_db_context") as mock_ctx:
+            mock_ctx.return_value.__enter__.return_value = mock_db
+            ids = seeding_service.seed_tasks(session_ids, count=5)
 
-        with patch("app.services.seeding_service.get_db_context") as mock_get_db:
-            mock_get_db.return_value.__enter__.return_value = mock_db_session
+        assert len(ids) == 5
+        assert all(tid.startswith("task_") for tid in ids)
+        assert mock_db.add.call_count == 5
+        mock_db.commit.assert_called_once()
 
-            task_ids = seeding_service.seed_tasks(session_ids, count=4)
+    def test_seed_tasks_zero_count(self, seeding_service, mock_db):
+        with patch("app.services.seeding_service.get_db_context") as mock_ctx:
+            mock_ctx.return_value.__enter__.return_value = mock_db
+            ids = seeding_service.seed_tasks(["session_001"], count=0)
 
-            assert len(task_ids) == 4
-            assert all(tid.startswith("task_") for tid in task_ids)
-            assert mock_db_session.add.call_count == 4
-            assert mock_db_session.commit.called
+        assert ids == []
 
-    def test_seed_task_dependencies(self, seeding_service, mock_db_session):
-        """Test seeding task dependencies."""
+
+# ---------------------------------------------------------------------------
+# seed_task_dependencies
+# ---------------------------------------------------------------------------
+
+
+class TestSeedTaskDependencies:
+
+    def test_seed_dependencies_basic(self, seeding_service, mock_db):
         task_ids = ["task_001", "task_002", "task_003"]
+        with patch("app.services.seeding_service.get_db_context") as mock_ctx:
+            mock_ctx.return_value.__enter__.return_value = mock_db
+            dep_ids = seeding_service.seed_task_dependencies(task_ids, count=2)
 
-        with patch("app.services.seeding_service.get_db_context") as mock_get_db:
-            mock_get_db.return_value.__enter__.return_value = mock_db_session
+        assert isinstance(dep_ids, list)
+        mock_db.commit.assert_called_once()
 
-            dependency_ids = seeding_service.seed_task_dependencies(task_ids, count=2)
+    def test_seed_dependencies_skips_duplicates(self, seeding_service, mock_db):
+        """When a dependency already exists, it should be skipped."""
+        task_ids = ["task_001", "task_002"]
+        # Simulate existing dependency
+        mock_db.query.return_value.filter.return_value.first.return_value = MagicMock()
+        with patch("app.services.seeding_service.get_db_context") as mock_ctx:
+            mock_ctx.return_value.__enter__.return_value = mock_db
+            dep_ids = seeding_service.seed_task_dependencies(task_ids, count=5)
 
-            # Should create dependencies (may be less than requested if duplicates)
-            assert isinstance(dependency_ids, list)
-            assert mock_db_session.commit.called
+        # No new dependencies added since all are "existing"
+        mock_db.add.assert_not_called()
 
-    def test_clear_all_data(self, seeding_service, mock_db_session):
-        """Test clearing all seeded data."""
-        with patch("app.services.seeding_service.get_db_context") as mock_get_db:
-            mock_get_db.return_value.__enter__.return_value = mock_db_session
 
+# ---------------------------------------------------------------------------
+# clear_all_data
+# ---------------------------------------------------------------------------
+
+
+class TestClearAllData:
+
+    def test_clear_all_data_returns_counts(self, seeding_service, mock_db):
+        mock_db.query.return_value.delete.return_value = 3
+        mock_db.query.return_value.filter.return_value.delete.return_value = 5
+        with patch("app.services.seeding_service.get_db_context") as mock_ctx:
+            mock_ctx.return_value.__enter__.return_value = mock_db
             result = seeding_service.clear_all_data()
 
-            assert isinstance(result, dict)
-            assert "users" in result
-            assert "sessions" in result
-            assert "tasks" in result
-            assert "task_dependencies" in result
-            assert "session_templates" in result
-            assert mock_db_session.commit.called
+        assert isinstance(result, dict)
+        assert "users" in result
+        assert "sessions" in result
+        assert "tasks" in result
+        assert "task_dependencies" in result
+        assert "session_templates" in result
+        mock_db.commit.assert_called_once()
 
-    def test_seed_all(self, seeding_service, mock_db_session):
-        """Test complete seeding workflow."""
-        with patch("app.services.seeding_service.get_db_context") as mock_get_db, patch(
-            "app.services.seeding_service.AuthManager.hash_password", return_value="hashed_password"
+    def test_clear_all_data_calls_delete_in_order(self, seeding_service, mock_db):
+        """Verify FK-safe deletion order: dependencies first, then tasks, sessions, etc."""
+        call_order = []
+
+        def track_delete():
+            call_order.append("delete")
+            return 0
+
+        mock_db.query.return_value.delete.side_effect = track_delete
+        mock_db.query.return_value.filter.return_value.delete.side_effect = track_delete
+
+        with patch("app.services.seeding_service.get_db_context") as mock_ctx:
+            mock_ctx.return_value.__enter__.return_value = mock_db
+            seeding_service.clear_all_data()
+
+        # 5 delete calls: task_dependencies, tasks, sessions, session_templates, users
+        assert len(call_order) == 5
+
+
+# ---------------------------------------------------------------------------
+# seed_all
+# ---------------------------------------------------------------------------
+
+
+class TestSeedAll:
+
+    def test_seed_all_returns_summary(self, seeding_service, mock_db):
+        with (
+            patch("app.services.seeding_service.get_db_context") as mock_ctx,
+            patch("app.services.seeding_service.AuthManager.hash_password", return_value="hashed"),
         ):
-            mock_get_db.return_value.__enter__.return_value = mock_db_session
-
+            mock_ctx.return_value.__enter__.return_value = mock_db
             result = seeding_service.seed_all(
-                user_count=2, template_count=1, session_count=2, task_count=3
+                user_count=2, template_count=2, session_count=3, task_count=4
             )
 
-            assert isinstance(result, dict)
-            assert "users_created" in result
-            assert "templates_created" in result
-            assert "sessions_created" in result
-            assert "tasks_created" in result
-            assert "dependencies_created" in result
-            assert result["users_created"] == 3  # 2 regular + 1 admin
+        assert "users_created" in result
+        assert "templates_created" in result
+        assert "sessions_created" in result
+        assert "tasks_created" in result
+        assert "dependencies_created" in result
+        assert result["users_created"] == 3  # 2 regular + 1 admin
+        assert result["templates_created"] == 2
+        assert result["sessions_created"] == 3
+        assert result["tasks_created"] == 4
 
-    def test_generate_task_parameters_attentional_blink(self, seeding_service):
-        """Test parameter generation for attentional blink tasks."""
-        params = seeding_service._generate_task_parameters("attentional_blink")
 
+# ---------------------------------------------------------------------------
+# _generate_task_parameters
+# ---------------------------------------------------------------------------
+
+
+class TestGenerateTaskParameters:
+
+    @pytest.mark.parametrize(
+        "task_type,expected_keys",
+        [
+            (
+                "attentional_blink",
+                ["stream_length", "target_position", "distractor_count", "stimulus_duration_ms"],
+            ),
+            ("working_memory", ["n_back_level", "sequence_length", "stimulus_types"]),
+            ("decision_making", ["deck_count", "trials_per_block", "feedback_delay_ms"]),
+            ("visual_search", ["target_type", "set_size", "target_present"]),
+            ("emotion_recognition", ["emotion", "intensity", "presentation_time_ms"]),
+            ("unknown_type", ["custom_parameter"]),
+        ],
+    )
+    def test_generate_parameters(self, seeding_service, task_type, expected_keys):
+        params = seeding_service._generate_task_parameters(task_type)
         assert isinstance(params, dict)
-        assert "stream_length" in params
-        assert "target_position" in params
-        assert "distractor_count" in params
-        assert "stimulus_duration_ms" in params
+        for key in expected_keys:
+            assert key in params
 
-    def test_generate_task_parameters_working_memory(self, seeding_service):
-        """Test parameter generation for working memory tasks."""
-        params = seeding_service._generate_task_parameters("working_memory")
 
-        assert isinstance(params, dict)
-        assert "n_back_level" in params
-        assert "sequence_length" in params
-        assert "stimulus_types" in params
+# ---------------------------------------------------------------------------
+# _generate_task_result
+# ---------------------------------------------------------------------------
 
-    def test_generate_task_parameters_unknown_type(self, seeding_service):
-        """Test parameter generation for unknown task types."""
-        params = seeding_service._generate_task_parameters("unknown_type")
 
-        assert isinstance(params, dict)
-        assert "custom_parameter" in params
+class TestGenerateTaskResult:
 
-    def test_generate_task_result_attentional_blink(self, seeding_service):
-        """Test result generation for attentional blink tasks."""
-        result = seeding_service._generate_task_result("attentional_blink")
-
+    @pytest.mark.parametrize(
+        "task_type,expected_keys",
+        [
+            ("attentional_blink", ["accuracy", "reaction_time_ms", "blink_effect_detected"]),
+            ("working_memory", ["accuracy", "false_positives", "false_negatives"]),
+            ("decision_making", ["total_score", "good_deck_preference", "learning_rate"]),
+            ("visual_search", ["search_time_ms", "accuracy", "slope_coefficient"]),
+            ("emotion_recognition", ["accuracy", "reaction_time_ms", "confidence_rating"]),
+            ("unknown_type", ["result_value"]),
+        ],
+    )
+    def test_generate_result(self, seeding_service, task_type, expected_keys):
+        result = seeding_service._generate_task_result(task_type)
         assert isinstance(result, dict)
-        assert "accuracy" in result
-        assert "reaction_time_ms" in result
-        assert "blink_effect_detected" in result
-
-    def test_generate_task_result_unknown_type(self, seeding_service):
-        """Test result generation for unknown task types."""
-        result = seeding_service._generate_task_result("unknown_type")
-
-        assert isinstance(result, dict)
-        assert "result_value" in result
+        for key in expected_keys:
+            assert key in result

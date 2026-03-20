@@ -298,9 +298,10 @@ class TestSessionDeletion:
             mock_session
         )
 
-        with patch.object(mock_manager, "get_session") as mock_get_session, patch.object(
-            mock_manager, "delete_session"
-        ) as mock_delete:
+        with (
+            patch.object(mock_manager, "get_session") as mock_get_session,
+            patch.object(mock_manager, "delete_session") as mock_delete,
+        ):
             mock_get_session.return_value = MagicMock()
 
             result = await delete_session("session123", mock_manager, mock_current_user, mock_db)
@@ -351,9 +352,10 @@ class TestSessionMaintenance:
             mock_session
         )
 
-        with patch.object(mock_manager, "get_session") as mock_get_session, patch.object(
-            mock_manager, "update_session_state"
-        ) as mock_update:
+        with (
+            patch.object(mock_manager, "get_session") as mock_get_session,
+            patch.object(mock_manager, "update_session_state") as mock_update,
+        ):
             mock_sim_session = MagicMock()
             mock_sim_session.state.value = "running"
             mock_sim_session.updated_at = datetime.utcnow()
@@ -474,9 +476,10 @@ class TestSessionPersistence:
             mock_session
         )
 
-        with patch.object(mock_manager, "get_session") as mock_get_session, patch.object(
-            mock_manager, "update_session_state"
-        ) as mock_update:
+        with (
+            patch.object(mock_manager, "get_session") as mock_get_session,
+            patch.object(mock_manager, "update_session_state") as mock_update,
+        ):
             mock_sim_session = MagicMock()
             mock_sim_session.state.value = "created"
             mock_sim_session.updated_at = datetime.utcnow()

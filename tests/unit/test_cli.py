@@ -2,9 +2,17 @@
 Unit tests for cli.py module.
 """
 
-from unittest.mock import patch, MagicMock
-from click.testing import CliRunner
 import sys
+from unittest.mock import MagicMock, patch
+
+import pytest
+from click.testing import CliRunner
+
+
+@pytest.fixture
+def runner():
+    """Create Click CLI runner."""
+    return CliRunner()
 
 
 class TestCLIMigrate:
@@ -13,7 +21,6 @@ class TestCLIMigrate:
     @patch("builtins.open")
     def test_migrate_with_revision(self, mock_open):
         """Test migrate command with specific revision."""
-        # Mock alembic imports
         mock_config_class = MagicMock()
         mock_config_instance = MagicMock()
         mock_config_class.return_value = mock_config_instance
@@ -35,7 +42,6 @@ class TestCLIMigrate:
 
     def test_migrate_with_verbose(self):
         """Test migrate command with verbose output."""
-        # Mock alembic imports
         mock_config_class = MagicMock()
         mock_config_instance = MagicMock()
         mock_config_class.return_value = mock_config_instance
@@ -58,7 +64,6 @@ class TestCLIMigrate:
     @patch("builtins.open")
     def test_migrate_failure(self, mock_open):
         """Test migrate command handles errors gracefully."""
-        # Mock alembic imports
         mock_config = MagicMock()
         mock_command = MagicMock()
         mock_command.side_effect = Exception("Migration failed")
@@ -75,13 +80,54 @@ class TestCLIMigrate:
             result = runner.invoke(cli, ["migrate"])
             assert result.exit_code == 1
 
+    def test_migrate_with_specific_revision(self):
+        """Test migration with specific revision."""
+        mock_config_class = MagicMock()
+        mock_config_instance = MagicMock()
+        mock_config_class.return_value = mock_config_instance
+        mock_command = MagicMock()
+
+        with patch.dict(
+            sys.modules,
+            {
+                "alembic": MagicMock(config=MagicMock(Config=mock_config_class)),
+                "alembic.config": MagicMock(Config=mock_config_class),
+                "alembic.command": mock_command,
+            },
+        ):
+            from app.cli import cli
+
+            runner = CliRunner()
+            result = runner.invoke(cli, ["migrate", "-r", "123456"])
+            assert result.exit_code == 0
+
+    def test_migrate_success_message(self):
+        """Test migrate outputs success message with revision."""
+        mock_config_class = MagicMock()
+        mock_config_instance = MagicMock()
+        mock_config_class.return_value = mock_config_instance
+        mock_command = MagicMock()
+
+        with patch.dict(
+            sys.modules,
+            {
+                "alembic": MagicMock(config=MagicMock(Config=mock_config_class)),
+                "alembic.config": MagicMock(Config=mock_config_class),
+                "alembic.command": mock_command,
+            },
+        ):
+            from app.cli import cli
+
+            runner = CliRunner()
+            result = runner.invoke(cli, ["migrate", "-r", "123456"])
+            assert result.exit_code == 0
+
 
 class TestCLIWorker:
     """Test CLI worker command."""
 
     def test_worker_with_defaults(self):
         """Test worker command with default parameters."""
-        # Mock celery_app
         mock_celery = MagicMock()
         mock_celery.start = MagicMock()
 
@@ -94,7 +140,6 @@ class TestCLIWorker:
 
     def test_worker_with_custom_params(self):
         """Test worker command with custom parameters."""
-        # Mock celery_app
         mock_celery = MagicMock()
         mock_celery.start = MagicMock()
 
@@ -109,7 +154,6 @@ class TestCLIWorker:
 
     def test_worker_with_hostname(self):
         """Test worker command with custom hostname."""
-        # Mock celery_app
         mock_celery = MagicMock()
         mock_celery.start = MagicMock()
 
@@ -122,7 +166,6 @@ class TestCLIWorker:
 
     def test_worker_failure(self):
         """Test worker command handles errors gracefully."""
-        # Mock celery_app
         mock_celery = MagicMock()
         mock_celery.start.side_effect = Exception("Worker failed")
 
@@ -131,11 +174,28 @@ class TestCLIWorker:
 
             runner = CliRunner()
             result = runner.invoke(cli, ["worker"])
-            # The CLI catches exceptions and calls sys.exit(1)
-            # However, in the mocked environment, the exception might be caught differently
-            # We verify the command completes (either with error code or gracefully)
-            # The important thing is that it doesn't crash
-            assert result.exit_code in [0, 1]  # Either succeeds or fails gracefully
+            assert result.exit_code in [0, 1]
+
+    def test_worker_start_message(self):
+        """Test worker outputs start message."""
+        mock_celery = MagicMock()
+        mock_celery.start = MagicMock()
+
+        with patch.dict(sys.modules, {"app.celery_app": mock_celery}):
+            from app.cli import cli
+
+            runner = CliRunner()
+            result = runner.invoke(cli, ["worker"])
+            assert result.exit_code == 0
+            assert "Starting Celery worker" in result.output
+
+    def test_worker_invalid_concurrency(self):
+        """Test worker with invalid concurrency value."""
+        from app.cli import cli
+
+        runner = CliRunner()
+        result = runner.invoke(cli, ["worker", "--concurrency", "invalid"])
+        assert result.exit_code != 0
 
 
 class TestCLISeed:
@@ -264,17 +324,16 @@ class TestCLISeed:
             runner = CliRunner()
             result = runner.invoke(cli, ["seed", "--clear", "--verbose"])
             assert result.exit_code == 0
-            # Verify clear_all_data and seed_all were called
             mock_seeder_instance.clear_all_data.assert_called_once()
             mock_seeder_instance.seed_all.assert_called_once()
 
-    def test_seed_failure(self, mock_init, mock_seeder):
+    def test_seed_failure(self):
         """Test seed command handles errors gracefully."""
-        mock_init.side_effect = Exception("Seeding failed")
+        mock_init = MagicMock(side_effect=Exception("Seeding failed"))
+        mock_seeder = MagicMock()
         with patch.dict(
             sys.modules,
             {
-                "app.services.seeding_service.DatabaseSeedingService": mock_seeder,
                 "app.database.connection": MagicMock(init_db=mock_init),
             },
         ):
@@ -283,6 +342,35 @@ class TestCLISeed:
             runner = CliRunner()
             result = runner.invoke(cli, ["seed"])
             assert result.exit_code == 1
+
+    def test_seed_negative_users(self):
+        """Test seed with negative user count."""
+        from app.cli import cli
+
+        runner = CliRunner()
+        result = runner.invoke(cli, ["seed", "--users", "-5"])
+        assert result.exit_code != 0
+
+    def test_seed_success_message(self):
+        """Test seed outputs success message."""
+        mock_seeder_instance = MagicMock()
+        mock_seeder_instance.seed_all.return_value = {}
+        mock_seeder_class = MagicMock(return_value=mock_seeder_instance)
+        mock_init_db = MagicMock()
+
+        with patch.dict(
+            sys.modules,
+            {
+                "app.database.connection": MagicMock(init_db=mock_init_db),
+                "app.services.seeding_service": MagicMock(DatabaseSeedingService=mock_seeder_class),
+            },
+        ):
+            from app.cli import cli
+
+            runner = CliRunner()
+            result = runner.invoke(cli, ["seed"])
+            assert result.exit_code == 0
+            assert "Database seeding completed successfully" in result.output
 
 
 class TestCLIClearSeed:
@@ -334,6 +422,27 @@ class TestCLIClearSeed:
             result = runner.invoke(cli, ["clear-seed-data", "--confirm"])
             assert result.exit_code == 1
 
+    def test_clear_success_message(self):
+        """Test clear outputs success message."""
+        mock_seeder_instance = MagicMock()
+        mock_seeder_instance.clear_all_data.return_value = {"users": 10, "sessions": 20}
+        mock_seeder_class = MagicMock(return_value=mock_seeder_instance)
+        mock_init_db = MagicMock()
+
+        with patch.dict(
+            sys.modules,
+            {
+                "app.database.connection": MagicMock(init_db=mock_init_db),
+                "app.services.seeding_service": MagicMock(DatabaseSeedingService=mock_seeder_class),
+            },
+        ):
+            from app.cli import cli
+
+            runner = CliRunner()
+            result = runner.invoke(cli, ["clear-seed-data", "--confirm"])
+            assert result.exit_code == 0
+            assert "Test data cleared successfully" in result.output
+
 
 class TestCLIMain:
     """Test CLI main group functionality."""
@@ -353,6 +462,45 @@ class TestCLIMain:
 
         runner = CliRunner()
         result = runner.invoke(cli, [])
-        # Click returns exit code 2 when no subcommand is provided
         assert result.exit_code == 2
         assert "Usage:" in result.output
+
+
+class TestCLIHelp:
+    """Test help output for all CLI subcommands."""
+
+    def test_migrate_help(self):
+        """Test migrate command help."""
+        from app.cli import cli
+
+        runner = CliRunner()
+        result = runner.invoke(cli, ["migrate", "--help"])
+        assert result.exit_code == 0
+        assert "Run database migrations" in result.output
+
+    def test_worker_help(self):
+        """Test worker command help."""
+        from app.cli import cli
+
+        runner = CliRunner()
+        result = runner.invoke(cli, ["worker", "--help"])
+        assert result.exit_code == 0
+        assert "Start Celery worker" in result.output
+
+    def test_seed_help(self):
+        """Test seed command help."""
+        from app.cli import cli
+
+        runner = CliRunner()
+        result = runner.invoke(cli, ["seed", "--help"])
+        assert result.exit_code == 0
+        assert "Seed database with test data" in result.output
+
+    def test_clear_seed_data_help(self):
+        """Test clear-seed-data command help."""
+        from app.cli import cli
+
+        runner = CliRunner()
+        result = runner.invoke(cli, ["clear-seed-data", "--help"])
+        assert result.exit_code == 0
+        assert "Clear all seeded test data" in result.output

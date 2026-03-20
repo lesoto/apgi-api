@@ -197,11 +197,12 @@ class TestUserRoutesIntegration:
             exp=datetime.now(timezone.utc) + timedelta(hours=1),
         )
 
-        with patch(
-            "app.services.authorization.get_current_user", return_value=mock_token_payload
-        ), patch(
-            "app.routes.users.get_user_management_service",
-            return_value=mock_user_management_service,
+        with (
+            patch("app.services.authorization.get_current_user", return_value=mock_token_payload),
+            patch(
+                "app.routes.users.get_user_management_service",
+                return_value=mock_user_management_service,
+            ),
         ):
             user_id = str(uuid.uuid4())
             update_data = {"email": "updated@example.com", "roles": ["user", "admin"]}

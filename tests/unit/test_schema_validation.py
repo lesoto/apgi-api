@@ -423,3 +423,155 @@ class TestResponseSchemaValidationMiddleware:
         response.status_code = 200
 
         await middleware._validate_response(request, response)
+
+
+# ---------------------------------------------------------------------------
+# Tests merged from test_schema_validation_middleware.py
+# ---------------------------------------------------------------------------
+import json as _json
+from unittest.mock import MagicMock as _MagicMock, AsyncMock as _AsyncMock
+from fastapi import Request as _Request, Response as _Response
+
+
+class TestSchemaValidationMiddlewareExtra:
+    """Additional tests merged from test_schema_validation_middleware.py."""
+
+    @pytest.mark.asyncio
+    async def test_dispatch_loads_openapi_schema_from_app(self):
+        """Test dispatch loads OpenAPI schema from request.app if not already loaded."""
+        mock_app = _MagicMock()
+        mock_app.openapi = _MagicMock(return_value={"paths": {}})
+        middleware = ResponseSchemaValidationMiddleware(mock_app, enabled=True, openapi_schema=None)
+
+        mock_request = _MagicMock()
+        mock_request.app = mock_app
+        mock_request.method = "GET"
+        mock_request.url.path = "/test"
+        response = _MagicMock()
+        response.status_code = 200
+        call_next = _AsyncMock(return_value=response)
+
+        await middleware.dispatch(mock_request, call_next)
+
+        mock_app.openapi.assert_called_once()
+
+    @pytest.mark.asyncio
+    async def test_validate_response_with_status_range(self):
+        """Test validation uses status range (2XX) when specific status not found."""
+        schema_with_range = {
+            "paths": {
+                "/test": {
+                    "get": {
+                        "responses": {
+                            "2XX": {
+                                "content": {
+                                    "application/json": {
+                                        "schema": {
+                                            "type": "object",
+                                            "properties": {"data": {"type": "string"}},
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        mock_app = _MagicMock()
+        middleware = ResponseSchemaValidationMiddleware(mock_app, openapi_schema=schema_with_range)
+
+        mock_request = _MagicMock()
+        mock_request.method = "GET"
+        mock_request.url.path = "/test"
+        response = _MagicMock()
+        response.status_code = 201
+        response.body = _json.dumps({"data": "test"}).encode()
+        call_next = _AsyncMock(return_value=response)
+
+        result = await middleware.dispatch(mock_request, call_next)
+
+        assert result.status_code == 201
+
+    @pytest.mark.asyncio
+    async def test_validate_response_with_nested_object(self):
+        """Test validation handles nested objects."""
+        schema_with_nested = {
+            "paths": {
+                "/test": {
+                    "get": {
+                        "responses": {
+                            "200": {
+                                "content": {
+                                    "application/json": {
+                                        "schema": {
+                                            "type": "object",
+                                            "properties": {
+                                                "user": {
+                                                    "type": "object",
+                                                    "properties": {
+                                                        "id": {"type": "integer"},
+                                                        "name": {"type": "string"},
+                                                    },
+                                                }
+                                            },
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        mock_app = _MagicMock()
+        middleware = ResponseSchemaValidationMiddleware(mock_app, openapi_schema=schema_with_nested)
+
+        mock_request = _MagicMock()
+        mock_request.method = "GET"
+        mock_request.url.path = "/test"
+        response = _MagicMock()
+        response.status_code = 200
+        response.body = _json.dumps({"user": {"id": 1, "name": "test"}}).encode()
+        call_next = _AsyncMock(return_value=response)
+
+        result = await middleware.dispatch(mock_request, call_next)
+
+        assert result.status_code == 200
+
+    def test_validate_field_with_number_type(self):
+        """Test field validation with number type."""
+        middleware = ResponseSchemaValidationMiddleware(_MagicMock())
+        errors = middleware._validate_field(123.45, {"type": "number"}, "field")
+        assert errors == []
+
+    def test_validate_field_with_boolean_type(self):
+        """Test field validation with boolean type."""
+        middleware = ResponseSchemaValidationMiddleware(_MagicMock())
+        errors = middleware._validate_field(True, {"type": "boolean"}, "field")
+        assert errors == []
+
+    def test_validate_field_with_integer_type(self):
+        """Test field validation with integer type."""
+        middleware = ResponseSchemaValidationMiddleware(_MagicMock())
+        errors = middleware._validate_field(42, {"type": "integer"}, "field")
+        assert errors == []
+
+    def test_find_matching_path_multi_segment_params(self):
+        """Test path matching handles multi-segment path parameters."""
+        schema = {
+            "paths": {
+                "/users/{id}": {"get": {"responses": {}}},
+                "/users/{id}/posts/{post_id}": {"get": {"responses": {}}},
+            }
+        }
+        middleware = ResponseSchemaValidationMiddleware(_MagicMock(), openapi_schema=schema)
+
+        result = middleware._find_matching_path("/users/123")
+        assert result is not None
+
+        result = middleware._find_matching_path("/users/123/posts/456")
+        assert result is not None
+
+        result = middleware._find_matching_path("/users")
+        assert result is None
