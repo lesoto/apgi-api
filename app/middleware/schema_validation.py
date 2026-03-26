@@ -291,7 +291,7 @@ class ResponseSchemaValidationMiddleware(BaseHTTPMiddleware):
             # It's a StreamingResponse (e.g., from another BaseHTTPMiddleware)
             # We need to consume the body and replace the iterator to keep it available
             chunks = []
-            async for chunk in response.body_iterator:
+            async for chunk in response.body_iterator:  # type: ignore[attr-defined]
                 chunks.append(chunk)
 
             # Re-create the iterator so it can still be sent to the client
@@ -299,7 +299,7 @@ class ResponseSchemaValidationMiddleware(BaseHTTPMiddleware):
                 for chunk in chunks:
                     yield chunk
 
-            response.body_iterator = new_iterator()
+            response.body_iterator = new_iterator()  # type: ignore[attr-defined]
             body = b"".join(chunks)
         else:
             return None

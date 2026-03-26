@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 
 import sys
-import os
 
-sys.path.append(os.path.dirname(__file__))
+# Add /app to Python path for proper imports
+sys.path.insert(0, "/app")
 
 from app.database.connection import SessionLocal
 from app.database.models import User
@@ -17,7 +17,7 @@ def create_demo_user():
         existing = db.query(User).filter(User.email == "user@example.com").first()
         if existing:
             if "admin" not in existing.roles or "user" not in existing.roles:
-                existing.roles = ["user", "admin"]  # type: ignore[assignment]
+                existing.roles = ["user", "admin"]
                 db.commit()
                 print("Demo user updated with user and admin roles")
             else:

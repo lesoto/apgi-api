@@ -7,6 +7,7 @@ by calling route functions directly with mocked dependencies.
 
 import pytest
 import uuid
+from typing import cast
 from unittest.mock import AsyncMock, MagicMock, patch
 from fastapi import HTTPException
 
@@ -185,7 +186,8 @@ class TestTaskRoutes:
         assert response.task_id == task_id
         assert response.status == "completed"
         assert response.state == "SUCCESS"
-        assert response.result["accuracy"] == 0.85  # type: ignore[union-attr]
+        assert response.result is not None
+        assert cast(float, response.result["accuracy"]) == 0.85
 
     @pytest.mark.asyncio
     async def test_get_task_status_not_found(self, mock_task_executor, mock_current_user):

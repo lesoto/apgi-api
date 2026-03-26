@@ -36,7 +36,7 @@ if "stripe" not in sys.modules:
     sys.modules["stripe.error"] = _stripe_mock.error
 
 
-@pytest.fixture(autouse=True, scope="function")
+@pytest.fixture(scope="function")
 def mock_psycopg2():
     """Patch psycopg2 and sub-modules into sys.modules before any test imports them."""
     mock = MagicMock()

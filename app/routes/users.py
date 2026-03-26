@@ -278,7 +278,7 @@ async def list_users(
                 user_id=user.user_id,  # type: ignore[arg-type]
                 username=user.username,  # type: ignore[arg-type]
                 email=user.email,  # type: ignore[arg-type]
-                roles=user.roles,  # type: ignore[arg-type]
+                roles=user.roles,
                 is_active=user.is_active,  # type: ignore[arg-type]
                 created_at=user.created_at,  # type: ignore[arg-type]
                 updated_at=user.updated_at,  # type: ignore[arg-type]
@@ -320,7 +320,7 @@ async def get_current_user_profile(
         user_id=user.user_id,  # type: ignore[arg-type]
         username=user.username,  # type: ignore[arg-type]
         email=user.email,  # type: ignore[arg-type]
-        roles=user.roles,  # type: ignore[arg-type]
+        roles=user.roles,
         is_active=user.is_active,  # type: ignore[arg-type]
         created_at=user.created_at,  # type: ignore[arg-type]
         updated_at=user.updated_at,  # type: ignore[arg-type]
@@ -395,7 +395,7 @@ async def get_user(
         user_id=user.user_id,  # type: ignore[arg-type]
         username=user.username,  # type: ignore[arg-type]
         email=user.email,  # type: ignore[arg-type]
-        roles=user.roles,  # type: ignore[arg-type]
+        roles=user.roles,
         is_active=user.is_active,  # type: ignore[arg-type]
         created_at=user.created_at,  # type: ignore[arg-type]
         updated_at=user.updated_at,  # type: ignore[arg-type]
@@ -452,7 +452,7 @@ async def partial_update_user(
             user_id=user.user_id,  # type: ignore[arg-type]
             username=user.username,  # type: ignore[arg-type]
             email=user.email,  # type: ignore[arg-type]
-            roles=user.roles,  # type: ignore[arg-type]
+            roles=user.roles,
             is_active=user.is_active,  # type: ignore[arg-type]
             created_at=user.created_at,  # type: ignore[arg-type]
             updated_at=user.updated_at,  # type: ignore[arg-type]
@@ -518,7 +518,7 @@ async def update_user(
             user_id=user.user_id,  # type: ignore[arg-type]
             username=user.username,  # type: ignore[arg-type]
             email=user.email,  # type: ignore[arg-type]
-            roles=user.roles,  # type: ignore[arg-type]
+            roles=user.roles,
             is_active=user.is_active,  # type: ignore[arg-type]
             created_at=user.created_at,  # type: ignore[arg-type]
             updated_at=user.updated_at,  # type: ignore[arg-type]

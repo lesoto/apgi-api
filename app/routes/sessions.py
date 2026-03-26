@@ -541,7 +541,7 @@ async def get_session_tasks(
             task_id=str(task.task_id),
             status=str(task.status),
             state=str(task.status),  # Use status as state since Celery state not stored in DB
-            result=dict(task.result_data) if task.result_data else None,  # type: ignore[arg-type]
+            result=dict(task.result_data) if task.result_data else None,  # type: ignore[assignment]
             error=str(task.error_message) if task.error_message else None,
             info=None,
         )

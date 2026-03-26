@@ -2,6 +2,7 @@
 
 import json
 import pytest
+from typing import Dict, Any
 from unittest.mock import patch, MagicMock, Mock, AsyncMock
 from app.middleware.schema_validation import ResponseSchemaValidationMiddleware
 
@@ -10,8 +11,9 @@ class TestResponseSchemaValidationMiddleware:
     """Test ResponseSchemaValidationMiddleware functionality."""
 
     @pytest.fixture
-    def validation_middleware():
-        return ResponseSchemaValidationMiddleware()
+    def validation_middleware(self):
+        mock_app = MagicMock()
+        return ResponseSchemaValidationMiddleware(app=mock_app)
 
     def test_valid_json_schema(self, validation_middleware):
         """Test valid JSON schema validation."""
@@ -95,10 +97,7 @@ class TestResponseSchemaValidationMiddleware:
             assert result["status_code"] == 413
 
 
-from app.middleware.schema_validation import ResponseSchemaValidationMiddleware
-
-
-class TestResponseSchemaValidationMiddleware:
+class TestResponseSchemaValidationMiddlewareAdditional:
     """Test ResponseSchemaValidationMiddleware functionality."""
 
     def setup_method(self):
@@ -516,6 +515,7 @@ class TestResponseSchemaValidationMiddleware:
 # Tests merged from test_schema_validation_middleware.py
 # ---------------------------------------------------------------------------
 import json as _json
+from typing import Dict, Any
 from unittest.mock import MagicMock as _MagicMock, AsyncMock as _AsyncMock
 
 
@@ -645,7 +645,7 @@ class TestSchemaValidationMiddlewareExtra:
 
     def test_find_matching_path_multi_segment_params(self):
         """Test path matching handles multi-segment path parameters."""
-        schema = {
+        schema: Dict[str, Any] = {
             "paths": {
                 "/users/{id}": {"get": {"responses": {}}},
                 "/users/{id}/posts/{post_id}": {"get": {"responses": {}}},

@@ -4,7 +4,7 @@
 
 ### Consciousness Equation
 
-```
+```text
 Consciousness = Allostasis + Precision Gating + Ignition
 
 1. Allostasis (Predictive Regulation)
@@ -23,7 +23,6 @@ Consciousness = Allostasis + Precision Gating + Ignition
 ## Key APGI Terms
 
 | Term | Definition | Example |
-|------|-----------|---------|
 | **Allostasis** | Predictive regulation; anticipating future states | Brain predicts you'll hear a car before you consciously hear it |
 | **Precision Gate** | Filter controlling information flow (0-1 scale) | 0.1 = sound mostly blocked; 0.9 = sound fully passes through |
 | **Gating Value** | Numeric value (0-1) of precision gate; determines signal transmission | Task-relevant signals get 0.8; distracting signals get 0.2 |
@@ -32,13 +31,13 @@ Consciousness = Allostasis + Precision Gating + Ignition
 | **Synchrony** | How aligned brain oscillations are; measure of integration | High synchrony = coordinated network activity = consciousness |
 | **Salience** | How important/novel/emotional a stimulus is | Your name is highly salient; background noise is low salience |
 
-## API Endpoints (Module 1 Focus)
+## API Endpoints
 
 These are the core endpoints you'll use in APGI simulations:
 
 ### Authentication
 
-```
+```python
 POST /v1/auth/register
   - Register new user account
 
@@ -51,7 +50,7 @@ POST /v1/auth/refresh
 
 ### Sessions (Core APGI Simulation)
 
-```
+```python
 POST /v1/sessions
   - Create new APGI session
   - Payload: config (JSON), description
@@ -76,7 +75,7 @@ GET /v1/sessions
 
 ### Tasks (Experiments within Session)
 
-```
+```python
 POST /v1/sessions/{session_id}/tasks
   - Submit experiment/stimulus to session
   - Payload: task_type, parameters
@@ -93,7 +92,7 @@ GET /v1/sessions/{session_id}/tasks
 
 ### Export & Results
 
-```
+```http
 POST /v1/sessions/{session_id}/export
   - Export session data
   - Payload: format="json"|"csv"
@@ -128,7 +127,6 @@ When creating a session, you provide a `config` object:
 ### Key Parameters
 
 | Parameter | Range | Meaning |
-|-----------|-------|---------|
 | `time_steps` | 1-1000 | How many simulation steps to run |
 | `initial_precision_gate` | 0-1 | Starting gate value (0=closed, 1=open) |
 | `noise_level` | 0-1 | Random perturbations in system |
@@ -140,11 +138,10 @@ When creating a session, you provide a `config` object:
 
 ## Session States
 
-```
+```text
 CREATED   → RUNNING   → PAUSED  → RESUMED  → STOPPED
   ↓          ↓                                   ↓
 (Setup)   (Active)                           (Results)
-
           Optional: RUNNING → ERROR (if something fails)
 ```
 
@@ -160,7 +157,7 @@ CREATED   → RUNNING   → PAUSED  → RESUMED  → STOPPED
 
 These are experiment types you can submit within a session:
 
-```
+```python
 "apply_stimulus"          - Apply sensory input to system
 "measure_consciousness"   - Measure current consciousness level
 "observe_state"          - Sample current system state
@@ -200,7 +197,7 @@ All successful responses follow this pattern:
 
 After login, you get a JWT token:
 
-```
+```python
 eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VyX2lkIjoiMTIzIn0.signature
 ```
 
@@ -212,7 +209,7 @@ This is divided into three parts (separated by `.`):
 
 Use it by including in all requests:
 
-```
+```http
 Authorization: Bearer eyJhbGciOi...
 ```
 
@@ -267,7 +264,6 @@ Authorization: Bearer eyJhbGciOi...
 ## Common HTTP Status Codes
 
 | Code | Meaning | Example |
-|------|---------|---------|
 | **200** | OK - Request succeeded | GET session successful |
 | **201** | Created - Resource created | POST session successful |
 | **400** | Bad Request - Invalid input | Malformed JSON in request |
@@ -281,7 +277,7 @@ Authorization: Bearer eyJhbGciOi...
 When you monitor APGI sessions:
 
 | Metric | Meaning | Typical Range |
-|--------|---------|---|
+| -------- | --------- | -------------- |
 | **Consciousness Level** | Overall consciousness in APGI system | 0-1 |
 | **Precision Gate Value** | Current filtering level per region | 0-1 |
 | **Synchrony** | Network synchronization level | 0-1 |
@@ -292,7 +288,6 @@ When you monitor APGI sessions:
 ## Troubleshooting Quick Reference
 
 | Issue | Cause | Solution |
-|-------|-------|----------|
 | 401 Unauthorized | Invalid/missing token | Re-login, get new token |
 | 403 Forbidden | Don't own this session | Verify session belongs to you |
 | 404 Not Found | Wrong session/task ID | Check IDs, list sessions to confirm |
@@ -304,7 +299,7 @@ When you monitor APGI sessions:
 
 How APGI theory maps to the system:
 
-```
+```text
 APGI Theory              API Implementation
 ─────────────────────────────────────────
 Consciousness model  ←→  Session object
@@ -314,13 +309,3 @@ Precision gates      ←→  task parameters
 Ignition events      ←→  Task status/results
 Measurement          ←→  Tasks + export
 ```
-
-## Next Steps
-
-- Review [THEORY.md](./THEORY.md) for deeper understanding
-- Go to [HANDS_ON.md](./HANDS_ON.md) to interact with the system
-- Check out [CODE_EXAMPLES](./CODE_EXAMPLES/) to see implementation
-
----
-
-**Reference Complete!** Use this when you need quick lookups while exploring the API.

@@ -6,6 +6,7 @@ Requirements: 2.9
 """
 
 import pytest
+from typing import Dict, Any
 from unittest.mock import MagicMock, AsyncMock, patch
 from datetime import datetime, timezone
 
@@ -137,7 +138,7 @@ class TestGetOverviewMetrics:
     @pytest.mark.asyncio
     async def test_uses_cache_on_second_call(self, service, mock_cache):
         mock_db = _make_mock_db()
-        cached_result = {"overview": {}}
+        cached_result: Dict[str, Any] = {"overview": {}}
         mock_cache.get_query_result.return_value = cached_result
 
         result = await service.get_overview_metrics()

@@ -15,6 +15,7 @@ Before understanding APGI, let's define consciousness. Philosophers and neurosci
 **Consciousness as Integrated Information**: The degree to which a system integrates information across distributed networks.
 
 Key properties of conscious experience:
+
 - **Unified**: Feels like a single experience, not fragmented pieces
 - **Selective**: We're aware of some things, not others
 - **Dynamic**: Changes moment to moment
@@ -22,6 +23,7 @@ Key properties of conscious experience:
 - **Reportable**: We can talk about what we're conscious of
 
 Traditional neuroscience correlates consciousness with:
+
 - Activity in the thalamocortical system
 - Synchronized oscillations across brain regions
 - Integrated information across neural networks
@@ -35,10 +37,12 @@ Traditional neuroscience correlates consciousness with:
 **Definition**: Dynamic regulation of internal states to achieve goals in a changing environment.
 
 Difference from *Homeostasis*:
+
 - **Homeostasis**: "Keep things stable" (e.g., constant body temperature)
 - **Allostasis**: "Anticipate and adapt" (e.g., raise metabolism before exercise)
 
 In APGI, allostasis means:
+
 - The brain maintains predictive models of the world
 - It gates information based on current needs and predictions
 - It prioritizes some signals over others dynamically
@@ -51,7 +55,7 @@ In APGI, allostasis means:
 
 The brain can't process everything—there's too much information. So it gates (filters) information:
 
-```
+```text
 Raw Input Signal → [Precision Gate] → Passed to Higher Processing
                         ↓
                    Gating Value (0-1)
@@ -61,10 +65,12 @@ Raw Input Signal → [Precision Gate] → Passed to Higher Processing
 ```
 
 **Precision value** indicates how certain the brain is that this information matters:
+
 - High precision (close to 1): "This signal is important, pass it through"
 - Low precision (close to 0): "This is noise or irrelevant, filter it out"
 
 **Sources of gating precision**:
+
 1. **Top-down** (expectations): "I'm expecting an important signal"
 2. **Bottom-up** (salience): "This signal is very novel or emotionally significant"
 3. **Attentional** (goals): "This is relevant to my current goal"
@@ -76,12 +82,14 @@ Raw Input Signal → [Precision Gate] → Passed to Higher Processing
 When multiple brain regions activate together in a synchronized pattern, an "ignition event" occurs. This is the neural signature of consciousness.
 
 Think of ignition like:
+
 - **Before ignition**: Different brain regions operating somewhat independently
 - **During ignition**: Networks synchronize, creating high integration
 - **Consciousness emerges**: The synchronized state corresponds to conscious awareness
 
 **Mathematical perspective**:
-```
+
+```text
 Consciousness = f(Integration, Differentiation)
               = How much information is integrated across networks
               + How much information is differentiated (specialized)
@@ -91,7 +99,7 @@ Consciousness = f(Integration, Differentiation)
 
 APGI models how the system transitions between states:
 
-```
+```text
 [RESTING] → [IGNITION_THRESHOLD] → [CONSCIOUS] → [FADING] → [RESTING]
              (precision gates open)              (attention shifts)
 ```
@@ -101,7 +109,7 @@ APGI models how the system transitions between states:
 **State characteristics**:
 
 | State | Precision Gates | Integration | Integration | Reportability |
-|-------|-----------------|-------------|-------------|---|
+| ------- | ----------------- | ------------- | ------------- | --- |
 | Unconscious | Low (closed) | Low | High | Can't report |
 | Threshold | Increasing | Medium | Medium | Vague awareness |
 | Conscious | High (open) | High | Medium | Clear report |
@@ -111,12 +119,13 @@ APGI models how the system transitions between states:
 
 ### The APGI Equation (Simplified)
 
-```
+```text
 Consciousness(t) = Sum of [Precision_Gate(i) × Signal(i) × Synchrony(t)]
                    for all regions i
 ```
 
 Breaking this down:
+
 - **Precision_Gate(i)**: How much is region i's signal gated (0-1)
 - **Signal(i)**: Current activity level of region i
 - **Synchrony(t)**: How synchronized all regions are at time t
@@ -124,7 +133,7 @@ Breaking this down:
 
 ### Information Flow in APGI
 
-```
+```text
 ┌─────────────────────────────────────────┐
 │         Sensory Input & Context         │
 └──────────────────┬──────────────────────┘
@@ -163,7 +172,7 @@ Breaking this down:
 
 The APGI system has multiple nested layers of organization:
 
-```
+```text
 [Conscious Experience & Report]
               ↑
 [Global Synchrony & Ignition]
@@ -196,7 +205,7 @@ class APGISession:
 ### How Concepts Map to the API
 
 | APGI Concept | API Representation |
-|---|---|
+| --- | --- |
 | **APGI System** | `Session` object in database |
 | **Configuration** | `config` field of Session (JSON) |
 | **System State** | `full_state` field of Session (JSON) |
@@ -207,7 +216,7 @@ class APGISession:
 
 ### Session Lifecycle
 
-```
+```text
 User creates a Session
         ↓
 CREATED state
@@ -233,6 +242,7 @@ Consciousness metrics, state history, etc.
 **Scenario**: User wants to run a simulation where a visual stimulus is expected vs. unexpected.
 
 1. **User creates Session**
+
    ```json
    {
      "config": {
@@ -249,6 +259,7 @@ Consciousness metrics, state history, etc.
    - Initializes network connections
 
 3. **User creates Task** (submit stimulus)
+
    ```json
    {
      "task_type": "apply_stimulus",
@@ -296,6 +307,7 @@ APGI explains several important phenomena:
 ### Testing the Model
 
 We test APGI by:
+
 1. **Parameter variation**: Change configuration, see what consciousness metrics result
 2. **Stimulus manipulation**: Apply different stimuli, measure gating responses
 3. **Comparison to data**: Do predictions match brain imaging, behavioral measures?
@@ -307,7 +319,7 @@ In this course, you'll build the infrastructure to test APGI computationally.
 
 If you want the mathematical formulation (not required for coding):
 
-```
+```text
 Let:
 - R(t) = activity vector of brain regions at time t
 - G(t) = precision gate vector at time t
@@ -322,6 +334,7 @@ Where ⊙ is element-wise multiplication (gating)
 ```
 
 **Interpretation**:
+
 - Brain activity R(t) is modified by gating G(t)
 - The gated activity integrates with predictions P(t)
 - Integration Ω measures how synchronized the result is
@@ -341,12 +354,14 @@ Where ⊙ is element-wise multiplication (gating)
 ## Summary
 
 APGI is a neuroscientific theory of consciousness that emphasizes:
+
 1. **Allostasis**: The brain predicts and anticipates
 2. **Precision Gating**: Selective information filtering based on predictions
 3. **Ignition**: Synchronized network activation
 4. **Emergence**: Consciousness arises from this dynamic process
 
 In our API, we implement APGI as a computational system where:
+
 - Sessions represent APGI simulations
 - Configurations define system parameters
 - Tasks apply stimuli or manipulations

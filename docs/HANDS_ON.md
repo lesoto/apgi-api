@@ -122,7 +122,8 @@ docker-compose -f deployment/docker-compose.yml up
 This single command starts everything. Docker will download images (first time only), so wait 2-3 minutes.
 
 **When complete**, you'll see:
-```
+
+```text
 apgi-api-api-1  | INFO:     Application startup complete
 ```
 
@@ -160,11 +161,12 @@ curl http://localhost:8000/health
 
 Open your browser and navigate to:
 
-```
+```text
 http://localhost:8000/docs
 ```
 
 You should see:
+
 - A Swagger UI with all API endpoints
 - Try-it-out buttons for each endpoint
 - Request/response examples
@@ -186,19 +188,21 @@ docker ps | grep celery
 
 ### Step 4a: Create a User Account
 
-In the API docs (http://localhost:8000/docs), find the **POST /v1/auth/register** endpoint.
+In the API docs (`http://localhost:8000/docs`), find the **POST /v1/auth/register** endpoint.
 
 1. Click "Try it out"
 2. Fill in the request body:
-   ```json
-   {
-     "username": "student",
-     "email": "student@example.com",
-     "password": "SecurePassword123!"
-   }
-   ```
-3. Click "Execute"
-4. You should get a 201 response with user details
+
+```json
+{
+  "username": "student",
+  "email": "student@example.com",
+  "password": "SecurePassword123!"
+}
+```
+
+1. Click "Execute"
+2. You should get a 201 response with user details
 
 ### Step 4b: Login and Get a Token
 
@@ -206,13 +210,16 @@ Find **POST /v1/auth/login** endpoint:
 
 1. Click "Try it out"
 2. Fill in:
+
    ```json
    {
      "username": "student",
      "password": "SecurePassword123!"
    }
    ```
+
 3. Click "Execute"
+
 4. You'll get back an `access_token` — **copy this**
 
 ### Step 4c: Authorize the API Docs
@@ -220,7 +227,8 @@ Find **POST /v1/auth/login** endpoint:
 At the top of the API docs page, click the green "Authorize" button.
 
 Paste your token:
-```
+
+```http
 Bearer <your_access_token>
 ```
 
@@ -232,26 +240,28 @@ Find **POST /v1/sessions** endpoint:
 
 1. Click "Try it out"
 2. Fill in the request body:
-   ```json
-   {
-     "description": "My first APGI simulation",
-     "config": {
-       "simulation_parameters": {
-         "time_steps": 100,
-         "initial_precision_gate": 0.3,
-         "noise_level": 0.2
-       }
-     }
-   }
-   ```
-3. Click "Execute"
-4. You'll get back a session object with `session_id`, state, etc.
+
+```json
+{
+ "description": "My first APGI simulation",
+ "config": {
+   "simulation_parameters": {
+     "time_steps": 100,
+      "initial_precision_gate": 0.3,
+      "noise_level": 0.2
+    }
+  }
+}
+```
+
+1. Click "Execute"
+2. You'll get back a session object with `session_id`, state, etc.
 
 **Copy the session_id** — you'll need it next.
 
 ### Step 4e: Check Session Status
 
-Find **GET /v1/sessions/{session_id}** endpoint:
+Find the **GET /v1/sessions/{session_id}** endpoint:
 
 1. Click "Try it out"
 2. Paste your `session_id` from step 4d
@@ -260,7 +270,7 @@ Find **GET /v1/sessions/{session_id}** endpoint:
 
 ### Step 4f: Start the Session
 
-Find **POST /v1/sessions/{session_id}/start** endpoint:
+Find the **POST /v1/sessions/{session_id}/start** endpoint:
 
 1. Click "Try it out"
 2. Paste your `session_id`
@@ -274,6 +284,7 @@ Find **POST /v1/sessions/{session_id}/tasks** endpoint:
 1. Click "Try it out"
 2. Paste your `session_id`
 3. Fill in the request body:
+
    ```json
    {
      "task_type": "apply_stimulus",
@@ -284,12 +295,13 @@ Find **POST /v1/sessions/{session_id}/tasks** endpoint:
      }
    }
    ```
+
 4. Click "Execute"
 5. You'll get a task ID back
 
 ### Step 4h: Check Task Status
 
-Find **GET /v1/sessions/{session_id}/tasks/{task_id}** endpoint:
+Find the **GET /v1/sessions/{session_id}/tasks/{task_id}** endpoint:
 
 1. Click "Try it out"
 2. Paste your session_id and task_id
@@ -303,11 +315,13 @@ Find **POST /v1/sessions/{session_id}/export** endpoint:
 1. Click "Try it out"
 2. Paste your session_id
 3. Fill in the request body:
+
    ```json
    {
      "format": "json"
    }
    ```
+
 4. Click "Execute"
 5. You get a download URL or the data itself
 
@@ -327,6 +341,7 @@ Password: dev_password
 ```
 
 You can browse:
+
 - `users` table (your account)
 - `sessions` table (your session)
 - `tasks` table (your task)
@@ -335,11 +350,13 @@ You can browse:
 ### View Application Metrics
 
 Open your browser to:
-```
+
+```text
 http://localhost:8000/metrics
 ```
 
 You'll see Prometheus metrics about:
+
 - Number of API requests
 - Response times
 - Error rates
@@ -356,15 +373,16 @@ curl http://localhost:8000/openapi.json | python -m json.tool | head -100
 
 You just:
 
-1. ✅ **Set up a development environment** with all services running
-2. ✅ **Authenticated with JWT** (the token you got is a signed token containing your user info)
-3. ✅ **Created an APGI session** (a simulation with specific parameters)
-4. ✅ **Ran a simulation** (state changed from created → running)
-5. ✅ **Submitted an experimental task** (a stimulus applied to the APGI system)
-6. ✅ **Monitored progress** (checked task status)
-7. ✅ **Exported results** (downloaded the simulation data)
+1. **Set up a development environment** with all services running
+2. **Authenticated with JWT** (the token you got is a signed token containing your user info)
+3. **Created an APGI session** (a simulation with specific parameters)
+4. **Ran a simulation** (state changed from created → running)
+5. **Submitted an experimental task** (a stimulus applied to the APGI system)
+6. **Monitored progress** (checked task status)
+7. **Exported results** (downloaded the simulation data)
 
 This entire flow is what APGI researchers would do to:
+
 - Set up a consciousness modeling experiment
 - Apply a stimulus (e.g., visual flash)
 - Measure how the system responded (precision gates, synchrony, consciousness level)
@@ -375,6 +393,7 @@ This entire flow is what APGI researchers would do to:
 ### "Connection refused" on localhost:8000
 
 The API didn't start. Check Docker logs:
+
 ```bash
 docker-compose -f deployment/docker-compose.yml logs api
 ```
@@ -384,6 +403,7 @@ Look for errors like missing environment variables or database connection failur
 ### "unauthorized" or "invalid token" errors
 
 Make sure you:
+
 1. Got a valid token from login (should start with `eyJ`)
 2. Clicked "Authorize" in the API docs
 3. Token format is exactly: `Bearer <token>` (with space)
@@ -391,11 +411,13 @@ Make sure you:
 ### Database errors
 
 The database migration might have failed. Try:
+
 ```bash
 docker-compose -f deployment/docker-compose.yml exec api alembic upgrade head
 ```
 
 Or reset everything:
+
 ```bash
 docker-compose -f deployment/docker-compose.yml down -v
 ./scripts/start.sh
@@ -404,18 +426,20 @@ docker-compose -f deployment/docker-compose.yml down -v
 ### Celery worker not working
 
 Check if it's running:
+
 ```bash
 docker ps | grep celery
 ```
 
 If it's stopped:
+
 ```bash
 docker-compose -f deployment/docker-compose.yml up celery_worker
 ```
 
 ## What's Running
 
-```
+```text
 ┌─────────────────────────────────────┐
 │    FastAPI Application (Port 8000)  │
 │  - Authentication (JWT)             │

@@ -514,7 +514,7 @@ def test_property_27_server_error_response(error_message):
         # Property 2: Response should be valid JSON
         # Handle response body decoding (can be bytes or memoryview)
         if hasattr(response.body, "decode"):
-            response_text = response.body.decode()  # type: ignore[attr-defined]
+            response_text = response.body.decode()
         elif isinstance(response.body, memoryview):
             response_text = response.body.tobytes().decode("utf-8", errors="ignore")
         else:
@@ -718,7 +718,7 @@ def test_property_28_file_paths_not_exposed(file_path):
         # Property: Response should not contain the file path
         # Handle response body decoding (can be bytes or memoryview)
         if hasattr(response.body, "decode"):
-            response_text = response.body.decode()  # type: ignore[attr-defined]
+            response_text = response.body.decode()
         elif isinstance(response.body, memoryview):
             response_text = response.body.tobytes().decode("utf-8", errors="ignore")
         else:

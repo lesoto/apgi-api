@@ -113,11 +113,11 @@ def configure_distributed_tracing(
 
         # Instrument frameworks
         # FastAPI instrumentation
-        FastAPIInstrumentor.instrument_app(
+        FastAPIInstrumentor().instrument(
             server_request_hook=_server_request_hook,
             client_request_hook=_client_request_hook,
             client_response_hook=_client_response_hook,
-        )  # type: ignore[call-arg]
+        )
 
         # SQLAlchemy instrumentation
         try:

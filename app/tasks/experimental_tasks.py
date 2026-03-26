@@ -5,20 +5,39 @@ Celery tasks for executing experimental paradigms (Iowa Gambling, Masking, Atten
 """
 
 import logging
+import sys
 from datetime import datetime, timezone
 from typing import Any, Dict
+
+# Add /app to Python path for proper imports
+sys.path.insert(0, "/app")
 
 from app.database.connection import get_db
 from app.database.models import Task as TaskModel
 from celery import Task
 
-from apgi_system.experiments.tasks.attentional_blink import AttentionalBlinkTask  # type: ignore[import-untyped]
-from apgi_system.experiments.tasks.binocular_rivalry import BinocularRivalryTask  # type: ignore[import-untyped]
-from apgi_system.experiments.tasks.change_blindness import ChangeBlindnessTask  # type: ignore[import-untyped]
-from apgi_system.experiments.tasks.iowa_gambling import IowaGamblingTask  # type: ignore[import-untyped]
-from apgi_system.experiments.tasks.masking_paradigm import MaskingParadigmTask  # type: ignore[import-untyped]
-from apgi_system.platform_utils import get_resource_path  # type: ignore[import-untyped]
-from apgi_system.system import APGISystem  # type: ignore[import-untyped]
+# apgi_system is an optional dependency for experimental paradigms
+try:
+    from apgi_system.experiments.tasks.attentional_blink import AttentionalBlinkTask  # type: ignore[import-untyped]
+    from apgi_system.experiments.tasks.binocular_rivalry import BinocularRivalryTask  # type: ignore[import-untyped]
+    from apgi_system.experiments.tasks.change_blindness import ChangeBlindnessTask  # type: ignore[import-untyped]
+    from apgi_system.experiments.tasks.iowa_gambling import IowaGamblingTask  # type: ignore[import-untyped]
+    from apgi_system.experiments.tasks.masking_paradigm import MaskingParadigmTask  # type: ignore[import-untyped]
+    from apgi_system.platform_utils import get_resource_path  # type: ignore[import-untyped]
+    from apgi_system.system import APGISystem  # type: ignore[import-untyped]
+
+    APGI_SYSTEM_AVAILABLE = True
+except ImportError:
+    APGI_SYSTEM_AVAILABLE = False
+    AttentionalBlinkTask = None
+    BinocularRivalryTask = None
+    ChangeBlindnessTask = None
+    IowaGamblingTask = None
+    MaskingParadigmTask = None
+    get_resource_path = None
+    APGISystem = None
+    logging.getLogger(__name__).warning("apgi_system not available - experimental tasks disabled")
+
 from app.celery_app import celery_app
 from app.services.webhook_manager import WebhookManager
 
@@ -107,6 +126,8 @@ class APGITask(Task):
     def apgi_system(self):
         """Lazy initialization of APGI system."""
         if self._apgi_system is None:
+            if not APGI_SYSTEM_AVAILABLE or APGISystem is None or get_resource_path is None:
+                raise ImportError("APGI system not available - apgi_system not installed")
             # Use platform-aware resource path resolution
             self._apgi_system = APGISystem(
                 config_path=str(get_resource_path("config/default.yaml"))
@@ -135,6 +156,9 @@ def execute_iowa_gambling_task(self, session_id: str, parameters: Dict[str, Any]
         Dict with task results and analysis
     """
     logger.info(f"Starting Iowa Gambling Task for session {session_id}")
+
+    if not APGI_SYSTEM_AVAILABLE or IowaGamblingTask is None:
+        raise ImportError("IowaGamblingTask not available - apgi_system not installed")
 
     result = None
     try:
@@ -212,11 +236,14 @@ def execute_masking_paradigm_task(
     """
     logger.info(f"Starting Masking Paradigm Task for session {session_id}")
 
+    if not APGI_SYSTEM_AVAILABLE or MaskingParadigmTask is None:
+        raise ImportError("MaskingParadigmTask not available - apgi_system not installed")
+
     result = None
     try:
         # Extract parameters with defaults
         target_duration_ms = parameters.get("target_duration_ms", 50.0)
-        soas = parameters.get("soas", [0, 17, 33, 50, 67, 83, 100, 150, 200, 300])
+        soas = parameters.get("soas", [50.0, 100.0, 150.0])
         mask_duration_ms = parameters.get("mask_duration_ms", 100.0)
         num_trials_per_condition = parameters.get("num_trials_per_condition", 20)
         target_strength = parameters.get("target_strength", 2.0)
@@ -278,7 +305,7 @@ def execute_attentional_blink_task(
         parameters: Task parameters including:
             - stream_length: Number of items in RSVP stream (default: 15)
             - item_duration_ms: Duration of each item (default: 100.0)
-            - num_trials_per_lag: Trials per lag condition (default: 20)
+            - num_trials_per_lag: Trials per lag condition (default: 10)
             - lags: List of lags to test (default: [1, 2, 3, 4, 8])
             - target_salience: Target salience boost (default: 2.0)
 
@@ -287,12 +314,15 @@ def execute_attentional_blink_task(
     """
     logger.info(f"Starting Attentional Blink Task for session {session_id}")
 
+    if not APGI_SYSTEM_AVAILABLE or AttentionalBlinkTask is None:
+        raise ImportError("AttentionalBlinkTask not available - apgi_system not installed")
+
     result = None
     try:
         # Extract parameters with defaults
         stream_length = parameters.get("stream_length", 15)
         item_duration_ms = parameters.get("item_duration_ms", 100.0)
-        num_trials_per_lag = parameters.get("num_trials_per_lag", 20)
+        num_trials_per_lag = parameters.get("num_trials_per_lag", 10)
         lags = parameters.get("lags", [1, 2, 3, 4, 8])
         target_salience = parameters.get("target_salience", 2.0)
 
@@ -354,6 +384,9 @@ def execute_change_blindness_task(
         Dict with task results and analysis
     """
     logger.info(f"Starting Change Blindness Task for session {session_id}")
+
+    if not APGI_SYSTEM_AVAILABLE or ChangeBlindnessTask is None:
+        raise ImportError("ChangeBlindnessTask not available - apgi_system not installed")
 
     result = None
     try:
@@ -420,6 +453,9 @@ def execute_binocular_rivalry_task(
         Dict with task results and analysis
     """
     logger.info(f"Starting Binocular Rivalry Task for session {session_id}")
+
+    if not APGI_SYSTEM_AVAILABLE or BinocularRivalryTask is None:
+        raise ImportError("BinocularRivalryTask not available - apgi_system not installed")
 
     result = None
     try:

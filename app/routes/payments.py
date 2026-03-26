@@ -426,13 +426,13 @@ async def _handle_subscription_event(db: Session, event_type: str, subscription:
                 import time
 
                 sub.status = status  # type: ignore[assignment]
-                sub.plan_id = subscription.get("plan", {}).get("id", sub.plan_id)  # type: ignore[assignment]
-                sub.current_period_start = datetime.fromtimestamp(
+                sub.plan_id = subscription.get("plan", {}).get("id", sub.plan_id)
+                sub.current_period_start = datetime.fromtimestamp(  # type: ignore[assignment]
                     subscription.get("current_period_start", time.time()), timezone.utc
-                )  # type: ignore[assignment]
-                sub.current_period_end = datetime.fromtimestamp(
+                )
+                sub.current_period_end = datetime.fromtimestamp(  # type: ignore[assignment]
                     subscription.get("current_period_end", time.time()), timezone.utc
-                )  # type: ignore[assignment]
+                )
                 sub.cancel_at_period_end = subscription.get("cancel_at_period_end", False)
 
                 if status in ["canceled", "unpaid", "paused", "past_due"]:

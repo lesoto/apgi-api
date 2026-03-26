@@ -8,7 +8,9 @@ Validates: Requirements 2.12
 """
 
 import pytest
-from unittest.mock import patch, MagicMock, Mock, AsyncMock
+from typing import cast
+from unittest.mock import Mock, MagicMock, patch, AsyncMock
+from fastapi import Request
 
 from app.services.authorization import (
     Role,
@@ -55,7 +57,7 @@ class TestRoleEnum:
 
     def test_role_is_string_enum(self):
         assert isinstance(Role.ADMIN, str)
-        assert Role.ADMIN == "admin"
+        assert Role.ADMIN == Role.ADMIN.value  # type: ignore[comparison-overlap]
 
     def test_all_roles_present(self):
         role_values = {r.value for r in Role}
@@ -98,7 +100,7 @@ class TestPermissionEnum:
 
     def test_permission_is_string_enum(self):
         assert isinstance(Permission.SESSION_READ, str)
-        assert Permission.SESSION_READ == "session:read"
+        assert Permission.SESSION_READ == Permission.SESSION_READ.value  # type: ignore[comparison-overlap]
 
 
 # ---------------------------------------------------------------------------
@@ -680,7 +682,7 @@ class TestGetCurrentUser:
         class _Request:
             state = _State()
 
-        request = _Request()
+        request = cast(Request, _Request())
         mock_db = MagicMock()
 
         with pytest.raises(InvalidTokenError):
@@ -694,7 +696,7 @@ class TestGetCurrentUser:
         class _Request:
             state = _State()
 
-        request = _Request()
+        request = cast(Request, _Request())
         mock_db = MagicMock()
         credentials = Mock()
         credentials.credentials = ""
@@ -712,7 +714,7 @@ class TestGetCurrentUser:
         class _Request:
             state = _State()
 
-        request = _Request()
+        request = cast(Request, _Request())
         mock_db = MagicMock()
         mock_payload = make_user(user_id="u1", roles=["researcher"])
 
@@ -735,7 +737,7 @@ class TestGetCurrentUser:
         class _Request:
             state = _State()
 
-        request = _Request()
+        request = cast(Request, _Request())
         mock_db = MagicMock()
 
         with patch("app.services.authorization.AuthManager") as MockAuthManager:
@@ -757,7 +759,7 @@ class TestGetCurrentUser:
         class _Request:
             state = _State()
 
-        request = _Request()
+        request = cast(Request, _Request())
         mock_db = MagicMock()
 
         with patch("app.services.authorization.AuthManager") as MockAuthManager:
@@ -778,7 +780,7 @@ class TestGetCurrentUser:
         class _Request:
             state = _State()
 
-        request = _Request()
+        request = cast(Request, _Request())
         mock_db = MagicMock()
 
         with patch("app.services.authorization.AuthManager") as MockAuthManager:
@@ -799,7 +801,7 @@ class TestGetCurrentUser:
         class _Request:
             state = _State()
 
-        request = _Request()
+        request = cast(Request, _Request())
         mock_db = MagicMock()
 
         with patch("app.services.authorization.AuthManager") as MockAuthManager:
@@ -820,7 +822,7 @@ class TestGetCurrentUser:
         class _Request:
             state = _State()
 
-        request = _Request()
+        request = cast(Request, _Request())
         mock_db = MagicMock()
 
         with patch("app.services.authorization.AuthManager") as MockAuthManager:

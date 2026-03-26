@@ -241,7 +241,7 @@ class UserManagementService:
         if password is not None:
             user.password_hash = self.auth_manager.hash_password(password)  # type: ignore[assignment]
         if roles is not None:
-            user.roles = roles  # type: ignore[assignment]
+            user.roles = roles
         if is_active is not None:
             user.is_active = is_active  # type: ignore[assignment]
 

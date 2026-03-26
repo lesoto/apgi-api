@@ -2,7 +2,7 @@
 # Multi-stage build for minimal image size
 
 # Build stage
-FROM python:3.11-slim as builder
+FROM python:3.11-slim AS builder
 
 WORKDIR /build
 
@@ -30,9 +30,10 @@ RUN apt-get update && \
     curl \
     && rm -rf /var/lib/apt/lists/*
 
-# Create non-root user with UID 1000
+# Create non-root user with UID 1000 and create /data for SQLite
 RUN useradd -m -u 1000 -s /bin/bash apgi && \
-    chown -R apgi:apgi /app
+    chown -R apgi:apgi /app && \
+    mkdir -p /data && chown apgi:apgi /data && chmod 755 /data
 
 # Copy Python dependencies from builder stage
 COPY --from=builder --chown=apgi:apgi /root/.local /home/apgi/.local

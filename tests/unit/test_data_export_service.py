@@ -2,6 +2,7 @@
 
 import json
 import pytest
+from typing import Dict, Any
 from unittest.mock import patch, MagicMock, AsyncMock
 from datetime import datetime
 from app.services.data_export import DataExportService
@@ -12,7 +13,8 @@ class TestDataExportService:
 
     @pytest.fixture
     def export_service(self):
-        return DataExportService()
+        mock_session_manager = MagicMock()
+        return DataExportService(session_manager=mock_session_manager)
 
     def test_export_user_data_basic(self, export_service):
         """Test basic user data export."""
@@ -321,7 +323,7 @@ class TestExtractTimeSeries:
         assert [p["time"] for p in result] == [1, 2, 3]
 
     def test_empty_time_points(self, service):
-        state = {"history": {"time": [], "x": []}}
+        state: Dict[str, Any] = {"history": {"time": [], "x": []}}
         result = service._extract_time_series(state, None, None, None)
         assert result == []
 

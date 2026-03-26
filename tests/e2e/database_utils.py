@@ -86,14 +86,14 @@ class DatabaseStateTester:
         """Get the current state of a session."""
         with get_db_context() as db:
             session = db.query(SessionModel).filter(SessionModel.session_id == session_id).first()
-            return session.state if session else None  # type: ignore[return-value]
+            return session.state if session else None
 
     @staticmethod
     def get_task_state(task_id: str) -> Optional[str]:
         """Get the current state of a task."""
         with get_db_context() as db:
             task = db.query(Task).filter(Task.task_id == task_id).first()
-            return task.status if task else None  # type: ignore[return-value]
+            return task.status if task else None
 
     @staticmethod
     def get_user_sessions(user_id: str) -> List[Dict[str, Any]]:

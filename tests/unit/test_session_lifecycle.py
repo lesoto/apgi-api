@@ -3,7 +3,6 @@ Unit tests for SessionLifecycleState transitions.
 
 Verifies that every allowed transition succeeds and every disallowed
 transition raises ValueError.
-Validates Requirements 2.3, 7.4.
 """
 
 import pytest
@@ -265,7 +264,7 @@ class TestStateInvariants:
         s = SimulationSession(str(uuid.uuid4()), {"config_path": "c.yaml"})
         assert s.state == SessionLifecycleState.CREATED
         await s.start()
-        assert s.state == SessionLifecycleState.RUNNING
+        assert s.state == SessionLifecycleState.RUNNING  # type: ignore[comparison-overlap]
         await s.pause()
         assert s.state == SessionLifecycleState.PAUSED
         await s.start()  # resume

@@ -290,7 +290,7 @@ class TestCreateSession:
         from app.models.schemas import SessionCreateRequest
 
         req = SessionCreateRequest(
-            config_path="configs/default.yaml", custom_config={}, template_id=None
+            config_path="configs/default.yaml", custom_config={}, template_id=None, description=None
         )
         session_id = await session_manager.create_session(req, "user1")
         assert len(session_id) == 36
@@ -304,7 +304,7 @@ class TestCreateSession:
         from app.models.schemas import SessionCreateRequest
 
         req = SessionCreateRequest(
-            config_path="configs/default.yaml", custom_config={}, template_id=None
+            config_path="configs/default.yaml", custom_config={}, template_id=None, description=None
         )
         session_id = await session_manager.create_session(req, "user1")
         mock_redis.setex.assert_awaited()
@@ -320,7 +320,7 @@ class TestCreateSession:
 
         mock_db.scalar.return_value = settings.max_sessions_per_user
         req = SessionCreateRequest(
-            config_path="configs/default.yaml", custom_config={}, template_id=None
+            config_path="configs/default.yaml", custom_config={}, template_id=None, description=None
         )
         with pytest.raises(ValueError, match="maximum number of sessions"):
             await session_manager.create_session(req, "user1")
@@ -332,7 +332,9 @@ class TestCreateSession:
 
         # The schema itself rejects all-None input
         with pytest.raises((ValidationError, ValueError)):
-            req = SessionCreateRequest(config_path=None, custom_config=None, template_id=None)
+            req = SessionCreateRequest(
+                config_path=None, custom_config=None, template_id=None, description=None
+            )
             await session_manager.create_session(req, "user1")
 
     @pytest.mark.asyncio
@@ -347,7 +349,9 @@ class TestCreateSession:
         template.default_description = "tmpl desc"
         mock_db.execute.return_value.scalar_one_or_none.return_value = template
 
-        req = SessionCreateRequest(template_id=TEMPLATE_UUID, config_path=None, custom_config=None)
+        req = SessionCreateRequest(
+            template_id=TEMPLATE_UUID, config_path=None, custom_config=None, description=None
+        )
         session_id = await session_manager.create_session(req, "user1")
         assert len(session_id) == 36
 
@@ -358,7 +362,9 @@ class TestCreateSession:
         from app.models.schemas import SessionCreateRequest
 
         mock_db.execute.return_value.scalar_one_or_none.return_value = None
-        req = SessionCreateRequest(template_id=TEMPLATE_UUID, config_path=None, custom_config=None)
+        req = SessionCreateRequest(
+            template_id=TEMPLATE_UUID, config_path=None, custom_config=None, description=None
+        )
         with pytest.raises(ValueError, match="not found"):
             await session_manager.create_session(req, "user1")
 
@@ -373,7 +379,9 @@ class TestCreateSession:
         template.is_public = False
         template.user_id = "other_user"
         mock_db.execute.return_value.scalar_one_or_none.return_value = template
-        req = SessionCreateRequest(template_id=TEMPLATE_UUID, config_path=None, custom_config=None)
+        req = SessionCreateRequest(
+            template_id=TEMPLATE_UUID, config_path=None, custom_config=None, description=None
+        )
         with pytest.raises(ValueError, match="not accessible"):
             await session_manager.create_session(req, "user1")
 
@@ -383,7 +391,7 @@ class TestCreateSession:
 
         mock_db.commit.side_effect = Exception("DB error")
         req = SessionCreateRequest(
-            config_path="configs/default.yaml", custom_config={}, template_id=None
+            config_path="configs/default.yaml", custom_config={}, template_id=None, description=None
         )
         with pytest.raises(Exception, match="DB error"):
             await session_manager.create_session(req, "user1")
