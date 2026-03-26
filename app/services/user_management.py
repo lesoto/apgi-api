@@ -372,9 +372,13 @@ class UserManagementService:
         from email.mime.multipart import MIMEMultipart
 
         if not settings.smtp_server:
-            logger.warning("SMTP server not configured, cannot send password reset email")
-            logger.info(f"Password reset initiated for {email}")
-            return
+            logger.error("SMTP server not configured, cannot send password reset email")
+            from ..exceptions import ServiceUnavailableError
+
+            raise ServiceUnavailableError(
+                service="SMTP",
+                reason="Email service is required but SMTP is not configured. Please configure SMTP_SERVER, SMTP_PORT, and related settings.",
+            )
 
         try:
             # Create message
@@ -418,8 +422,11 @@ APGI API Team
 
         except Exception as e:
             logger.error(f"Failed to send password reset email to {email}: {e}")
-            # Don't raise exception to avoid breaking password reset
-            logger.warning("Password reset email failed to send")
+            from ..exceptions import ServiceUnavailableError
+
+            raise ServiceUnavailableError(
+                service="SMTP", reason=f"Failed to send password reset email: {str(e)}"
+            ) from e
 
     def reset_password(self, user_id: str, new_password: Optional[str] = None) -> str:
         """
@@ -490,8 +497,13 @@ APGI API Team
         from email.mime.multipart import MIMEMultipart
 
         if not settings.smtp_server:
-            logger.warning("SMTP server not configured, cannot send verification email")
-            return
+            logger.error("SMTP server not configured, cannot send verification email")
+            from ..exceptions import ServiceUnavailableError
+
+            raise ServiceUnavailableError(
+                service="SMTP",
+                reason="Email service is required but SMTP is not configured. Please configure SMTP_SERVER, SMTP_PORT, and related settings.",
+            )
 
         try:
             # Create message
@@ -535,8 +547,11 @@ APGI API Team
 
         except Exception as e:
             logger.error(f"Failed to send verification email to {email}: {e}")
-            # Don't raise exception to avoid breaking registration
-            logger.warning(f"Verification email failed to send for {email}")
+            from ..exceptions import ServiceUnavailableError
+
+            raise ServiceUnavailableError(
+                service="SMTP", reason=f"Failed to send verification email: {str(e)}"
+            ) from e
 
     def delete_user(self, user_id: str) -> bool:
         """

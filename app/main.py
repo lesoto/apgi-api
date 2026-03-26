@@ -33,6 +33,7 @@ from app.middleware.api_versioning import APIVersioningMiddleware
 from app.middleware.authentication import AuthenticationMiddleware
 from app.middleware.cors_config import configure_cors
 from app.middleware.csrf import CSRFMiddleware
+from app.middleware.deprecation import DeprecationMiddleware
 from app.middleware.metrics import PrometheusMetricsMiddleware
 from app.middleware.request_size_limit import RequestSizeLimitMiddleware
 from app.middleware.schema_validation import ResponseSchemaValidationMiddleware
@@ -296,6 +297,12 @@ All endpoints except `/health`, `/docs`, and `/openapi.json` require authenticat
 
     # Add security headers middleware
     app.add_middleware(SecurityHeadersMiddleware)
+
+    # Add deprecation middleware (adds warning headers to deprecated endpoints)
+    version.configure_deprecated_endpoints(version.get_deprecated_endpoints())
+    app.add_middleware(
+        DeprecationMiddleware, deprecated_endpoints=version.get_deprecated_endpoints()
+    )
 
     # Configure CORS
     configure_cors(app)

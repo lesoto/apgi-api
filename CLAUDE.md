@@ -70,7 +70,7 @@ mypy app/
 
 ### Middleware stack (outermost to innermost)
 
-`RequestSizeLimitMiddleware` → `GZipMiddleware` → `PrometheusMetricsMiddleware` → `ProfilingMiddleware` (optional) → `RequestLoggingMiddleware` → `APIVersioningMiddleware` → `ResponseSchemaValidationMiddleware` → `CSRFMiddleware` → `AuthenticationMiddleware` → `DeprecationMiddleware` → `RateLimitingMiddleware` → `CORSMiddleware`
+`CORSMiddleware` → `SecurityHeadersMiddleware` → `SecurityValidationMiddleware` → `AuthenticationMiddleware` → `RateLimitingMiddleware` → `CSRFMiddleware` → `ResponseSchemaValidationMiddleware` → `APIVersioningMiddleware` → `RequestLoggingMiddleware` → `ProfilingMiddleware` (optional) → `PrometheusMetricsMiddleware` → `GZipMiddleware` → `RequestSizeLimitMiddleware` → `Application`
 
 ### Route initialization pattern
 

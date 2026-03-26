@@ -301,15 +301,52 @@ class TestBusinessMetricsIntegration:
         with patch("app.services.business_metrics.get_db_context") as mock_db_context:
             mock_db = MagicMock()
 
-            # Mock query results
+            # Mock query results for different metrics
             mock_db.query.return_value.scalar.return_value = 10
             mock_db.query.return_value.filter.return_value.scalar.return_value = 5
+            mock_db.query.return_value.filter.return_value.filter.return_value.scalar.return_value = (
+                3
+            )
 
-            mock_db_context.return_value.__enter__.return_value = mock_db
+            # Mock the context manager
+            mock_context_manager = MagicMock()
+            mock_context_manager.__enter__ = MagicMock(return_value=mock_db)
+            mock_context_manager.__exit__ = MagicMock(return_value=None)
+            mock_db_context.return_value = mock_context_manager
 
-            # This will fail with the current mocking, but tests the structure
-            # In a real test, we'd need more detailed mocking of SQLAlchemy queries
-            pass
+            # Get the overview metrics
+            result = await service.get_overview_metrics()
+
+            # Verify the structure
+            assert "overview" in result
+            overview = result["overview"]
+
+            # Check that all expected metrics are present
+            expected_metrics = [
+                "total_users",
+                "active_users",
+                "total_sessions",
+                "active_sessions",
+                "total_tasks",
+                "task_completion_rate",
+                "total_templates",
+                "public_templates",
+            ]
+
+            for metric in expected_metrics:
+                assert metric in overview, f"Missing metric: {metric}"
+
+            # Verify metric structure (should be MetricValue objects)
+            for metric_name, metric_value in overview.items():
+                assert hasattr(
+                    metric_value, "value"
+                ), f"Metric {metric_name} should have 'value' attribute"
+                assert hasattr(
+                    metric_value, "label"
+                ), f"Metric {metric_name} should have 'label' attribute"
+                assert hasattr(
+                    metric_value, "description"
+                ), f"Metric {metric_name} should have 'description' attribute"
 
 
 class TestDistributedTracing:

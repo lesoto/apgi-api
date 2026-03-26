@@ -13,7 +13,7 @@ from sqlalchemy.orm import Session
 
 from app.config import settings
 from app.database.connection import get_db
-from app.database.models import Order, Subscription, User
+from app.database.models import Order, Subscription, ProcessedWebhookEvent, User
 from app.models.schemas import ErrorResponse
 from app.services.authorization import Permission, require_permission
 
@@ -134,7 +134,6 @@ async def stripe_webhook(request: Request, db: Session = Depends(get_db)):
             )
 
         # Get webhook endpoint secret from config
-        # In production, this should be configured per webhook endpoint
         endpoint_secret = getattr(settings, "stripe_webhook_secret", None)
         if not endpoint_secret:
             logger.warning("Stripe webhook secret not configured")
@@ -147,65 +146,65 @@ async def stripe_webhook(request: Request, db: Session = Depends(get_db)):
         try:
             event = stripe.Webhook.construct_event(payload, sig_header, endpoint_secret)
         except ValueError as e:
-            # Invalid payload
             logger.warning(f"Invalid Stripe webhook payload: {e}")
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid payload")
         except stripe.SignatureVerificationError as e:
-            # Invalid signature
             logger.warning(f"Invalid Stripe webhook signature: {e}")
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid signature")
+
+        # Check for idempotency
+        event_id = event["id"]
+        existing_event = (
+            db.query(ProcessedWebhookEvent)
+            .filter(ProcessedWebhookEvent.event_id == event_id)
+            .first()
+        )
+        if existing_event:
+            logger.info(f"Stripe event {event_id} already processed, skipping.")
+            return {"status": "success", "detail": "already_processed"}
 
         # Process the event
         event_type = event["type"]
         event_data = event["data"]["object"]
 
-        logger.info(f"Processing Stripe webhook event: {event_type}")
+        logger.info(f"Processing Stripe webhook event: {event_type} ({event_id})")
 
         # Handle different event types
+        success = False
+        processing_error = None
         if event_type == "payment_intent.succeeded":
-            # Payment succeeded - update order status and send confirmation
-            payment_intent = event_data
-            logger.info(f"Payment succeeded: {payment_intent['id']}")
-            await _handle_payment_succeeded(db, payment_intent)
-
+            success = await _handle_payment_succeeded(db, event_data)
         elif event_type == "payment_intent.payment_failed":
-            # Payment failed - notify user and update order
-            payment_intent = event_data
-            logger.warning(f"Payment failed: {payment_intent['id']}")
-            await _handle_payment_failed(db, payment_intent)
-
+            success = await _handle_payment_failed(db, event_data)
         elif event_type == "charge.dispute.created":
-            # Dispute created - notify admin and mark order
-            dispute = event_data
-            logger.warning(f"Dispute created: {dispute['id']} for charge {dispute['charge']}")
-            await _handle_dispute_created(db, dispute)
-
+            success = await _handle_dispute_created(db, event_data)
         elif event_type == "charge.dispute.closed":
-            # Dispute resolved - update based on outcome
-            dispute = event_data
-            logger.info(f"Dispute closed: {dispute['id']}, status: {dispute['status']}")
-            await _handle_dispute_closed(db, dispute)
-
+            success = await _handle_dispute_closed(db, event_data)
         elif event_type == "charge.refunded":
-            # Refund processed - update order and notify
             charge = event_data
             refund_amount = sum(
                 refund["amount"] for refund in charge.get("refunds", {}).get("data", [])
             )
-            logger.info(f"Refund processed: charge {charge['id']}, amount: {refund_amount}")
-            await _handle_refund(db, charge, refund_amount)
-
+            success = await _handle_refund(db, charge, refund_amount)
         elif event_type.startswith("customer.subscription."):
-            # Subscription events - handle lifecycle
-            subscription = event_data
-            logger.info(f"Subscription event {event_type}: {subscription['id']}")
-            await _handle_subscription_event(db, event_type, subscription)
-
+            success = await _handle_subscription_event(db, event_type, event_data)
         else:
-            # Unhandled event type
             logger.info(f"Unhandled Stripe event type: {event_type}")
+            success = True  # Mark as "processed" even if unhandled to avoid retries
 
-        # Return success response
+        # Log processing failures with full context for debugging
+        if not success:
+            logger.error(
+                f"Webhook processing failed: event_type={event_type}, event_id={event_id}, "
+                f"event_data={event_data}"
+            )
+
+        # Record processed event for idempotency if successful
+        if success:
+            processed_event = ProcessedWebhookEvent(event_id=event_id, event_type=event_type)
+            db.add(processed_event)
+            db.commit()
+
         return {"status": "success"}
 
     except HTTPException:
@@ -218,12 +217,21 @@ async def stripe_webhook(request: Request, db: Session = Depends(get_db)):
         )
 
 
-async def _handle_payment_succeeded(db: Session, payment_intent: dict) -> None:
+async def _handle_payment_succeeded(db: Session, payment_intent: dict) -> bool:
     """Handle successful payment intent."""
     try:
         payment_intent_id = payment_intent.get("id")
         metadata = payment_intent.get("metadata", {})
         user_id = metadata.get("user_id")
+
+        # Security validation: verify user_id exists in database
+        if user_id:
+            existing_user = db.query(User).filter(User.user_id == user_id).first()
+            if not existing_user:
+                logger.error(
+                    f"Payment success handler: Invalid user_id {user_id} for payment {payment_intent_id}"
+                )
+                return False
         order_id = metadata.get("order_id")
         amount = payment_intent.get("amount", 0)
         currency = payment_intent.get("currency", "usd")
@@ -236,28 +244,58 @@ async def _handle_payment_succeeded(db: Session, payment_intent: dict) -> None:
         if order_id:
             order = db.query(Order).filter(Order.order_id == order_id).first()
             if order:
+                # Security Validation: Verify user_id and amount match
+                if user_id and order.user_id != user_id:
+                    logger.error(
+                        f"CRITICAL: Metadata user_id mismatch for order {order_id}: "
+                        f"order owner={order.user_id}, webhook user_id={user_id}, "
+                        f"payment_intent={payment_intent_id}"
+                    )
+                    return False
+
+                if order.amount_cents != amount:
+                    logger.error(
+                        f"CRITICAL: Payment amount mismatch for order {order_id}: "
+                        f"order amount={order.amount_cents}, webhook amount={amount}, "
+                        f"payment_intent={payment_intent_id}"
+                    )
+                    return False
+
                 order.status = "succeeded"  # type: ignore[assignment]
                 db.commit()
                 logger.info(
                     f"Payment {payment_intent_id} processed successfully - "
                     f"User: {user_id}, Order: {order_id}"
                 )
+                return True
             else:
                 logger.warning(
-                    f"Order {order_id} not found for successful payment {payment_intent_id}"
+                    f"Order {order_id} not found for successful payment {payment_intent_id}. "
+                    f"Metadata may be stale or order was deleted."
                 )
+                return False
+        return True  # No order_id, nothing to update but still successful receipt
 
     except Exception as e:
         logger.error(f"Failed to handle payment success: {e}", exc_info=True)
-        # Don't raise - webhook should acknowledge receipt
+        return False
 
 
-async def _handle_payment_failed(db: Session, payment_intent: dict) -> None:
+async def _handle_payment_failed(db: Session, payment_intent: dict) -> bool:
     """Handle failed payment intent."""
     try:
         payment_intent_id = payment_intent.get("id")
         metadata = payment_intent.get("metadata", {})
         user_id = metadata.get("user_id")
+
+        # Security validation: verify user_id exists in database
+        if user_id:
+            existing_user = db.query(User).filter(User.user_id == user_id).first()
+            if not existing_user:
+                logger.error(
+                    f"Payment success handler: Invalid user_id {user_id} for payment {payment_intent_id}"
+                )
+                return False
         order_id = metadata.get("order_id")
         last_payment_error = payment_intent.get("last_payment_error", {})
         amount = payment_intent.get("amount", 0)
@@ -281,12 +319,14 @@ async def _handle_payment_failed(db: Session, payment_intent: dict) -> None:
             f"Payment {payment_intent_id} failed - User: {user_id}, "
             f"Order: {order_id}, Amount: ${amount / 100:.2f}, Error: {error_message}"
         )
+        return True
 
     except Exception as e:
         logger.error(f"Failed to handle payment failure: {e}", exc_info=True)
+        return False
 
 
-async def _handle_dispute_created(db: Session, dispute: dict) -> None:
+async def _handle_dispute_created(db: Session, dispute: dict) -> bool:
     """Handle charge dispute creation."""
     try:
         dispute_id = dispute.get("id")
@@ -294,7 +334,6 @@ async def _handle_dispute_created(db: Session, dispute: dict) -> None:
         amount = dispute.get("amount", 0)
         currency = dispute.get("currency", "usd")
         reason = dispute.get("reason", "unknown")
-        metadata = dispute.get("metadata", {})
 
         logger.warning(
             f"Processing dispute creation: {dispute_id} for charge {charge_id}, "
@@ -302,17 +341,18 @@ async def _handle_dispute_created(db: Session, dispute: dict) -> None:
         )
 
         # Log dispute for admin follow-up
-        # Note: Full dispute management requires Order model implementation
         logger.warning(
             f"Dispute {dispute_id} created - Charge: {charge_id}, "
             f"Amount: ${amount / 100:.2f} {currency}, Reason: {reason}"
         )
+        return True
 
     except Exception as e:
         logger.error(f"Failed to handle dispute creation: {e}", exc_info=True)
+        return False
 
 
-async def _handle_dispute_closed(db: Session, dispute: dict) -> None:
+async def _handle_dispute_closed(db: Session, dispute: dict) -> bool:
     """Handle charge dispute resolution."""
     try:
         dispute_id = dispute.get("id")
@@ -325,19 +365,29 @@ async def _handle_dispute_closed(db: Session, dispute: dict) -> None:
         )
 
         # Log dispute resolution for record keeping
-        # Note: Full dispute management requires Order model implementation
         logger.info(f"Dispute {dispute_id} closed - Status: {status}, Charge: {charge_id}")
+        return True
 
     except Exception as e:
         logger.error(f"Failed to handle dispute closure: {e}", exc_info=True)
+        return False
 
 
-async def _handle_refund(db: Session, charge: dict, refund_amount: int) -> None:
+async def _handle_refund(db: Session, charge: dict, refund_amount: int) -> bool:
     """Handle charge refund."""
     try:
         charge_id = charge.get("id")
         metadata = charge.get("metadata", {})
         user_id = metadata.get("user_id")
+
+        # Security validation: verify user_id exists in database
+        if user_id:
+            existing_user = db.query(User).filter(User.user_id == user_id).first()
+            if not existing_user:
+                logger.error(
+                    f"Payment success handler: Invalid user_id {user_id} for payment {charge_id}"
+                )
+                return False
         order_id = metadata.get("order_id")
         currency = charge.get("currency", "usd")
 
@@ -357,12 +407,14 @@ async def _handle_refund(db: Session, charge: dict, refund_amount: int) -> None:
             f"Refund processed - Charge: {charge_id}, Amount: ${refund_amount / 100:.2f} {currency}, "
             f"User: {user_id}, Order: {order_id}"
         )
+        return True
 
     except Exception as e:
         logger.error(f"Failed to handle refund: {e}", exc_info=True)
+        return False
 
 
-async def _handle_subscription_event(db: Session, event_type: str, subscription: dict) -> None:
+async def _handle_subscription_event(db: Session, event_type: str, subscription: dict) -> bool:
     """Handle subscription lifecycle events."""
     try:
         subscription_id = subscription.get("id")
@@ -370,6 +422,15 @@ async def _handle_subscription_event(db: Session, event_type: str, subscription:
         status = subscription.get("status")
         metadata = subscription.get("metadata", {})
         user_id = metadata.get("user_id")
+
+        # Security validation: verify user_id exists in database
+        if user_id:
+            existing_user = db.query(User).filter(User.user_id == user_id).first()
+            if not existing_user:
+                logger.error(
+                    f"Payment success handler: Invalid user_id {user_id} for payment {subscription_id}"
+                )
+                return False
 
         logger.info(
             f"Processing subscription event: {event_type} for {subscription_id}, "
@@ -388,7 +449,6 @@ async def _handle_subscription_event(db: Session, event_type: str, subscription:
                 .first()
             )
             if not sub and user_id:
-                # Add check since user_id might be required but let's assume valid user limits
                 from datetime import datetime
                 import time
 
@@ -434,10 +494,6 @@ async def _handle_subscription_event(db: Session, event_type: str, subscription:
                     subscription.get("current_period_end", time.time()), timezone.utc
                 )
                 sub.cancel_at_period_end = subscription.get("cancel_at_period_end", False)
-
-                if status in ["canceled", "unpaid", "paused", "past_due"]:
-                    user = db.query(User).filter(User.user_id == sub.user_id).first()
-                    # if they canceled, their current_period_end dictates access. If unpaid: you might remove entitlements
                 db.commit()
 
         elif event_type in ["customer.subscription.payment_failed", "invoice.payment_failed"]:
@@ -452,6 +508,8 @@ async def _handle_subscription_event(db: Session, event_type: str, subscription:
                 db.commit()
 
         logger.info(f"Subscription event {event_type} processed for {subscription_id}")
+        return True
 
     except Exception as e:
         logger.error(f"Failed to handle subscription event: {e}", exc_info=True)
+        return False

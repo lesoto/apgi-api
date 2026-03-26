@@ -163,23 +163,25 @@ class SecurityValidationMiddleware(BaseHTTPMiddleware):
             path = request.url.path
 
             # Login endpoint validation
-            if "/v1/auth/login" in path:
+            if path == "/v1/auth/login" or re.match(r"^/v1/auth/login(?:/.*)?$", path):
                 return self._validate_login_data(data)
 
             # Registration endpoint validation
-            elif "/v1/users/register" in path:
+            elif path == "/v1/users/register" or re.match(r"^/v1/users/register(?:/.*)?$", path):
                 return self._validate_registration_data(data)
 
             # User profile update validation
-            elif "/v1/users/me" in path and request.method.upper() in ["PUT", "PATCH"]:
+            elif (
+                path == "/v1/users/me" or re.match(r"^/v1/users/me(?:/.*)?$", path)
+            ) and request.method.upper() in ["PUT", "PATCH"]:
                 return self._validate_user_profile_data(data)
 
             # Search endpoint validation
-            elif "/v1/users" in path and request.method.upper() == "GET":
+            elif path == "/v1/users" and request.method.upper() == "GET":
                 return self._validate_search_data(data)
 
             # Password change validation
-            elif "/v1/users/me/password" in path and request.method.upper() == "POST":
+            elif path == "/v1/users/me/password" and request.method.upper() == "POST":
                 return self._validate_password_data(data)
 
             # Default validation for other endpoints

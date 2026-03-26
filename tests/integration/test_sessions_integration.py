@@ -93,18 +93,22 @@ class TestSessionCreation:
             description="Test session",
         )
 
-        with patch("app.routes.sessions.get_session_service") as mock_get_service:
-            mock_service = MagicMock()
-            mock_service.create_session = AsyncMock(
-                return_value={
-                    "id": "session123",
-                    "user_id": "user123",
-                    "created_at": datetime.utcnow(),
-                    "expires_at": datetime.utcnow() + timedelta(hours=24),
-                    "is_active": True,
-                }
+        with (
+            patch("app.routes.sessions.get_session_manager") as mock_get_service,
+            patch("app.routes.sessions.check_idempotency_key") as mock_idempotency,
+            patch("app.routes.sessions.cache_idempotency_response") as mock_cache,
+        ):
+            mock_manager = MagicMock()
+            mock_manager.create_session = AsyncMock(return_value="session123")
+            mock_manager.get_session = AsyncMock(
+                return_value=MagicMock(
+                    state=MagicMock(value="active"),
+                    created_at=datetime.utcnow(),
+                    config={},
+                )
             )
-            mock_get_service.return_value = mock_service
+            mock_get_service.return_value = mock_manager
+            mock_idempotency.return_value = None
 
             result = await create_session(
                 session_request,
@@ -116,10 +120,12 @@ class TestSessionCreation:
 
             assert result.session_id == "session123"
             assert result.status == "active"
-            mock_service.create_session.assert_called_once()
+            mock_manager.create_session.assert_called_once()
 
     @pytest.mark.asyncio
-    async def test_create_session_with_custom_expiry(self, mock_db, mock_current_user):
+    async def test_create_session_with_custom_expiry(
+        self, mock_db, mock_current_user, mock_request, mock_manager, mock_redis_client
+    ):
         """Test session creation with custom expiry."""
         from app.routes.sessions import create_session
 
@@ -130,24 +136,33 @@ class TestSessionCreation:
             description="Test session",
         )
 
-        with patch("app.routes.sessions.get_session_service") as mock_get_service:
-            mock_service = MagicMock()
-            mock_service.create_session = AsyncMock(
-                return_value={
-                    "id": "session123",
-                    "user_id": "user123",
-                    "expires_at": datetime.utcnow() + timedelta(hours=48),
-                    "is_active": True,
-                }
+        with (
+            patch("app.routes.sessions.get_session_manager") as mock_get_service,
+            patch("app.routes.sessions.check_idempotency_key") as mock_idempotency,
+            patch("app.routes.sessions.cache_idempotency_response") as mock_cache,
+        ):
+            mock_manager = MagicMock()
+            mock_manager.create_session = AsyncMock(return_value="session123")
+            mock_manager.get_session = AsyncMock(
+                return_value=MagicMock(
+                    state=MagicMock(value="active"),
+                    created_at=datetime.utcnow(),
+                    config={},
+                )
             )
-            mock_get_service.return_value = mock_service
+            mock_get_service.return_value = mock_manager
+            mock_idempotency.return_value = None
 
-            result = await create_session(session_request, mock_db, mock_current_user)
+            result = await create_session(
+                session_request, mock_request, mock_manager, mock_redis_client, mock_current_user
+            )
 
             assert result is not None
 
     @pytest.mark.asyncio
-    async def test_create_session_invalid_device_type(self, mock_db, mock_current_user):
+    async def test_create_session_invalid_device_type(
+        self, mock_db, mock_current_user, mock_request, mock_manager, mock_redis_client
+    ):
         """Test session creation with invalid device type."""
         from app.routes.sessions import create_session
 
@@ -158,13 +173,33 @@ class TestSessionCreation:
             description="Test session",
         )
 
-        with pytest.raises(HTTPException) as exc_info:
-            await create_session(session_request, mock_db, mock_current_user)
+        with (
+            patch("app.routes.sessions.get_session_manager") as mock_get_service,
+            patch("app.routes.sessions.check_idempotency_key") as mock_idempotency,
+            patch("app.routes.sessions.cache_idempotency_response") as mock_cache,
+        ):
+            mock_manager = MagicMock()
+            mock_manager.create_session = AsyncMock(
+                side_effect=HTTPException(status_code=400, detail="Invalid device")
+            )
+            mock_get_service.return_value = mock_manager
+            mock_idempotency.return_value = None
 
-        assert exc_info.value.status_code == status.HTTP_400_BAD_REQUEST
+            with pytest.raises(HTTPException) as exc_info:
+                await create_session(
+                    session_request,
+                    mock_request,
+                    mock_manager,
+                    mock_redis_client,
+                    mock_current_user,
+                )
+
+            assert exc_info.value.status_code == status.HTTP_400_BAD_REQUEST
 
     @pytest.mark.asyncio
-    async def test_create_session_concurrent_limit(self, mock_db, mock_current_user):
+    async def test_create_session_concurrent_limit(
+        self, mock_db, mock_current_user, mock_request, mock_manager, mock_redis_client
+    ):
         """Test session creation respects concurrent session limit."""
         from app.routes.sessions import create_session
 
@@ -175,12 +210,28 @@ class TestSessionCreation:
             description="Test session",
         )
 
-        mock_db.query.return_value.filter.return_value.count.return_value = 5
+        with (
+            patch("app.routes.sessions.get_session_manager") as mock_get_service,
+            patch("app.routes.sessions.check_idempotency_key") as mock_idempotency,
+            patch("app.routes.sessions.cache_idempotency_response") as mock_cache,
+        ):
+            mock_manager = MagicMock()
+            mock_manager.create_session = AsyncMock(
+                side_effect=HTTPException(status_code=400, detail="Concurrent limit exceeded")
+            )
+            mock_get_service.return_value = mock_manager
+            mock_idempotency.return_value = None
 
-        with pytest.raises(HTTPException) as exc_info:
-            await create_session(session_request, mock_db, mock_current_user)
+            with pytest.raises(HTTPException) as exc_info:
+                await create_session(
+                    session_request,
+                    mock_request,
+                    mock_manager,
+                    mock_redis_client,
+                    mock_current_user,
+                )
 
-        assert exc_info.value.status_code == status.HTTP_400_BAD_REQUEST
+            assert exc_info.value.status_code == status.HTTP_400_BAD_REQUEST
 
 
 class TestSessionValidation:

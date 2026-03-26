@@ -745,3 +745,25 @@ class Subscription(Base):  # type: ignore[misc, valid-type]
 
     # Relationships
     user = relationship("User", backref="subscription", uselist=False)
+
+
+class ProcessedWebhookEvent(Base):  # type: ignore[misc, valid-type]
+    """Track processed Stripe webhook event IDs to ensure idempotency."""
+
+    __tablename__ = "processed_webhook_events"
+
+    event_id = Column(
+        String(255),
+        primary_key=True,
+        comment="Stripe Event ID (e.g., evt_...)",
+    )
+    event_type = Column(String(100), nullable=False, index=True, comment="Stripe event type")
+    processed_at = Column(
+        DateTime(timezone=True),
+        nullable=False,
+        server_default=func.now(),
+        comment="When the event was successfully processed",
+    )
+
+    def __repr__(self):
+        return f"<ProcessedWebhookEvent(event_id={self.event_id}, type={self.event_type})>"

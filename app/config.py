@@ -121,6 +121,7 @@ class Settings:
                 "GET",
                 "POST",
                 "PUT",
+                "PATCH",
                 "DELETE",
                 "OPTIONS",
                 "HEAD",
@@ -455,6 +456,15 @@ class Settings:
                     "webhook signature verification."
                 )
 
+        # Validate SMTP configuration for production
+        if is_production:
+            if not self.smtp_server:
+                errors.append(
+                    "SMTP_SERVER is not configured for production. "
+                    "Email features (password reset, email verification) require SMTP. "
+                    "Set SMTP_SERVER or disable email-dependent features."
+                )
+
         # Validate URL formats
         try:
             parsed = urlparse(self.database_url)
@@ -477,10 +487,14 @@ class Settings:
         except Exception:
             errors.append("CELERY_BROKER_URL is not a valid URL.")
 
-        # If there are critical errors in production, fail fast
-        if errors and is_production:
-            error_message = "CRITICAL CONFIGURATION ERRORS:\n" + "\n".join(
-                f"  - {error}" for error in errors
+        # If there are critical errors in production or staging, fail fast
+        is_staging = self.environment.lower() == "staging"
+        if errors and (
+            self.environment.lower() == "production" or self.environment.lower() == "staging"
+        ):
+            error_message = (
+                f"CRITICAL CONFIGURATION ERRORS ({self.environment.upper()}):\n"
+                + "\n".join(f"  - {error}" for error in errors)
             )
             raise ValueError(error_message)
 

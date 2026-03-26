@@ -527,7 +527,6 @@ class TestsRunnerGUI:
                 stderr=subprocess.STDOUT,
                 text=True,
                 bufsize=1,
-                universal_newlines=True,
                 cwd=self.tests_dir.parent,
                 env=env,
             )
@@ -614,7 +613,6 @@ class TestsRunnerGUI:
                 stderr=subprocess.STDOUT,
                 text=True,
                 bufsize=1,
-                universal_newlines=True,
                 cwd=self.tests_dir.parent,
                 env=env,
             )

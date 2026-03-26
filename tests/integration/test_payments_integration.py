@@ -232,7 +232,7 @@ class TestPaymentsIntegration:
     ):
         """Test webhook with invalid signature."""
         mock_settings.stripe_webhook_secret = "test_secret"
-        mock_stripe.Webhook.construct_event.side_effect = Exception("Invalid signature")
+        mock_stripe.Webhook.construct_event.side_effect = ValueError("Invalid signature")
 
         from app.routes.payments import stripe_webhook
         from fastapi import Request
@@ -240,7 +240,9 @@ class TestPaymentsIntegration:
         # Create a mock request
         mock_request = MagicMock(spec=Request)
         mock_request.headers = {"stripe-signature": "invalid_signature"}
-        mock_request.body = AsyncMock(return_value=b'{"data": {"object": {"id": "pi_123"}}}')
+
+        # Make body property return bytes directly
+        mock_request.body = b'{"data": {"object": {"id": "pi_123"}}}'
 
         with pytest.raises(HTTPException) as exc_info:
             await stripe_webhook(mock_request, mock_get_db.return_value)

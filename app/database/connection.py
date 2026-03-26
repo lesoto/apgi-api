@@ -143,9 +143,8 @@ NOTE: These credentials allow full system access - change immediately
             secrets_file_path = pathlib.Path(temp_file.name)
             secrets_file_path.chmod(0o600)
 
-            logger.warning(
-                f"Default user created: {secure_username} - credentials written to temporary file: {secrets_file_path}"
-                f" (File will be automatically cleaned up when closed)"
+            logger.info(
+                "Default user created: {secure_username}. Credentials written to secure temporary file for initial setup."
             )
 
         # Import here to avoid circular import
