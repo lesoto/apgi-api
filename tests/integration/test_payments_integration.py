@@ -140,17 +140,14 @@ class TestPaymentsIntegration:
 
     @patch("app.routes.payments.stripe")
     @patch("app.routes.payments.get_db")
-    @patch("app.config.settings")
     async def test_webhook_payment_success(
         self,
-        mock_settings,
         mock_get_db,
         mock_stripe,
         mock_db,
         mock_order,
     ):
         """Test successful payment webhook handling."""
-        mock_settings.stripe_webhook_secret = "test_secret"
         mock_get_db.return_value = mock_db
 
         # Mock Stripe event
@@ -179,23 +176,22 @@ class TestPaymentsIntegration:
 
         with patch("app.routes.payments.stripe.Webhook.construct_event") as mock_construct:
             mock_construct.return_value = mock_event
-            result = await stripe_webhook(mock_request, mock_db)
+            # Patch the settings at the point where it's accessed
+            with patch("app.routes.payments.settings.stripe_webhook_secret", "test_secret"):
+                result = await stripe_webhook(mock_request, mock_db)
 
         assert result["status"] == "success"
 
     @patch("app.routes.payments.stripe")
     @patch("app.routes.payments.get_db")
-    @patch("app.config.settings")
     async def test_webhook_payment_failed(
         self,
-        mock_settings,
         mock_get_db,
         mock_stripe,
         mock_db,
         mock_order,
     ):
         """Test failed payment webhook handling."""
-        mock_settings.stripe_webhook_secret = "test_secret"
         mock_get_db.return_value = mock_db
 
         # Mock Stripe event
@@ -217,22 +213,22 @@ class TestPaymentsIntegration:
 
         with patch("app.routes.payments.stripe.Webhook.construct_event") as mock_construct:
             mock_construct.return_value = mock_event
-            result = await stripe_webhook(mock_request, mock_db)
+            # Patch the settings at the point where it's accessed
+            with patch("app.routes.payments.settings.stripe_webhook_secret", "test_secret"):
+                result = await stripe_webhook(mock_request, mock_db)
 
         assert result["status"] == "success"
 
     @patch("app.routes.payments.stripe")
     @patch("app.routes.payments.get_db")
-    @patch("app.config.settings")
     async def test_webhook_invalid_signature(
         self,
-        mock_settings,
         mock_get_db,
         mock_stripe,
+        mock_db,
     ):
         """Test webhook with invalid signature."""
-        mock_settings.stripe_webhook_secret = "test_secret"
-        mock_stripe.Webhook.construct_event.side_effect = ValueError("Invalid signature")
+        mock_get_db.return_value = mock_db
 
         from app.routes.payments import stripe_webhook
         from fastapi import Request
@@ -240,11 +236,14 @@ class TestPaymentsIntegration:
         # Create a mock request
         mock_request = MagicMock(spec=Request)
         mock_request.headers = {"stripe-signature": "invalid_signature"}
+        # Make body method return bytes directly
+        mock_request.body = AsyncMock(return_value=b'{"data": {"object": {"id": "pi_123"}}}')
 
-        # Make body property return bytes directly
-        mock_request.body = b'{"data": {"object": {"id": "pi_123"}}}'
-
-        with pytest.raises(HTTPException) as exc_info:
-            await stripe_webhook(mock_request, mock_get_db.return_value)
+        with patch("app.routes.payments.stripe.Webhook.construct_event") as mock_construct:
+            mock_construct.side_effect = ValueError("Invalid signature")
+            # Patch the settings at the point where it's accessed
+            with patch("app.routes.payments.settings.stripe_webhook_secret", "test_secret"):
+                with pytest.raises(HTTPException) as exc_info:
+                    await stripe_webhook(mock_request, mock_db)
 
         assert exc_info.value.status_code == status.HTTP_400_BAD_REQUEST

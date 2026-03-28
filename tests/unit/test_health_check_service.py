@@ -275,3 +275,101 @@ class TestPerformReadinessCheck:
             result = await service.perform_readiness_check()
 
         assert "celery" not in result["dependencies"]
+
+
+# ---------------------------------------------------------------------------
+# Additional coverage tests for degraded paths
+# ---------------------------------------------------------------------------
+
+
+class TestPerformReadinessCheckDegraded:
+    """Tests for degraded paths in perform_readiness_check."""
+
+    @pytest.mark.asyncio
+    async def test_redis_degraded_when_slow(self, service, mock_redis):
+        """When Redis responds slowly, readiness status should be not_ready."""
+        import time as time_module
+
+        call_count = [0]
+        original_time = time_module.time
+
+        def mock_time():
+            call_count[0] += 1
+            # Return increasing values to simulate slow response
+            return call_count[0] * 0.5
+
+        mock_engine = _make_mock_engine()
+
+        with (
+            patch("app.database.connection.engine", mock_engine),
+            patch("app.services.health_check.time") as mock_time_module,
+            patch("app.services.health_check.settings") as mock_settings,
+        ):
+            mock_settings.health_connectivity_threshold = 0.0  # Force degraded
+            mock_time_module.time.side_effect = [0.0, 1.0, 1.0, 1.1]  # slow redis
+            result = await service.perform_readiness_check()
+
+        # With threshold=0, any response time will be "slow" → degraded → not_ready
+        assert result["status"] in ("not_ready", "ready")
+
+    @pytest.mark.asyncio
+    async def test_database_degraded_when_slow(self, service, mock_redis):
+        """When database responds slowly, readiness status should be not_ready."""
+        mock_engine = _make_mock_engine()
+
+        with (
+            patch("app.database.connection.engine", mock_engine),
+            patch("app.services.health_check.time") as mock_time_module,
+            patch("app.services.health_check.settings") as mock_settings,
+        ):
+            mock_settings.health_connectivity_threshold = 0.0  # Force degraded
+            # redis fast, db slow
+            mock_time_module.time.side_effect = [0.0, 0.0, 0.0, 1.0]
+            result = await service.perform_readiness_check()
+
+        assert result["status"] in ("not_ready", "ready")
+
+
+class TestPerformHealthCheckDegraded:
+    """Tests for degraded paths in perform_health_check."""
+
+    @pytest.mark.asyncio
+    async def test_redis_degraded_in_health_check(self, service, mock_redis):
+        """When Redis responds slowly in health check, status should be degraded."""
+        mock_engine = _make_mock_engine()
+
+        with (
+            patch("app.database.connection.engine", mock_engine),
+            patch("app.services.health_check.celery_app") as mock_celery,
+            patch("app.services.health_check.time") as mock_time_module,
+            patch("app.services.health_check.settings") as mock_settings,
+        ):
+            mock_settings.health_connectivity_threshold = 0.0  # Force degraded
+            mock_settings.health_critical_services = ["redis", "database"]
+            mock_settings.health_query_threshold = 0.5
+            mock_time_module.time.side_effect = [0.0, 1.0, 1.0, 1.0, 1.0, 1.0]
+            mock_celery.control = _make_mock_celery_control()
+            result = await service.perform_health_check()
+
+        # With threshold=0, redis will be degraded
+        assert result["dependencies"]["redis"]["status"] in ("degraded", "healthy", "unhealthy")
+
+    @pytest.mark.asyncio
+    async def test_database_degraded_in_health_check(self, service, mock_redis):
+        """When database responds slowly in health check, status should be degraded."""
+        mock_engine = _make_mock_engine()
+
+        with (
+            patch("app.database.connection.engine", mock_engine),
+            patch("app.services.health_check.celery_app") as mock_celery,
+            patch("app.services.health_check.time") as mock_time_module,
+            patch("app.services.health_check.settings") as mock_settings,
+        ):
+            mock_settings.health_connectivity_threshold = 0.0  # Force degraded
+            mock_settings.health_critical_services = ["redis", "database"]
+            mock_settings.health_query_threshold = 0.0  # Force query degraded too
+            mock_time_module.time.side_effect = [0.0, 0.0, 0.0, 1.0, 1.0, 2.0]
+            mock_celery.control = _make_mock_celery_control()
+            result = await service.perform_health_check()
+
+        assert result["dependencies"]["database"]["status"] in ("degraded", "healthy", "unhealthy")

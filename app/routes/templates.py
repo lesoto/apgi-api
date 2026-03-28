@@ -9,7 +9,7 @@ from uuid import uuid4
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy import select
-from app.database.connection import get_db_context
+from app.database.connection import get_async_db_context
 from app.database.models import SessionTemplate
 from app.models.schemas import (
     SessionTemplateCreateRequest,
@@ -76,7 +76,7 @@ async def list_templates(
 
     try:
         result = None
-        with get_db_context() as db:
+        async with get_async_db_context() as db:
             # Build query
             query = select(SessionTemplate)
 
@@ -167,7 +167,7 @@ async def create_template(
     """
     try:
         template = None
-        with get_db_context() as db:
+        async with get_async_db_context() as db:
             # Check for duplicate name for this user
             existing_stmt = select(SessionTemplate).where(
                 SessionTemplate.user_id == current_user.user_id,
@@ -278,7 +278,7 @@ async def get_template(
     """
     try:
         template = None
-        with get_db_context() as db:
+        async with get_async_db_context() as db:
             stmt = select(SessionTemplate).where(SessionTemplate.template_id == template_id)
             result = db.execute(stmt)
             template = result.scalar_one_or_none()
@@ -348,7 +348,7 @@ async def update_template(
     """
     try:
         template = None
-        with get_db_context() as db:
+        async with get_async_db_context() as db:
             stmt = select(SessionTemplate).where(SessionTemplate.template_id == template_id)
             result = db.execute(stmt)
             template = result.scalar_one_or_none()
@@ -444,7 +444,7 @@ async def delete_template(
         HTTPException: If template not found or access denied
     """
     try:
-        with get_db_context() as db:
+        async with get_async_db_context() as db:
             stmt = select(SessionTemplate).where(SessionTemplate.template_id == template_id)
             result = db.execute(stmt)
             template = result.scalar_one_or_none()

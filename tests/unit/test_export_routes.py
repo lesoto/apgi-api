@@ -1,356 +1,547 @@
 """
-Unit tests for export routes.
+Unit tests for app/routes/export.py
+
+Covers all endpoints:
+  GET /v1/sessions/{session_id}/export     - export session data (CSV/JSON)
+  GET /v1/sessions/{session_id}/summary    - get summary statistics
+  GET /v1/sessions/{session_id}/timeseries - get time series data
+  GET /v1/sessions/{session_id}/events     - get event analysis
+
+Also covers:
+  - get_data_export_service() 503 when not initialized
+  - init_export_routes() initialization
+  - All 4xx/5xx error paths per endpoint
 """
 
 import pytest
-from unittest.mock import Mock, MagicMock, patch
-from fastapi import HTTPException, status
-from io import BytesIO
-from datetime import datetime, timezone
+import io
+from contextlib import asynccontextmanager
+from datetime import datetime, timezone, timedelta
+from unittest.mock import MagicMock, AsyncMock, patch
+from fastapi import HTTPException
+from fastapi.testclient import TestClient
+
+from app.models.schemas import TokenPayload
 
 
-@pytest.fixture
-def mock_db():
-    """Mock database session."""
+# ---------------------------------------------------------------------------
+# Shared helpers
+# ---------------------------------------------------------------------------
+
+ADMIN_USER = TokenPayload(
+    user_id="user123",
+    username="testuser",
+    roles=["admin"],
+    exp=datetime.now(timezone.utc) + timedelta(hours=1),
+    token_type="access",
+    permissions=[],
+)
+
+
+@asynccontextmanager
+async def noop_lifespan(app):
+    yield
+
+
+def make_mock_db(session=None):
+    """Return a mock db whose query().filter().first() returns `session`."""
     db = MagicMock()
-    db.execute = MagicMock()
-    db.commit = MagicMock()
-    db.rollback = MagicMock()
-    db.refresh = MagicMock()
-    db.add = MagicMock()
-    db.delete = MagicMock()
-    db.query = MagicMock()
+    db.query.return_value.filter.return_value.first.return_value = session
     return db
 
 
-@pytest.fixture
-def mock_current_user():
-    """Mock current user."""
-    user = Mock()
-    user.user_id = "user123"
-    user.email = "test@example.com"
-    user.roles = ["user"]
-    return user
-
-
-@pytest.fixture
-def mock_session():
-    """Mock session."""
+def make_mock_session(session_id="session123", user_id="user123"):
     session = MagicMock()
-    session.session_id = "session123"
-    session.user_id = "user123"
-    session.status = "completed"
-    session.created_at = datetime.now(timezone.utc)
-    session.updated_at = datetime.now(timezone.utc)
+    session.session_id = session_id
+    session.user_id = user_id
     return session
 
 
-@pytest.fixture
-def mock_data_export_service():
-    """Mock data export service."""
-    service = MagicMock()
-    service.export_session_data.return_value = BytesIO(b"test data")
-    service.export_summary_statistics.return_value = BytesIO(b"stats data")
-    service.export_event_analysis.return_value = BytesIO(b"event data")
-    return service
+def make_mock_service():
+    svc = MagicMock()
+    svc.export_session_data = AsyncMock(return_value=(b"col1,col2\n1,2", "text/csv"))
+    svc.generate_summary_stats = AsyncMock(
+        return_value={
+            "mean": 1.0,
+            "std": 0.5,
+            "min": 0.1,
+            "max": 2.0,
+        }
+    )
+    svc.export_time_series = AsyncMock(
+        return_value={
+            "session_id": "session123",
+            "variables": ["var1"],
+            "data": [],
+            "num_points": 0,
+            "next_cursor": None,
+        }
+    )
+    svc.get_event_analysis = AsyncMock(
+        return_value={
+            "session_id": "session123",
+            "event_type": "ignition",
+            "total_events": 5,
+        }
+    )
+    return svc
 
 
-class TestExportRoutes:
-    """Test export routes."""
+def make_client(mock_db=None, mock_service=None, user=None):
+    """Create a TestClient with dependency overrides."""
+    from app.main import create_app
+    from app.database.connection import get_db
+    from app.routes.export import get_data_export_service
+    from app.services.authorization import get_current_user
 
-    @patch("app.routes.export.get_data_export_service")
-    @patch("app.routes.export.get_db_context")
-    @patch("app.routes.export.get_current_user")
-    @patch("app.routes.export.require_permission")
-    async def test_export_session_data_csv(
-        self,
-        mock_require_permission,
-        mock_get_user,
-        mock_get_db,
-        mock_get_service,
-        mock_db,
-        mock_current_user,
-        mock_session,
-        mock_data_export_service,
-    ):
-        """Test successful session data export to CSV."""
-        mock_get_user.return_value = mock_current_user
-        mock_get_db.return_value.__enter__.return_value = mock_db
-        mock_get_service.return_value = mock_data_export_service
-        mock_db.execute.return_value.scalar_one_or_none.return_value = mock_session
+    if mock_db is None:
+        mock_db = make_mock_db()
+    if mock_service is None:
+        mock_service = make_mock_service()
+    if user is None:
+        user = ADMIN_USER
 
-        from app.routes.export import export_session_data
+    app = create_app(test_mode=True)
+    app.router.lifespan_context = noop_lifespan
 
-        result = await export_session_data(
-            "session123", format="csv", current_user=mock_current_user
-        )
+    app.dependency_overrides[get_db] = lambda: mock_db
+    app.dependency_overrides[get_data_export_service] = lambda: mock_service
+    app.dependency_overrides[get_current_user] = lambda: user
 
-        assert result.media_type == "text/csv"
-        assert "attachment" in result.headers.get("content-disposition", "")
+    client = TestClient(app, raise_server_exceptions=False)
+    return client, app
 
-    @patch("app.routes.export.get_data_export_service")
-    @patch("app.routes.export.get_db_context")
-    @patch("app.routes.export.get_current_user")
-    @patch("app.routes.export.require_permission")
-    async def test_export_session_data_json(
-        self,
-        mock_require_permission,
-        mock_get_user,
-        mock_get_db,
-        mock_get_service,
-        mock_db,
-        mock_current_user,
-        mock_session,
-        mock_data_export_service,
-    ):
-        """Test successful session data export to JSON."""
-        mock_get_user.return_value = mock_current_user
-        mock_get_db.return_value.__enter__.return_value = mock_db
-        mock_get_service.return_value = mock_data_export_service
-        mock_db.execute.return_value.scalar_one_or_none.return_value = mock_session
 
-        from app.routes.export import export_session_data
+# ---------------------------------------------------------------------------
+# Tests: get_data_export_service factory
+# ---------------------------------------------------------------------------
 
-        result = await export_session_data(
-            "session123", format="json", current_user=mock_current_user
-        )
 
-        assert result.media_type == "application/json"
-        assert "attachment" in result.headers.get("content-disposition", "")
-
-    @patch("app.routes.export.get_data_export_service")
-    @patch("app.routes.export.get_db_context")
-    @patch("app.routes.export.get_current_user")
-    @patch("app.routes.export.require_permission")
-    async def test_export_session_data_invalid_format(
-        self,
-        mock_require_permission,
-        mock_get_user,
-        mock_get_db,
-        mock_get_service,
-        mock_current_user,
-    ):
-        """Test session data export with invalid format."""
-        mock_get_user.return_value = mock_current_user
-
-        from app.routes.export import export_session_data
-
-        with pytest.raises(HTTPException) as exc_info:
-            await export_session_data(
-                "session123", format="invalid", current_user=mock_current_user
-            )
-
-        assert exc_info.value.status_code == status.HTTP_400_BAD_REQUEST
-
-    @patch("app.routes.export.get_data_export_service")
-    @patch("app.routes.export.get_db_context")
-    @patch("app.routes.export.get_current_user")
-    @patch("app.routes.export.require_permission")
-    async def test_export_session_data_not_found(
-        self,
-        mock_require_permission,
-        mock_get_user,
-        mock_get_db,
-        mock_get_service,
-        mock_db,
-        mock_current_user,
-    ):
-        """Test exporting non-existent session."""
-        mock_get_user.return_value = mock_current_user
-        mock_get_db.return_value.__enter__.return_value = mock_db
-        mock_db.execute.return_value.scalar_one_or_none.return_value = None
-
-        from app.routes.export import export_session_data
-
-        with pytest.raises(HTTPException) as exc_info:
-            await export_session_data("nonexistent", format="csv", current_user=mock_current_user)
-
-        assert exc_info.value.status_code == status.HTTP_404_NOT_FOUND
-
-    @patch("app.routes.export.get_data_export_service")
-    @patch("app.routes.export.get_db_context")
-    @patch("app.routes.export.get_current_user")
-    @patch("app.routes.export.require_permission")
-    async def test_export_summary_statistics(
-        self,
-        mock_require_permission,
-        mock_get_user,
-        mock_get_db,
-        mock_get_service,
-        mock_db,
-        mock_current_user,
-        mock_session,
-        mock_data_export_service,
-    ):
-        """Test successful summary statistics export."""
-        mock_get_user.return_value = mock_current_user
-        mock_get_db.return_value.__enter__.return_value = mock_db
-        mock_get_service.return_value = mock_data_export_service
-        mock_db.execute.return_value.scalar_one_or_none.return_value = mock_session
-
-        from app.routes.export import get_summary_statistics
-
-        result = await get_summary_statistics("session123", current_user=mock_current_user)
-
-        assert result is not None
-        mock_data_export_service.export_summary_statistics.assert_called_once()
-
-    @patch("app.routes.export.get_data_export_service")
-    @patch("app.routes.export.get_db_context")
-    @patch("app.routes.export.get_current_user")
-    @patch("app.routes.export.require_permission")
-    async def test_export_event_analysis(
-        self,
-        mock_require_permission,
-        mock_get_user,
-        mock_get_db,
-        mock_get_service,
-        mock_db,
-        mock_current_user,
-        mock_session,
-        mock_data_export_service,
-    ):
-        """Test successful event analysis export."""
-        mock_get_user.return_value = mock_current_user
-        mock_get_db.return_value.__enter__.return_value = mock_db
-        mock_get_service.return_value = mock_data_export_service
-        mock_db.execute.return_value.scalar_one_or_none.return_value = mock_session
-
-        from app.routes.export import get_event_analysis
-
-        result = await get_event_analysis("session123", current_user=mock_current_user)
-
-        assert result is not None
-        mock_data_export_service.export_event_analysis.assert_called_once()
-
-    @patch("app.routes.export.get_data_export_service")
-    @patch("app.routes.export.get_db_context")
-    @patch("app.routes.export.get_current_user")
-    @patch("app.routes.export.require_permission")
-    async def test_export_access_denied(
-        self,
-        mock_require_permission,
-        mock_get_user,
-        mock_get_db,
-        mock_get_service,
-        mock_db,
-        mock_current_user,
-        mock_session,
-    ):
-        """Test export with access denied."""
-        mock_get_user.return_value = mock_current_user
-        mock_get_db.return_value.__enter__.return_value = mock_db
-        mock_session.user_id = "other_user"
-        mock_db.execute.return_value.scalar_one_or_none.return_value = mock_session
-
-        from app.routes.export import export_session_data
-
-        with pytest.raises(HTTPException) as exc_info:
-            await export_session_data("session123", format="csv", current_user=mock_current_user)
-
-        assert exc_info.value.status_code == status.HTTP_403_FORBIDDEN
-
-    @patch("app.routes.export.get_data_export_service")
-    @patch("app.routes.export.get_db_context")
-    @patch("app.routes.export.get_current_user")
-    @patch("app.routes.export.require_permission")
-    async def test_export_service_error(
-        self,
-        mock_require_permission,
-        mock_get_user,
-        mock_get_db,
-        mock_get_service,
-        mock_db,
-        mock_current_user,
-        mock_session,
-    ):
-        """Test export with service error."""
-        mock_get_user.return_value = mock_current_user
-        mock_get_db.return_value.__enter__.return_value = mock_db
-        mock_db.execute.return_value.scalar_one_or_none.return_value = mock_session
-
-        mock_service = MagicMock()
-        mock_service.export_session_data.side_effect = Exception("Export failed")
-        mock_get_service.return_value = mock_service
-
-        from app.routes.export import export_session_data
-
-        with pytest.raises(HTTPException) as exc_info:
-            await export_session_data("session123", format="csv", current_user=mock_current_user)
-
-        assert exc_info.value.status_code == status.HTTP_500_INTERNAL_SERVER_ERROR
-
-    def test_get_data_export_service_initialization(self):
-        """Test data export service initialization."""
+class TestGetDataExportService:
+    def test_raises_503_when_not_initialized(self):
+        """get_data_export_service raises HTTP 503 when _data_export_service is None."""
+        import app.routes.export as export_module
         from app.routes.export import get_data_export_service
 
-        service = get_data_export_service()
-        assert service is not None
+        original = export_module._data_export_service
+        export_module._data_export_service = None
+        try:
+            with pytest.raises(HTTPException) as exc_info:
+                get_data_export_service()
+            assert exc_info.value.status_code == 503
+        finally:
+            export_module._data_export_service = original
 
-    @patch("app.routes.export.get_data_export_service")
-    @patch("app.routes.export.get_db_context")
-    @patch("app.routes.export.get_current_user")
-    @patch("app.routes.export.require_permission")
-    async def test_export_large_dataset(
-        self,
-        mock_require_permission,
-        mock_get_user,
-        mock_get_db,
-        mock_get_service,
-        mock_db,
-        mock_current_user,
-        mock_session,
-        mock_data_export_service,
-    ):
-        """Test export with large dataset."""
-        mock_get_user.return_value = mock_current_user
-        mock_get_db.return_value.__enter__.return_value = mock_db
-        mock_get_service.return_value = mock_data_export_service
-        mock_db.execute.return_value.scalar_one_or_none.return_value = mock_session
+    def test_returns_service_when_initialized(self):
+        """get_data_export_service returns the service when initialized."""
+        import app.routes.export as export_module
+        from app.routes.export import get_data_export_service
 
-        large_data = b"x" * (10 * 1024 * 1024)  # 10MB
-        mock_data_export_service.export_session_data.return_value = BytesIO(large_data)
+        mock_svc = MagicMock()
+        original = export_module._data_export_service
+        export_module._data_export_service = mock_svc
+        try:
+            result = get_data_export_service()
+            assert result is mock_svc
+        finally:
+            export_module._data_export_service = original
 
-        from app.routes.export import export_session_data
 
-        result = await export_session_data(
-            "session123", format="csv", current_user=mock_current_user
+# ---------------------------------------------------------------------------
+# Tests: init_export_routes
+# ---------------------------------------------------------------------------
+
+
+class TestInitExportRoutes:
+    def test_init_export_routes_sets_service(self):
+        """init_export_routes initializes the DataExportService singleton."""
+        import app.routes.export as export_module
+        from app.routes.export import init_export_routes
+
+        mock_session_manager = MagicMock()
+        original = export_module._data_export_service
+        export_module._data_export_service = None
+
+        with patch("app.routes.export.DataExportService") as MockDES:
+            mock_instance = MagicMock()
+            MockDES.return_value = mock_instance
+            init_export_routes(mock_session_manager)
+            MockDES.assert_called_once_with(mock_session_manager)
+            assert export_module._data_export_service is mock_instance
+
+        export_module._data_export_service = original
+
+
+# ---------------------------------------------------------------------------
+# Tests: export_session_data  GET /v1/sessions/{session_id}/export
+# ---------------------------------------------------------------------------
+
+
+class TestExportSessionData:
+    def test_export_csv_success(self):
+        """Happy path: CSV export returns 200 with text/csv content type."""
+        mock_session = make_mock_session()
+        mock_db = make_mock_db(session=mock_session)
+        mock_svc = make_mock_service()
+        mock_svc.export_session_data = AsyncMock(return_value=(b"col1,col2\n1,2", "text/csv"))
+
+        client, _ = make_client(mock_db=mock_db, mock_service=mock_svc)
+        response = client.get("/v1/sessions/session123/export?format=csv")
+
+        assert response.status_code == 200
+        assert "text/csv" in response.headers["content-type"]
+        assert "attachment" in response.headers["content-disposition"]
+
+    def test_export_json_success(self):
+        """Happy path: JSON export returns 200 with application/json content type."""
+        mock_session = make_mock_session()
+        mock_db = make_mock_db(session=mock_session)
+        mock_svc = make_mock_service()
+        mock_svc.export_session_data = AsyncMock(return_value=(b'{"data": []}', "application/json"))
+
+        client, _ = make_client(mock_db=mock_db, mock_service=mock_svc)
+        response = client.get("/v1/sessions/session123/export?format=json")
+
+        assert response.status_code == 200
+        assert "application/json" in response.headers["content-type"]
+
+    def test_export_invalid_format_returns_400(self):
+        """Invalid format parameter returns HTTP 400."""
+        mock_session = make_mock_session()
+        mock_db = make_mock_db(session=mock_session)
+
+        client, _ = make_client(mock_db=mock_db)
+        response = client.get("/v1/sessions/session123/export?format=xml")
+
+        assert response.status_code == 400
+
+    def test_export_session_not_found_returns_404(self):
+        """Session not found returns HTTP 404."""
+        mock_db = make_mock_db(session=None)
+
+        client, _ = make_client(mock_db=mock_db)
+        response = client.get("/v1/sessions/nonexistent/export?format=csv")
+
+        assert response.status_code == 404
+
+    def test_export_service_error_returns_500(self):
+        """Service exception returns HTTP 500."""
+        mock_session = make_mock_session()
+        mock_db = make_mock_db(session=mock_session)
+        mock_svc = make_mock_service()
+        mock_svc.export_session_data = AsyncMock(side_effect=RuntimeError("export failed"))
+
+        client, _ = make_client(mock_db=mock_db, mock_service=mock_svc)
+        response = client.get("/v1/sessions/session123/export?format=csv")
+
+        assert response.status_code == 500
+
+    def test_export_value_error_exceeds_maximum_returns_413(self):
+        """ValueError with 'exceeds maximum' returns HTTP 413."""
+        mock_session = make_mock_session()
+        mock_db = make_mock_db(session=mock_session)
+        mock_svc = make_mock_service()
+        mock_svc.export_session_data = AsyncMock(
+            side_effect=ValueError("Data size exceeds maximum allowed limit")
         )
 
-        assert result.media_type == "text/csv"
+        client, _ = make_client(mock_db=mock_db, mock_service=mock_svc)
+        response = client.get("/v1/sessions/session123/export?format=csv")
 
-    @patch("app.routes.export.get_data_export_service")
-    @patch("app.routes.export.get_db_context")
-    @patch("app.routes.export.get_current_user")
-    @patch("app.routes.export.require_permission")
-    async def test_export_with_filters(
-        self,
-        mock_require_permission,
-        mock_get_user,
-        mock_get_db,
-        mock_get_service,
-        mock_db,
-        mock_current_user,
-        mock_session,
-        mock_data_export_service,
-    ):
-        """Test export with date filters."""
-        mock_get_user.return_value = mock_current_user
-        mock_get_db.return_value.__enter__.return_value = mock_db
-        mock_get_service.return_value = mock_data_export_service
-        mock_db.execute.return_value.scalar_one_or_none.return_value = mock_session
+        assert response.status_code == 413
 
-        from app.routes.export import export_session_data
+    def test_export_value_error_other_returns_404(self):
+        """ValueError without 'exceeds maximum' returns HTTP 404."""
+        mock_session = make_mock_session()
+        mock_db = make_mock_db(session=mock_session)
+        mock_svc = make_mock_service()
+        mock_svc.export_session_data = AsyncMock(side_effect=ValueError("Session not found"))
 
-        result = await export_session_data(
-            "session123",
-            format="csv",
-            start_time=1704067200000.0,  # 2024-01-01 in ms
-            end_time=1735689599000.0,  # 2024-12-31 in ms
-            db=mock_db,
-            service=mock_data_export_service,
-            current_user=mock_current_user,
+        client, _ = make_client(mock_db=mock_db, mock_service=mock_svc)
+        response = client.get("/v1/sessions/session123/export?format=csv")
+
+        assert response.status_code == 404
+
+    def test_export_with_valid_variables(self):
+        """Export with valid variable names succeeds."""
+        mock_session = make_mock_session()
+        mock_db = make_mock_db(session=mock_session)
+        mock_svc = make_mock_service()
+        mock_svc.export_session_data = AsyncMock(return_value=(b"data", "text/csv"))
+
+        client, _ = make_client(mock_db=mock_db, mock_service=mock_svc)
+        response = client.get("/v1/sessions/session123/export?format=csv&variables=var1,var2")
+
+        assert response.status_code == 200
+
+    def test_export_with_invalid_variable_name_returns_400(self):
+        """Export with invalid variable name returns HTTP 400."""
+        mock_session = make_mock_session()
+        mock_db = make_mock_db(session=mock_session)
+
+        client, _ = make_client(mock_db=mock_db)
+        response = client.get(
+            "/v1/sessions/session123/export?format=csv&variables=valid,inv%40lid%21"
         )
 
-        assert result.media_type == "text/csv"
-        mock_data_export_service.export_session_data.assert_called_once()
+        assert response.status_code == 400
+
+    def test_export_with_empty_variable_name_returns_400(self):
+        """Export with empty variable name (e.g. trailing comma) returns HTTP 400."""
+        mock_session = make_mock_session()
+        mock_db = make_mock_db(session=mock_session)
+
+        client, _ = make_client(mock_db=mock_db)
+        # Use a space as the second variable which won't match the regex after strip
+        response = client.get("/v1/sessions/session123/export?format=csv&variables=var1,%20")
+
+        assert response.status_code == 400
+
+    def test_export_with_time_filters(self):
+        """Export with start_time and end_time filters succeeds."""
+        mock_session = make_mock_session()
+        mock_db = make_mock_db(session=mock_session)
+        mock_svc = make_mock_service()
+        mock_svc.export_session_data = AsyncMock(return_value=(b"data", "text/csv"))
+
+        client, _ = make_client(mock_db=mock_db, mock_service=mock_svc)
+        response = client.get(
+            "/v1/sessions/session123/export?format=csv&start_time=0&end_time=1000"
+        )
+
+        assert response.status_code == 200
+        mock_svc.export_session_data.assert_called_once()
+
+    def test_export_default_format_is_json(self):
+        """Default format (no format param) is json."""
+        mock_session = make_mock_session()
+        mock_db = make_mock_db(session=mock_session)
+        mock_svc = make_mock_service()
+        mock_svc.export_session_data = AsyncMock(return_value=(b'{"data":[]}', "application/json"))
+
+        client, _ = make_client(mock_db=mock_db, mock_service=mock_svc)
+        response = client.get("/v1/sessions/session123/export")
+
+        assert response.status_code == 200
+
+    def test_export_with_bytesio_response(self):
+        """Service returning BytesIO object is handled correctly."""
+        mock_session = make_mock_session()
+        mock_db = make_mock_db(session=mock_session)
+        mock_svc = make_mock_service()
+        mock_svc.export_session_data = AsyncMock(return_value=(io.BytesIO(b"csv,data"), "text/csv"))
+
+        client, _ = make_client(mock_db=mock_db, mock_service=mock_svc)
+        response = client.get("/v1/sessions/session123/export?format=csv")
+
+        assert response.status_code == 200
+
+
+# ---------------------------------------------------------------------------
+# Tests: get_summary_statistics  GET /v1/sessions/{session_id}/summary
+# ---------------------------------------------------------------------------
+
+
+class TestGetSummaryStatistics:
+    def test_summary_success(self):
+        """Happy path: returns 200 with summary statistics."""
+        mock_svc = make_mock_service()
+
+        client, _ = make_client(mock_service=mock_svc)
+        response = client.get("/v1/sessions/session123/summary")
+
+        assert response.status_code == 200
+        mock_svc.generate_summary_stats.assert_called_once_with("session123", "user123")
+
+    def test_summary_value_error_returns_404(self):
+        """ValueError from service returns HTTP 404."""
+        mock_svc = make_mock_service()
+        mock_svc.generate_summary_stats = AsyncMock(side_effect=ValueError("Session not found"))
+
+        client, _ = make_client(mock_service=mock_svc)
+        response = client.get("/v1/sessions/session123/summary")
+
+        assert response.status_code == 404
+
+    def test_summary_generic_exception_returns_500(self):
+        """Generic exception from service returns HTTP 500."""
+        mock_svc = make_mock_service()
+        mock_svc.generate_summary_stats = AsyncMock(side_effect=RuntimeError("db connection lost"))
+
+        client, _ = make_client(mock_service=mock_svc)
+        response = client.get("/v1/sessions/session123/summary")
+
+        assert response.status_code == 500
+
+
+# ---------------------------------------------------------------------------
+# Tests: get_time_series_data  GET /v1/sessions/{session_id}/timeseries
+# ---------------------------------------------------------------------------
+
+
+class TestGetTimeSeriesData:
+    def test_timeseries_success(self):
+        """Happy path: returns 200 with time series data."""
+        mock_svc = make_mock_service()
+
+        client, _ = make_client(mock_service=mock_svc)
+        response = client.get("/v1/sessions/session123/timeseries?variables=var1,var2")
+
+        assert response.status_code == 200
+        mock_svc.export_time_series.assert_called_once()
+
+    def test_timeseries_invalid_variable_returns_400(self):
+        """Invalid variable name returns HTTP 400."""
+        client, _ = make_client()
+        response = client.get("/v1/sessions/session123/timeseries?variables=valid,inv%40lid")
+
+        assert response.status_code == 400
+
+    def test_timeseries_empty_variable_returns_400(self):
+        """Empty variable name (space after comma) returns HTTP 400."""
+        client, _ = make_client()
+        response = client.get("/v1/sessions/session123/timeseries?variables=var1,%20")
+
+        assert response.status_code == 400
+
+    def test_timeseries_value_error_returns_404(self):
+        """ValueError from service returns HTTP 404."""
+        mock_svc = make_mock_service()
+        mock_svc.export_time_series = AsyncMock(side_effect=ValueError("Session not found"))
+
+        client, _ = make_client(mock_service=mock_svc)
+        response = client.get("/v1/sessions/session123/timeseries?variables=var1")
+
+        assert response.status_code == 404
+
+    def test_timeseries_generic_exception_returns_500(self):
+        """Generic exception from service returns HTTP 500."""
+        mock_svc = make_mock_service()
+        mock_svc.export_time_series = AsyncMock(side_effect=RuntimeError("unexpected error"))
+
+        client, _ = make_client(mock_service=mock_svc)
+        response = client.get("/v1/sessions/session123/timeseries?variables=var1")
+
+        assert response.status_code == 500
+
+    def test_timeseries_with_optional_params(self):
+        """Time series with downsample, limit, cursor, and time filters succeeds."""
+        mock_svc = make_mock_service()
+
+        client, _ = make_client(mock_service=mock_svc)
+        response = client.get(
+            "/v1/sessions/session123/timeseries"
+            "?variables=var1&start_time=0&end_time=1000&downsample=2&limit=100&cursor=abc"
+        )
+
+        assert response.status_code == 200
+        mock_svc.export_time_series.assert_called_once()
+
+    def test_timeseries_missing_variables_returns_422(self):
+        """Missing required variables parameter returns HTTP 422."""
+        client, _ = make_client()
+        response = client.get("/v1/sessions/session123/timeseries")
+
+        assert response.status_code == 422
+
+
+# ---------------------------------------------------------------------------
+# Tests: get_event_analysis  GET /v1/sessions/{session_id}/events
+# ---------------------------------------------------------------------------
+
+
+class TestGetEventAnalysis:
+    def test_event_analysis_ignition_success(self):
+        """Happy path: ignition event analysis returns 200."""
+        mock_svc = make_mock_service()
+
+        client, _ = make_client(mock_service=mock_svc)
+        response = client.get("/v1/sessions/session123/events?event_type=ignition")
+
+        assert response.status_code == 200
+        mock_svc.get_event_analysis.assert_called_once_with(
+            session_id="session123", event_type="ignition", user_id="user123"
+        )
+
+    def test_event_analysis_metabolism_success(self):
+        """metabolism event type returns 200."""
+        mock_svc = make_mock_service()
+        mock_svc.get_event_analysis = AsyncMock(
+            return_value={
+                "session_id": "session123",
+                "event_type": "metabolism",
+                "total_events": 3,
+            }
+        )
+
+        client, _ = make_client(mock_service=mock_svc)
+        response = client.get("/v1/sessions/session123/events?event_type=metabolism")
+
+        assert response.status_code == 200
+
+    def test_event_analysis_allostatic_load_success(self):
+        """allostatic_load event type returns 200."""
+        mock_svc = make_mock_service()
+        mock_svc.get_event_analysis = AsyncMock(
+            return_value={
+                "session_id": "session123",
+                "event_type": "allostatic_load",
+                "total_events": 2,
+            }
+        )
+
+        client, _ = make_client(mock_service=mock_svc)
+        response = client.get("/v1/sessions/session123/events?event_type=allostatic_load")
+
+        assert response.status_code == 200
+
+    def test_event_analysis_invalid_event_type_returns_400(self):
+        """Invalid event_type returns HTTP 400."""
+        client, _ = make_client()
+        response = client.get("/v1/sessions/session123/events?event_type=unknown_type")
+
+        assert response.status_code == 400
+
+    def test_event_analysis_value_error_returns_404(self):
+        """ValueError from service returns HTTP 404."""
+        mock_svc = make_mock_service()
+        mock_svc.get_event_analysis = AsyncMock(side_effect=ValueError("Session not found"))
+
+        client, _ = make_client(mock_service=mock_svc)
+        response = client.get("/v1/sessions/session123/events?event_type=ignition")
+
+        assert response.status_code == 404
+
+    def test_event_analysis_generic_exception_returns_500(self):
+        """Generic exception from service returns HTTP 500."""
+        mock_svc = make_mock_service()
+        mock_svc.get_event_analysis = AsyncMock(side_effect=RuntimeError("unexpected error"))
+
+        client, _ = make_client(mock_service=mock_svc)
+        response = client.get("/v1/sessions/session123/events?event_type=ignition")
+
+        assert response.status_code == 500
+
+    def test_event_analysis_http_exception_re_raised(self):
+        """HTTPException from service is re-raised unchanged."""
+        mock_svc = make_mock_service()
+        mock_svc.get_event_analysis = AsyncMock(
+            side_effect=HTTPException(status_code=403, detail="Forbidden")
+        )
+
+        client, _ = make_client(mock_service=mock_svc)
+        response = client.get("/v1/sessions/session123/events?event_type=ignition")
+
+        assert response.status_code == 403
+
+    def test_event_analysis_default_event_type_is_ignition(self):
+        """Default event_type (no param) is 'ignition'."""
+        mock_svc = make_mock_service()
+
+        client, _ = make_client(mock_service=mock_svc)
+        response = client.get("/v1/sessions/session123/events")
+
+        assert response.status_code == 200
+        mock_svc.get_event_analysis.assert_called_once_with(
+            session_id="session123", event_type="ignition", user_id="user123"
+        )

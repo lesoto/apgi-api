@@ -202,3 +202,115 @@ class TestDeprecationMiddleware:
         new_endpoints = {"/new": {"sunset": "2027-01-01"}}
         middleware.update_deprecated_endpoints(new_endpoints)
         assert middleware.deprecated_endpoints == new_endpoints
+
+    def test_build_warning_message_non_latin1_path(self):
+        """Test building warning message with non-latin-1 path characters."""
+        middleware = DeprecationMiddleware(self.app)
+        # Use characters that cannot be encoded in latin-1
+        # Chinese characters are outside latin-1 range
+        path_with_unicode = "/api/测试"
+        message = middleware._build_warning_message(path_with_unicode, {})
+        # Should contain the escaped version
+        assert "Deprecated API endpoint" in message
+        # The path should be present in some form (escaped)
+        assert len(message) > 0
+
+    def test_build_warning_message_non_latin1_replacement(self):
+        """Test building warning message with non-latin-1 replacement characters."""
+        middleware = DeprecationMiddleware(self.app)
+        # Use characters that cannot be encoded in latin-1 in replacement
+        info = {"replacement": "/v2/新"}
+        message = middleware._build_warning_message("/api/test", info)
+        # Should contain the Use message with escaped replacement
+        assert "Use" in message
+        assert len(message) > 0
+
+    def test_path_matches_multiple_parameters(self):
+        """Test path matching with multiple parameters."""
+        middleware = DeprecationMiddleware(self.app)
+        assert (
+            middleware._path_matches(
+                "/api/users/123/sessions/456", "/api/users/{user_id}/sessions/{session_id}"
+            )
+            is True
+        )
+
+    def test_path_matches_parameter_mismatch(self):
+        """Test path matching where parameter position has non-matching literal."""
+        middleware = DeprecationMiddleware(self.app)
+        # Pattern has parameter but actual has different literal
+        assert middleware._path_matches("/api/users/123", "/api/items/{item_id}") is False
+
+    @pytest.mark.asyncio
+    async def test_dispatch_multiple_deprecated_endpoints_first_match(self):
+        """Test dispatch returns first matching deprecated endpoint."""
+        # Set up multiple patterns where one is more specific
+        deprecated_endpoints = {
+            "/v1/sessions/{session_id}": {
+                "sunset": "2026-06-01",
+                "replacement": "/v2/sessions/{id}",
+            },
+            "/v1/sessions/{session_id}/tasks": {"sunset": "2026-07-01"},
+        }
+        middleware = DeprecationMiddleware(self.app, deprecated_endpoints)
+        request = MagicMock()
+        request.url.path = "/v1/sessions/abc123"
+        response = Response("OK")
+
+        call_next = AsyncMock(return_value=response)
+        result = await middleware.dispatch(request, call_next)
+
+        assert result == response
+        assert result.headers["Deprecation"] == "true"
+        # Should match the first pattern
+        assert "2026-06-01" in result.headers["Sunset"]
+
+    def test_get_deprecation_info_multiple_patterns(self):
+        """Test getting deprecation info when multiple patterns could match."""
+        deprecated_endpoints = {
+            "/v1/sessions/{session_id}": {"sunset": "2026-06-01"},
+            "/v1/sessions/{session_id}/tasks": {"sunset": "2026-07-01"},
+        }
+        middleware = DeprecationMiddleware(self.app, deprecated_endpoints)
+        # This should match the first pattern in iteration order
+        info = middleware._get_deprecation_info("/v1/sessions/abc123")
+        assert info is not None
+        assert "sunset" in info
+
+    def test_path_matches_empty_path_parts(self):
+        """Test path matching with empty path parts (double slashes)."""
+        middleware = DeprecationMiddleware(self.app)
+        # Paths with double slashes create empty parts
+        assert middleware._path_matches("/api//test", "/api//test") is True
+
+    def test_path_matches_single_part_paths(self):
+        """Test path matching with single-part paths."""
+        middleware = DeprecationMiddleware(self.app)
+        assert middleware._path_matches("/api", "/api") is True
+        assert middleware._path_matches("/api", "/other") is False
+
+    @pytest.mark.asyncio
+    async def test_dispatch_with_empty_deprecation_info(self):
+        """Test dispatch when deprecation info exists but is empty dict."""
+        # Empty dict is falsy, so it won't trigger the deprecation headers
+        # This test verifies that behavior
+        middleware = DeprecationMiddleware(self.app, {"/v1/test": {}})
+        request = MagicMock()
+        request.url.path = "/v1/test"
+        response = Response("OK")
+
+        call_next = AsyncMock(return_value=response)
+        result = await middleware.dispatch(request, call_next)
+
+        assert result == response
+        # Empty dict is falsy, so no headers should be added
+        assert "Deprecation" not in result.headers
+
+    def test_build_warning_message_with_both_unicode_issues(self):
+        """Test building warning message when both path and replacement have unicode."""
+        middleware = DeprecationMiddleware(self.app)
+        info = {"sunset": "2026-01-01", "replacement": "/v2/新"}
+        message = middleware._build_warning_message("/api/测试", info)
+        assert "Deprecated API endpoint" in message
+        assert "Sunset date: 2026-01-01" in message
+        assert "Use" in message

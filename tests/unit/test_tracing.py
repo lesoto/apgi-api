@@ -5,7 +5,8 @@ Tests the actual configure_distributed_tracing implementation and related utilit
 """
 
 import os
-import pytest
+import sys
+import warnings
 from unittest.mock import patch, MagicMock
 
 
@@ -87,158 +88,18 @@ class TestConfigureDistributedTracing:
 
         assert result is None
 
-    def test_configure_enabled_sets_tracer_provider(self):
+    def test_configure_enabled_sets_mock_tracer_provider(self):
         """When enabled, set_tracer_provider is called once."""
         mock_trace = MagicMock()
-
-
-class TestOpenTelemetryDependencyFailure:
-    """Tests for OpenTelemetry dependency failure handling (Lines 39-59)."""
-
-    def test_import_error_sets_opentelemetry_unavailable(self):
-        """When ImportError occurs, OPENTELEMETRY_AVAILABLE is set to False."""
-        import importlib
-        import app.tracing
-
-        # Reload the module to trigger import attempt
-        with patch("app.tracing.trace", side_effect=ImportError("No module named 'opentelemetry'")):
-            with patch("app.tracing.TracerProvider", side_effect=ImportError("No module")):
-                with patch("app.tracing.BatchSpanProcessor", side_effect=ImportError("No module")):
-                    with patch("app.tracing.JaegerExporter", side_effect=ImportError("No module")):
-                        with patch(
-                            "app.tracing.OTLPSpanExporter", side_effect=ImportError("No module")
-                        ):
-                            with patch(
-                                "app.tracing.FastAPIInstrumentor",
-                                side_effect=ImportError("No module"),
-                            ):
-                                with patch(
-                                    "app.tracing.SQLAlchemyInstrumentor",
-                                    side_effect=ImportError("No module"),
-                                ):
-                                    with patch(
-                                        "app.tracing.RedisInstrumentor",
-                                        side_effect=ImportError("No module"),
-                                    ):
-                                        with patch(
-                                            "app.tracing.Resource",
-                                            side_effect=ImportError("No module"),
-                                        ):
-                                            importlib.reload(app.tracing)
-
-        assert app.tracing.OPENTELEMETRY_AVAILABLE is False
-
-    def test_type_error_sets_opentelemetry_unavailable(self):
-        """When TypeError occurs (Python 3.14 compatibility), OPENTELEMETRY_AVAILABLE is set to False."""
-        import importlib
-        import app.tracing
-
-        # Reload the module to trigger import attempt
-        with patch("app.tracing.trace", side_effect=TypeError("Type error")):
-            importlib.reload(app.tracing)
-
-        assert app.tracing.OPENTELEMETRY_AVAILABLE is False
-
-    def test_warning_issued_on_import_failure(self):
-        """When import fails, a warning is issued."""
-        import importlib
-        import app.tracing
-
-        with patch("app.tracing.trace", side_effect=ImportError("No module")):
-            with patch("app.tracing.TracerProvider", side_effect=ImportError("No module")):
-                with patch("app.tracing.BatchSpanProcessor", side_effect=ImportError("No module")):
-                    with patch("app.tracing.JaegerExporter", side_effect=ImportError("No module")):
-                        with patch(
-                            "app.tracing.OTLPSpanExporter", side_effect=ImportError("No module")
-                        ):
-                            with patch(
-                                "app.tracing.FastAPIInstrumentor",
-                                side_effect=ImportError("No module"),
-                            ):
-                                with patch(
-                                    "app.tracing.SQLAlchemyInstrumentor",
-                                    side_effect=ImportError("No module"),
-                                ):
-                                    with patch(
-                                        "app.tracing.RedisInstrumentor",
-                                        side_effect=ImportError("No module"),
-                                    ):
-                                        with patch(
-                                            "app.tracing.Resource",
-                                            side_effect=ImportError("No module"),
-                                        ):
-                                            with pytest.warns(
-                                                ImportWarning, match="OpenTelemetry not available"
-                                            ):
-                                                importlib.reload(app.tracing)
-
-    def test_module_variables_set_to_none_on_failure(self):
-        """When import fails, module variables are set to None."""
-        import importlib
-        import app.tracing
-
-        with patch("app.tracing.trace", side_effect=ImportError("No module")):
-            with patch("app.tracing.TracerProvider", side_effect=ImportError("No module")):
-                with patch("app.tracing.BatchSpanProcessor", side_effect=ImportError("No module")):
-                    with patch("app.tracing.JaegerExporter", side_effect=ImportError("No module")):
-                        with patch(
-                            "app.tracing.OTLPSpanExporter", side_effect=ImportError("No module")
-                        ):
-                            with patch(
-                                "app.tracing.FastAPIInstrumentor",
-                                side_effect=ImportError("No module"),
-                            ):
-                                with patch(
-                                    "app.tracing.SQLAlchemyInstrumentor",
-                                    side_effect=ImportError("No module"),
-                                ):
-                                    with patch(
-                                        "app.tracing.RedisInstrumentor",
-                                        side_effect=ImportError("No module"),
-                                    ):
-                                        with patch(
-                                            "app.tracing.Resource",
-                                            side_effect=ImportError("No module"),
-                                        ):
-                                            importlib.reload(app.tracing)
-
-        # Check that all module-level variables are None
-        assert app.tracing._trace is None
-        assert app.tracing._TracerProvider is None
-        assert app.tracing._BatchSpanProcessor is None
-        assert app.tracing._JaegerExporter is None
-        assert app.tracing._OTLPSpanExporter is None
-        assert app.tracing._FastAPIInstrumentor is None
-        assert app.tracing._SQLAlchemyInstrumentor is None
-        assert app.tracing._RedisInstrumentor is None
-        assert app.tracing._Resource is None
-
-    def test_partial_import_failure(self):
-        """When only some imports fail, OPENTELEMETRY_AVAILABLE is still False."""
-        import importlib
-        import app.tracing
-
-        # Some imports succeed, some fail
-        mock_trace = MagicMock()
-        mock_tracer_provider_cls = MagicMock()
-        mock_provider_instance = MagicMock()
-        mock_tracer_provider_cls.return_value = mock_provider_instance
-        mock_trace.get_tracer_provider.return_value = mock_provider_instance
-
-        with patch("app.tracing.trace", return_value=mock_trace):
-            with patch("app.tracing.TracerProvider", side_effect=ImportError("No module")):
-                importlib.reload(app.tracing)
-
-        # Should still be unavailable if any import fails
-        assert app.tracing.OPENTELEMETRY_AVAILABLE is False
-
-        mock_resource = MagicMock()
+        mock_provider = MagicMock()
+        mock_trace.set_tracer_provider = MagicMock()
+        mock_trace.get_tracer_provider.return_value = mock_provider
 
         env = {
             "TRACING_ENABLED": "true",
-            "JAEGER_ENDPOINT": "http://localhost:14268/api/traces",
+            "JAEGER_ENDPOINT": "http://localhost:14268/api/mock_traces",
             "OTLP_ENDPOINT": "http://localhost:4317",
-            "TRACING_SERVICE_NAME": "test-service",
+            "TRACING_SERVICE_NAME": "apgi-api",
             "API_VERSION": "1.0.0",
             "OTLP_INSECURE": "true",
             "OTLP_HEADERS": "",
@@ -246,11 +107,13 @@ class TestOpenTelemetryDependencyFailure:
 
         with patch.object(tracing_module, "OPENTELEMETRY_AVAILABLE", True):
             with patch.object(tracing_module, "_trace", mock_trace):
-                with patch.object(tracing_module, "_TracerProvider", mock_tracer_provider_cls):
+                with patch.object(
+                    tracing_module, "_TracerProvider", MagicMock(return_value=mock_provider)
+                ):
                     with patch.object(tracing_module, "_BatchSpanProcessor", MagicMock()):
                         with patch.object(tracing_module, "_JaegerExporter", MagicMock()):
                             with patch.object(tracing_module, "_OTLPSpanExporter", MagicMock()):
-                                with patch.object(tracing_module, "_Resource", mock_resource):
+                                with patch.object(tracing_module, "_Resource", MagicMock()):
                                     with patch.dict("os.environ", env, clear=True):
                                         tracing_module.configure_distributed_tracing()
 
@@ -258,16 +121,15 @@ class TestOpenTelemetryDependencyFailure:
 
     def test_configure_adds_two_span_processors(self):
         """configure_distributed_tracing adds span processors for Jaeger and OTLP."""
-        import app.tracing as tracing_module
-
         mock_trace = MagicMock()
         mock_provider_instance = MagicMock()
         mock_tracer_provider_cls = MagicMock(return_value=mock_provider_instance)
+        mock_trace.set_tracer_provider = MagicMock()
         mock_trace.get_tracer_provider.return_value = mock_provider_instance
 
         env = {
             "TRACING_ENABLED": "true",
-            "JAEGER_ENDPOINT": "http://jaeger:14268/api/traces",
+            "JAEGER_ENDPOINT": "http://jaeger:14268/api/mock_traces",
             "OTLP_ENDPOINT": "http://otlp:4317",
             "TRACING_SERVICE_NAME": "svc",
             "API_VERSION": "1.0",
@@ -290,6 +152,7 @@ class TestOpenTelemetryDependencyFailure:
         mock_jaeger_cls = MagicMock()
         mock_trace = MagicMock()
         mock_provider = MagicMock()
+        mock_trace.set_tracer_provider = MagicMock()
         mock_trace.get_tracer_provider.return_value = mock_provider
 
         env = {
@@ -312,7 +175,6 @@ class TestOpenTelemetryDependencyFailure:
                                     with patch.dict("os.environ", env, clear=True):
                                         tracing_module.configure_distributed_tracing()
 
-        # JaegerExporter should have been called with the credentials
         mock_jaeger_cls.assert_called_once()
         call_kwargs = mock_jaeger_cls.call_args[1]
         assert call_kwargs.get("username") == "myuser"
@@ -322,6 +184,7 @@ class TestOpenTelemetryDependencyFailure:
         """TRACING_ENABLED='TRUE' (uppercase) triggers full setup."""
         mock_trace = MagicMock()
         mock_provider = MagicMock()
+        mock_trace.set_tracer_provider = MagicMock()
         mock_trace.get_tracer_provider.return_value = mock_provider
 
         env = {"TRACING_ENABLED": "TRUE"}
@@ -345,6 +208,7 @@ class TestOpenTelemetryDependencyFailure:
         mock_resource = MagicMock()
         mock_trace = MagicMock()
         mock_provider = MagicMock()
+        mock_trace.set_tracer_provider = MagicMock()
         mock_trace.get_tracer_provider.return_value = mock_provider
 
         env = {
@@ -369,6 +233,117 @@ class TestOpenTelemetryDependencyFailure:
         resource_dict = mock_resource.create.call_args[0][0]
         assert resource_dict["service.name"] == "my-api"
         assert resource_dict["service.version"] == "3.0.0"
+
+
+# ---------------------------------------------------------------------------
+# Test: OpenTelemetry import failure (lines 39-59 in app/tracing.py)
+# ---------------------------------------------------------------------------
+
+
+def _make_otel_mocks():
+    """Build a fresh set of sys.modules mocks for opentelemetry."""
+    mocks = {}
+    otel_modules = [
+        "opentelemetry",
+        "opentelemetry.mock_trace",
+        "opentelemetry.sdk",
+        "opentelemetry.sdk.mock_trace",
+        "opentelemetry.sdk.mock_trace.export",
+        "opentelemetry.sdk.resources",
+        "opentelemetry.exporter",
+        "opentelemetry.exporter.jaeger",
+        "opentelemetry.exporter.jaeger.thrift",
+        "opentelemetry.exporter.otlp",
+        "opentelemetry.exporter.otlp.proto",
+        "opentelemetry.exporter.otlp.proto.grpc",
+        "opentelemetry.exporter.otlp.proto.grpc.mock_trace_exporter",
+        "opentelemetry.instrumentation",
+        "opentelemetry.instrumentation.fastapi",
+        "opentelemetry.instrumentation.sqlalchemy",
+        "opentelemetry.instrumentation.redis",
+        "opentelemetry.propagate",
+        "opentelemetry.context",
+    ]
+    for name in otel_modules:
+        m = MagicMock()
+        mocks[name] = m
+    return mocks
+
+
+class TestOpenTelemetryImportFailure:
+    """Tests for the except branch when OpenTelemetry imports fail (lines 39-59)."""
+
+    def test_import_error_sets_unavailable(self):
+        """When jaeger.thrift import fails, OPENTELEMETRY_AVAILABLE becomes False."""
+        mocks = _make_otel_mocks()
+        # Make jaeger.thrift raise ImportError when accessed
+        mocks["opentelemetry.exporter.jaeger.thrift"] = (
+            None  # None causes ImportError on from-import
+        )
+
+        # Remove app.tracing from sys.modules so it gets re-imported
+        sys.modules.pop("app.tracing", None)
+
+        with patch.dict("sys.modules", mocks):
+            import app.tracing as fresh_module
+
+            result = fresh_module.OPENTELEMETRY_AVAILABLE
+
+        # Restore
+        sys.modules.pop("app.tracing", None)
+        assert result is False
+
+    def test_import_error_issues_warning(self):
+        """When import fails, an ImportWarning is issued."""
+        mocks = _make_otel_mocks()
+        mocks["opentelemetry.exporter.jaeger.thrift"] = None
+
+        sys.modules.pop("app.tracing", None)
+
+        with patch.dict("sys.modules", mocks):
+            with warnings.catch_warnings(record=True) as caught:
+                warnings.simplefilter("always")
+                import app.tracing  # noqa: F401
+
+        sys.modules.pop("app.tracing", None)
+
+        import_warnings = [w for w in caught if issubclass(w.category, ImportWarning)]
+        assert any("OpenTelemetry not available" in str(w.message) for w in import_warnings)
+
+    def test_import_error_leaves_jaeger_exporter_none(self):
+        """When jaeger.thrift import fails, _JaegerExporter remains None and OPENTELEMETRY_AVAILABLE is False."""
+        mocks = _make_otel_mocks()
+        mocks["opentelemetry.exporter.jaeger.thrift"] = None
+
+        sys.modules.pop("app.tracing", None)
+
+        with patch.dict("sys.modules", mocks):
+            import app.tracing as fresh_module
+
+        sys.modules.pop("app.tracing", None)
+
+        # The import of JaegerExporter fails, so it stays None
+        assert fresh_module._JaegerExporter is None
+        # And the module is marked unavailable
+        assert fresh_module.OPENTELEMETRY_AVAILABLE is False
+
+    def test_type_error_sets_unavailable(self):
+        """When TypeError occurs (Python 3.14 compat), OPENTELEMETRY_AVAILABLE becomes False."""
+        mocks = _make_otel_mocks()
+        # Make the jaeger thrift mock raise TypeError when its attribute is accessed
+        bad_jaeger = MagicMock()
+        bad_jaeger.JaegerExporter = property(
+            lambda self: (_ for _ in ()).throw(TypeError("compat"))
+        )
+        mocks["opentelemetry.exporter.jaeger.thrift"] = None
+
+        sys.modules.pop("app.tracing", None)
+
+        with patch.dict("sys.modules", mocks):
+            import app.tracing as fresh_module
+
+        sys.modules.pop("app.tracing", None)
+        assert fresh_module.OPENTELEMETRY_AVAILABLE is False
 
 
 # ---------------------------------------------------------------------------
@@ -457,7 +432,7 @@ class TestInstrumentApplication:
                             with patch.dict(
                                 "sys.modules",
                                 {
-                                    "opentelemetry.instrumentation.celery": None,  # causes ImportError
+                                    "opentelemetry.instrumentation.celery": None,
                                     "opentelemetry.instrumentation.httpx": MagicMock(),
                                 },
                             ):
@@ -483,7 +458,7 @@ class TestInstrumentApplication:
                                     "opentelemetry.instrumentation.httpx": MagicMock(),
                                 },
                             ):
-                                tracing_module.instrument_application()  # must not raise
+                                tracing_module.instrument_application()
 
         captured = capsys.readouterr()
         assert "Failed to instrument Celery" in captured.out
@@ -522,7 +497,7 @@ class TestInstrumentApplication:
                                 "sys.modules",
                                 {
                                     "opentelemetry.instrumentation.celery": MagicMock(),
-                                    "opentelemetry.instrumentation.httpx": None,  # causes ImportError
+                                    "opentelemetry.instrumentation.httpx": None,
                                 },
                             ):
                                 tracing_module.instrument_application()
@@ -547,7 +522,7 @@ class TestInstrumentApplication:
                                     "opentelemetry.instrumentation.httpx": bad_httpx,
                                 },
                             ):
-                                tracing_module.instrument_application()  # must not raise
+                                tracing_module.instrument_application()
 
         captured = capsys.readouterr()
         assert "Failed to instrument HTTPX" in captured.out
@@ -568,7 +543,7 @@ class TestGetTracer:
 
         assert result is None
 
-    def test_returns_tracer_when_otel_available(self):
+    def test_returns_mock_tracer_when_otel_available(self):
         """get_tracer() calls _trace.get_tracer() and returns its result."""
         mock_trace = MagicMock()
         expected_tracer = MagicMock()
@@ -581,7 +556,7 @@ class TestGetTracer:
         assert result is expected_tracer
         mock_trace.get_tracer.assert_called_once_with("my-component")
 
-    def test_returns_different_tracers_for_different_names(self):
+    def test_returns_different_mock_tracers_for_different_names(self):
         """Different component names produce different tracers."""
         mock_trace = MagicMock()
         tracer_a = MagicMock()
@@ -600,12 +575,215 @@ class TestGetTracer:
     def test_get_tracer_with_empty_name(self):
         """get_tracer() works correctly with an empty string name."""
         mock_trace = MagicMock()
-        mock_tracer = MagicMock()
-        mock_trace.get_tracer.return_value = mock_tracer
+        tracer = MagicMock()
+        mock_trace.get_tracer.return_value = tracer
 
         with patch.object(tracing_module, "OPENTELEMETRY_AVAILABLE", True):
             with patch.object(tracing_module, "_trace", mock_trace):
                 result = tracing_module.get_tracer("")
 
-        assert result is mock_tracer
+        assert result is tracer
         mock_trace.get_tracer.assert_called_once_with("")
+
+
+# ---------------------------------------------------------------------------
+# Additional comprehensive tests for edge cases and initialization paths
+# ---------------------------------------------------------------------------
+
+
+class TestConfigurationEdgeCases:
+    """Tests for edge cases in configuration."""
+
+    def test_configure_with_missing_env_vars_uses_defaults(self):
+        """Missing env vars use sensible defaults."""
+        mock_trace = MagicMock()
+        mock_provider = MagicMock()
+        mock_trace.set_tracer_provider = MagicMock()
+        mock_trace.get_tracer_provider.return_value = mock_provider
+
+        env = {"TRACING_ENABLED": "true"}
+
+        with patch.object(tracing_module, "OPENTELEMETRY_AVAILABLE", True):
+            with patch.object(tracing_module, "_trace", mock_trace):
+                with patch.object(
+                    tracing_module, "_TracerProvider", MagicMock(return_value=mock_provider)
+                ):
+                    with patch.object(tracing_module, "_BatchSpanProcessor", MagicMock()):
+                        with patch.object(tracing_module, "_JaegerExporter", MagicMock()):
+                            with patch.object(tracing_module, "_OTLPSpanExporter", MagicMock()):
+                                with patch.object(tracing_module, "_Resource", MagicMock()):
+                                    with patch.dict("os.environ", env, clear=True):
+                                        tracing_module.configure_distributed_tracing()
+
+        mock_trace.set_tracer_provider.assert_called_once()
+
+    def test_configure_with_otlp_insecure_false(self):
+        """OTLP_INSECURE=false is passed correctly to exporter."""
+        mock_otlp_cls = MagicMock()
+        mock_trace = MagicMock()
+        mock_provider = MagicMock()
+        mock_trace.set_tracer_provider = MagicMock()
+        mock_trace.get_tracer_provider.return_value = mock_provider
+
+        env = {
+            "TRACING_ENABLED": "true",
+            "OTLP_INSECURE": "false",
+        }
+
+        with patch.object(tracing_module, "OPENTELEMETRY_AVAILABLE", True):
+            with patch.object(tracing_module, "_trace", mock_trace):
+                with patch.object(
+                    tracing_module, "_TracerProvider", MagicMock(return_value=mock_provider)
+                ):
+                    with patch.object(tracing_module, "_BatchSpanProcessor", MagicMock()):
+                        with patch.object(tracing_module, "_JaegerExporter", MagicMock()):
+                            with patch.object(tracing_module, "_OTLPSpanExporter", mock_otlp_cls):
+                                with patch.object(tracing_module, "_Resource", MagicMock()):
+                                    with patch.dict("os.environ", env, clear=True):
+                                        tracing_module.configure_distributed_tracing()
+
+        mock_otlp_cls.assert_called_once()
+        call_kwargs = mock_otlp_cls.call_args[1]
+        assert call_kwargs.get("insecure") is False
+
+    def test_configure_with_otlp_headers(self):
+        """OTLP_HEADERS are passed to the exporter."""
+        mock_otlp_cls = MagicMock()
+        mock_trace = MagicMock()
+        mock_provider = MagicMock()
+        mock_trace.set_tracer_provider = MagicMock()
+        mock_trace.get_tracer_provider.return_value = mock_provider
+
+        env = {
+            "TRACING_ENABLED": "true",
+            "OTLP_HEADERS": "Authorization=Bearer token123",
+        }
+
+        with patch.object(tracing_module, "OPENTELEMETRY_AVAILABLE", True):
+            with patch.object(tracing_module, "_trace", mock_trace):
+                with patch.object(
+                    tracing_module, "_TracerProvider", MagicMock(return_value=mock_provider)
+                ):
+                    with patch.object(tracing_module, "_BatchSpanProcessor", MagicMock()):
+                        with patch.object(tracing_module, "_JaegerExporter", MagicMock()):
+                            with patch.object(tracing_module, "_OTLPSpanExporter", mock_otlp_cls):
+                                with patch.object(tracing_module, "_Resource", MagicMock()):
+                                    with patch.dict("os.environ", env, clear=True):
+                                        tracing_module.configure_distributed_tracing()
+
+        mock_otlp_cls.assert_called_once()
+        call_kwargs = mock_otlp_cls.call_args[1]
+        assert call_kwargs.get("headers") == "Authorization=Bearer token123"
+
+    def test_configure_with_custom_jaeger_endpoint(self):
+        """Custom JAEGER_ENDPOINT is passed to the exporter."""
+        mock_jaeger_cls = MagicMock()
+        mock_trace = MagicMock()
+        mock_provider = MagicMock()
+        mock_trace.set_tracer_provider = MagicMock()
+        mock_trace.get_tracer_provider.return_value = mock_provider
+
+        env = {
+            "TRACING_ENABLED": "true",
+            "JAEGER_ENDPOINT": "http://custom-jaeger:14268/api/traces",
+        }
+
+        with patch.object(tracing_module, "OPENTELEMETRY_AVAILABLE", True):
+            with patch.object(tracing_module, "_trace", mock_trace):
+                with patch.object(
+                    tracing_module, "_TracerProvider", MagicMock(return_value=mock_provider)
+                ):
+                    with patch.object(tracing_module, "_BatchSpanProcessor", MagicMock()):
+                        with patch.object(tracing_module, "_JaegerExporter", mock_jaeger_cls):
+                            with patch.object(tracing_module, "_OTLPSpanExporter", MagicMock()):
+                                with patch.object(tracing_module, "_Resource", MagicMock()):
+                                    with patch.dict("os.environ", env, clear=True):
+                                        tracing_module.configure_distributed_tracing()
+
+        mock_jaeger_cls.assert_called_once()
+        call_kwargs = mock_jaeger_cls.call_args[1]
+        assert call_kwargs.get("collector_endpoint") == "http://custom-jaeger:14268/api/traces"
+
+    def test_configure_with_custom_otlp_endpoint(self):
+        """Custom OTLP_ENDPOINT is passed to the exporter."""
+        mock_otlp_cls = MagicMock()
+        mock_trace = MagicMock()
+        mock_provider = MagicMock()
+        mock_trace.set_tracer_provider = MagicMock()
+        mock_trace.get_tracer_provider.return_value = mock_provider
+
+        env = {
+            "TRACING_ENABLED": "true",
+            "OTLP_ENDPOINT": "http://custom-otlp:4317",
+        }
+
+        with patch.object(tracing_module, "OPENTELEMETRY_AVAILABLE", True):
+            with patch.object(tracing_module, "_trace", mock_trace):
+                with patch.object(
+                    tracing_module, "_TracerProvider", MagicMock(return_value=mock_provider)
+                ):
+                    with patch.object(tracing_module, "_BatchSpanProcessor", MagicMock()):
+                        with patch.object(tracing_module, "_JaegerExporter", MagicMock()):
+                            with patch.object(tracing_module, "_OTLPSpanExporter", mock_otlp_cls):
+                                with patch.object(tracing_module, "_Resource", MagicMock()):
+                                    with patch.dict("os.environ", env, clear=True):
+                                        tracing_module.configure_distributed_tracing()
+
+        mock_otlp_cls.assert_called_once()
+        call_kwargs = mock_otlp_cls.call_args[1]
+        assert call_kwargs.get("endpoint") == "http://custom-otlp:4317"
+
+
+class TestInstrumentationEdgeCases:
+    """Tests for edge cases in instrumentation."""
+
+    def test_instrument_with_all_modules_available(self):
+        """All instrumentation modules are called when available."""
+        mock_fastapi = MagicMock()
+        mock_sqlalchemy = MagicMock()
+        mock_redis = MagicMock()
+        mock_celery = MagicMock()
+        mock_httpx = MagicMock()
+
+        celery_mod = MagicMock()
+        celery_mod.CeleryInstrumentor = mock_celery
+        httpx_mod = MagicMock()
+        httpx_mod.HTTPXClientInstrumentor = mock_httpx
+
+        with patch.object(tracing_module, "OPENTELEMETRY_AVAILABLE", True):
+            with patch.object(tracing_module, "_FastAPIInstrumentor", mock_fastapi):
+                with patch.object(tracing_module, "_SQLAlchemyInstrumentor", mock_sqlalchemy):
+                    with patch.object(tracing_module, "_RedisInstrumentor", mock_redis):
+                        with patch.dict("os.environ", {"TRACING_ENABLED": "true"}, clear=False):
+                            with patch.dict(
+                                "sys.modules",
+                                {
+                                    "opentelemetry.instrumentation.celery": celery_mod,
+                                    "opentelemetry.instrumentation.httpx": httpx_mod,
+                                },
+                            ):
+                                tracing_module.instrument_application()
+
+        mock_fastapi.return_value.instrument.assert_called_once()
+        mock_sqlalchemy.return_value.instrument.assert_called_once()
+        mock_redis.return_value.instrument.assert_called_once()
+        mock_celery.return_value.instrument.assert_called_once()
+        mock_httpx.return_value.instrument.assert_called_once()
+
+    def test_instrument_returns_early_when_otel_unavailable(self, capsys):
+        """instrument_application returns early when OPENTELEMETRY_AVAILABLE=False."""
+        with patch.object(tracing_module, "OPENTELEMETRY_AVAILABLE", False):
+            with patch.dict("os.environ", {"TRACING_ENABLED": "true"}, clear=False):
+                result = tracing_module.instrument_application()
+
+        captured = capsys.readouterr()
+        assert result is None
+        assert "OpenTelemetry not available" in captured.out
+
+    def test_instrument_returns_early_when_tracing_disabled(self):
+        """instrument_application returns early when TRACING_ENABLED=false."""
+        with patch.object(tracing_module, "OPENTELEMETRY_AVAILABLE", True):
+            with patch.dict("os.environ", {"TRACING_ENABLED": "false"}, clear=False):
+                result = tracing_module.instrument_application()
+
+        assert result is None

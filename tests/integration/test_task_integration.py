@@ -235,7 +235,10 @@ class TestTaskRoutesIntegration:
         from app.routes.tasks import init_task_routes
 
         task_id = str(uuid.uuid4())
+        # Make sure get_task_status returns None to simulate task not found
         mock_task_executor.get_task_status.return_value = None
+        # Make sure cancel_task also raises an appropriate exception
+        mock_task_executor.cancel_task.side_effect = ValueError(f"Task {task_id} not found")
 
         # Initialize the task executor with mock
         init_task_routes()

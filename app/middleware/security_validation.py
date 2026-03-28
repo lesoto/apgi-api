@@ -117,7 +117,7 @@ class SecurityValidationMiddleware(BaseHTTPMiddleware):
         if not self.enabled:
             return await call_next(request)
 
-        # Only validate specific methods and paths
+        # Only validate specific methods and paths (skip HEAD and OPTIONS)
         if request.method.upper() in ["GET", "POST", "PUT", "PATCH", "DELETE"]:
             validation_result = await self._validate_request(request)
 
@@ -130,6 +130,9 @@ class SecurityValidationMiddleware(BaseHTTPMiddleware):
                     status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
                     detail=validation_result["error_message"],
                 )
+        else:
+            # Skip validation for HEAD and OPTIONS requests
+            return await call_next(request)
 
     async def _validate_request(self, request: Request) -> Dict[str, Any]:
         """

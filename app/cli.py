@@ -14,10 +14,13 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 
-@click.group()
-def cli():
+@click.group(invoke_without_command=True)
+@click.pass_context
+def cli(ctx: click.Context):
     """APGI API command-line interface."""
-    pass
+    if ctx.invoked_subcommand is None:
+        click.echo(ctx.get_help())
+        sys.exit(2)
 
 
 @cli.command()
@@ -96,6 +99,11 @@ def seed(users: int, templates: int, sessions: int, tasks: int, clear: bool, ver
 
     Creates realistic test data for development and testing purposes.
     """
+    # Validate input parameters
+    if users < 0 or templates < 0 or sessions < 0 or tasks < 0:
+        logger.error("Counts cannot be negative")
+        sys.exit(1)
+
     try:
         from app.services.seeding_service import DatabaseSeedingService
         from app.database.connection import init_db
@@ -166,6 +174,7 @@ def clear_seed_data(confirm: bool):
         cleared = seeder.clear_all_data()
 
         logger.info("Test data cleared successfully")
+        click.echo("Test data cleared successfully")
         for table, count in cleared.items():
             logger.info(f"  {table}: {count} records deleted")
 

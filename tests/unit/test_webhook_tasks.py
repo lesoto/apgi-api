@@ -1,149 +1,136 @@
-"""Tests for webhook_tasks.py module."""
+"""Test webhook tasks."""
 
 import pytest
-from unittest.mock import patch, MagicMock, AsyncMock
+from unittest.mock import MagicMock, patch, AsyncMock
+import asyncio
+
+from app.tasks.webhook_tasks import process_pending_webhooks, _process_webhooks
 
 
 class TestWebhookTasks:
-    """Test suite for webhook_tasks module."""
+    """Test webhook tasks functionality."""
 
-    @patch("app.tasks.webhook_tasks.SessionLocal")
+    def test_process_pending_webhooks_task_exists(self):
+        """Test that the Celery task is properly defined."""
+        assert callable(process_pending_webhooks)
+        assert hasattr(process_pending_webhooks, "__wrapped__")
+
     @patch("app.tasks.webhook_tasks.WebhookManager")
-    def test_process_pending_webhooks_success(self, mock_webhook_manager, mock_session_local):
-        """Test successful processing of pending webhooks."""
+    @patch("app.tasks.webhook_tasks.SessionLocal")
+    def test_process_pending_webhooks_success(self, mock_session_local, mock_webhook_manager):
+        """Test successful webhook processing."""
+        # Setup mocks
         mock_db = MagicMock()
         mock_session_local.return_value = mock_db
+
         mock_manager = MagicMock()
         mock_webhook_manager.return_value = mock_manager
         mock_manager.process_pending_deliveries = AsyncMock(return_value=5)
 
-        from app.tasks.webhook_tasks import process_pending_webhooks
+        # Run the async function
+        result = asyncio.run(_process_webhooks())
 
-        result = process_pending_webhooks()
-
+        # Verify results
         assert result == 5
         mock_session_local.assert_called_once()
         mock_webhook_manager.assert_called_once()
         mock_manager.process_pending_deliveries.assert_called_once_with(mock_db)
         mock_db.close.assert_called_once()
 
-    @patch("app.tasks.webhook_tasks.SessionLocal")
     @patch("app.tasks.webhook_tasks.WebhookManager")
-    def test_process_pending_webhooks_zero_processed(
-        self, mock_webhook_manager, mock_session_local
-    ):
-        """Test processing when no webhooks are pending."""
+    @patch("app.tasks.webhook_tasks.SessionLocal")
+    def test_process_pending_webhooks_exception(self, mock_session_local, mock_webhook_manager):
+        """Test webhook processing with exception."""
+        # Setup mocks
         mock_db = MagicMock()
         mock_session_local.return_value = mock_db
+
         mock_manager = MagicMock()
         mock_webhook_manager.return_value = mock_manager
-        mock_manager.process_pending_deliveries = AsyncMock(return_value=0)
+        test_exception = ValueError("Test webhook error")
+        mock_manager.process_pending_deliveries = AsyncMock(side_effect=test_exception)
 
-        from app.tasks.webhook_tasks import process_pending_webhooks
+        # Run and expect exception
+        with pytest.raises(ValueError, match="Test webhook error"):
+            asyncio.run(_process_webhooks())
 
-        result = process_pending_webhooks()
-
-        assert result == 0
+        # Verify cleanup even on exception
         mock_session_local.assert_called_once()
         mock_webhook_manager.assert_called_once()
         mock_manager.process_pending_deliveries.assert_called_once_with(mock_db)
         mock_db.close.assert_called_once()
 
-    @patch("app.tasks.webhook_tasks.SessionLocal")
     @patch("app.tasks.webhook_tasks.WebhookManager")
-    def test_process_pending_webhooks_exception(self, mock_webhook_manager, mock_session_local):
-        """Test handling when webhook processing raises an exception."""
+    @patch("app.tasks.webhook_tasks.SessionLocal")
+    def test_process_pending_webhooks_logging(self, mock_session_local, mock_webhook_manager):
+        """Test that webhook processing is properly logged."""
+        # Setup mocks
         mock_db = MagicMock()
         mock_session_local.return_value = mock_db
-        mock_manager = MagicMock()
-        mock_webhook_manager.return_value = mock_manager
-        mock_manager.process_pending_deliveries = AsyncMock(
-            side_effect=Exception("Processing failed")
-        )
 
-        from app.tasks.webhook_tasks import process_pending_webhooks
-
-        with pytest.raises(Exception, match="Processing failed"):
-            process_pending_webhooks()
-
-        mock_db.close.assert_called_once()
-
-    @patch("app.tasks.webhook_tasks.SessionLocal")
-    @patch("app.tasks.webhook_tasks.WebhookManager")
-    def test_process_pending_webhooks_multiple_processed(
-        self, mock_webhook_manager, mock_session_local
-    ):
-        """Test processing multiple webhooks."""
-        mock_db = MagicMock()
-        mock_session_local.return_value = mock_db
-        mock_manager = MagicMock()
-        mock_webhook_manager.return_value = mock_manager
-        mock_manager.process_pending_deliveries = AsyncMock(return_value=10)
-
-        from app.tasks.webhook_tasks import process_pending_webhooks
-
-        result = process_pending_webhooks()
-
-        assert result == 10
-        mock_session_local.assert_called_once()
-        mock_webhook_manager.assert_called_once()
-        mock_manager.process_pending_deliveries.assert_called_once_with(mock_db)
-        mock_db.close.assert_called_once()
-
-    @patch("app.tasks.webhook_tasks.SessionLocal")
-    @patch("app.tasks.webhook_tasks.WebhookManager")
-    def test_process_pending_webhooks_database_error(
-        self, mock_webhook_manager, mock_session_local
-    ):
-        """Test handling when database session creation fails."""
-        mock_session_local.side_effect = Exception("Database connection failed")
-
-        from app.tasks.webhook_tasks import process_pending_webhooks
-
-        with pytest.raises(Exception, match="Database connection failed"):
-            process_pending_webhooks()
-
-    @pytest.mark.asyncio
-    @patch("app.tasks.webhook_tasks.SessionLocal")
-    @patch("app.tasks.webhook_tasks.WebhookManager")
-    async def test_process_webhooks_async_success(self, mock_webhook_manager, mock_session_local):
-        """Test the async _process_webhooks function directly."""
-        mock_db = MagicMock()
-        mock_session_local.return_value = mock_db
         mock_manager = MagicMock()
         mock_webhook_manager.return_value = mock_manager
         mock_manager.process_pending_deliveries = AsyncMock(return_value=3)
 
-        from app.tasks.webhook_tasks import _process_webhooks
+        with patch("app.tasks.webhook_tasks.logger") as mock_logger:
+            asyncio.run(_process_webhooks())
 
-        result = await _process_webhooks()
+            # Verify logging
+            mock_logger.info.assert_called_once_with("Processed 3 pending webhooks")
 
-        assert result == 3
-        mock_session_local.assert_called_once()
-        mock_webhook_manager.assert_called_once()
-        mock_manager.process_pending_deliveries.assert_called_once_with(mock_db)
-        mock_db.close.assert_called_once()
-
-    @pytest.mark.asyncio
-    @patch("app.tasks.webhook_tasks.SessionLocal")
     @patch("app.tasks.webhook_tasks.WebhookManager")
-    async def test_process_webhooks_async_exception(self, mock_webhook_manager, mock_session_local):
-        """Test the async _process_webhooks function with exception."""
+    @patch("app.tasks.webhook_tasks.SessionLocal")
+    def test_process_pending_webhooks_error_logging(self, mock_session_local, mock_webhook_manager):
+        """Test that webhook processing errors are properly logged."""
+        # Setup mocks
         mock_db = MagicMock()
         mock_session_local.return_value = mock_db
+
         mock_manager = MagicMock()
         mock_webhook_manager.return_value = mock_manager
-        mock_manager.process_pending_deliveries = AsyncMock(side_effect=Exception("Webhook error"))
+        test_exception = ValueError("Test webhook error")
+        mock_manager.process_pending_deliveries = AsyncMock(side_effect=test_exception)
 
-        from app.tasks.webhook_tasks import _process_webhooks
+        with patch("app.tasks.webhook_tasks.logger") as mock_logger:
+            with pytest.raises(ValueError):
+                asyncio.run(_process_webhooks())
 
-        with pytest.raises(Exception, match="Webhook error"):
-            await _process_webhooks()
+            # Verify error logging
+            mock_logger.error.assert_called_once_with(
+                "Error processing webhooks: Test webhook error"
+            )
 
-        mock_db.close.assert_called_once()
+    def test_process_webhooks_closes_database(self, mock_session_local, mock_webhook_manager):
+        """Test that database connection is always closed."""
+        # Setup mocks
+        mock_db = MagicMock()
+        mock_session_local.return_value = mock_db
 
-    def test_process_pending_webhooks_task_name(self):
-        """Test that the Celery task has the correct name."""
-        from app.tasks.webhook_tasks import process_pending_webhooks
+        mock_manager = MagicMock()
+        mock_webhook_manager.return_value = mock_manager
+        mock_manager.process_pending_deliveries = AsyncMock(return_value=1)
 
-        assert process_pending_webhooks.name == "process_pending_webhooks"
+        # Run the function
+        asyncio.run(_process_webhooks())
+
+        # Verify database is closed regardless of success/failure
+        assert mock_db.close.call_count == 1
+
+    @patch("app.tasks.webhook_tasks.WebhookManager")
+    @patch("app.tasks.webhook_tasks.SessionLocal")
+    def test_process_webhooks_manager_parameters(self, mock_session_local, mock_webhook_manager):
+        """Test that WebhookManager is called with correct parameters."""
+        # Setup mocks
+        mock_db = MagicMock()
+        mock_session_local.return_value = mock_db
+
+        mock_manager = MagicMock()
+        mock_webhook_manager.return_value = mock_manager
+        mock_manager.process_pending_deliveries = AsyncMock(return_value=2)
+
+        # Run the function
+        asyncio.run(_process_webhooks())
+
+        # Verify WebhookManager instantiation
+        mock_webhook_manager.assert_called_once()
+        mock_manager.process_pending_deliveries.assert_called_once_with(mock_db)

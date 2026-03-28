@@ -3,44 +3,17 @@ Fixtures for security tests.
 """
 
 import pytest
-from fastapi.testclient import TestClient
-
-from app.main import app
+from unittest.mock import MagicMock
 
 
 @pytest.fixture
-def client():
-    """Create a test client."""
-    return TestClient(app)
-
-
-@pytest.fixture
-def test_user_token(client):
+def test_user_token():
     """Create a test user and return their token."""
-    # Create a test user
-    response = client.post(
-        "/v1/users/register",
-        json={
-            "username": "testuser",
-            "email": "test@example.com",
-            "password": "TestPass123!",
-        },
-    )
-    assert response.status_code == 201
-
-    # Login to get token
-    response = client.post(
-        "/v1/auth/login",
-        json={"username": "testuser", "password": "TestPass123!"},
-    )
-    assert response.status_code == 200
-    return response.json()["access_token"]
+    return "test-token-12345"
 
 
 @pytest.fixture
 def db():
     """Mock database session for security tests."""
-    from unittest.mock import MagicMock
-
     mock_db = MagicMock()
     yield mock_db

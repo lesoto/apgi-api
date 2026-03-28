@@ -236,7 +236,7 @@ class ProfilingService:
     def get_system_performance(self) -> Dict[str, Any]:
         """Get current system performance metrics."""
         try:
-            import psutil
+            import psutil  # type: ignore
             import threading
 
             # CPU usage

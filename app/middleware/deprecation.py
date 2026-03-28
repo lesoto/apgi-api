@@ -57,9 +57,9 @@ class DeprecationMiddleware(BaseHTTPMiddleware):
 
             # Add Link header pointing to replacement if specified
             if "replacement" in deprecation_info:
-                response.headers[
-                    "Link"
-                ] = f'<{deprecation_info["replacement"]}>; rel="successor-version"'
+                response.headers["Link"] = (
+                    f'<{deprecation_info["replacement"]}>; rel="successor-version"'
+                )
 
             # Add custom warning header with deprecation message
             warning_msg = self._build_warning_message(path, deprecation_info)

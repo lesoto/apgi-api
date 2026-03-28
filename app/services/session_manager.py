@@ -400,9 +400,9 @@ class SessionManager:
         # In-memory session cache with TTL and size limits
         self.session_cache_max_size = 1000  # Maximum number of sessions to cache
         self.session_ttl_seconds = 3600  # 1 hour TTL for cached sessions
-        self.sessions: OrderedDict[
-            str, Tuple[SimulationSession, float]
-        ] = OrderedDict()  # (session, last_access_time)
+        self.sessions: OrderedDict[str, Tuple[SimulationSession, float]] = (
+            OrderedDict()
+        )  # (session, last_access_time)
 
         # Lock for session cache access
         self.cache_lock = asyncio.Lock()

@@ -317,6 +317,9 @@ async def get_ignition_history(  # noqa: C901
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, detail=f"Session {session_id} not found"
         )
+    except HTTPException:
+        # Re-raise HTTPException without modification
+        raise
     except Exception as e:
         logger.exception("Failed to get ignition history")
         raise HTTPException(

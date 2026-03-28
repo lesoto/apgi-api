@@ -117,13 +117,13 @@ async def export_session_data(
             )
 
         # Parse variables list
+        import re
+
         var_list = None
         if variables:
             var_list = [v.strip() for v in variables.split(",")]
 
             # Validate variable names (alphanumeric with underscores and hyphens)
-            import re
-
             for var in var_list:
                 if not var or not re.match(r"^[a-zA-Z0-9_-]+$", var):
                     raise HTTPException(
@@ -186,6 +186,8 @@ async def export_session_data(
             headers={"Content-Disposition": f'attachment; filename="{filename}"'},
         )
 
+    except HTTPException:
+        raise
     except ValueError as e:
         if "exceeds maximum" in str(e):
             raise HTTPException(status.HTTP_413_REQUEST_ENTITY_TOO_LARGE, detail=str(e))
@@ -328,6 +330,8 @@ async def get_time_series_data(
     except ValueError as e:
         logger.warning(f"Time series retrieval failed for session {session_id}: {e}")
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
+    except HTTPException:
+        raise
     except Exception as e:
         logger.exception("Failed to get time series data")
         raise HTTPException(

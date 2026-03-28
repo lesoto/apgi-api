@@ -4,126 +4,57 @@ import json
 import pytest
 from typing import Dict, Any
 from unittest.mock import patch, MagicMock, AsyncMock
-from datetime import datetime
+
 from app.services.data_export import DataExportService
 
 
 class TestDataExportService:
-    """Test DataExportService functionality."""
+    """Test DataExportService initialization and basic functionality."""
 
     @pytest.fixture
     def export_service(self):
         mock_session_manager = MagicMock()
         return DataExportService(session_manager=mock_session_manager)
 
-    def test_export_user_data_basic(self, export_service):
-        """Test basic user data export."""
-        with patch("app.services.data_export.get_db_context") as mock_db_context:
-            mock_db = MagicMock()
-            mock_db_context.return_value.__enter__.return_value = mock_db
-            mock_db.query.return_value.join.return_value.all.return_value = [
-                MagicMock(user_id="user1", username="user1", email="user1@example.com"),
-                MagicMock(user_id="user2", username="user2", email="user2@example.com"),
-            ]
+    def test_initialization(self, export_service):
+        """Test DataExportService initializes correctly."""
+        assert export_service.session_manager is not None
 
-            # Export user data
-            result = export_service.export_user_data(["user1", "user2"])
+    def test_export_json_basic(self, export_service):
+        """Test _export_json returns bytes and correct content type."""
+        data = {"session_id": "s1", "data": []}
+        result, ct = export_service._export_json(data)
+        assert ct == "application/json"
+        assert isinstance(result, bytes)
+        parsed = json.loads(result)
+        assert parsed["session_id"] == "s1"
 
-            # Verify export structure
-            assert "users" in result
-            assert len(result["users"]) == 2
-            assert result["users"][0]["username"] == "user1"
-            assert result["users"][1]["username"] == "user2"
-            assert "export_timestamp" in result
-            assert isinstance(result["export_timestamp"], datetime)
+    def test_export_csv_basic(self, export_service):
+        """Test _export_csv returns bytes."""
+        data = {
+            "session_id": "s1",
+            "created_at": "2024-01-01T00:00:00Z",
+            "updated_at": "2024-01-01T01:00:00Z",
+            "config": {},
+            "state": "completed",
+            "data": [{"time": 0, "x": 1}],
+        }
+        result = export_service._export_csv(data)
+        assert isinstance(result, bytes)
+        text = result.decode("utf-8")
+        assert "time" in text
 
-    def test_export_task_data_basic(self, export_service):
-        """Test basic task data export."""
-        with patch("app.services.data_export.get_db_context") as mock_db_context:
-            mock_db = MagicMock()
-            mock_db_context.return_value.__enter__.return_value = mock_db
-            mock_db.query.return_value.join.return_value.all.return_value = [
-                MagicMock(task_id="task1", title="Task 1", status="completed"),
-                MagicMock(task_id="task2", title="Task 2", status="pending"),
-            ]
+    def test_redact_config_basic(self, export_service):
+        """Test _redact_config removes sensitive keys."""
+        config = {"password": "secret", "name": "test"}
+        redacted = export_service._redact_config(config)
+        assert redacted["password"] == "[REDACTED]"
+        assert redacted["name"] == "test"
 
-            # Export task data
-            result = export_service.export_task_data(["task1", "task2"])
-
-            # Verify export structure
-            assert "tasks" in result
-            assert len(result["tasks"]) == 2
-            assert result["tasks"][0]["title"] == "Task 1"
-            assert result["tasks"][1]["title"] == "Task 2"
-            assert "export_timestamp" in result
-
-    def test_export_session_data_basic(self, export_service):
-        """Test basic session data export."""
-        with patch("app.services.data_export.get_db_context") as mock_db_context:
-            mock_db = MagicMock()
-            mock_db_context.return_value.__enter__.return_value = mock_db
-            mock_db.query.return_value.join.return_value.all.return_value = [
-                MagicMock(session_id="session1", user_id="user1", created_at=datetime.now()),
-                MagicMock(session_id="session2", user_id="user2", created_at=datetime.now()),
-            ]
-
-            # Export session data
-            result = export_service.export_session_data(["session1", "session2"])
-
-            # Verify export structure
-            assert "sessions" in result
-            assert len(result["sessions"]) == 2
-            assert result["sessions"][0]["user_id"] == "user1"
-            assert result["sessions"][1]["user_id"] == "user2"
-            assert "export_timestamp" in result
-
-    def test_export_empty_lists(self, export_service):
-        """Test export with empty lists."""
-        with patch("app.services.data_export.get_db_context") as mock_db_context:
-            mock_db = MagicMock()
-            mock_db_context.return_value.__enter__.return_value = mock_db
-
-            # Export empty data
-            result = export_service.export_user_data([])
-
-            # Verify empty export
-            assert result["users"] == []
-            assert "export_timestamp" in result
-
-    def test_export_format_json(self, export_service):
-        """Test export format is JSON serializable."""
-        with patch("app.services.data_export.get_db_context") as mock_db_context:
-            mock_db = MagicMock()
-            mock_db_context.return_value.__enter__.return_value = mock_db
-            mock_db.query.return_value.join.return_value.all.return_value = [
-                MagicMock(user_id="user1", username="user1", email="user1@example.com")
-            ]
-
-            # Export and verify JSON serializable
-            result = export_service.export_user_data(["user1"])
-
-            # Should not raise exception when serializing to JSON
-            import json
-
-            json_str = json.dumps(result)
-            assert isinstance(json_str, str)
-
-    def test_export_includes_metadata(self, export_service):
-        """Test export includes metadata."""
-        with patch("app.services.data_export.get_db_context") as mock_db_context:
-            mock_db = MagicMock()
-            mock_db_context.return_value.__enter__.return_value = mock_db
-            mock_db.query.return_value.join.return_value.all.return_value = [
-                MagicMock(user_id="user1", username="user1", email="user1@example.com")
-            ]
-
-            # Export user data
-            result = export_service.export_user_data(["user1"])
-
-            # Verify metadata fields
-            assert "export_version" in result
-            assert "total_records" in result
-            assert result["total_records"] == 1
+    def test_extract_time_series_empty(self, export_service):
+        """Test _extract_time_series with empty state."""
+        result = export_service._extract_time_series({}, None, None, None)
+        assert result == []
 
 
 @pytest.fixture

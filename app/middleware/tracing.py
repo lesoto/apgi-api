@@ -22,7 +22,7 @@ try:
 
     # Try to import JaegerExporter conditionally
     try:
-        from opentelemetry.exporter.jaeger.thrift import JaegerExporter
+        from opentelemetry.exporter.jaeger.thrift import JaegerExporter  # type: ignore
 
         JAEGER_EXPORTER_AVAILABLE = True
     except ImportError as jaeger_error:

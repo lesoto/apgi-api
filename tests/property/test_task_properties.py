@@ -17,8 +17,43 @@ from pathlib import Path
 # Add app directory to path for imports
 sys.path.insert(0, str(Path(__file__).parent.parent.parent / "app"))
 
-from celery.result import AsyncResult
-from celery import states
+# Import Celery with mock fallback for testing
+try:
+    from celery.result import AsyncResult
+    from celery import states
+
+    CELERY_AVAILABLE = True
+except ImportError:
+    # Create mock celery classes for testing without celery installation
+    class MockStates:
+        PENDING = "PENDING"
+        RECEIVED = "RECEIVED"
+        STARTED = "STARTED"
+        SUCCESS = "SUCCESS"
+        FAILURE = "FAILURE"
+        RETRY = "RETRY"
+        REVOKED = "REVOKED"
+
+    class MockAsyncResult:
+        def __init__(self, task_id):
+            self.id = task_id
+            self.state = MockStates.PENDING
+            self.status = MockStates.PENDING
+            self.result = None
+            self.info = None
+
+        def ready(self):
+            return self.state in [MockStates.SUCCESS, MockStates.FAILURE, MockStates.REVOKED]
+
+        def successful(self):
+            return self.state == MockStates.SUCCESS
+
+        def failed(self):
+            return self.state == MockStates.FAILURE
+
+    AsyncResult = MockAsyncResult
+    states = MockStates
+    CELERY_AVAILABLE = False
 
 # ============================================================================
 # Helper Functions

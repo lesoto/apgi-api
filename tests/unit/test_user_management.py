@@ -121,8 +121,8 @@ class TestCreateUser:
     @patch("app.services.user_management.settings")
     def test_create_user_success(self, mock_settings, mock_db, mock_auth_manager, mock_user_model):
         """Test successful user creation."""
-        mock_settings.smtp_server = "smtp.example.com"
-        mock_settings.require_email_verification = True
+        mock_settings.smtp_server = None  # No SMTP - skip email sending
+        mock_settings.require_email_verification = False  # Auto-activate
         mock_settings.smtp_from_email = "noreply@example.com"
         mock_settings.base_url = "https://example.com"
         mock_db.add.return_value = None
@@ -536,7 +536,8 @@ class TestRequestPasswordReset:
 
         service = UserManagementService(mock_db)
 
-        service.request_password_reset("test@example.com")
+        with patch.object(service, "_send_password_reset_email") as mock_send:
+            service.request_password_reset("test@example.com")
 
         assert mock_user_model.password_reset_token is not None
         assert mock_user_model.password_reset_expires_at is not None
@@ -790,14 +791,15 @@ class TestSendPasswordResetEmail:
 
     @patch("app.services.user_management.settings")
     def test_send_password_reset_email_no_smtp(self, mock_settings, mock_db, mock_auth_manager):
-        """Test send password reset email when SMTP not configured."""
+        """Test send password reset email when SMTP not configured raises ServiceUnavailableError."""
+        from app.exceptions import ServiceUnavailableError
+
         mock_settings.smtp_server = None
 
         service = UserManagementService(mock_db)
 
-        service._send_password_reset_email("test@example.com", "reset_token")
-
-        # Should not raise, just log warning
+        with pytest.raises(ServiceUnavailableError):
+            service._send_password_reset_email("test@example.com", "reset_token")
 
     @patch("app.services.user_management.settings")
     @patch("smtplib.SMTP")
@@ -831,7 +833,9 @@ class TestSendPasswordResetEmail:
     def test_send_password_reset_email_error(
         self, mock_ssl, mock_smtp, mock_settings, mock_db, mock_auth_manager
     ):
-        """Test password reset email sending with error."""
+        """Test password reset email sending with SMTP error raises ServiceUnavailableError."""
+        from app.exceptions import ServiceUnavailableError
+
         mock_settings.smtp_server = "smtp.example.com"
         mock_settings.smtp_port = 587
         mock_settings.smtp_from_email = "noreply@example.com"
@@ -845,9 +849,8 @@ class TestSendPasswordResetEmail:
 
         service = UserManagementService(mock_db)
 
-        service._send_password_reset_email("test@example.com", "reset_token")
-
-        # Should not raise, just log error
+        with pytest.raises(ServiceUnavailableError):
+            service._send_password_reset_email("test@example.com", "reset_token")
 
 
 class TestSendVerificationEmail:
@@ -855,14 +858,15 @@ class TestSendVerificationEmail:
 
     @patch("app.services.user_management.settings")
     def test_send_verification_email_no_smtp(self, mock_settings, mock_db, mock_auth_manager):
-        """Test send verification email when SMTP not configured."""
+        """Test send verification email when SMTP not configured raises ServiceUnavailableError."""
+        from app.exceptions import ServiceUnavailableError
+
         mock_settings.smtp_server = None
 
         service = UserManagementService(mock_db)
 
-        service._send_verification_email("test@example.com", "verification_token")
-
-        # Should not raise, just log warning
+        with pytest.raises(ServiceUnavailableError):
+            service._send_verification_email("test@example.com", "verification_token")
 
     @patch("app.services.user_management.settings")
     @patch("smtplib.SMTP")
@@ -875,6 +879,8 @@ class TestSendVerificationEmail:
         mock_settings.smtp_port = 587
         mock_settings.smtp_from_email = "noreply@example.com"
         mock_settings.base_url = "https://example.com"
+        mock_settings.smtp_username = None
+        mock_settings.smtp_password = None
 
         mock_server = MagicMock()
         mock_smtp.return_value = mock_server
@@ -893,11 +899,15 @@ class TestSendVerificationEmail:
     def test_send_verification_email_error(
         self, mock_ssl, mock_smtp, mock_settings, mock_db, mock_auth_manager
     ):
-        """Test verification email sending with error."""
+        """Test verification email sending with SMTP error raises ServiceUnavailableError."""
+        from app.exceptions import ServiceUnavailableError
+
         mock_settings.smtp_server = "smtp.example.com"
         mock_settings.smtp_port = 587
         mock_settings.smtp_from_email = "noreply@example.com"
         mock_settings.base_url = "https://example.com"
+        mock_settings.smtp_username = None
+        mock_settings.smtp_password = None
 
         mock_server = MagicMock()
         mock_smtp.return_value = mock_server
@@ -905,9 +915,8 @@ class TestSendVerificationEmail:
 
         service = UserManagementService(mock_db)
 
-        service._send_verification_email("test@example.com", "verification_token")
-
-        # Should not raise, just log error
+        with pytest.raises(ServiceUnavailableError):
+            service._send_verification_email("test@example.com", "verification_token")
 
 
 class TestDeleteUser:

@@ -135,7 +135,7 @@ class TestDashboardOverview:
         from app.routes.metrics import get_dashboard_overview
 
         mock_service = MagicMock()
-        mock_service.get_overview_metrics.return_value = {"total_requests": 100}
+        mock_service.get_overview_metrics = AsyncMock(return_value={"total_requests": 100})
 
         result = await get_dashboard_overview(service=mock_service)
 
@@ -147,7 +147,7 @@ class TestDashboardOverview:
         from app.routes.metrics import get_dashboard_overview
 
         mock_service = MagicMock()
-        mock_service.get_overview_metrics.side_effect = RuntimeError("db down")
+        mock_service.get_overview_metrics = AsyncMock(side_effect=RuntimeError("db down"))
 
         with pytest.raises(HTTPException) as exc_info:
             await get_dashboard_overview(service=mock_service)

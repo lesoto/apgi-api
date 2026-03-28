@@ -381,6 +381,19 @@ class TestTrustedProxy:
         result = mw._get_client_id(request)
         assert result == "ip:203.0.113.1"
 
+    def test_is_trusted_proxy_with_invalid_direct_ip_format(self):
+        """When direct_ip is invalid format, is_trusted_proxy returns False and uses direct IP."""
+        mw = self._make_mw()
+
+        request = MagicMock()
+        del request.state.user
+        request.client.host = "not-an-ip"
+        request.headers = {"X-Forwarded-For": "203.0.113.1"}
+
+        result = mw._get_client_id(request)
+        # Should use direct IP since is_trusted_proxy fails on invalid direct_ip
+        assert result == "ip:not-an-ip"
+
 
 class TestShouldSkipRateLimiting:
     """Test skip-list logic."""
@@ -565,3 +578,61 @@ class TestDispatch:
         # Should not raise
         result = await mw.dispatch(request, call_next)
         call_next.assert_called_once_with(request)
+
+    @pytest.mark.asyncio
+    async def test_reset_time_negative_value_handled(self):
+        """If reset_time is negative, uses default 60-second window."""
+        from app.middleware.rate_limiting import RateLimitingMiddleware
+
+        response_mock = MagicMock()
+        response_mock.headers = {}
+        call_next = AsyncMock(return_value=response_mock)
+
+        request = MagicMock()
+        request.url.path = "/v1/sessions"
+        request.method = "GET"
+        del request.state.user
+        request.client.host = "10.0.0.1"
+        request.headers = {}
+
+        mock_rate_limiter = MagicMock()
+        # Return a very large negative reset_time to trigger the negative timestamp check
+        mock_rate_limiter.check_rate_limit = AsyncMock(return_value=(True, 59, -(10**15)))
+
+        mock_redis = MagicMock()
+        with patch("app.middleware.rate_limiting.RateLimiter", return_value=mock_rate_limiter):
+            mw = RateLimitingMiddleware(AsyncMock(), redis_client=mock_redis, enabled=True)
+
+        result = await mw.dispatch(request, call_next)
+        call_next.assert_called_once_with(request)
+        # Should have rate limit headers
+        assert "X-RateLimit-Limit" in response_mock.headers
+
+    @pytest.mark.asyncio
+    async def test_reset_time_invalid_type_handled(self):
+        """If reset_time is invalid type, uses default 60-second window."""
+        from app.middleware.rate_limiting import RateLimitingMiddleware
+
+        response_mock = MagicMock()
+        response_mock.headers = {}
+        call_next = AsyncMock(return_value=response_mock)
+
+        request = MagicMock()
+        request.url.path = "/v1/sessions"
+        request.method = "GET"
+        del request.state.user
+        request.client.host = "10.0.0.1"
+        request.headers = {}
+
+        mock_rate_limiter = MagicMock()
+        # Return invalid reset_time type to trigger exception handling
+        mock_rate_limiter.check_rate_limit = AsyncMock(return_value=(True, 59, "invalid"))
+
+        mock_redis = MagicMock()
+        with patch("app.middleware.rate_limiting.RateLimiter", return_value=mock_rate_limiter):
+            mw = RateLimitingMiddleware(AsyncMock(), redis_client=mock_redis, enabled=True)
+
+        result = await mw.dispatch(request, call_next)
+        call_next.assert_called_once_with(request)
+        # Should have rate limit headers
+        assert "X-RateLimit-Limit" in response_mock.headers

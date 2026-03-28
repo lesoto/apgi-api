@@ -10,7 +10,13 @@ from datetime import datetime, timezone
 from typing import Any, Dict, Optional
 import time
 
-from celery.result import AsyncResult
+try:
+    from celery.result import AsyncResult
+except ImportError as e:
+    # Handle potential celery import issues
+    import celery
+
+    AsyncResult = celery.result.AsyncResult
 
 from app.celery_app import celery_app
 from app.database.connection import get_db_context

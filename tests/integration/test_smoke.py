@@ -94,9 +94,9 @@ class TestHealthEndpoints:
             assert "status" in data
             assert data["status"] in ["healthy", "ready"]
         else:
-            # When service unavailable, response is error format
-            assert "error" in data
-            assert data["error"]["code"] == "SERVICE_UNAVAILABLE"
+            # When service unavailable, response has status field
+            assert "status" in data
+            assert data["status"] in ["not_ready", "degraded"]
 
     @pytest.mark.asyncio
     async def test_health_service_not_initialized(self, client):

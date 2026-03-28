@@ -8,8 +8,8 @@ import logging
 import secrets
 import string
 import uuid
-from contextlib import contextmanager
-from typing import Generator
+from contextlib import contextmanager, asynccontextmanager
+from typing import Generator, AsyncGenerator
 
 from sqlalchemy import create_engine
 from sqlalchemy.orm import Session, sessionmaker
@@ -158,6 +158,7 @@ NOTE: These credentials allow full system access - change immediately
             email=f"{secure_username}@apgi-system.local",
             password_hash=AuthManager.hash_password(secure_password),
             roles=["user", "session_manager"],
+            is_active=True,  # Explicitly set is_active to satisfy database schema
         )
 
         db.add(default_user)
@@ -205,6 +206,30 @@ def get_db_context() -> Generator[Session, None, None]:
 
     Usage:
         with get_db_context() as db:
+            # Use db session
+            pass
+    """
+    db = SessionLocal()
+    try:
+        yield db
+        db.commit()
+    except Exception:
+        db.rollback()
+        raise
+    finally:
+        db.close()
+
+
+@asynccontextmanager
+async def get_async_db_context() -> AsyncGenerator[Session, None]:
+    """
+    Async context manager for database session.
+
+    Yields:
+        Session: SQLAlchemy database session
+
+    Usage:
+        async with get_async_db_context() as db:
             # Use db session
             pass
     """

@@ -5,7 +5,7 @@ Provides Prometheus metrics for monitoring API performance and health.
 """
 
 import time
-import psutil
+import psutil  # type: ignore
 from typing import Callable
 
 from fastapi import Request

@@ -9,15 +9,7 @@ import warnings
 from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
-    from opentelemetry import trace
-    from opentelemetry.sdk.trace import TracerProvider
-    from opentelemetry.sdk.trace.export import BatchSpanProcessor
-    from opentelemetry.exporter.jaeger.thrift import JaegerExporter
-    from opentelemetry.exporter.otlp.proto.grpc.trace_exporter import OTLPSpanExporter
-    from opentelemetry.instrumentation.fastapi import FastAPIInstrumentor
-    from opentelemetry.instrumentation.sqlalchemy import SQLAlchemyInstrumentor
-    from opentelemetry.instrumentation.redis import RedisInstrumentor
-    from opentelemetry.sdk.resources import Resource
+    pass
 
 # Module-level variables to hold the actual imports
 _trace: Any = None
@@ -35,7 +27,7 @@ try:
     from opentelemetry import trace as _trace
     from opentelemetry.sdk.trace import TracerProvider as _TracerProvider
     from opentelemetry.sdk.trace.export import BatchSpanProcessor as _BatchSpanProcessor
-    from opentelemetry.exporter.jaeger.thrift import JaegerExporter as _JaegerExporter
+    from opentelemetry.exporter.jaeger.thrift import JaegerExporter as _JaegerExporterInstance  # type: ignore
     from opentelemetry.exporter.otlp.proto.grpc.trace_exporter import (
         OTLPSpanExporter as _OTLPSpanExporter,
     )
@@ -46,20 +38,15 @@ try:
     from opentelemetry.instrumentation.redis import RedisInstrumentor as _RedisInstrumentor
     from opentelemetry.sdk.resources import Resource as _Resource
 
-    _trace = trace
-    _TracerProvider = TracerProvider
-    _BatchSpanProcessor = BatchSpanProcessor
-    _JaegerExporter = JaegerExporter
-    _OTLPSpanExporter = OTLPSpanExporter
-    _FastAPIInstrumentor = FastAPIInstrumentor
-    _SQLAlchemyInstrumentor = SQLAlchemyInstrumentor
-    _RedisInstrumentor = RedisInstrumentor
-    _Resource = Resource
+    # For test compatibility, also expose as _mock_trace when mocked
+    _mock_trace = _trace
+    _JaegerExporter = _JaegerExporterInstance
 
     OPENTELEMETRY_AVAILABLE = True
 except (ImportError, TypeError) as e:
     # Handle Python 3.14 compatibility issues
     OPENTELEMETRY_AVAILABLE = False
+    _mock_trace = None  # For test compatibility when OpenTelemetry is not available
     warnings.warn(
         f"OpenTelemetry not available: {str(e)}. "
         "Distributed tracing will be disabled. "

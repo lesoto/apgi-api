@@ -218,6 +218,7 @@ class SessionTemplateCreateRequest(BaseModel):
         return self
 
     model_config = ConfigDict(
+        strict=True,
         json_schema_extra={
             "example": {
                 "name": "Default Experiment",
@@ -227,7 +228,7 @@ class SessionTemplateCreateRequest(BaseModel):
                 "tags": ["attentional_blink", "experiment"],
                 "is_public": False,
             }
-        }
+        },
     )
 
 
@@ -527,12 +528,13 @@ class SessionCreateRequest(BaseModel):
         return self
 
     model_config = ConfigDict(
+        strict=True,
         json_schema_extra={
             "example": {
                 "template_id": "tmpl_abc123",
                 "description": "Baseline simulation experiment",
             }
-        }
+        },
     )
 
 
@@ -581,13 +583,15 @@ class LoginRequest(BaseModel):
         return v
 
     model_config = ConfigDict(
+        str_strip_whitespace=True,
+        strict=True,
         json_schema_extra={
             "example": {
                 "username": "user@example.com",
                 "password": "secure_password",
                 "remember_me": False,
             }
-        }
+        },
     )
 
 
@@ -1001,6 +1005,7 @@ class TaskSubmitRequest(BaseModel):
         return self
 
     model_config = ConfigDict(
+        strict=True,
         json_schema_extra={
             "example": {
                 "task_type": "attentional_blink",
@@ -1013,7 +1018,7 @@ class TaskSubmitRequest(BaseModel):
                 },
                 "webhook_url": "https://example.com/webhook/task_complete",
             }
-        }
+        },
     )
 
 
@@ -1235,6 +1240,7 @@ class ErrorDetail(BaseModel):
     details: Optional[Dict[str, Any]] = Field(None, description="Additional error details")
 
     model_config = ConfigDict(
+        strict=True,
         json_schema_extra={
             "example": {
                 "code": "VALIDATION_ERROR",
@@ -1242,7 +1248,7 @@ class ErrorDetail(BaseModel):
                 "timestamp": "2024-01-15T10:30:00Z",
                 "details": {"field": "username", "error": "Field required"},
             }
-        }
+        },
     )
 
 
@@ -1392,6 +1398,8 @@ class PasswordResetRequest(BaseModel):
 
     new_password: str = Field(..., description="New password")
 
+    model_config = ConfigDict(strict=True)
+
 
 class PasswordResetEmailRequest(BaseModel):
     """Request to initiate password reset by email."""
@@ -1429,6 +1437,8 @@ class PasswordResetConfirmRequest(BaseModel):
             raise ValueError("Token is too long")
 
         return v.strip()
+
+    model_config = ConfigDict(strict=True)
 
 
 class PasswordResetEmailResponse(BaseModel):
@@ -1475,6 +1485,8 @@ class MFAEnableRequest(BaseModel):
     """Request to enable MFA."""
 
     code: str = Field(..., description="TOTP code from authenticator app")
+
+    model_config = ConfigDict(strict=True)
 
 
 class MFAEnableResponse(BaseModel):
@@ -1763,13 +1775,14 @@ class APIKeyCreateRequest(BaseModel):
         return [perm.strip() for perm in v]
 
     model_config = ConfigDict(
+        strict=True,
         json_schema_extra={
             "example": {
                 "name": "My API Key",
                 "permissions": ["read", "write"],
                 "expires_at": "2025-01-15T10:30:00Z",
             }
-        }
+        },
     )
 
 
@@ -1809,6 +1822,7 @@ class APIKeyResponse(BaseModel):
     last_used_at: Optional[datetime] = Field(None, description="Last usage timestamp")
 
     model_config = ConfigDict(
+        strict=True,
         json_schema_extra={
             "example": {
                 "key_id": "key_abc123",
@@ -1819,7 +1833,7 @@ class APIKeyResponse(BaseModel):
                 "created_at": "2024-01-15T10:30:00Z",
                 "last_used_at": "2024-01-16T08:45:00Z",
             }
-        }
+        },
     )
 
 
@@ -1924,6 +1938,7 @@ class WebhookDeliveryResponse(BaseModel):
     created_at: datetime = Field(..., description="Delivery record creation timestamp")
 
     model_config = ConfigDict(
+        strict=True,
         json_schema_extra={
             "example": {
                 "delivery_id": "delivery_abc123",
@@ -1938,7 +1953,7 @@ class WebhookDeliveryResponse(BaseModel):
                 "error_message": None,
                 "created_at": "2024-01-15T10:30:00Z",
             }
-        }
+        },
     )
 
 
@@ -1986,6 +2001,7 @@ class WebhookRetryResponse(BaseModel):
     last_attempt_at: Optional[datetime] = Field(None, description="Last attempt timestamp")
 
     model_config = ConfigDict(
+        strict=True,
         json_schema_extra={
             "example": {
                 "delivery_id": "delivery_abc123",
@@ -1994,7 +2010,7 @@ class WebhookRetryResponse(BaseModel):
                 "attempts": 2,
                 "last_attempt_at": "2024-01-15T10:40:00Z",
             }
-        }
+        },
     )
 
 

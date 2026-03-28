@@ -5,7 +5,7 @@ Contains all Celery task definitions for asynchronous execution.
 """
 
 # Import the module to register tasks with Celery
-from app.tasks import experimental_tasks
+from . import experimental_tasks
 
 __all__ = [
     "experimental_tasks",

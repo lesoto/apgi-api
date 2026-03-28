@@ -7,7 +7,7 @@ Tests for session management, lifecycle, and cleanup.
 import pytest
 from unittest.mock import MagicMock, AsyncMock, patch
 from fastapi import HTTPException, status
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from app.models.schemas import SessionCreateRequest
 
 
@@ -64,8 +64,8 @@ def mock_session_service():
         return_value={
             "id": "session123",
             "user_id": "user123",
-            "created_at": datetime.utcnow(),
-            "expires_at": datetime.utcnow() + timedelta(hours=24),
+            "created_at": datetime.now(timezone.utc),
+            "expires_at": datetime.now(timezone.utc) + timedelta(hours=24),
             "is_active": True,
         }
     )
@@ -95,32 +95,40 @@ class TestSessionCreation:
 
         with (
             patch("app.routes.sessions.get_session_manager") as mock_get_service,
-            patch("app.routes.sessions.check_idempotency_key") as mock_idempotency,
-            patch("app.routes.sessions.cache_idempotency_response") as mock_cache,
+            patch("app.routes.sessions.get_redis_client") as mock_get_redis,
+            patch("app.routes.sessions.get_current_user", return_value=mock_current_user),
+            patch(
+                "app.routes.sessions.require_permission", return_value=lambda func: func
+            ),  # Mock permission decorator
+            patch(
+                "app.routes.sessions.check_idempotency_key", return_value=None
+            ),  # Mock idempotency check
+            patch(
+                "app.routes.sessions.cache_idempotency_response", return_value=None
+            ),  # Mock cache function
         ):
-            mock_manager = MagicMock()
-            mock_manager.create_session = AsyncMock(return_value="session123")
-            mock_manager.get_session = AsyncMock(
-                return_value=MagicMock(
-                    state=MagicMock(value="active"),
-                    created_at=datetime.utcnow(),
-                    config={},
-                )
-            )
-            mock_get_service.return_value = mock_manager
-            mock_idempotency.return_value = None
+            mock_manager_instance = MagicMock()
+            mock_manager_instance.create_session = AsyncMock(return_value="session123")
+            mock_sim_session = MagicMock()
+            mock_sim_session.state.value = "active"
+            mock_sim_session.created_at = datetime.now(timezone.utc)
+            mock_sim_session.config = {}
+            mock_manager_instance.get_session = AsyncMock(return_value=mock_sim_session)
+
+            mock_get_service.return_value = mock_manager_instance
+            mock_get_redis.return_value = mock_redis_client
 
             result = await create_session(
                 session_request,
                 mock_request,
-                mock_manager,
-                mock_redis_client,
-                mock_current_user,
+                manager=mock_manager_instance,  # Pass the manager directly
+                redis_client=mock_redis_client,
+                current_user=mock_current_user,
             )
 
             assert result.session_id == "session123"
             assert result.status == "active"
-            mock_manager.create_session.assert_called_once()
+            mock_manager_instance.create_session.assert_called_once()
 
     @pytest.mark.asyncio
     async def test_create_session_with_custom_expiry(
@@ -138,23 +146,35 @@ class TestSessionCreation:
 
         with (
             patch("app.routes.sessions.get_session_manager") as mock_get_service,
-            patch("app.routes.sessions.check_idempotency_key") as mock_idempotency,
-            patch("app.routes.sessions.cache_idempotency_response") as mock_cache,
+            patch("app.routes.sessions.get_redis_client") as mock_get_redis,
+            patch("app.routes.sessions.get_current_user", return_value=mock_current_user),
+            patch(
+                "app.routes.sessions.require_permission", return_value=lambda func: func
+            ),  # Mock permission decorator
+            patch(
+                "app.routes.sessions.check_idempotency_key", return_value=None
+            ),  # Mock idempotency check
+            patch(
+                "app.routes.sessions.cache_idempotency_response", return_value=None
+            ),  # Mock cache function
         ):
-            mock_manager = MagicMock()
-            mock_manager.create_session = AsyncMock(return_value="session123")
-            mock_manager.get_session = AsyncMock(
-                return_value=MagicMock(
-                    state=MagicMock(value="active"),
-                    created_at=datetime.utcnow(),
-                    config={},
-                )
-            )
-            mock_get_service.return_value = mock_manager
-            mock_idempotency.return_value = None
+            mock_manager_instance = MagicMock()
+            mock_manager_instance.create_session = AsyncMock(return_value="session123")
+            mock_sim_session = MagicMock()
+            mock_sim_session.state.value = "active"
+            mock_sim_session.created_at = datetime.now(timezone.utc)
+            mock_sim_session.config = {}
+            mock_manager_instance.get_session = AsyncMock(return_value=mock_sim_session)
+
+            mock_get_service.return_value = mock_manager_instance
+            mock_get_redis.return_value = mock_redis_client
 
             result = await create_session(
-                session_request, mock_request, mock_manager, mock_redis_client, mock_current_user
+                session_request,
+                mock_request,
+                manager=mock_manager_instance,
+                redis_client=mock_redis_client,
+                current_user=mock_current_user,
             )
 
             assert result is not None
@@ -175,23 +195,33 @@ class TestSessionCreation:
 
         with (
             patch("app.routes.sessions.get_session_manager") as mock_get_service,
-            patch("app.routes.sessions.check_idempotency_key") as mock_idempotency,
-            patch("app.routes.sessions.cache_idempotency_response") as mock_cache,
+            patch("app.routes.sessions.get_redis_client") as mock_get_redis,
+            patch("app.routes.sessions.get_current_user", return_value=mock_current_user),
+            patch(
+                "app.routes.sessions.require_permission", return_value=lambda func: func
+            ),  # Mock permission decorator
+            patch(
+                "app.routes.sessions.check_idempotency_key", return_value=None
+            ),  # Mock idempotency check
+            patch(
+                "app.routes.sessions.cache_idempotency_response", return_value=None
+            ),  # Mock cache function
         ):
-            mock_manager = MagicMock()
-            mock_manager.create_session = AsyncMock(
+            mock_manager_instance = MagicMock()
+            mock_manager_instance.create_session = AsyncMock(
                 side_effect=HTTPException(status_code=400, detail="Invalid device")
             )
-            mock_get_service.return_value = mock_manager
-            mock_idempotency.return_value = None
+
+            mock_get_service.return_value = mock_manager_instance
+            mock_get_redis.return_value = mock_redis_client
 
             with pytest.raises(HTTPException) as exc_info:
                 await create_session(
                     session_request,
                     mock_request,
-                    mock_manager,
-                    mock_redis_client,
-                    mock_current_user,
+                    manager=mock_manager_instance,
+                    redis_client=mock_redis_client,
+                    current_user=mock_current_user,
                 )
 
             assert exc_info.value.status_code == status.HTTP_400_BAD_REQUEST
@@ -212,23 +242,33 @@ class TestSessionCreation:
 
         with (
             patch("app.routes.sessions.get_session_manager") as mock_get_service,
-            patch("app.routes.sessions.check_idempotency_key") as mock_idempotency,
-            patch("app.routes.sessions.cache_idempotency_response") as mock_cache,
+            patch("app.routes.sessions.get_redis_client") as mock_get_redis,
+            patch("app.routes.sessions.get_current_user", return_value=mock_current_user),
+            patch(
+                "app.routes.sessions.require_permission", return_value=lambda func: func
+            ),  # Mock permission decorator
+            patch(
+                "app.routes.sessions.check_idempotency_key", return_value=None
+            ),  # Mock idempotency check
+            patch(
+                "app.routes.sessions.cache_idempotency_response", return_value=None
+            ),  # Mock cache function
         ):
-            mock_manager = MagicMock()
-            mock_manager.create_session = AsyncMock(
+            mock_manager_instance = MagicMock()
+            mock_manager_instance.create_session = AsyncMock(
                 side_effect=HTTPException(status_code=400, detail="Concurrent limit exceeded")
             )
-            mock_get_service.return_value = mock_manager
-            mock_idempotency.return_value = None
+
+            mock_get_service.return_value = mock_manager_instance
+            mock_get_redis.return_value = mock_redis_client
 
             with pytest.raises(HTTPException) as exc_info:
                 await create_session(
                     session_request,
                     mock_request,
-                    mock_manager,
-                    mock_redis_client,
-                    mock_current_user,
+                    manager=mock_manager_instance,
+                    redis_client=mock_redis_client,
+                    current_user=mock_current_user,
                 )
 
             assert exc_info.value.status_code == status.HTTP_400_BAD_REQUEST
@@ -254,7 +294,11 @@ class TestSessionValidation:
         )
 
         result = await validate_session_ownership(
-            "user123", mock_current_user.user_id, mock_manager, mock_db, is_admin=False
+            session_id="session123",
+            user_id=mock_current_user.user_id,
+            manager=mock_manager,
+            db_session=mock_db,
+            is_admin=False,
         )
 
         assert result.session_id == "session123"
@@ -272,10 +316,10 @@ class TestSessionValidation:
 
         with pytest.raises(HTTPException) as exc_info:
             await validate_session_ownership(
-                "session999",
-                mock_current_user.user_id,
-                mock_manager,
-                mock_db,
+                session_id="session999",
+                user_id=mock_current_user.user_id,
+                manager=mock_manager,
+                db_session=mock_db,
                 is_admin=False,
             )
 
@@ -300,10 +344,10 @@ class TestSessionValidation:
 
         with pytest.raises(HTTPException) as exc_info:
             await validate_session_ownership(
-                "session123",
-                mock_current_user.user_id,
-                mock_manager,
-                mock_db,
+                session_id="session123",
+                user_id=mock_current_user.user_id,
+                manager=mock_manager,
+                db_session=mock_db,
                 is_admin=False,
             )
 
@@ -326,7 +370,11 @@ class TestSessionValidation:
         )
 
         result = await validate_session_ownership(
-            "session123", mock_current_user.user_id, mock_manager, mock_db, is_admin=True
+            session_id="session123",
+            user_id=mock_current_user.user_id,
+            manager=mock_manager,
+            db_session=mock_db,
+            is_admin=True,
         )
 
         assert result.session_id == "session123"
@@ -349,16 +397,19 @@ class TestSessionDeletion:
             mock_session
         )
 
-        with (
-            patch.object(mock_manager, "get_session") as mock_get_session,
-            patch.object(mock_manager, "delete_session") as mock_delete,
-        ):
-            mock_get_session.return_value = MagicMock()
+        mock_sim_session = MagicMock()
+        mock_manager.get_session = AsyncMock(return_value=mock_sim_session)
+        mock_manager.delete_session = AsyncMock(return_value=None)
 
-            result = await delete_session("session123", mock_manager, mock_current_user, mock_db)
+        result = await delete_session(
+            session_id="session123",
+            manager=mock_manager,
+            current_user=mock_current_user,
+            db=mock_db,
+        )
 
-            assert result is None
-            mock_delete.assert_called_once_with("session123")
+        assert result is None
+        mock_manager.delete_session.assert_called_once_with("session123")
 
     @pytest.mark.asyncio
     async def test_delete_session_unauthorized(self, mock_db, mock_current_user, mock_manager):
@@ -375,7 +426,12 @@ class TestSessionDeletion:
         )
 
         with pytest.raises(HTTPException) as exc_info:
-            await delete_session("session123", mock_manager, mock_current_user, mock_db)
+            await delete_session(
+                session_id="session123",
+                manager=mock_manager,
+                current_user=mock_current_user,
+                db=mock_db,
+            )
 
         assert exc_info.value.status_code == status.HTTP_403_FORBIDDEN
 
@@ -397,40 +453,57 @@ class TestSessionMaintenance:
         mock_session.session_id = "session123"
         mock_session.user_id = mock_current_user.user_id
         mock_session.is_deleted = False
-        mock_session.updated_at = datetime.utcnow()
+        mock_session.updated_at = datetime.now(timezone.utc)
 
         mock_db.query.return_value.filter.return_value.filter.return_value.first.return_value = (
             mock_session
         )
 
-        with (
-            patch.object(mock_manager, "get_session") as mock_get_session,
-            patch.object(mock_manager, "update_session_state") as mock_update,
-        ):
-            mock_sim_session = MagicMock()
-            mock_sim_session.state.value = "running"
-            mock_sim_session.updated_at = datetime.utcnow()
-            mock_get_session.return_value = mock_sim_session
-            mock_sim_session.start.return_value = {"status": "running"}
-            mock_sim_session.pause.return_value = {"status": "paused"}
-            mock_sim_session.stop.return_value = {"status": "stopped"}
-            mock_sim_session.reset.return_value = {"status": "created"}
+        mock_sim_session = MagicMock()
+        mock_sim_session.state.value = "running"
+        mock_sim_session.updated_at = datetime.now(timezone.utc)
+        mock_manager.get_session = AsyncMock(return_value=mock_sim_session)
+        mock_manager.update_session_state = AsyncMock(return_value=None)
+        mock_sim_session.start = AsyncMock(return_value={"status": "running"})
+        mock_sim_session.pause = AsyncMock(return_value={"status": "paused"})
+        mock_sim_session.stop = AsyncMock(return_value={"status": "stopped"})
+        mock_sim_session.reset = AsyncMock(return_value={"status": "created"})
 
-            # Test start
-            result = await start_session("session123", mock_manager, mock_current_user, mock_db)
-            assert result.session_id == "session123"
+        # Test start
+        result = await start_session(
+            session_id="session123",
+            manager=mock_manager,
+            current_user=mock_current_user,
+            db=mock_db,
+        )
+        assert result.session_id == "session123"
 
-            # Test pause
-            result = await pause_session("session123", mock_manager, mock_current_user, mock_db)
-            assert result.session_id == "session123"
+        # Test pause
+        result = await pause_session(
+            session_id="session123",
+            manager=mock_manager,
+            current_user=mock_current_user,
+            db=mock_db,
+        )
+        assert result.session_id == "session123"
 
-            # Test stop
-            result = await stop_session("session123", mock_manager, mock_current_user, mock_db)
-            assert result.session_id == "session123"
+        # Test stop
+        result = await stop_session(
+            session_id="session123",
+            manager=mock_manager,
+            current_user=mock_current_user,
+            db=mock_db,
+        )
+        assert result.session_id == "session123"
 
-            # Test reset
-            result = await reset_session("session123", mock_manager, mock_current_user, mock_db)
-            assert result.session_id == "session123"
+        # Test reset
+        result = await reset_session(
+            session_id="session123",
+            manager=mock_manager,
+            current_user=mock_current_user,
+            db=mock_db,
+        )
+        assert result.session_id == "session123"
 
 
 class TestSessionList:
@@ -442,36 +515,35 @@ class TestSessionList:
         from app.routes.sessions import list_sessions
         from app.models.schemas import SessionListResponse
 
-        with patch.object(mock_manager, "list_sessions") as mock_list:
-            mock_sessions_data = {
-                "sessions": [
-                    MagicMock(
-                        session_id="session123",
-                        state="active",
-                        created_at=datetime.utcnow(),
-                        updated_at=datetime.utcnow(),
-                        config={},
-                        description="Test session",
-                    ),
-                    MagicMock(
-                        session_id="session456",
-                        state="inactive",
-                        created_at=datetime.utcnow(),
-                        updated_at=datetime.utcnow(),
-                        config={},
-                        description="Test session 2",
-                    ),
-                ],
-                "total": 2,
-            }
-            mock_list.return_value = mock_sessions_data
+        mock_sessions_data = {
+            "sessions": [
+                MagicMock(
+                    session_id="session123",
+                    state="active",
+                    created_at=datetime.now(timezone.utc),
+                    updated_at=datetime.now(timezone.utc),
+                    config={},
+                    description="Test session",
+                ),
+                MagicMock(
+                    session_id="session456",
+                    state="inactive",
+                    created_at=datetime.now(timezone.utc),
+                    updated_at=datetime.now(timezone.utc),
+                    config={},
+                    description="Test session 2",
+                ),
+            ],
+            "total": 2,
+        }
+        mock_manager.list_sessions = AsyncMock(return_value=mock_sessions_data)
 
-            result = await list_sessions(current_user=mock_current_user, manager=mock_manager)
+        result = await list_sessions(current_user=mock_current_user, manager=mock_manager)
 
-            assert isinstance(result, SessionListResponse)
-            assert len(result.sessions) == 2
-            assert result.sessions[0].session_id == "session123"
-            assert result.sessions[1].session_id == "session456"
+        assert isinstance(result, SessionListResponse)
+        assert len(result.sessions) == 2
+        assert result.sessions[0].session_id == "session123"
+        assert result.sessions[1].session_id == "session456"
 
     @pytest.mark.asyncio
     async def test_list_sessions_with_pagination(self, mock_db, mock_current_user, mock_manager):
@@ -479,34 +551,33 @@ class TestSessionList:
         from app.routes.sessions import list_sessions
         from app.models.schemas import SessionListResponse
 
-        with patch.object(mock_manager, "list_sessions") as mock_list:
-            mock_sessions_data = {
-                "sessions": [
-                    MagicMock(
-                        session_id="session123",
-                        state="active",
-                        created_at=datetime.utcnow(),
-                        updated_at=datetime.utcnow(),
-                        config={},
-                        description="Test session",
-                    )
-                ],
-                "total": 5,
-            }
-            mock_list.return_value = mock_sessions_data
+        mock_sessions_data = {
+            "sessions": [
+                MagicMock(
+                    session_id="session123",
+                    state="active",
+                    created_at=datetime.now(timezone.utc),
+                    updated_at=datetime.now(timezone.utc),
+                    config={},
+                    description="Test session",
+                )
+            ],
+            "total": 5,
+        }
+        mock_manager.list_sessions = AsyncMock(return_value=mock_sessions_data)
 
-            result = await list_sessions(
-                page=1,
-                per_page=10,
-                manager=mock_manager,
-                current_user=mock_current_user,
-            )
+        result = await list_sessions(
+            page=1,
+            per_page=10,
+            manager=mock_manager,
+            current_user=mock_current_user,
+        )
 
-            assert isinstance(result, SessionListResponse)
-            assert len(result.sessions) == 1
-            assert result.pagination.page == 1
-            assert result.pagination.per_page == 10
-            assert result.pagination.total == 5
+        assert isinstance(result, SessionListResponse)
+        assert len(result.sessions) == 1
+        assert result.pagination.page == 1
+        assert result.pagination.per_page == 10
+        assert result.pagination.total == 5
 
 
 class TestSessionPersistence:
@@ -521,23 +592,25 @@ class TestSessionPersistence:
         mock_session.session_id = "session123"
         mock_session.user_id = mock_current_user.user_id
         mock_session.is_deleted = False
-        mock_session.updated_at = datetime.utcnow()
+        mock_session.updated_at = datetime.now(timezone.utc)
 
         mock_db.query.return_value.filter.return_value.filter.return_value.first.return_value = (
             mock_session
         )
 
-        with (
-            patch.object(mock_manager, "get_session") as mock_get_session,
-            patch.object(mock_manager, "update_session_state") as mock_update,
-        ):
-            mock_sim_session = MagicMock()
-            mock_sim_session.state.value = "created"
-            mock_sim_session.updated_at = datetime.utcnow()
-            mock_get_session.return_value = mock_sim_session
-            mock_sim_session.reset.return_value = {"status": "created"}
+        mock_sim_session = MagicMock()
+        mock_sim_session.state.value = "created"
+        mock_sim_session.updated_at = datetime.now(timezone.utc)
+        mock_manager.get_session = AsyncMock(return_value=mock_sim_session)
+        mock_manager.update_session_state = AsyncMock(return_value=None)
+        mock_sim_session.reset = AsyncMock(return_value={"status": "created"})
 
-            result = await reset_session("session123", mock_manager, mock_current_user, mock_db)
+        result = await reset_session(
+            session_id="session123",
+            manager=mock_manager,
+            current_user=mock_current_user,
+            db=mock_db,
+        )
 
-            assert result.session_id == "session123"
-            assert result.status == "created"
+        assert result.session_id == "session123"
+        assert result.status == "created"

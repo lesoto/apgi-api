@@ -108,8 +108,8 @@
             width: 100%;
             max-width: 500px;
             background: var(--panel-bg);
-            backdrop-filter: blur(25px);
             -webkit-backdrop-filter: blur(25px);
+            backdrop-filter: blur(25px);
             border: 1px solid rgba(255, 255, 255, 0.08);
             border-radius: 24px;
             padding: 40px;
@@ -289,6 +289,45 @@
             text-decoration: underline;
         }
 
+        .validation-subtitle {
+            margin-bottom: 40px;
+        }
+
+        .workspace-uplink {
+            border-left: 4px solid var(--workspace-purple);
+            text-align: left;
+        }
+
+        .calibrating-parameters {
+            border-left: 4px solid var(--threshold-blue);
+            text-align: left;
+            margin-bottom: 0;
+        }
+
+        .success-wrapper {
+            padding-top: 20px;
+        }
+
+        .success-subtitle {
+            margin-bottom: 30px;
+            color: var(--modulator-green);
+        }
+
+        .threshold-moment {
+            border-left: 4px solid var(--threshold-blue);
+            text-align: left;
+            background: rgba(0, 180, 255, 0.08);
+            border-color: rgba(0, 180, 255, 0.2);
+        }
+
+        .threshold-container {
+            background: rgba(0, 180, 255, 0.15);
+        }
+
+        .dashboard-link {
+            text-decoration: none;
+        }
+
         /* Processing Spinner */
         .processing-wrapper {
             text-align: center;
@@ -366,7 +405,7 @@
                     </feMerge>
                 </filter>
             </defs>
-            <path class="node-path" d="M10%,20% Q30%,50% 50%,30% T90%,60%" style="filter: url(#glow);" />
+            <path class="node-path" d="M10%,20% Q30%,50% 50%,30% T90%,60%" />
             <path class="node-path" d="M0,80% Q40%,90% 60%,60% T100%,70%" />
             <path class="node-path" d="M20%,20% Q50%,40% 80%,20% T120%,40%" />
             
@@ -426,10 +465,10 @@
             <div class="processing-wrapper">
                 <div class="spinner"></div>
                 <h2>Synchronizing Arrays</h2>
-                <p class="subtitle" style="margin-bottom: 40px;">Validating identity across cognitive subnetworks...</p>
+                <p class="subtitle validation-subtitle">Validating identity across cognitive subnetworks...</p>
 
                 <!-- Conceptual Icon 1/2: Workspace Purple Broadcast Tower -->
-                <div class="conceptual-icon-box" style="border-left: 4px solid var(--workspace-purple); text-align: left;">
+                <div class="conceptual-icon-box workspace-uplink">
                     <div class="icon-container">
                         <svg viewBox="0 0 24 24" stroke="var(--workspace-purple)" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round" aria-label="Broadcast Tower" role="img">
                             <path d="M12 12v11"></path><path d="M8 23h8"></path><circle cx="12" cy="9" r="3"></circle>
@@ -438,13 +477,13 @@
                         </svg>
                     </div>
                     <div class="icon-text">
-                        <h4 style="color: var(--workspace-purple)">Global Workspace Uplink</h4>
+                        <h4>Global Workspace Uplink</h4>
                         <p>Injecting profile into conscious access stream.</p>
                     </div>
                 </div>
 
                 <!-- Conceptual Icon 2/2: Gauge/Meter -->
-                <div class="conceptual-icon-box" style="border-left: 4px solid var(--threshold-blue); text-align: left; margin-bottom: 0;">
+                <div class="conceptual-icon-box calibrating-parameters">
                     <div class="icon-container">
                         <svg viewBox="0 0 24 24" fill="none" stroke="var(--threshold-blue)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-label="Gauge" role="img">
                             <path d="M2 12A10 10 0 0 1 22 12"></path>
@@ -453,7 +492,7 @@
                         </svg>
                     </div>
                     <div class="icon-text">
-                        <h4 style="color: var(--threshold-blue)">Calibrating Parameters</h4>
+                        <h4>Calibrating Parameters</h4>
                         <p>Adjusting baseline arousal configurations for your node.</p>
                     </div>
                 </div>
@@ -461,8 +500,8 @@
         </div>
 
         <!-- STEP 3: SUCCESS -->
-        <div id="step-success" class="step" style="text-align: center;">
-            <div class="processing-wrapper" style="padding-top: 20px;">
+        <div id="step-success" class="step">
+            <div class="processing-wrapper success-wrapper">
                 <!-- Concept Icon: Neuromodulator Green Flask / Success -->
                 <div class="state-icon-large">
                     <svg viewBox="0 0 24 24" fill="none" stroke="var(--modulator-green)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-label="Chemical Flask" role="img">
@@ -471,21 +510,21 @@
                     </svg>
                 </div>
                 <h2>Equilibrium Reached</h2>
-                <p class="subtitle" style="margin-bottom: 30px; color: var(--modulator-green);">Node Successfully Initialized</p>
+                <p class="subtitle success-subtitle">Node Successfully Initialized</p>
 
-                <div class="conceptual-icon-box" style="border-left: 4px solid var(--threshold-blue); text-align: left; background: rgba(0, 180, 255, 0.08); border-color: rgba(0, 180, 255, 0.2);">
-                    <div class="icon-container" style="background: rgba(0, 180, 255, 0.15);">
+                <div class="conceptual-icon-box threshold-moment">
+                    <div class="icon-container threshold-container">
                         <svg viewBox="0 0 24 24" fill="none" stroke="var(--threshold-blue)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-label="Lightning Bolt" role="img">
                             <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon>
                         </svg>
                     </div>
                     <div class="icon-text">
-                        <h4 style="color: var(--threshold-blue)">Aha Moment!</h4>
+                        <h4>Aha Moment!</h4>
                         <p>Threshold crossed. Welcome to the APGI Cognitive Network.</p>
                     </div>
                 </div>
 
-                <a href="checkout.html" class="btn-primary" style="text-decoration: none;">Proceed to Dashboard</a>
+                <a href="checkout.html" class="btn-primary dashboard-link">Proceed to Dashboard</a>
             </div>
         </div>
 

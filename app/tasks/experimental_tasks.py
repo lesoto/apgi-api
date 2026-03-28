@@ -158,7 +158,12 @@ def execute_iowa_gambling_task(self, session_id: str, parameters: Dict[str, Any]
     logger.info(f"Starting Iowa Gambling Task for session {session_id}")
 
     if not APGI_SYSTEM_AVAILABLE or IowaGamblingTask is None:
-        raise ImportError("IowaGamblingTask not available - apgi_system not installed")
+        return {
+            "task_type": "iowa_gambling",
+            "session_id": session_id,
+            "status": "failed",
+            "error": "IowaGamblingTask not available - apgi_system not installed",
+        }
 
     result = None
     try:
@@ -237,7 +242,12 @@ def execute_masking_paradigm_task(
     logger.info(f"Starting Masking Paradigm Task for session {session_id}")
 
     if not APGI_SYSTEM_AVAILABLE or MaskingParadigmTask is None:
-        raise ImportError("MaskingParadigmTask not available - apgi_system not installed")
+        return {
+            "task_type": "masking_paradigm",
+            "session_id": session_id,
+            "status": "failed",
+            "error": "MaskingParadigmTask not available - apgi_system not installed",
+        }
 
     result = None
     try:
@@ -250,6 +260,7 @@ def execute_masking_paradigm_task(
         mask_strength = parameters.get("mask_strength", 3.0)
 
         # Create task instance
+        # noqa: E501 - Parameters are from external apgi_system classes
         task = MaskingParadigmTask(
             target_duration_ms=target_duration_ms,
             soas=soas,
@@ -315,7 +326,12 @@ def execute_attentional_blink_task(
     logger.info(f"Starting Attentional Blink Task for session {session_id}")
 
     if not APGI_SYSTEM_AVAILABLE or AttentionalBlinkTask is None:
-        raise ImportError("AttentionalBlinkTask not available - apgi_system not installed")
+        return {
+            "task_type": "attentional_blink",
+            "session_id": session_id,
+            "status": "failed",
+            "error": "AttentionalBlinkTask not available - apgi_system not installed",
+        }
 
     result = None
     try:
@@ -327,6 +343,7 @@ def execute_attentional_blink_task(
         target_salience = parameters.get("target_salience", 2.0)
 
         # Create task instance
+        # noqa: E501 - Parameters are from external apgi_system classes
         task = AttentionalBlinkTask(
             stream_length=stream_length,
             item_duration_ms=item_duration_ms,
@@ -386,17 +403,23 @@ def execute_change_blindness_task(
     logger.info(f"Starting Change Blindness Task for session {session_id}")
 
     if not APGI_SYSTEM_AVAILABLE or ChangeBlindnessTask is None:
-        raise ImportError("ChangeBlindnessTask not available - apgi_system not installed")
+        return {
+            "task_type": "change_blindness",
+            "session_id": session_id,
+            "status": "failed",
+            "error": "ChangeBlindnessTask not available - apgi_system not installed",
+        }
 
     result = None
     try:
         # Extract parameters with defaults
-        image_size = parameters.get("image_size", (256, 256))
+        image_size = parameters.get("image_size", (128, 128))
         change_magnitude = parameters.get("change_magnitude", 0.3)
         flicker_duration_ms = parameters.get("flicker_duration_ms", 100.0)
         num_trials = parameters.get("num_trials", 50)
 
         # Create task instance
+        # noqa: E501 - Parameters are from external apgi_system classes
         task = ChangeBlindnessTask(
             image_size=image_size,
             change_magnitude=change_magnitude,
@@ -455,18 +478,24 @@ def execute_binocular_rivalry_task(
     logger.info(f"Starting Binocular Rivalry Task for session {session_id}")
 
     if not APGI_SYSTEM_AVAILABLE or BinocularRivalryTask is None:
-        raise ImportError("BinocularRivalryTask not available - apgi_system not installed")
+        return {
+            "task_type": "binocular_rivalry",
+            "session_id": session_id,
+            "status": "failed",
+            "error": "BinocularRivalryTask not available - apgi_system not installed",
+        }
 
     result = None
     try:
         # Extract parameters with defaults
-        pattern_size = parameters.get("pattern_size", (256, 256))
+        pattern_size = parameters.get("pattern_size", (128, 128))
         contrast_left = parameters.get("contrast_left", 1.0)
         contrast_right = parameters.get("contrast_right", 1.0)
         duration_seconds = parameters.get("duration_seconds", 60.0)
         sampling_rate_hz = parameters.get("sampling_rate_hz", 30.0)
 
         # Create task instance
+        # noqa: E501 - Parameters are from external apgi_system classes
         task = BinocularRivalryTask(
             pattern_size=pattern_size,
             contrast_left=contrast_left,

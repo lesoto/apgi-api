@@ -6,7 +6,7 @@ This package contains the standalone REST API for the APGI system.
 
 __version__ = "1.0.0"
 
-from typing import Any, Dict, Optional
+from typing import Any, Dict, Optional, Union
 
 
 class MockSubSystem:
@@ -28,7 +28,7 @@ class MockSubSystem:
 class APGISystem:
     """Mock APGI System implementation."""
 
-    def __init__(self, config_path: Optional[Dict[str, Any]] = None):
+    def __init__(self, config_path: Optional[Union[str, Dict[str, Any]]] = None):
         # Handle config_path being a string (file path) or dict
         if isinstance(config_path, str):
             # Load config from file path

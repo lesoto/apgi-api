@@ -8,7 +8,7 @@ Module-level patches (applied before any test file is imported by pytest):
 """
 
 import sys
-from unittest.mock import MagicMock
+from unittest.mock import MagicMock, patch
 import pytest
 
 # ---------------------------------------------------------------------------
@@ -45,6 +45,7 @@ def mock_psycopg2():
     mock.errors = MagicMock()
     mock.errors.DuplicateDatabase = type("DuplicateDatabase", (Exception,), {})
     mock.errors.DuplicateObject = type("DuplicateObject", (Exception,), {})
+    mock.errors.InsufficientPrivilege = type("InsufficientPrivilege", (Exception,), {})
 
     sys.modules["psycopg2"] = mock
     sys.modules["psycopg2.extensions"] = mock.extensions
@@ -67,6 +68,8 @@ def mock_opentelemetry():
         "opentelemetry.sdk.trace",
         "opentelemetry.sdk.trace.export",
         "opentelemetry.exporter",
+        "opentelemetry.exporter.jaeger",
+        "opentelemetry.exporter.jaeger.thrift",
         "opentelemetry.exporter.otlp",
         "opentelemetry.exporter.otlp.proto",
         "opentelemetry.exporter.otlp.proto.grpc",
@@ -75,8 +78,11 @@ def mock_opentelemetry():
         "opentelemetry.instrumentation.fastapi",
         "opentelemetry.instrumentation.sqlalchemy",
         "opentelemetry.instrumentation.redis",
+        "opentelemetry.instrumentation.celery",
+        "opentelemetry.instrumentation.httpx",
         "opentelemetry.propagate",
         "opentelemetry.context",
+        "opentelemetry.sdk.resources",
     ]
 
     mocks = {}
@@ -100,3 +106,18 @@ def mock_celery_app():
     yield mock
 
     sys.modules.pop("app.celery_app", None)
+
+
+@pytest.fixture(autouse=True, scope="function")
+def mock_shared_task():
+    """Patch celery.shared_task to return a decorator that preserves the function."""
+
+    def shared_task_decorator(name=None, **kwargs):
+        def decorator(func):
+            func.name = name or func.__name__
+            return func
+
+        return decorator
+
+    with patch("celery.shared_task", side_effect=shared_task_decorator):
+        yield
