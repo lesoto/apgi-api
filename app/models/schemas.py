@@ -77,10 +77,13 @@ UUID_PATTERN = re.compile(
 class CustomConfig(BaseModel):
     """Custom configuration overrides with strict validation."""
 
-    model_config = ConfigDict(extra="allow")  # Allow arbitrary fields
+    config: Dict[str, Any] = Field(
+        default_factory=dict, description="Custom configuration dictionary"
+    )
 
-    @model_validator(mode="after")
-    def validate_config_structure(self):
+    @field_validator("config")
+    @classmethod
+    def validate_config_structure(cls, v):
         """Validate that config values are reasonable types and not too deeply nested."""
 
         def validate_value(value, depth=0, max_depth=5):
@@ -88,14 +91,14 @@ class CustomConfig(BaseModel):
                 raise ValueError(f"Configuration nesting too deep (max {max_depth} levels)")
 
             if isinstance(value, dict):
-                for k, v in value.items():
+                for k, v_inner in value.items():
                     if not isinstance(k, str) or not k.strip():
                         raise ValueError(f"Configuration key must be a non-empty string, got: {k}")
                     # Prevent dangerous keys
                     dangerous_keys = {"database_url", "secret_key", "password", "token"}
                     if k.lower() in dangerous_keys:
                         raise ValueError(f'Configuration key "{k}" is not allowed in custom config')
-                    validate_value(v, depth + 1, max_depth)
+                    validate_value(v_inner, depth + 1, max_depth)
             elif isinstance(value, list):
                 for item in value:
                     validate_value(item, depth + 1, max_depth)
@@ -104,11 +107,12 @@ class CustomConfig(BaseModel):
                     f"Configuration value must be a string, number, boolean, null, or nested structure, got: {type(value)}"
                 )
 
-        # Validate all fields
-        for field_name, field_value in self.__dict__.items():
-            validate_value(field_value)
+        validate_value(v)
+        return v
 
-        return self
+    def model_dump(self, **kwargs):
+        """Override model_dump to return just the config dict for backward compatibility."""
+        return self.config
 
 
 class SessionTemplateCreateRequest(BaseModel):
@@ -146,6 +150,9 @@ class SessionTemplateCreateRequest(BaseModel):
         if not isinstance(v, str) or not v.strip():
             raise ValueError("Configuration path must be a non-empty string")
 
+        # Strip whitespace first
+        v = v.strip()
+
         # Basic path validation - prevent directory traversal
         if ".." in v:
             raise ValueError("Invalid configuration path: directory traversal not allowed")
@@ -158,7 +165,7 @@ class SessionTemplateCreateRequest(BaseModel):
         if len(v) > 255:
             raise ValueError("Configuration path is too long (max 255 characters)")
 
-        return v.strip()
+        return v
 
     @field_validator("custom_config")
     @classmethod
@@ -438,11 +445,14 @@ class SessionCreateRequest(BaseModel):
         if not isinstance(v, str) or not v.strip():
             raise ValueError("Template ID must be a non-empty string")
 
+        # Strip whitespace first
+        v = v.strip()
+
         # UUID validation pattern
         if not UUID_PATTERN.match(v):
             raise ValueError(f"Invalid template ID format: {v}")
 
-        return v.strip()
+        return v
 
     @field_validator("config_path")
     @classmethod

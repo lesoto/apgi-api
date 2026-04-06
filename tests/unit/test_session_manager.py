@@ -386,6 +386,46 @@ class TestCreateSession:
             await session_manager.create_session(req, "user1")
 
     @pytest.mark.asyncio
+    async def test_create_session_custom_config_merge(self, session_manager, mock_db, apgi_patch):
+        """Test custom_config merge with existing config (lines 545-547)."""
+        from app.models.schemas import SessionCreateRequest
+
+        # Template with existing custom_config
+        template = MagicMock()
+        template.template_id = TEMPLATE_UUID
+        template.is_public = True
+        template.config_path = "configs/template.yaml"
+        template.custom_config = {"existing_key": "existing_value"}
+        template.default_description = "template desc"
+        mock_db.execute.return_value.scalar_one_or_none.return_value = template
+
+        # Request with custom_config that should merge with template's
+        req = SessionCreateRequest(
+            template_id=TEMPLATE_UUID,
+            config_path=None,
+            custom_config={"new_key": "new_value"},
+            description=None,
+        )
+        session_id = await session_manager.create_session(req, "user1")
+        assert len(session_id) == 36
+
+    @pytest.mark.asyncio
+    async def test_create_session_with_description_no_template(
+        self, session_manager, mock_db, apgi_patch
+    ):
+        """Test description set when no template (line 549)."""
+        from app.models.schemas import SessionCreateRequest
+
+        req = SessionCreateRequest(
+            config_path="configs/default.yaml",
+            custom_config=None,
+            template_id=None,
+            description="My custom description",
+        )
+        session_id = await session_manager.create_session(req, "user1")
+        assert len(session_id) == 36
+
+    @pytest.mark.asyncio
     async def test_create_session_db_error_rolls_back(self, session_manager, mock_db, apgi_patch):
         from app.models.schemas import SessionCreateRequest
 

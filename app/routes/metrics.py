@@ -251,7 +251,7 @@ async def get_complete_dashboard(
                 return cached_data
 
         # Compute dashboard data
-        dashboard_data = service.get_dashboard_data(days)
+        dashboard_data = await service.get_dashboard_data(days)
 
         # Cache the result for 15 minutes (900 seconds)
         if cache_service:
@@ -294,7 +294,7 @@ async def get_dashboard_html(
             )
 
         # Get dashboard data
-        dashboard_data = service.get_dashboard_data(days)
+        dashboard_data = await service.get_dashboard_data(days)
 
         # Create simple HTML dashboard
         html_content = f"""

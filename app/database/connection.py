@@ -48,17 +48,42 @@ SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
 def generate_secure_password(length: int = 32) -> str:
     """
-    Generate a secure random password.
+    Generate a secure random password that meets validation requirements.
+
+    Ensures password contains at least one uppercase letter, one lowercase letter,
+    and one digit as required by the API's password validation.
 
     Args:
         length: Length of the password to generate
 
     Returns:
-        Secure random password string
+        Secure random password string meeting validation requirements
     """
-    alphabet = string.ascii_letters + string.digits + "!@#$%^&*()_+-=[]{}|;:,.<>?"
-    password = "".join(secrets.choice(alphabet) for _ in range(length))
-    return password
+    if length < 3:
+        raise ValueError("Password length must be at least 3")
+
+    # Required character sets
+    uppercase = string.ascii_uppercase
+    lowercase = string.ascii_lowercase
+    digits = string.digits
+    special = "!@#$%^&*()_+-=[]{}|;:,.<>?"
+
+    # Ensure at least one of each required type
+    password_chars = [
+        secrets.choice(uppercase),
+        secrets.choice(lowercase),
+        secrets.choice(digits),
+    ]
+
+    # Fill remaining with mixed characters
+    all_chars = uppercase + lowercase + digits + special
+    remaining = length - len(password_chars)
+    password_chars.extend(secrets.choice(all_chars) for _ in range(remaining))
+
+    # Shuffle to avoid predictable patterns
+    secrets.SystemRandom().shuffle(password_chars)
+
+    return "".join(password_chars)
 
 
 def generate_secure_username(prefix: str = "user") -> str:
@@ -122,13 +147,13 @@ def create_default_user():
         import pathlib
         import tempfile
 
-        # Use NamedTemporaryFile with delete=True for automatic cleanup
-        # Use mode='w+' to write text and keep file open for logging
+        # Use NamedTemporaryFile with delete=False so credentials can be retrieved
+        # The file will be cleaned up by OS on reboot
         with tempfile.NamedTemporaryFile(
             mode="w+",
             prefix="apgi_default_user_",
             suffix=".txt",
-            delete=True,
+            delete=False,
             encoding="utf-8",
         ) as temp_file:
             secrets_content = f"""Generated default user credentials - STORE SECURELY

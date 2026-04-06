@@ -109,6 +109,7 @@ def test_property_1_config_env_override(config_key, env_value, bool_value):
     env_vars = {
         "ENVIRONMENT": "development",
         "JWT_SECRET_KEY": "test-secret-key-at-least-32-characters-long-for-testing",
+        "WEBHOOK_SECRET_KEY": "test-webhook-secret-key-for-testing-only-32chars",
         config_key: env_value,
     }
 
@@ -196,6 +197,7 @@ def test_property_1_config_default_when_not_set(config_key):
     env_vars = {
         "ENVIRONMENT": "development",
         "JWT_SECRET_KEY": "test-secret-key-at-least-32-characters-long",
+        "WEBHOOK_SECRET_KEY": "test-webhook-secret-key-for-testing-only-32chars",
     }
 
     # Reload config with minimal environment (config_key not set)

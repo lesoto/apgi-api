@@ -295,7 +295,8 @@ class TestGetTemplateMetrics:
 
 
 class TestGetDashboardData:
-    def test_returns_all_sections(self, service):
+    @pytest.mark.asyncio
+    async def test_returns_all_sections(self, service):
         mock_db = _make_mock_db()
         with (
             patch("app.services.business_metrics.get_db_context") as mock_ctx,
@@ -303,7 +304,7 @@ class TestGetDashboardData:
         ):
             mock_ctx.return_value.__enter__.return_value = mock_db
             mock_overview.return_value = {"overview": {}}
-            result = service.get_dashboard_data(days=30)
+            result = await service.get_dashboard_data(days=30)
 
         assert "sessions" in result
         assert "tasks" in result
@@ -313,7 +314,8 @@ class TestGetDashboardData:
         assert "time_range_days" in result
         assert result["time_range_days"] == 30
 
-    def test_generated_at_is_datetime(self, service):
+    @pytest.mark.asyncio
+    async def test_generated_at_is_datetime(self, service):
         mock_db = _make_mock_db()
         with (
             patch("app.services.business_metrics.get_db_context") as mock_ctx,
@@ -321,7 +323,7 @@ class TestGetDashboardData:
         ):
             mock_ctx.return_value.__enter__.return_value = mock_db
             mock_overview.return_value = {}
-            result = service.get_dashboard_data()
+            result = await service.get_dashboard_data()
 
         assert isinstance(result["generated_at"], datetime)
 

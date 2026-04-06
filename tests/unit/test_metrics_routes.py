@@ -367,7 +367,7 @@ class TestCompleteDashboard:
 
         mock_service = MagicMock()
         dashboard_data = {"overview": {"total_requests": 99}}
-        mock_service.get_dashboard_data.return_value = dashboard_data
+        mock_service.get_dashboard_data = AsyncMock(return_value=dashboard_data)
 
         mock_cache = AsyncMock()
         mock_cache.get_api_response = AsyncMock(return_value=None)  # cache miss
@@ -387,7 +387,7 @@ class TestCompleteDashboard:
 
         mock_service = MagicMock()
         dashboard_data: Dict[str, Any] = {"overview": {}}
-        mock_service.get_dashboard_data.return_value = dashboard_data
+        mock_service.get_dashboard_data = AsyncMock(return_value=dashboard_data)
 
         with patch("app.routes.metrics.get_cache_service", return_value=None):
             result = await get_complete_dashboard(days=30, service=mock_service)
@@ -431,15 +431,17 @@ class TestDashboardHTML:
         from fastapi.responses import HTMLResponse
 
         mock_service = MagicMock()
-        mock_service.get_dashboard_data.return_value = {
-            "overview": {
-                "total_requests": 100,
-                "active_users": 5,
-                "avg_response_time": 12.3,
-                "error_rate": 0.5,
-            },
-            "system": {"uptime_hours": 24.0, "cpu_usage": 30.0, "memory_usage": 45.0},
-        }
+        mock_service.get_dashboard_data = AsyncMock(
+            return_value={
+                "overview": {
+                    "total_requests": 100,
+                    "active_users": 5,
+                    "avg_response_time": 12.3,
+                    "error_rate": 0.5,
+                },
+                "system": {"uptime_hours": 24.0, "cpu_usage": 30.0, "memory_usage": 45.0},
+            }
+        )
 
         result = await get_dashboard_html(days=30, service=mock_service)
 
@@ -488,15 +490,17 @@ class TestDashboardHTML:
 
         mock_service = MagicMock()
         # A value containing XSS payload stored as total_requests
-        mock_service.get_dashboard_data.return_value = {
-            "overview": {
-                "total_requests": 100,  # numeric, no XSS risk
-                "active_users": 5,
-                "avg_response_time": 12.3,
-                "error_rate": 0.5,
-            },
-            "system": {"uptime_hours": 24.0, "cpu_usage": 30.0, "memory_usage": 45.0},
-        }
+        mock_service.get_dashboard_data = AsyncMock(
+            return_value={
+                "overview": {
+                    "total_requests": 100,  # numeric, no XSS risk
+                    "active_users": 5,
+                    "avg_response_time": 12.3,
+                    "error_rate": 0.5,
+                },
+                "system": {"uptime_hours": 24.0, "cpu_usage": 30.0, "memory_usage": 45.0},
+            }
+        )
 
         result = await get_dashboard_html(days=30, service=mock_service)
         # Verify it returns a valid HTML dashboard

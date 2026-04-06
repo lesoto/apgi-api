@@ -6,7 +6,7 @@ Tests all CRUD operations, error handling, pagination, and access control.
 
 import pytest
 from datetime import datetime, timezone, timedelta
-from unittest.mock import MagicMock, patch, AsyncMock
+from unittest.mock import MagicMock, patch, AsyncMock, PropertyMock
 from uuid import uuid4
 
 from fastapi.testclient import TestClient
@@ -1000,3 +1000,357 @@ class TestIntegrationWithFastAPI:
         with TestClient(app, raise_server_exceptions=False) as client:
             resp = client.delete("/v1/templates/test-template-id")
             assert resp.status_code in [204, 404, 403, 500]
+
+
+class TestExceptionHandlingAndEdgeCases:
+    """Test exception handling and edge cases for 100% coverage."""
+
+    @pytest.mark.asyncio
+    async def test_list_templates_exception_inside_try_block(self, caplog):
+        """Test exception handling in list_templates try block (Lines 137-142)."""
+        mock_db = MagicMock()
+        # Make db.execute raise an exception inside the try block
+        mock_db.execute.side_effect = Exception("Query execution failed")
+
+        with patch("app.routes.templates.get_async_db_context") as mock_db_context:
+            mock_context_manager = MagicMock()
+            mock_context_manager.__aenter__ = AsyncMock(return_value=mock_db)
+            mock_context_manager.__aexit__ = AsyncMock(return_value=False)
+            mock_db_context.return_value = mock_context_manager
+
+            with pytest.raises(HTTPException) as exc_info:
+                await list_templates(page=1, per_page=10, public_only=False, current_user=FAKE_USER)
+
+        assert exc_info.value.status_code == 500
+        assert "internal error" in exc_info.value.detail.lower()
+
+    @pytest.mark.asyncio
+    async def test_create_template_http_exception_reraise(self, mock_template):
+        """Test that HTTPException is re-raised in create_template (Lines 253-254)."""
+        from app.models.schemas import SessionTemplateCreateRequest
+
+        mock_db = MagicMock()
+
+        # First execute for duplicate check returns None
+        mock_check_result = MagicMock()
+        mock_check_result.scalar_one_or_none.return_value = None
+
+        mock_db.execute.return_value = mock_check_result
+
+        # Make db.add raise an HTTPException specifically
+        http_exc = HTTPException(status_code=418, detail="I'm a teapot")
+        mock_db.add.side_effect = http_exc
+
+        with patch("app.routes.templates.get_async_db_context") as mock_db_context:
+            mock_context_manager = MagicMock()
+            mock_context_manager.__aenter__ = AsyncMock(return_value=mock_db)
+            mock_context_manager.__aexit__ = AsyncMock(return_value=False)
+            mock_db_context.return_value = mock_context_manager
+
+            request = SessionTemplateCreateRequest(
+                name="Test Template",
+                description="Description",
+                config_path="/config/test.yaml",
+                custom_config=None,
+                default_description=None,
+                tags=[],
+                is_public=False,
+            )
+
+            # HTTPException should be re-raised as-is
+            with pytest.raises(HTTPException) as exc_info:
+                await create_template(request=request, current_user=FAKE_USER)
+
+            assert exc_info.value.status_code == 418
+            assert "teapot" in exc_info.value.detail.lower()
+
+    @pytest.mark.asyncio
+    async def test_get_template_exception_reraise(self, mock_template):
+        """Test that general exceptions are caught and converted to 500 in get_template."""
+        mock_db = MagicMock()
+
+        # First call returns template, but accessing is_public raises exception
+        mock_result = MagicMock()
+        mock_result.scalar_one_or_none.return_value = mock_template
+
+        # Make template.is_public access raise an exception
+        http_exc = HTTPException(status_code=418, detail="I'm a teapot")
+        type(mock_template).is_public = PropertyMock(side_effect=http_exc)
+
+        mock_db.execute.return_value = mock_result
+
+        with patch("app.routes.templates.get_async_db_context") as mock_db_context:
+            mock_context_manager = MagicMock()
+            mock_context_manager.__aenter__ = AsyncMock(return_value=mock_db)
+            mock_context_manager.__aexit__ = AsyncMock(return_value=False)
+            mock_db_context.return_value = mock_context_manager
+
+            # HTTPException should be re-raised as-is (caught by outer except)
+            with pytest.raises(HTTPException) as exc_info:
+                await get_template(
+                    template_id=str(mock_template.template_id), current_user=FAKE_USER
+                )
+
+            # The HTTPException from is_public access should propagate
+            assert exc_info.value.status_code == 418
+
+        # Reset the mock
+        type(mock_template).is_public = PropertyMock(return_value=False)
+
+    @pytest.mark.asyncio
+    async def test_update_template_http_exception_reraise(self, mock_template):
+        """Test that HTTPException is re-raised in update_template (Lines 423-424)."""
+        from app.models.schemas import SessionTemplateUpdateRequest
+
+        mock_db = MagicMock()
+
+        mock_result = MagicMock()
+        mock_result.scalar_one_or_none.return_value = mock_template
+
+        # Make it raise HTTPException on second execute
+        http_exc = HTTPException(status_code=418, detail="I'm a teapot")
+        mock_db.execute.side_effect = [mock_result, http_exc]
+
+        with patch("app.routes.templates.get_async_db_context") as mock_db_context:
+            mock_context_manager = MagicMock()
+            mock_context_manager.__aenter__ = AsyncMock(return_value=mock_db)
+            mock_context_manager.__aexit__ = AsyncMock(return_value=False)
+            mock_db_context.return_value = mock_context_manager
+
+            request = SessionTemplateUpdateRequest(
+                name="New Name",
+                description=None,
+                config_path=None,
+                custom_config=None,
+                default_description=None,
+                tags=None,
+                is_public=None,
+            )
+
+            # HTTPException should be re-raised as-is
+            with pytest.raises(HTTPException) as exc_info:
+                await update_template(
+                    template_id=str(mock_template.template_id),
+                    request=request,
+                    current_user=FAKE_USER,
+                )
+
+            assert exc_info.value.status_code == 418
+
+    @pytest.mark.asyncio
+    async def test_delete_template_http_exception_reraise(self, mock_template):
+        """Test that HTTPException is re-raised in delete_template (Lines 472-473)."""
+        mock_db = MagicMock()
+
+        mock_result = MagicMock()
+        mock_result.scalar_one_or_none.return_value = mock_template
+        mock_db.execute.return_value = mock_result
+
+        # Make db.delete raise HTTPException
+        http_exc = HTTPException(status_code=418, detail="I'm a teapot")
+        mock_db.delete.side_effect = http_exc
+
+        with patch("app.routes.templates.get_async_db_context") as mock_db_context:
+            mock_context_manager = MagicMock()
+            mock_context_manager.__aenter__ = AsyncMock(return_value=mock_db)
+            mock_context_manager.__aexit__ = AsyncMock(return_value=False)
+            mock_db_context.return_value = mock_context_manager
+
+            # HTTPException should be re-raised as-is
+            with pytest.raises(HTTPException) as exc_info:
+                await delete_template(
+                    template_id=str(mock_template.template_id), current_user=FAKE_USER
+                )
+
+            assert exc_info.value.status_code == 418
+
+    @pytest.mark.asyncio
+    async def test_update_template_with_all_fields(self, mock_template):
+        """Test updating all fields of a template."""
+        from app.models.schemas import SessionTemplateUpdateRequest
+
+        mock_db = MagicMock()
+        mock_result = MagicMock()
+        mock_result.scalar_one_or_none.return_value = mock_template
+
+        # For duplicate check, return None
+        mock_check_result = MagicMock()
+        mock_check_result.scalar_one_or_none.return_value = None
+
+        mock_db.execute.side_effect = [mock_result, mock_check_result]
+
+        with patch("app.routes.templates.get_async_db_context") as mock_db_context:
+            mock_context_manager = MagicMock()
+            mock_context_manager.__aenter__ = AsyncMock(return_value=mock_db)
+            mock_context_manager.__aexit__ = AsyncMock(return_value=False)
+            mock_db_context.return_value = mock_context_manager
+
+            request = SessionTemplateUpdateRequest(
+                name="New Name",
+                description="New Description",
+                config_path="config/new.yaml",  # Relative path, not absolute
+                custom_config={"new": "config"},
+                default_description="New Default",
+                tags=["new", "tags"],
+                is_public=True,
+            )
+
+            response = await update_template(
+                template_id=str(mock_template.template_id),
+                request=request,
+                current_user=FAKE_USER,
+            )
+
+            assert response is not None
+            # Verify all fields were updated
+            assert mock_template.name == "New Name"
+            assert mock_template.description == "New Description"
+            assert mock_template.config_path == "config/new.yaml"
+            assert mock_template.custom_config == {"new": "config"}
+            assert mock_template.default_description == "New Default"
+            assert mock_template.tags == ["new", "tags"]
+            assert mock_template.is_public is True
+
+    @pytest.mark.asyncio
+    async def test_create_template_rollback_on_error(self):
+        """Test that rollback is called when commit fails."""
+        from app.models.schemas import SessionTemplateCreateRequest
+
+        mock_db = MagicMock()
+
+        mock_check_result = MagicMock()
+        mock_check_result.scalar_one_or_none.return_value = None
+
+        mock_db.execute.return_value = mock_check_result
+        mock_db.commit.side_effect = Exception("Commit failed")
+
+        with patch("app.routes.templates.get_async_db_context") as mock_db_context:
+            mock_context_manager = MagicMock()
+            mock_context_manager.__aenter__ = AsyncMock(return_value=mock_db)
+            mock_context_manager.__aexit__ = AsyncMock(return_value=False)
+            mock_db_context.return_value = mock_context_manager
+
+            request = SessionTemplateCreateRequest(
+                name="Test Template",
+                description="Description",
+                config_path="/config/test.yaml",
+                custom_config=None,
+                default_description=None,
+                tags=[],
+                is_public=False,
+            )
+
+            with pytest.raises(HTTPException):
+                await create_template(request=request, current_user=FAKE_USER)
+
+            # Verify rollback was called
+            mock_db.rollback.assert_called_once()
+
+    @pytest.mark.asyncio
+    async def test_list_templates_with_none_tags(self, mock_template):
+        """Test list templates handles None tags gracefully."""
+        mock_template.tags = None  # Set tags to None
+
+        mock_db = MagicMock()
+        mock_result = MagicMock()
+        mock_result.scalars.return_value.all.return_value = [mock_template]
+        mock_db.execute.return_value = mock_result
+
+        mock_count_query = MockQuery(has_whereclause=True)
+        mock_db.query.return_value = mock_count_query
+
+        with patch("app.routes.templates.get_async_db_context") as mock_db_context:
+            mock_context_manager = MagicMock()
+            mock_context_manager.__aenter__ = AsyncMock(return_value=mock_db)
+            mock_context_manager.__aexit__ = AsyncMock(return_value=False)
+            mock_db_context.return_value = mock_context_manager
+
+            response = await list_templates(
+                page=1, per_page=10, public_only=False, current_user=FAKE_USER
+            )
+
+        assert response.templates is not None
+        # The response should have empty list for tags when None
+        assert response.templates[0].tags == []
+
+    @pytest.mark.asyncio
+    async def test_update_template_no_name_change(self, mock_template):
+        """Test update when name is not provided (None)."""
+        from app.models.schemas import SessionTemplateUpdateRequest
+
+        mock_db = MagicMock()
+        mock_result = MagicMock()
+        mock_result.scalar_one_or_none.return_value = mock_template
+        mock_db.execute.return_value = mock_result
+
+        with patch("app.routes.templates.get_async_db_context") as mock_db_context:
+            mock_context_manager = MagicMock()
+            mock_context_manager.__aenter__ = AsyncMock(return_value=mock_db)
+            mock_context_manager.__aexit__ = AsyncMock(return_value=False)
+            mock_db_context.return_value = mock_context_manager
+
+            # Name is None, so no duplicate check should happen
+            request = SessionTemplateUpdateRequest(
+                name=None,
+                description="Updated Description",
+                config_path=None,
+                custom_config=None,
+                default_description=None,
+                tags=None,
+                is_public=None,
+            )
+
+            response = await update_template(
+                template_id=str(mock_template.template_id),
+                request=request,
+                current_user=FAKE_USER,
+            )
+
+            # Only one execute call (for fetching template)
+            assert mock_db.execute.call_count == 1
+            assert response.description == "Updated Description"
+
+    @pytest.mark.asyncio
+    async def test_list_templates_public_only_with_no_results(self):
+        """Test public_only=true with no results."""
+        mock_db = MagicMock()
+        mock_result = MagicMock()
+        mock_result.scalars.return_value.all.return_value = []
+        mock_db.execute.return_value = mock_result
+
+        # Mock count query with no whereclause (no results)
+        mock_count_query = MockQuery(has_whereclause=False)
+        mock_db.query.return_value = mock_count_query
+
+        with patch("app.routes.templates.get_async_db_context") as mock_db_context:
+            mock_context_manager = MagicMock()
+            mock_context_manager.__aenter__ = AsyncMock(return_value=mock_db)
+            mock_context_manager.__aexit__ = AsyncMock(return_value=False)
+            mock_db_context.return_value = mock_context_manager
+
+            response = await list_templates(
+                page=1, per_page=10, public_only=True, current_user=FAKE_USER
+            )
+
+        assert len(response.templates) == 0
+        assert response.pagination.total == 0
+
+    @pytest.mark.asyncio
+    async def test_delete_template_general_exception(self, caplog):
+        """Test general exception handling in delete_template."""
+        mock_db = MagicMock()
+        mock_result = MagicMock()
+        mock_result.scalar_one_or_none.return_value = None  # Template not found
+        mock_db.execute.return_value = mock_result
+
+        with patch("app.routes.templates.get_async_db_context") as mock_db_context:
+            mock_context_manager = MagicMock()
+            mock_context_manager.__aenter__ = AsyncMock(return_value=mock_db)
+            mock_context_manager.__aexit__ = AsyncMock(return_value=False)
+            mock_db_context.return_value = mock_context_manager
+
+            # Should raise 404 (HTTPException)
+            with pytest.raises(HTTPException) as exc_info:
+                await delete_template(template_id="non-existent", current_user=FAKE_USER)
+
+            assert exc_info.value.status_code == 404

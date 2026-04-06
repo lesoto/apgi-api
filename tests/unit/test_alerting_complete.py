@@ -176,6 +176,52 @@ class TestEmailNotificationChannel:
             assert result is False
 
 
+class TestWebhookNotificationChannel:
+    """Test Webhook notification channel."""
+
+    @pytest.mark.asyncio
+    async def test_webhook_channel_exception(self):
+        """Test webhook channel exception handling (lines 121-128)."""
+        from app.middleware.alerting import WebhookNotificationChannel
+
+        with patch("httpx.AsyncClient") as mock_client_class:
+            mock_client = AsyncMock()
+            mock_client.post.side_effect = Exception("Connection failed")
+            mock_client_class.return_value.__aenter__.return_value = mock_client
+
+            channel = WebhookNotificationChannel("https://example.com/webhook")
+            alert = Alert(
+                title="Test Alert",
+                message="Test message",
+                severity=AlertSeverity.ERROR,
+            )
+
+            result = await channel.send_alert(alert)
+            assert result is False
+
+    @pytest.mark.asyncio
+    async def test_webhook_non_success_status(self):
+        """Test webhook channel with non-success status (lines 112-119)."""
+        from app.middleware.alerting import WebhookNotificationChannel
+
+        with patch("httpx.AsyncClient") as mock_client_class:
+            mock_client = AsyncMock()
+            mock_response = AsyncMock()
+            mock_response.status_code = 400
+            mock_client.post.return_value = mock_response
+            mock_client_class.return_value.__aenter__.return_value = mock_client
+
+            channel = WebhookNotificationChannel("https://example.com/webhook")
+            alert = Alert(
+                title="Test Alert",
+                message="Test message",
+                severity=AlertSeverity.WARNING,
+            )
+
+            result = await channel.send_alert(alert)
+            assert result is False
+
+
 class TestLogNotificationChannel:
     """Test log notification channel."""
 

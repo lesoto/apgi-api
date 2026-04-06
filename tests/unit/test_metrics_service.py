@@ -19,7 +19,7 @@ def mock_business_metrics_service():
     service.get_task_metrics = MagicMock(return_value={"total_tasks": 20})
     service.get_user_metrics = MagicMock(return_value={"total_users": 10})
     service.get_template_metrics = MagicMock(return_value={"total_templates": 5})
-    service.get_dashboard_data = MagicMock(
+    service.get_dashboard_data = AsyncMock(
         return_value={
             "overview": {
                 "total_requests": 1000,

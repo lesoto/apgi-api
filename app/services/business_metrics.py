@@ -433,7 +433,7 @@ class BusinessMetricsService:
                 ],
             }
 
-    def get_dashboard_data(self, days: int = 30) -> Dict[str, Any]:
+    async def get_dashboard_data(self, days: int = 30) -> Dict[str, Any]:
         """
         Get complete dashboard data combining all metrics.
 
@@ -443,8 +443,9 @@ class BusinessMetricsService:
         Returns:
             Complete dashboard data dictionary
         """
+        overview = await self.get_overview_metrics()
         return {
-            "overview": self.get_overview_metrics(),
+            "overview": overview,
             "sessions": self.get_session_metrics(days),
             "tasks": self.get_task_metrics(days),
             "users": self.get_user_metrics(days),

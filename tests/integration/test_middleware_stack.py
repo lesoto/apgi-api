@@ -249,6 +249,10 @@ class TestCSRFMiddleware:
         response = full_stack_client.get("/v1/version")
         csrf_cookie = response.cookies.get("csrf_token")
 
+        # Set cookie on client instance (not per-request) to avoid deprecation warning
+        if csrf_cookie:
+            full_stack_client.cookies.set("csrf_token", csrf_cookie)
+
         # Make POST request with invalid CSRF token
         response = full_stack_client.post(
             "/v1/sessions",
@@ -257,7 +261,6 @@ class TestCSRFMiddleware:
                 "Content-Type": "application/x-www-form-urlencoded",
             },
             data={"description": "test"},
-            cookies={"csrf_token": csrf_cookie} if csrf_cookie else {},
         )
 
         # Should be rejected with 403 or 401

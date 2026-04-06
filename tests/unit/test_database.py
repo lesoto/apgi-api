@@ -462,16 +462,26 @@ class TestSecurePasswordGeneration:
         password2 = generate_secure_password()
         assert password1 != password2
 
-    def test_generate_secure_password_zero_length(self):
-        """Test that generate_secure_password handles zero length."""
-        password = generate_secure_password(length=0)
-        assert len(password) == 0
-        assert password == ""
+    def test_generate_secure_password_minimum_length(self):
+        """Test that generate_secure_password requires minimum length of 3."""
+        # Should work with minimum length 3
+        password = generate_secure_password(length=3)
+        assert len(password) == 3
 
-    def test_generate_secure_password_one_character(self):
-        """Test that generate_secure_password can generate single character."""
-        password = generate_secure_password(length=1)
-        assert len(password) == 1
+    def test_generate_secure_password_zero_length_raises(self):
+        """Test that generate_secure_password raises ValueError for length < 3."""
+        with pytest.raises(ValueError, match="Password length must be at least 3"):
+            generate_secure_password(length=0)
+
+    def test_generate_secure_password_one_character_raises(self):
+        """Test that generate_secure_password raises ValueError for length < 3."""
+        with pytest.raises(ValueError, match="Password length must be at least 3"):
+            generate_secure_password(length=1)
+
+    def test_generate_secure_password_two_characters_raises(self):
+        """Test that generate_secure_password raises ValueError for length < 3."""
+        with pytest.raises(ValueError, match="Password length must be at least 3"):
+            generate_secure_password(length=2)
 
 
 class TestSecureUsernameGeneration:

@@ -412,10 +412,10 @@ class TestValidTokenValidation:
             hashed_token = middleware._hash_token(test_token)
 
         # Make POST request with valid token
+        client_csrf_enabled.cookies.set("csrf_token", hashed_token)
         response = client_csrf_enabled.post(
             "/test",
             headers={"X-CSRF-Token": test_token},
-            cookies={"csrf_token": hashed_token},
         )
         assert response.status_code == 200
         assert response.json()["message"] == "POST success"
@@ -428,10 +428,10 @@ class TestValidTokenValidation:
             middleware = CSRFMiddleware(MagicMock())
             hashed_token = middleware._hash_token(test_token)
 
+        client_csrf_enabled.cookies.set("csrf_token", hashed_token)
         response = client_csrf_enabled.put(
             "/test",
             headers={"X-CSRF-Token": test_token},
-            cookies={"csrf_token": hashed_token},
         )
         assert response.status_code == 200
         assert response.json()["message"] == "PUT success"
@@ -444,10 +444,10 @@ class TestValidTokenValidation:
             middleware = CSRFMiddleware(MagicMock())
             hashed_token = middleware._hash_token(test_token)
 
+        client_csrf_enabled.cookies.set("csrf_token", hashed_token)
         response = client_csrf_enabled.delete(
             "/test",
             headers={"X-CSRF-Token": test_token},
-            cookies={"csrf_token": hashed_token},
         )
         assert response.status_code == 200
         assert response.json()["message"] == "DELETE success"
@@ -460,10 +460,10 @@ class TestValidTokenValidation:
             middleware = CSRFMiddleware(MagicMock())
             hashed_token = middleware._hash_token(test_token)
 
+        client_csrf_enabled.cookies.set("csrf_token", hashed_token)
         response = client_csrf_enabled.patch(
             "/test",
             headers={"X-CSRF-Token": test_token},
-            cookies={"csrf_token": hashed_token},
         )
         assert response.status_code == 200
         assert response.json()["message"] == "PATCH success"
@@ -505,10 +505,8 @@ class TestMissingTokenRejection:
 
     def test_missing_header_token_with_cookie(self, client_csrf_enabled):
         """Test that missing header token is rejected even with cookie."""
-        response = client_csrf_enabled.post(
-            "/test",
-            cookies={"csrf_token": "some-cookie-value"},
-        )
+        client_csrf_enabled.cookies.set("csrf_token", "some-cookie-value")
+        response = client_csrf_enabled.post("/test")
         assert response.status_code == 403
         assert response.json()["error"]["code"] == "CSRF_TOKEN_MISSING"
 
@@ -542,10 +540,10 @@ class TestInvalidTokenRejection:
 
     def test_invalid_token_on_post_request(self, client_csrf_enabled):
         """Test that POST request with invalid token is rejected."""
+        client_csrf_enabled.cookies.set("csrf_token", "invalid-cookie")
         response = client_csrf_enabled.post(
             "/test",
             headers={"X-CSRF-Token": "invalid-token"},
-            cookies={"csrf_token": "invalid-cookie"},
         )
         assert response.status_code == 403
         data = response.json()
@@ -554,30 +552,30 @@ class TestInvalidTokenRejection:
 
     def test_invalid_token_on_put_request(self, client_csrf_enabled):
         """Test that PUT request with invalid token is rejected."""
+        client_csrf_enabled.cookies.set("csrf_token", "invalid-cookie")
         response = client_csrf_enabled.put(
             "/test",
             headers={"X-CSRF-Token": "invalid-token"},
-            cookies={"csrf_token": "invalid-cookie"},
         )
         assert response.status_code == 403
         assert response.json()["error"]["code"] == "CSRF_TOKEN_INVALID"
 
     def test_invalid_token_on_delete_request(self, client_csrf_enabled):
         """Test that DELETE request with invalid token is rejected."""
+        client_csrf_enabled.cookies.set("csrf_token", "invalid-cookie")
         response = client_csrf_enabled.delete(
             "/test",
             headers={"X-CSRF-Token": "invalid-token"},
-            cookies={"csrf_token": "invalid-cookie"},
         )
         assert response.status_code == 403
         assert response.json()["error"]["code"] == "CSRF_TOKEN_INVALID"
 
     def test_invalid_token_on_patch_request(self, client_csrf_enabled):
         """Test that PATCH request with invalid token is rejected."""
+        client_csrf_enabled.cookies.set("csrf_token", "invalid-cookie")
         response = client_csrf_enabled.patch(
             "/test",
             headers={"X-CSRF-Token": "invalid-token"},
-            cookies={"csrf_token": "invalid-cookie"},
         )
         assert response.status_code == 403
         assert response.json()["error"]["code"] == "CSRF_TOKEN_INVALID"
@@ -594,10 +592,10 @@ class TestInvalidTokenRejection:
             hash2 = middleware._hash_token(token2)
 
         # Send token1 in header but hash2 in cookie (mismatch)
+        client_csrf_enabled.cookies.set("csrf_token", hash2)
         response = client_csrf_enabled.post(
             "/test",
             headers={"X-CSRF-Token": token1},
-            cookies={"csrf_token": hash2},
         )
         assert response.status_code == 403
         assert response.json()["error"]["code"] == "CSRF_TOKEN_INVALID"
@@ -718,10 +716,10 @@ class TestFormDataTokenExtraction:
             middleware = CSRFMiddleware(MagicMock())
             hashed_token = middleware._hash_token(test_token)
 
+        client_csrf_enabled.cookies.set("csrf_token", hashed_token)
         response = client_csrf_enabled.post(
             "/form-test",
             data={"csrf_token": test_token, "field": "value"},
-            cookies={"csrf_token": hashed_token},
         )
         assert response.status_code == 200
         assert response.json()["message"] == "Form POST success"
@@ -734,10 +732,10 @@ class TestFormDataTokenExtraction:
             middleware = CSRFMiddleware(MagicMock())
             hashed_token = middleware._hash_token(test_token)
 
+        client_csrf_enabled.cookies.set("csrf_token", hashed_token)
         response = client_csrf_enabled.post(
             "/form-test",
             data={"csrf_token": test_token, "field": "value"},
-            cookies={"csrf_token": hashed_token},
         )
         assert response.status_code == 200
 
@@ -758,10 +756,10 @@ class TestHeaderTokenExtraction:
             middleware = CSRFMiddleware(MagicMock())
             hashed_token = middleware._hash_token(test_token)
 
+        client_csrf_enabled.cookies.set("csrf_token", hashed_token)
         response = client_csrf_enabled.post(
             "/test",
             headers={"X-CSRF-Token": test_token},
-            cookies={"csrf_token": hashed_token},
         )
         assert response.status_code == 200
         assert response.json()["message"] == "POST success"
@@ -787,10 +785,10 @@ class TestHeaderTokenExtraction:
         middleware = CSRFMiddleware(MagicMock(), header_name="X-Custom-CSRF")
         hashed_token = middleware._hash_token(test_token)
 
+        client.cookies.set("csrf_token", hashed_token)
         response = client.post(
             "/test",
             headers={"X-Custom-CSRF": test_token},
-            cookies={"csrf_token": hashed_token},
         )
         assert response.status_code == 200
 

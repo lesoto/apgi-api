@@ -13,6 +13,7 @@ Usage:
 """
 
 import json
+import tempfile
 import time
 from typing import Any, Dict, Optional, cast
 
@@ -117,45 +118,70 @@ class APIDemo:
         # 2. Authentication
         print("\n2. AUTHENTICATION")
 
-        # Try to get the default user credentials from the database
+        # Try to get the default user credentials from the temp file or database
+        login_data = None
         try:
-            import psycopg2
+            import pathlib
 
-            conn = psycopg2.connect(
-                host="127.0.0.1",
-                port="5432",
-                database="apgi_api_dev",
-                user="apgi_dev",
-                password="dev_password",
-            )
-            cursor = conn.cursor()
-            cursor.execute("SELECT username FROM users WHERE username LIKE 'default_%' LIMIT 1;")
-            result = cursor.fetchone()
-            cursor.close()
-            conn.close()
+            # Find the credentials file
+            temp_dir = pathlib.Path(tempfile.gettempdir())
+            cred_files = list(temp_dir.glob("apgi_default_user_*.txt"))
 
-            if result:
-                default_username = result[0]
-                # Use the actual generated password for the default user
-                login_data = {
-                    "username": default_username,
-                    "password": "GShnY46?a$s6Ug%:HG!aquBkVgSliTv!",
-                    "remember_me": False,
-                }
-            else:
-                # Fallback to hardcoded credentials
-                login_data = {
-                    "username": "user@example.com",
-                    "password": "SecurePassword123",
-                    "remember_me": False,
-                }
+            if cred_files:
+                # Read the most recent credentials file
+                cred_file = max(cred_files, key=lambda p: p.stat().st_mtime)
+                content = cred_file.read_text()
+
+                # Parse username and password from file
+                username = None
+                password = None
+                for line in content.splitlines():
+                    if line.startswith("Username: "):
+                        username = line.replace("Username: ", "").strip()
+                    elif line.startswith("Password: "):
+                        password = line.replace("Password: ", "").strip()
+
+                if username and password:
+                    login_data = {
+                        "username": username,
+                        "password": password,
+                        "remember_me": False,
+                    }
         except Exception:
-            # Use the actual credentials as fallback
-            login_data = {
-                "username": "default_453f0163d1d998ad",
-                "password": "GShnY46?a$s6Ug%:HG!aquBkVgSliTv!",
-                "remember_me": False,
-            }
+            pass
+
+        # Fallback to database query
+        if not login_data:
+            try:
+                import psycopg2
+
+                conn = psycopg2.connect(
+                    host="127.0.0.1",
+                    port="5432",
+                    database="apgi_api_dev",
+                    user="apgi_dev",
+                    password="dev_password",
+                )
+                cursor = conn.cursor()
+                cursor.execute(
+                    "SELECT username FROM users WHERE username LIKE 'default_%' LIMIT 1;"
+                )
+                result = cursor.fetchone()
+                cursor.close()
+                conn.close()
+
+                if result:
+                    default_username = result[0]
+                    # For this demo, we need the plaintext password which was in the temp file
+                    # If temp file is gone, we can't login (passwords are hashed)
+                    print(
+                        "✗ Credentials file not found and password cannot be recovered from database"
+                    )
+                    print("  Please restart the server to generate new credentials")
+                    return
+            except Exception:
+                print("✗ Login failed - could not retrieve credentials")
+                return
         login_response = self.make_request("POST", "/v1/auth/login", login_data, auth=False)
         if "access_token" in login_response:
             self.access_token = login_response["access_token"]
