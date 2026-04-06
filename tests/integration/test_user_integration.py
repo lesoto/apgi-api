@@ -23,7 +23,7 @@ async def authenticated_client(
     # Mock Redis for the lifespan
     mock_redis_client = AsyncMock()
     mock_redis_client.ping = AsyncMock()
-    mock_redis_client.close = AsyncMock()
+    mock_redis_client.aclose = AsyncMock()
 
     # Mock User for authentication
     mock_user = MagicMock()

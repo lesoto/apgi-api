@@ -98,7 +98,7 @@ class TestLifespanStartup:
         # Mock Redis client
         mock_redis_client = AsyncMock()
         mock_redis_client.ping = AsyncMock()
-        mock_redis_client.close = AsyncMock()
+        mock_redis_client.aclose = AsyncMock()
         mock_redis.return_value = mock_redis_client
 
         # Mock all route initializations
@@ -128,7 +128,7 @@ class TestLifespanStartup:
         # Mock Redis client
         mock_redis_client = AsyncMock()
         mock_redis_client.ping = AsyncMock()
-        mock_redis_client.close = AsyncMock()
+        mock_redis_client.aclose = AsyncMock()
         mock_redis.return_value = mock_redis_client
 
         with (
@@ -176,7 +176,7 @@ class TestGracefulShutdown:
         # Mock Redis client
         mock_redis_client = AsyncMock()
         mock_redis_client.ping = AsyncMock()
-        mock_redis_client.close = AsyncMock()
+        mock_redis_client.aclose = AsyncMock()
         mock_redis.return_value = mock_redis_client
 
         with (
@@ -205,7 +205,7 @@ class TestGracefulShutdown:
         # Mock Redis client
         mock_redis_client = AsyncMock()
         mock_redis_client.ping = AsyncMock()
-        mock_redis_client.close = AsyncMock()
+        mock_redis_client.aclose = AsyncMock()
         mock_redis.return_value = mock_redis_client
 
         with (
@@ -222,7 +222,7 @@ class TestGracefulShutdown:
                 pass
 
             # Verify Redis close was called during shutdown
-            mock_redis_client.close.assert_called_once()
+            mock_redis_client.aclose.assert_called_once()
 
     @pytest.mark.asyncio
     @patch("redis.asyncio.from_url")
@@ -233,7 +233,7 @@ class TestGracefulShutdown:
         # Mock Redis client
         mock_redis_client = AsyncMock()
         mock_redis_client.ping = AsyncMock()
-        mock_redis_client.close = AsyncMock()
+        mock_redis_client.aclose = AsyncMock()
         mock_redis.return_value = mock_redis_client
 
         # Track call order
@@ -242,7 +242,7 @@ class TestGracefulShutdown:
         async def track_redis_close():
             call_order.append("redis")
 
-        mock_redis_client.close.side_effect = track_redis_close
+        mock_redis_client.aclose.side_effect = track_redis_close
 
         with (
             patch("app.main.sessions.init_session_routes"),

@@ -20,7 +20,6 @@ from app.database.models import Session as SessionModel
 from app.models.schemas import TokenPayload
 from app.services.authorization import require_permission, Permission  # noqa: F401
 
-
 # ---------------------------------------------------------------------------
 # Shared helpers and fixtures
 # ---------------------------------------------------------------------------

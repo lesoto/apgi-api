@@ -14,7 +14,6 @@ from celery import states
 from app.services.task_executor import TaskExecutor, retry_with_backoff, async_retry_with_backoff
 from app.database.models import Task, TaskStatus
 
-
 # ============================================================================
 # Test Retry Functions
 # ============================================================================

@@ -22,7 +22,6 @@ from fastapi.testclient import TestClient
 
 from app.middleware.csrf import CSRFMiddleware
 
-
 # ---------------------------------------------------------------------------
 # Fixtures
 # ---------------------------------------------------------------------------

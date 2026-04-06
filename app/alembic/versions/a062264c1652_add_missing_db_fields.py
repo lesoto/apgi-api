@@ -5,6 +5,7 @@ Revises: add_audit_logs_table
 Create Date: 2026-03-08 11:38:19.376854
 
 """
+
 from alembic import op
 import sqlalchemy as sa
 from sqlalchemy.dialects import postgresql

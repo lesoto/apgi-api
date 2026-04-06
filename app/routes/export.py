@@ -190,7 +190,7 @@ async def export_session_data(
         raise
     except ValueError as e:
         if "exceeds maximum" in str(e):
-            raise HTTPException(status.HTTP_413_REQUEST_ENTITY_TOO_LARGE, detail=str(e))
+            raise HTTPException(status.HTTP_413_CONTENT_TOO_LARGE, detail=str(e))
         else:
             logger.warning(f"Export failed for session {session_id}: {e}")
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))

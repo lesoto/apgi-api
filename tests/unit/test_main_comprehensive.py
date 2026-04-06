@@ -110,7 +110,7 @@ class TestLifespanComprehensive:
 
         mock_redis_client = AsyncMock()
         mock_redis_client.ping = AsyncMock()
-        mock_redis_client.close = AsyncMock()
+        mock_redis_client.aclose = AsyncMock()
         mock_redis.return_value = mock_redis_client
 
         with (
@@ -161,7 +161,7 @@ class TestLifespanComprehensive:
 
                 mock_redis_client = AsyncMock()
                 mock_redis_client.ping = AsyncMock()
-                mock_redis_client.close = AsyncMock()
+                mock_redis_client.aclose = AsyncMock()
                 mock_redis.return_value = mock_redis_client
 
                 with (
@@ -209,7 +209,7 @@ class TestLifespanComprehensive:
 
         mock_redis_client = AsyncMock()
         mock_redis_client.ping = AsyncMock()
-        mock_redis_client.close = AsyncMock()
+        mock_redis_client.aclose = AsyncMock()
         mock_redis.return_value = mock_redis_client
 
         with patch("app.main.init_db", side_effect=Exception("Database failed")):
@@ -227,7 +227,7 @@ class TestLifespanComprehensive:
 
         mock_redis_client = AsyncMock()
         mock_redis_client.ping = AsyncMock(side_effect=Exception("Ping failed"))
-        mock_redis_client.close = AsyncMock()
+        mock_redis_client.aclose = AsyncMock()
         mock_redis.return_value = mock_redis_client
 
         with (
@@ -248,7 +248,7 @@ class TestLifespanComprehensive:
 
         mock_redis_client = AsyncMock()
         mock_redis_client.ping = AsyncMock()
-        mock_redis_client.close = AsyncMock()
+        mock_redis_client.aclose = AsyncMock()
         mock_redis.return_value = mock_redis_client
 
         with (
@@ -268,7 +268,7 @@ class TestLifespanComprehensive:
                 assert mock_redis_client.ping.call_count == 1
 
             # Verify shutdown components called
-            mock_redis_client.close.assert_called_once()
+            mock_redis_client.aclose.assert_called_once()
             mock_close_db.assert_called_once()
 
 

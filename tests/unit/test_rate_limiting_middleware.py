@@ -7,7 +7,6 @@ Tests the actual RateLimitingMiddleware ASGI interface, not a fictional API.
 import pytest
 from unittest.mock import AsyncMock, MagicMock, patch
 
-
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------

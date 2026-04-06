@@ -17,7 +17,6 @@ from fastapi import Request
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.types import ASGIApp
 
-
 # Context variable for request ID propagation
 request_id_context: contextvars.ContextVar[Optional[str]] = contextvars.ContextVar(
     "request_id", default=None

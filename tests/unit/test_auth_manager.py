@@ -16,7 +16,6 @@ import jwt
 from app.config import settings
 from app.exceptions import AuthenticationError, ExpiredTokenError, InvalidTokenError
 
-
 # ---------------------------------------------------------------------------
 # Fixtures
 # ---------------------------------------------------------------------------

@@ -27,7 +27,6 @@ from typing import Any, Dict
 from unittest.mock import patch, MagicMock, AsyncMock
 from fastapi import HTTPException
 
-
 # ---------------------------------------------------------------------------
 # Module-level service factories
 # ---------------------------------------------------------------------------

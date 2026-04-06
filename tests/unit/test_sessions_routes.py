@@ -19,7 +19,6 @@ from app.routes.sessions import (
 from app.database.models import Session as SessionModel
 from app.models.schemas import TokenPayload
 
-
 # ---------------------------------------------------------------------------
 # Shared helpers
 # ---------------------------------------------------------------------------

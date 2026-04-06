@@ -29,7 +29,6 @@ from app.services.authorization import (
 )
 from app.exceptions import AuthorizationError, InvalidTokenError
 
-
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------

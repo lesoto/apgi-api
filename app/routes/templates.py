@@ -90,9 +90,11 @@ async def list_templates(
                 )
 
             # Get total count
+            # Use explicit None check to avoid SQLAlchemy boolean evaluation error
+            where_clause = query.whereclause
             total = (
-                db.query(SessionTemplate).filter(query.whereclause).count()
-                if query.whereclause
+                db.query(SessionTemplate).filter(where_clause).count()
+                if where_clause is not None
                 else db.query(SessionTemplate).count()
             )
 

@@ -12,7 +12,6 @@ import re
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
-
 # Base Models
 # ----------------------------------------------------------------------------
 

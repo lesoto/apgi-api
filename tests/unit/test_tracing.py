@@ -9,13 +9,11 @@ import sys
 import warnings
 from unittest.mock import patch, MagicMock
 
-
 # ---------------------------------------------------------------------------
 # Import the module (conftest already mocked all otel modules)
 # ---------------------------------------------------------------------------
 
 import app.tracing as tracing_module
-
 
 # ---------------------------------------------------------------------------
 # Test: module-level state

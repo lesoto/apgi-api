@@ -22,7 +22,7 @@ async def authenticated_client(test_environment, mock_database_connection):
     # Mock Redis for the lifespan
     mock_redis_client = AsyncMock()
     mock_redis_client.ping = AsyncMock()
-    mock_redis_client.close = AsyncMock()
+    mock_redis_client.aclose = AsyncMock()
     mock_redis_client.get = AsyncMock(return_value=None)
 
     # Create mock session manager

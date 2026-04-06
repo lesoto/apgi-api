@@ -8,7 +8,6 @@ from celery import Celery
 
 from app.config import settings
 
-
 # Validate broker and backend URLs
 
 

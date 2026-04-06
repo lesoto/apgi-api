@@ -24,7 +24,6 @@ from app.routes.webhooks import (
 from app.services.auth_manager import TokenPayload
 from app.database.connection import get_db
 
-
 # ---------------------------------------------------------------------------
 # Shared fixtures
 # ---------------------------------------------------------------------------

@@ -59,9 +59,7 @@ def create_sqlite_initial_schema():
         """Apply the initial schema directly to SQLite engine."""
         with engine.connect() as conn:
             # Create users table
-            conn.execute(
-                sa.text(
-                    """
+            conn.execute(sa.text("""
                 CREATE TABLE IF NOT EXISTS users (
                     user_id VARCHAR(36) PRIMARY KEY,
                     username VARCHAR(100) NOT NULL UNIQUE,
@@ -71,14 +69,10 @@ def create_sqlite_initial_schema():
                     created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
                     last_login DATETIME
                 )
-            """
-                )
-            )
+            """))
 
             # Create sessions table
-            conn.execute(
-                sa.text(
-                    """
+            conn.execute(sa.text("""
                 CREATE TABLE IF NOT EXISTS sessions (
                     session_id VARCHAR(36) PRIMARY KEY,
                     user_id VARCHAR(36) NOT NULL,
@@ -88,14 +82,10 @@ def create_sqlite_initial_schema():
                     last_login DATETIME,
                     FOREIGN KEY (user_id) REFERENCES users (user_id)
                 )
-            """
-                )
-            )
+            """))
 
             # Create tasks table
-            conn.execute(
-                sa.text(
-                    """
+            conn.execute(sa.text("""
                 CREATE TABLE IF NOT EXISTS tasks (
                     task_id VARCHAR(36) PRIMARY KEY,
                     session_id VARCHAR(36) NOT NULL,
@@ -105,14 +95,10 @@ def create_sqlite_initial_schema():
                     created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
                     FOREIGN KEY (session_id) REFERENCES sessions (session_id)
                 )
-            """
-                )
-            )
+            """))
 
             # Create other required tables
-            conn.execute(
-                sa.text(
-                    """
+            conn.execute(sa.text("""
                 CREATE TABLE IF NOT EXISTS refresh_tokens (
                     token_id VARCHAR(36) PRIMARY KEY,
                     user_id VARCHAR(36) NOT NULL,
@@ -121,13 +107,9 @@ def create_sqlite_initial_schema():
                     created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
                     FOREIGN KEY (user_id) REFERENCES users (user_id)
                 )
-            """
-                )
-            )
+            """))
 
-            conn.execute(
-                sa.text(
-                    """
+            conn.execute(sa.text("""
                 CREATE TABLE IF NOT EXISTS session_data (
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
                     session_id VARCHAR(36) NOT NULL,
@@ -136,13 +118,9 @@ def create_sqlite_initial_schema():
                     created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
                     FOREIGN KEY (session_id) REFERENCES sessions (session_id)
                 )
-            """
-                )
-            )
+            """))
 
-            conn.execute(
-                sa.text(
-                    """
+            conn.execute(sa.text("""
                 CREATE TABLE IF NOT EXISTS webhook_deliveries (
                     delivery_id VARCHAR(36) PRIMARY KEY,
                     task_id VARCHAR(36) NOT NULL,
@@ -153,9 +131,7 @@ def create_sqlite_initial_schema():
                     created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
                     FOREIGN KEY (task_id) REFERENCES tasks (task_id)
                 )
-            """
-                )
-            )
+            """))
 
             # Create indexes
             conn.execute(
@@ -170,15 +146,11 @@ def create_sqlite_initial_schema():
             )
 
             # Create alembic_version table
-            conn.execute(
-                sa.text(
-                    """
+            conn.execute(sa.text("""
                 CREATE TABLE IF NOT EXISTS alembic_version (
                     version_num VARCHAR(255) PRIMARY KEY
                 )
-            """
-                )
-            )
+            """))
             conn.execute(
                 sa.text("INSERT OR IGNORE INTO alembic_version (version_num) VALUES ('001')")
             )

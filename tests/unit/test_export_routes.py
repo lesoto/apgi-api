@@ -23,7 +23,6 @@ from fastapi.testclient import TestClient
 
 from app.models.schemas import TokenPayload
 
-
 # ---------------------------------------------------------------------------
 # Shared helpers
 # ---------------------------------------------------------------------------

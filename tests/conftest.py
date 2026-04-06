@@ -73,9 +73,59 @@ apgi_modules = {
     "apgi_system.system": MagicMock(),
 }
 
+
 # Mock other problematic dependencies
+# Create a custom Celery mock that returns actual decorated functions
+def mock_celery_task_decorator(*args, bind=False, base=None, name=None, **kwargs):
+    """Mock decorator that returns the actual function being decorated."""
+
+    def decorator(func):
+        func.name = name or func.__name__
+        func.bind = bind
+        func.base = base
+        return func
+
+    if args and callable(args[0]):
+        # Used as @celery_app.task without parentheses
+        return decorator(args[0])
+    return decorator
+
+
+class MockCeleryTask:
+    """Mock Celery Task base class."""
+
+    pass
+
+
+class MockCelery:
+    """Mock Celery class that returns actual decorated functions."""
+
+    def __init__(self, *args, **kwargs):
+        self.conf = MagicMock()
+        self.conf.task_routes = {}
+        self.conf.beat_schedule = {}
+        self.conf.update = MagicMock()
+        self.tasks = {}  # Add tasks registry
+        self.send_task = MagicMock()
+        self.control = MagicMock()  # Add control for revoke, etc.
+
+    def task(self, *args, bind=False, base=None, name=None, **kwargs):
+        """Return actual decorated function."""
+        return mock_celery_task_decorator(*args, bind=bind, base=base, name=name, **kwargs)
+
+
+class MockCeleryModule:
+    """Mock celery module with MockCelery class."""
+
+    Celery = MockCelery
+    Task = MockCeleryTask
+    shared_task = mock_celery_task_decorator
+    result = MagicMock()
+    states = MagicMock()
+
+
 other_modules = {
-    "celery": MagicMock(),
+    "celery": MockCeleryModule(),
     "kombu": MagicMock(),
     "billiard": MagicMock(),
 }
@@ -84,7 +134,7 @@ other_modules = {
 import sys
 
 for module_name, module_mock in {**otel_modules, **apgi_modules, **other_modules}.items():
-    sys.modules[module_name] = module_mock
+    sys.modules[module_name] = module_mock  # type: ignore[assignment]
 
 # Suppress warnings about missing optional dependencies
 warnings.filterwarnings("ignore", category=ImportWarning)
