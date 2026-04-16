@@ -71,7 +71,7 @@ class APITestClient:
         response.raise_for_status()
         return cast(Dict[str, Any], response.json())
 
-    async def list_sessions(self, **params) -> Dict[str, Any]:
+    async def list_sessions(self, **params: Any) -> Dict[str, Any]:
         """List user sessions."""
         response = await self.client.get("/v1/sessions", params=params)
         response.raise_for_status()
@@ -113,7 +113,7 @@ class APITestClient:
         response.raise_for_status()
         return cast(Dict[str, Any], response.json())
 
-    async def list_templates(self, **params) -> Dict[str, Any]:
+    async def list_templates(self, **params: Any) -> Dict[str, Any]:
         """List session templates."""
         response = await self.client.get("/v1/templates", params=params)
         response.raise_for_status()
@@ -139,7 +139,7 @@ class APITestClient:
 
         raise TimeoutError(f"Task {task_id} did not complete within {timeout} seconds")
 
-    async def close(self):
+    async def close(self) -> None:
         """Close the HTTP client."""
         await self.client.aclose()
 
@@ -339,7 +339,7 @@ class E2ETestFramework:
         """Test concurrent workload handling."""
         results: List[Dict[str, Any]] = []
 
-        async def user_workflow(user_id: int):
+        async def user_workflow(user_id: int) -> Dict[str, Any]:
             """Simulate a user's complete workflow."""
             user_data = {
                 "username": f"concurrent_user_{user_id}",
@@ -467,7 +467,7 @@ class E2ETestFramework:
 
 # Pytest fixtures for E2E testing
 @pytest.fixture
-async def api_client():
+async def api_client() -> AsyncGenerator[APITestClient, None]:
     """Fixture providing an API test client."""
     client = APITestClient()
     try:
@@ -477,7 +477,7 @@ async def api_client():
 
 
 @pytest.fixture
-async def authenticated_api_client(api_client):
+async def authenticated_api_client(api_client: APITestClient) -> APITestClient:
     """Fixture providing an authenticated API test client."""
     # Create test user
     user_data = {
@@ -493,6 +493,6 @@ async def authenticated_api_client(api_client):
 
 
 @pytest.fixture
-def e2e_framework():
+def e2e_framework() -> E2ETestFramework:
     """Fixture providing the E2E testing framework."""
     return E2ETestFramework()

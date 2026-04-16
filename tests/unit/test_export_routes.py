@@ -17,6 +17,7 @@ import pytest
 import io
 from contextlib import asynccontextmanager
 from datetime import datetime, timezone, timedelta
+from typing import Optional, AsyncGenerator
 from unittest.mock import MagicMock, AsyncMock, patch
 from fastapi import HTTPException
 from fastapi.testclient import TestClient
@@ -38,25 +39,25 @@ ADMIN_USER = TokenPayload(
 
 
 @asynccontextmanager
-async def noop_lifespan(app):
+async def noop_lifespan(app: object) -> AsyncGenerator[None, None]:
     yield
 
 
-def make_mock_db(session=None):
+def make_mock_db(session: Optional[MagicMock] = None) -> MagicMock:
     """Return a mock db whose query().filter().first() returns `session`."""
     db = MagicMock()
     db.query.return_value.filter.return_value.first.return_value = session
     return db
 
 
-def make_mock_session(session_id="session123", user_id="user123"):
+def make_mock_session(session_id: str = "session123", user_id: str = "user123") -> MagicMock:
     session = MagicMock()
     session.session_id = session_id
     session.user_id = user_id
     return session
 
 
-def make_mock_service():
+def make_mock_service() -> MagicMock:
     svc = MagicMock()
     svc.export_session_data = AsyncMock(return_value=(b"col1,col2\n1,2", "text/csv"))
     svc.generate_summary_stats = AsyncMock(
@@ -86,7 +87,11 @@ def make_mock_service():
     return svc
 
 
-def make_client(mock_db=None, mock_service=None, user=None):
+def make_client(
+    mock_db: Optional[MagicMock] = None,
+    mock_service: Optional[MagicMock] = None,
+    user: Optional[TokenPayload] = None,
+) -> tuple[TestClient, object]:
     """Create a TestClient with dependency overrides."""
     from app.main import create_app
     from app.database.connection import get_db
@@ -117,7 +122,7 @@ def make_client(mock_db=None, mock_service=None, user=None):
 
 
 class TestGetDataExportService:
-    def test_raises_503_when_not_initialized(self):
+    def test_raises_503_when_not_initialized(self) -> None:
         """get_data_export_service raises HTTP 503 when _data_export_service is None."""
         import app.routes.export as export_module
         from app.routes.export import get_data_export_service
@@ -131,7 +136,7 @@ class TestGetDataExportService:
         finally:
             export_module._data_export_service = original
 
-    def test_returns_service_when_initialized(self):
+    def test_returns_service_when_initialized(self) -> None:
         """get_data_export_service returns the service when initialized."""
         import app.routes.export as export_module
         from app.routes.export import get_data_export_service
@@ -152,7 +157,7 @@ class TestGetDataExportService:
 
 
 class TestInitExportRoutes:
-    def test_init_export_routes_sets_service(self):
+    def test_init_export_routes_sets_service(self) -> None:
         """init_export_routes initializes the DataExportService singleton."""
         import app.routes.export as export_module
         from app.routes.export import init_export_routes
@@ -177,7 +182,7 @@ class TestInitExportRoutes:
 
 
 class TestExportSessionData:
-    def test_export_csv_success(self):
+    def test_export_csv_success(self) -> None:
         """Happy path: CSV export returns 200 with text/csv content type."""
         mock_session = make_mock_session()
         mock_db = make_mock_db(session=mock_session)
@@ -191,7 +196,7 @@ class TestExportSessionData:
         assert "text/csv" in response.headers["content-type"]
         assert "attachment" in response.headers["content-disposition"]
 
-    def test_export_json_success(self):
+    def test_export_json_success(self) -> None:
         """Happy path: JSON export returns 200 with application/json content type."""
         mock_session = make_mock_session()
         mock_db = make_mock_db(session=mock_session)
@@ -204,7 +209,7 @@ class TestExportSessionData:
         assert response.status_code == 200
         assert "application/json" in response.headers["content-type"]
 
-    def test_export_invalid_format_returns_400(self):
+    def test_export_invalid_format_returns_400(self) -> None:
         """Invalid format parameter returns HTTP 400."""
         mock_session = make_mock_session()
         mock_db = make_mock_db(session=mock_session)
@@ -214,7 +219,7 @@ class TestExportSessionData:
 
         assert response.status_code == 400
 
-    def test_export_session_not_found_returns_404(self):
+    def test_export_session_not_found_returns_404(self) -> None:
         """Session not found returns HTTP 404."""
         mock_db = make_mock_db(session=None)
 
@@ -223,7 +228,7 @@ class TestExportSessionData:
 
         assert response.status_code == 404
 
-    def test_export_service_error_returns_500(self):
+    def test_export_service_error_returns_500(self) -> None:
         """Service exception returns HTTP 500."""
         mock_session = make_mock_session()
         mock_db = make_mock_db(session=mock_session)
@@ -235,7 +240,7 @@ class TestExportSessionData:
 
         assert response.status_code == 500
 
-    def test_export_value_error_exceeds_maximum_returns_413(self):
+    def test_export_value_error_exceeds_maximum_returns_413(self) -> None:
         """ValueError with 'exceeds maximum' returns HTTP 413."""
         mock_session = make_mock_session()
         mock_db = make_mock_db(session=mock_session)
@@ -249,7 +254,7 @@ class TestExportSessionData:
 
         assert response.status_code == 413
 
-    def test_export_value_error_other_returns_404(self):
+    def test_export_value_error_other_returns_404(self) -> None:
         """ValueError without 'exceeds maximum' returns HTTP 404."""
         mock_session = make_mock_session()
         mock_db = make_mock_db(session=mock_session)
@@ -261,7 +266,7 @@ class TestExportSessionData:
 
         assert response.status_code == 404
 
-    def test_export_with_valid_variables(self):
+    def test_export_with_valid_variables(self) -> None:
         """Export with valid variable names succeeds."""
         mock_session = make_mock_session()
         mock_db = make_mock_db(session=mock_session)
@@ -273,7 +278,7 @@ class TestExportSessionData:
 
         assert response.status_code == 200
 
-    def test_export_with_invalid_variable_name_returns_400(self):
+    def test_export_with_invalid_variable_name_returns_400(self) -> None:
         """Export with invalid variable name returns HTTP 400."""
         mock_session = make_mock_session()
         mock_db = make_mock_db(session=mock_session)
@@ -285,7 +290,7 @@ class TestExportSessionData:
 
         assert response.status_code == 400
 
-    def test_export_with_empty_variable_name_returns_400(self):
+    def test_export_with_empty_variable_name_returns_400(self) -> None:
         """Export with empty variable name (e.g. trailing comma) returns HTTP 400."""
         mock_session = make_mock_session()
         mock_db = make_mock_db(session=mock_session)
@@ -296,7 +301,7 @@ class TestExportSessionData:
 
         assert response.status_code == 400
 
-    def test_export_with_time_filters(self):
+    def test_export_with_time_filters(self) -> None:
         """Export with start_time and end_time filters succeeds."""
         mock_session = make_mock_session()
         mock_db = make_mock_db(session=mock_session)
@@ -311,7 +316,7 @@ class TestExportSessionData:
         assert response.status_code == 200
         mock_svc.export_session_data.assert_called_once()
 
-    def test_export_default_format_is_json(self):
+    def test_export_default_format_is_json(self) -> None:
         """Default format (no format param) is json."""
         mock_session = make_mock_session()
         mock_db = make_mock_db(session=mock_session)
@@ -323,7 +328,7 @@ class TestExportSessionData:
 
         assert response.status_code == 200
 
-    def test_export_with_bytesio_response(self):
+    def test_export_with_bytesio_response(self) -> None:
         """Service returning BytesIO object is handled correctly."""
         mock_session = make_mock_session()
         mock_db = make_mock_db(session=mock_session)
@@ -342,7 +347,7 @@ class TestExportSessionData:
 
 
 class TestGetSummaryStatistics:
-    def test_summary_success(self):
+    def test_summary_success(self) -> None:
         """Happy path: returns 200 with summary statistics."""
         mock_svc = make_mock_service()
 
@@ -352,7 +357,7 @@ class TestGetSummaryStatistics:
         assert response.status_code == 200
         mock_svc.generate_summary_stats.assert_called_once_with("session123", "user123")
 
-    def test_summary_value_error_returns_404(self):
+    def test_summary_value_error_returns_404(self) -> None:
         """ValueError from service returns HTTP 404."""
         mock_svc = make_mock_service()
         mock_svc.generate_summary_stats = AsyncMock(side_effect=ValueError("Session not found"))
@@ -362,7 +367,7 @@ class TestGetSummaryStatistics:
 
         assert response.status_code == 404
 
-    def test_summary_generic_exception_returns_500(self):
+    def test_summary_generic_exception_returns_500(self) -> None:
         """Generic exception from service returns HTTP 500."""
         mock_svc = make_mock_service()
         mock_svc.generate_summary_stats = AsyncMock(side_effect=RuntimeError("db connection lost"))
@@ -379,7 +384,7 @@ class TestGetSummaryStatistics:
 
 
 class TestGetTimeSeriesData:
-    def test_timeseries_success(self):
+    def test_timeseries_success(self) -> None:
         """Happy path: returns 200 with time series data."""
         mock_svc = make_mock_service()
 
@@ -389,21 +394,21 @@ class TestGetTimeSeriesData:
         assert response.status_code == 200
         mock_svc.export_time_series.assert_called_once()
 
-    def test_timeseries_invalid_variable_returns_400(self):
+    def test_timeseries_invalid_variable_returns_400(self) -> None:
         """Invalid variable name returns HTTP 400."""
         client, _ = make_client()
         response = client.get("/v1/sessions/session123/timeseries?variables=valid,inv%40lid")
 
         assert response.status_code == 400
 
-    def test_timeseries_empty_variable_returns_400(self):
+    def test_timeseries_empty_variable_returns_400(self) -> None:
         """Empty variable name (space after comma) returns HTTP 400."""
         client, _ = make_client()
         response = client.get("/v1/sessions/session123/timeseries?variables=var1,%20")
 
         assert response.status_code == 400
 
-    def test_timeseries_value_error_returns_404(self):
+    def test_timeseries_value_error_returns_404(self) -> None:
         """ValueError from service returns HTTP 404."""
         mock_svc = make_mock_service()
         mock_svc.export_time_series = AsyncMock(side_effect=ValueError("Session not found"))
@@ -413,7 +418,7 @@ class TestGetTimeSeriesData:
 
         assert response.status_code == 404
 
-    def test_timeseries_generic_exception_returns_500(self):
+    def test_timeseries_generic_exception_returns_500(self) -> None:
         """Generic exception from service returns HTTP 500."""
         mock_svc = make_mock_service()
         mock_svc.export_time_series = AsyncMock(side_effect=RuntimeError("unexpected error"))
@@ -423,7 +428,7 @@ class TestGetTimeSeriesData:
 
         assert response.status_code == 500
 
-    def test_timeseries_with_optional_params(self):
+    def test_timeseries_with_optional_params(self) -> None:
         """Time series with downsample, limit, cursor, and time filters succeeds."""
         mock_svc = make_mock_service()
 
@@ -436,7 +441,7 @@ class TestGetTimeSeriesData:
         assert response.status_code == 200
         mock_svc.export_time_series.assert_called_once()
 
-    def test_timeseries_missing_variables_returns_422(self):
+    def test_timeseries_missing_variables_returns_422(self) -> None:
         """Missing required variables parameter returns HTTP 422."""
         client, _ = make_client()
         response = client.get("/v1/sessions/session123/timeseries")
@@ -450,7 +455,7 @@ class TestGetTimeSeriesData:
 
 
 class TestGetEventAnalysis:
-    def test_event_analysis_ignition_success(self):
+    def test_event_analysis_ignition_success(self) -> None:
         """Happy path: ignition event analysis returns 200."""
         mock_svc = make_mock_service()
 
@@ -462,7 +467,7 @@ class TestGetEventAnalysis:
             session_id="session123", event_type="ignition", user_id="user123"
         )
 
-    def test_event_analysis_metabolism_success(self):
+    def test_event_analysis_metabolism_success(self) -> None:
         """metabolism event type returns 200."""
         mock_svc = make_mock_service()
         mock_svc.get_event_analysis = AsyncMock(
@@ -478,7 +483,7 @@ class TestGetEventAnalysis:
 
         assert response.status_code == 200
 
-    def test_event_analysis_allostatic_load_success(self):
+    def test_event_analysis_allostatic_load_success(self) -> None:
         """allostatic_load event type returns 200."""
         mock_svc = make_mock_service()
         mock_svc.get_event_analysis = AsyncMock(
@@ -494,14 +499,14 @@ class TestGetEventAnalysis:
 
         assert response.status_code == 200
 
-    def test_event_analysis_invalid_event_type_returns_400(self):
+    def test_event_analysis_invalid_event_type_returns_400(self) -> None:
         """Invalid event_type returns HTTP 400."""
         client, _ = make_client()
         response = client.get("/v1/sessions/session123/events?event_type=unknown_type")
 
         assert response.status_code == 400
 
-    def test_event_analysis_value_error_returns_404(self):
+    def test_event_analysis_value_error_returns_404(self) -> None:
         """ValueError from service returns HTTP 404."""
         mock_svc = make_mock_service()
         mock_svc.get_event_analysis = AsyncMock(side_effect=ValueError("Session not found"))
@@ -511,7 +516,7 @@ class TestGetEventAnalysis:
 
         assert response.status_code == 404
 
-    def test_event_analysis_generic_exception_returns_500(self):
+    def test_event_analysis_generic_exception_returns_500(self) -> None:
         """Generic exception from service returns HTTP 500."""
         mock_svc = make_mock_service()
         mock_svc.get_event_analysis = AsyncMock(side_effect=RuntimeError("unexpected error"))
@@ -521,7 +526,7 @@ class TestGetEventAnalysis:
 
         assert response.status_code == 500
 
-    def test_event_analysis_http_exception_re_raised(self):
+    def test_event_analysis_http_exception_re_raised(self) -> None:
         """HTTPException from service is re-raised unchanged."""
         mock_svc = make_mock_service()
         mock_svc.get_event_analysis = AsyncMock(
@@ -533,7 +538,7 @@ class TestGetEventAnalysis:
 
         assert response.status_code == 403
 
-    def test_event_analysis_default_event_type_is_ignition(self):
+    def test_event_analysis_default_event_type_is_ignition(self) -> None:
         """Default event_type (no param) is 'ignition'."""
         mock_svc = make_mock_service()
 

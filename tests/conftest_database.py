@@ -10,22 +10,24 @@ import pytest
 from unittest.mock import patch, MagicMock
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
+from typing import Generator, Any
 
 # Test database URL using SQLite in-memory database
 TEST_DATABASE_URL = "sqlite:///:memory:"
 
 
 @pytest.fixture
-def test_db_engine():
+def test_db_engine() -> Generator[Any, Any, None]:
     """Create a test database engine using SQLite in-memory database."""
     engine = create_engine(
         TEST_DATABASE_URL, echo=False, connect_args={"check_same_thread": False}  # SQLite specific
     )
-    return engine
+    yield engine
+    engine.dispose()
 
 
 @pytest.fixture
-def test_db_session(test_db_engine):
+def test_db_session(test_db_engine) -> Generator[Any, Any, None]:
     """Create a test database session."""
     TestSessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=test_db_engine)
     session = TestSessionLocal()
@@ -36,7 +38,7 @@ def test_db_session(test_db_engine):
 
 
 @pytest.fixture
-def mock_database_connection():
+def mock_database_connection() -> Generator[tuple[Any, Any, Any], Any, None]:
     """Mock database connection for tests that don't need actual DB."""
     with (
         patch("app.database.connection.engine") as mock_engine,
@@ -53,7 +55,7 @@ def mock_database_connection():
 
 
 @pytest.fixture
-def test_environment():
+def test_environment() -> Generator[dict[str, str], Any, None]:
     """Set test environment variables."""
     original_env = {}
     test_vars = {

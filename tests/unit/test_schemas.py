@@ -23,6 +23,7 @@ from app.models.schemas import (
     # Session schemas
     SessionCreateRequest,
     SessionTemplateCreateRequest,
+    SessionTemplateUpdateRequest,
     # Task schemas
     TaskSubmitRequest,
     TaskDependencyCreateRequest,
@@ -49,6 +50,7 @@ from app.models.schemas import (
     PaginationInfo,
     ErrorDetail,
     TokenPayload,
+    CustomConfig,
 )
 
 # ============================================================================
@@ -716,6 +718,60 @@ class TestSessionTemplateCreateRequest:
                 is_public=False,
             )
         assert "must be provided" in str(exc_info.value)
+
+
+class TestCustomConfig:
+    """Tests for CustomConfig schema."""
+
+    def test_valid_custom_config(self):
+        """Test valid custom config."""
+        config = CustomConfig(config={"key": "value"})
+        assert config.config == {"key": "value"}
+
+    def test_invalid_custom_config_empty_key(self):
+        """Test invalid custom config — empty key."""
+        with pytest.raises(ValidationError) as exc_info:
+            CustomConfig(config={"": "value"})
+        assert "non-empty string" in str(exc_info.value)
+
+    def test_invalid_custom_config_dangerous_key(self):
+        """Test invalid custom config — dangerous key."""
+        with pytest.raises(ValidationError) as exc_info:
+            CustomConfig(config={"secret_key": "value"})
+        assert "not allowed" in str(exc_info.value)
+
+    def test_invalid_custom_config_list_validation(self):
+        """Test invalid custom config — list with invalid item."""
+        with pytest.raises(ValidationError) as exc_info:
+            CustomConfig(config={"items": [1, 2, object()]})
+        assert "must be a string, number, boolean, null" in str(exc_info.value)
+
+    def test_invalid_custom_config_invalid_type(self):
+        """Test invalid custom config — invalid value type."""
+        with pytest.raises(ValidationError) as exc_info:
+            CustomConfig(config={"key": object()})
+        assert "must be a string, number, boolean, null" in str(exc_info.value)
+
+
+class TestSessionTemplateUpdateRequest:
+    """Tests for SessionTemplateUpdateRequest schema."""
+
+    def test_valid_template_update(self):
+        """Test valid template update."""
+        template = SessionTemplateUpdateRequest(name="Updated Name")
+        assert template.name == "Updated Name"
+
+    def test_invalid_name_empty(self):
+        """Test invalid template update — empty name."""
+        with pytest.raises(ValidationError) as exc_info:
+            SessionTemplateUpdateRequest(name="  ")
+        assert "cannot be empty" in str(exc_info.value)
+
+    def test_invalid_name_too_long(self):
+        """Test invalid template update — name too long."""
+        with pytest.raises(ValidationError) as exc_info:
+            SessionTemplateUpdateRequest(name="x" * 101)
+        assert "too long" in str(exc_info.value)
 
 
 # ============================================================================

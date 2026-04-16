@@ -14,6 +14,7 @@ os.environ.setdefault("WEBHOOK_SECRET_KEY", "test-webhook-key-that-is-long-enoug
 os.environ.setdefault("ENVIRONMENT", "development")
 os.environ.setdefault("DATABASE_URL", "sqlite:///:memory:")
 os.environ.setdefault("REDIS_URL", "redis://localhost:6379/1")
+os.environ.setdefault("TEST_MODE", "true")
 
 # ── Hypothesis profiles ──────────────────────────────────────────────────────
 import hypothesis  # noqa: E402
@@ -44,6 +45,44 @@ settings.register_profile(
 
 # Load "ci" when running in CI, otherwise "dev" for faster local iteration.
 settings.load_profile("ci" if os.getenv("CI") else "dev")
+
+
+# ── Mock structured logging BEFORE app import ─────────────────────────────
+# This must be done before any app module is imported to prevent logging conflicts
+from unittest.mock import patch
+
+patch("app.middleware.logging.configure_structured_logging", lambda *args, **kwargs: None).start()
+
+
+# ── Logging configuration for tests ─────────────────────────────────────────────
+import logging
+import pytest
+
+
+@pytest.fixture
+def reset_logging():
+    """Reset logging configuration to prevent LogRecord conflicts.
+
+    Use this fixture only when necessary, as it interferes with caplog.
+    """
+    # Remove all handlers from root logger
+    root_logger = logging.getLogger()
+    original_handlers = root_logger.handlers[:]
+    for handler in root_logger.handlers[:]:
+        root_logger.removeHandler(handler)
+    # Reset log level
+    original_level = root_logger.level
+    root_logger.setLevel(logging.WARNING)
+
+    yield
+
+    # Restore original state
+    root_logger.setLevel(original_level)
+    for handler in root_logger.handlers[:]:
+        root_logger.removeHandler(handler)
+    for handler in original_handlers:
+        root_logger.addHandler(handler)
+
 
 # ── Global mocks for optional dependencies ──────────────────────────────────
 # Mock optional dependencies that commonly cause test failures

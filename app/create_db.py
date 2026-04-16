@@ -2,7 +2,7 @@ import psycopg2
 from psycopg2 import sql
 
 
-def create_database():
+def create_database() -> None:
     try:
         # Connect to PostgreSQL as superuser (postgres)
         conn = psycopg2.connect(

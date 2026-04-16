@@ -6,6 +6,7 @@ Validates: Requirements 3.10, 3.15
 """
 
 import pytest
+from typing import Generator
 from unittest.mock import MagicMock, patch, AsyncMock
 from datetime import datetime, timezone, timedelta
 from sqlalchemy.orm import Session
@@ -35,7 +36,7 @@ except ImportError:
 
 
 @pytest.fixture
-def mock_db():
+def mock_db() -> MagicMock:
     """Create a mock database session."""
     db = MagicMock(spec=Session)
     db.query = MagicMock()
@@ -47,7 +48,7 @@ def mock_db():
 
 
 @pytest.fixture
-def mock_user():
+def mock_user() -> MagicMock:
     """Create a mock user object."""
     user = MagicMock()
     user.user_id = "test_user_123"
@@ -64,7 +65,7 @@ def mock_user():
 
 
 @pytest.fixture
-def mock_current_user():
+def mock_current_user() -> TokenPayload:
     """Create a mock current user token payload."""
     return TokenPayload(
         user_id="test_user_123",
@@ -76,7 +77,7 @@ def mock_current_user():
 
 
 @pytest.fixture
-def client(mock_db):
+def client(mock_db: MagicMock) -> Generator[TestClient, None, None]:
     """Create a TestClient with mocked database dependency."""
     app = create_app(test_mode=True)
     app.dependency_overrides[get_db] = lambda: mock_db
@@ -92,7 +93,9 @@ def client(mock_db):
 class TestLogin:
     """Test the /login endpoint."""
 
-    def test_login_success(self, client, mock_db, mock_user):
+    def test_login_success(
+        self, client: TestClient, mock_db: MagicMock, mock_user: MagicMock
+    ) -> None:
         """Test successful login with valid credentials."""
         # Setup mock
         mock_db.query.return_value.filter.return_value.first.return_value = mock_user
@@ -125,7 +128,9 @@ class TestLogin:
         assert data["token_type"] == "bearer"
         assert data["expires_in"] == 1800
 
-    def test_login_with_remember_me(self, client, mock_db, mock_user):
+    def test_login_with_remember_me(
+        self, client: TestClient, mock_db: MagicMock, mock_user: MagicMock
+    ) -> None:
         """Test login with remember_me flag."""
         mock_db.query.return_value.filter.return_value.first.return_value = mock_user
 
@@ -154,7 +159,9 @@ class TestLogin:
         data = response.json()
         assert data["refresh_expires_in"] == 2592000
 
-    def test_login_with_mfa_code(self, client, mock_db, mock_user):
+    def test_login_with_mfa_code(
+        self, client: TestClient, mock_db: MagicMock, mock_user: MagicMock
+    ) -> None:
         """Test login with MFA code."""
         mock_db.query.return_value.filter.return_value.first.return_value = mock_user
 
@@ -184,7 +191,7 @@ class TestLogin:
             "testuser", "SecurePassword123", "123456"
         )
 
-    def test_login_invalid_credentials(self, client, mock_db):
+    def test_login_invalid_credentials(self, client: TestClient, mock_db: MagicMock) -> None:
         """Test login with invalid credentials."""
         with patch("app.routes.auth.AuthManager") as mock_auth_manager_class:
             mock_auth_manager = MagicMock()
@@ -201,7 +208,7 @@ class TestLogin:
 
         assert response.status_code == 401
 
-    def test_login_account_locked(self, client, mock_db):
+    def test_login_account_locked(self, client: TestClient, mock_db: MagicMock) -> None:
         """Test login when account is locked."""
         with patch("app.routes.auth.AuthManager") as mock_auth_manager_class:
             mock_auth_manager = MagicMock()
@@ -220,7 +227,7 @@ class TestLogin:
 
         assert response.status_code == 401
 
-    def test_login_account_inactive(self, client, mock_db):
+    def test_login_account_inactive(self, client: TestClient, mock_db: MagicMock) -> None:
         """Test login when account is not active."""
         with patch("app.routes.auth.AuthManager") as mock_auth_manager_class:
             mock_auth_manager = MagicMock()
@@ -239,7 +246,7 @@ class TestLogin:
 
         assert response.status_code == 401
 
-    def test_login_mfa_required(self, client, mock_db):
+    def test_login_mfa_required(self, client: TestClient, mock_db: MagicMock) -> None:
         """Test login when MFA code is required but not provided."""
         with patch("app.routes.auth.AuthManager") as mock_auth_manager_class:
             mock_auth_manager = MagicMock()
@@ -258,7 +265,7 @@ class TestLogin:
 
         assert response.status_code == 401
 
-    def test_login_invalid_mfa_code(self, client, mock_db):
+    def test_login_invalid_mfa_code(self, client: TestClient, mock_db: MagicMock) -> None:
         """Test login with invalid MFA code."""
         with patch("app.routes.auth.AuthManager") as mock_auth_manager_class:
             mock_auth_manager = MagicMock()
@@ -278,7 +285,9 @@ class TestLogin:
 
         assert response.status_code == 401
 
-    def test_login_audit_log_import_failure(self, client, mock_db, mock_user):
+    def test_login_audit_log_import_failure(
+        self, client: TestClient, mock_db: MagicMock, mock_user: MagicMock
+    ) -> None:
         """Test login succeeds even if AuditLog import fails."""
         mock_db.query.return_value.filter.return_value.first.return_value = mock_user
 
@@ -309,7 +318,7 @@ class TestLogin:
         assert response.status_code == 200
         assert "access_token" in response.json()
 
-    def test_login_missing_username(self, client):
+    def test_login_missing_username(self, client: TestClient) -> None:
         """Test login with missing username."""
         response = client.post(
             "/v1/auth/login",
@@ -320,7 +329,7 @@ class TestLogin:
 
         assert response.status_code == 422  # Validation error
 
-    def test_login_missing_password(self, client):
+    def test_login_missing_password(self, client: TestClient) -> None:
         """Test login with missing password."""
         response = client.post(
             "/v1/auth/login",
@@ -331,7 +340,7 @@ class TestLogin:
 
         assert response.status_code == 422  # Validation error
 
-    def test_login_empty_username(self, client):
+    def test_login_empty_username(self, client: TestClient) -> None:
         """Test login with empty username."""
         response = client.post(
             "/v1/auth/login",
@@ -343,7 +352,7 @@ class TestLogin:
 
         assert response.status_code == 422  # Validation error
 
-    def test_login_weak_password(self, client):
+    def test_login_weak_password(self, client: TestClient) -> None:
         """Test login with weak password."""
         response = client.post(
             "/v1/auth/login",
@@ -365,7 +374,7 @@ class TestRefreshToken:
     """Test the /refresh endpoint."""
 
     @pytest.mark.asyncio
-    async def test_refresh_token_success(self, client, mock_db):
+    async def test_refresh_token_success(self, client: TestClient, mock_db: MagicMock) -> None:
         """Test successful token refresh."""
         with patch("app.routes.auth.AuthManager") as mock_auth_manager_class:
             mock_auth_manager = AsyncMock()
@@ -392,7 +401,7 @@ class TestRefreshToken:
         assert data["token_type"] == "bearer"
 
     @pytest.mark.asyncio
-    async def test_refresh_token_invalid(self, client, mock_db):
+    async def test_refresh_token_invalid(self, client: TestClient, mock_db: MagicMock) -> None:
         """Test refresh with invalid token."""
         with patch("app.routes.auth.AuthManager") as mock_auth_manager_class:
             mock_auth_manager = AsyncMock()
@@ -409,7 +418,7 @@ class TestRefreshToken:
         assert response.status_code == 401
 
     @pytest.mark.asyncio
-    async def test_refresh_token_expired(self, client, mock_db):
+    async def test_refresh_token_expired(self, client: TestClient, mock_db: MagicMock) -> None:
         """Test refresh with expired token."""
         with patch("app.routes.auth.AuthManager") as mock_auth_manager_class:
             mock_auth_manager = AsyncMock()
@@ -428,7 +437,7 @@ class TestRefreshToken:
         assert response.status_code == 401
 
     @pytest.mark.asyncio
-    async def test_refresh_token_revoked(self, client, mock_db):
+    async def test_refresh_token_revoked(self, client: TestClient, mock_db: MagicMock) -> None:
         """Test refresh with revoked token."""
         with patch("app.routes.auth.AuthManager") as mock_auth_manager_class:
             mock_auth_manager = AsyncMock()
@@ -447,7 +456,9 @@ class TestRefreshToken:
         assert response.status_code == 401
 
     @pytest.mark.asyncio
-    async def test_refresh_token_generic_error(self, client, mock_db):
+    async def test_refresh_token_generic_error(
+        self, client: TestClient, mock_db: MagicMock
+    ) -> None:
         """Test refresh with generic error."""
         with patch("app.routes.auth.AuthManager") as mock_auth_manager_class:
             mock_auth_manager = AsyncMock()
@@ -463,7 +474,7 @@ class TestRefreshToken:
 
         assert response.status_code == 401
 
-    def test_refresh_token_missing(self, client):
+    def test_refresh_token_missing(self, client: TestClient) -> None:
         """Test refresh with missing token."""
         response = client.post(
             "/v1/auth/refresh",
@@ -482,7 +493,9 @@ class TestLogout:
     """Test the /logout endpoint."""
 
     @pytest.mark.asyncio
-    async def test_logout_success(self, client, mock_db, mock_current_user):
+    async def test_logout_success(
+        self, client: TestClient, mock_db: MagicMock, mock_current_user: TokenPayload
+    ) -> None:
         """Test successful logout."""
         with patch("app.routes.auth.AuthManager") as mock_auth_manager_class:
             mock_auth_manager = AsyncMock()
@@ -493,7 +506,7 @@ class TestLogout:
             # Override the get_current_user dependency
             from app.services.authorization import get_current_user
 
-            client.app.dependency_overrides[get_current_user] = lambda: mock_current_user
+            client.app.dependency_overrides[get_current_user] = lambda: mock_current_user  # type: ignore
 
             response = client.post(
                 "/v1/auth/logout",
@@ -506,7 +519,9 @@ class TestLogout:
         assert response.status_code == 204
 
     @pytest.mark.asyncio
-    async def test_logout_token_mismatch(self, client, mock_db, mock_current_user):
+    async def test_logout_token_mismatch(
+        self, client: TestClient, mock_db: MagicMock, mock_current_user: TokenPayload
+    ) -> None:
         """Test logout when token doesn't belong to current user."""
         other_user = TokenPayload(
             user_id="other_user_456",
@@ -524,7 +539,7 @@ class TestLogout:
             # Override the get_current_user dependency
             from app.services.authorization import get_current_user
 
-            client.app.dependency_overrides[get_current_user] = lambda: mock_current_user
+            client.app.dependency_overrides[get_current_user] = lambda: mock_current_user  # type: ignore
 
             response = client.post(
                 "/v1/auth/logout",
@@ -537,7 +552,9 @@ class TestLogout:
         assert response.status_code == 204
 
     @pytest.mark.asyncio
-    async def test_logout_invalid_token(self, client, mock_db, mock_current_user):
+    async def test_logout_invalid_token(
+        self, client: TestClient, mock_db: MagicMock, mock_current_user: TokenPayload
+    ) -> None:
         """Test logout with invalid refresh token."""
         with patch("app.routes.auth.AuthManager") as mock_auth_manager_class:
             mock_auth_manager = AsyncMock()
@@ -547,7 +564,7 @@ class TestLogout:
             # Override the get_current_user dependency
             from app.services.authorization import get_current_user
 
-            client.app.dependency_overrides[get_current_user] = lambda: mock_current_user
+            client.app.dependency_overrides[get_current_user] = lambda: mock_current_user  # type: ignore
 
             response = client.post(
                 "/v1/auth/logout",
@@ -559,12 +576,14 @@ class TestLogout:
 
         assert response.status_code == 204  # Logout is graceful
 
-    def test_logout_missing_refresh_token(self, client, mock_current_user):
+    def test_logout_missing_refresh_token(
+        self, client: TestClient, mock_current_user: TokenPayload
+    ) -> None:
         """Test logout with missing refresh token."""
         # Override the get_current_user dependency
         from app.services.authorization import get_current_user
 
-        client.app.dependency_overrides[get_current_user] = lambda: mock_current_user
+        client.app.dependency_overrides[get_current_user] = lambda: mock_current_user  # type: ignore
 
         response = client.post(
             "/v1/auth/logout",
@@ -584,7 +603,9 @@ class TestLogoutAccess:
     """Test the /logout-access endpoint."""
 
     @pytest.mark.asyncio
-    async def test_logout_access_success(self, client, mock_db, mock_current_user):
+    async def test_logout_access_success(
+        self, client: TestClient, mock_db: MagicMock, mock_current_user: TokenPayload
+    ) -> None:
         """Test successful access token revocation."""
         with patch("app.routes.auth.AuthManager") as mock_auth_manager_class:
             mock_auth_manager = AsyncMock()
@@ -594,7 +615,7 @@ class TestLogoutAccess:
             # Override the get_current_user dependency
             from app.services.authorization import get_current_user
 
-            client.app.dependency_overrides[get_current_user] = lambda: mock_current_user
+            client.app.dependency_overrides[get_current_user] = lambda: mock_current_user  # type: ignore
 
             response = client.post(
                 "/v1/auth/logout-access",
@@ -604,7 +625,9 @@ class TestLogoutAccess:
         assert response.status_code == 204
 
     @pytest.mark.asyncio
-    async def test_logout_access_redis_unavailable(self, client, mock_db, mock_current_user):
+    async def test_logout_access_redis_unavailable(
+        self, client: TestClient, mock_db: MagicMock, mock_current_user: TokenPayload
+    ) -> None:
         """Test logout-access when Redis is unavailable."""
         with patch("app.routes.auth.AuthManager") as mock_auth_manager_class:
             mock_auth_manager = AsyncMock()
@@ -614,7 +637,7 @@ class TestLogoutAccess:
             # Override the get_current_user dependency
             from app.services.authorization import get_current_user
 
-            client.app.dependency_overrides[get_current_user] = lambda: mock_current_user
+            client.app.dependency_overrides[get_current_user] = lambda: mock_current_user  # type: ignore
 
             response = client.post(
                 "/v1/auth/logout-access",
@@ -624,23 +647,27 @@ class TestLogoutAccess:
         # Should still return 204 (graceful degradation)
         assert response.status_code == 204
 
-    def test_logout_access_missing_auth_header(self, client, mock_current_user):
+    def test_logout_access_missing_auth_header(
+        self, client: TestClient, mock_current_user: TokenPayload
+    ) -> None:
         """Test logout-access without Authorization header."""
         # Override the get_current_user dependency
         from app.services.authorization import get_current_user
 
-        client.app.dependency_overrides[get_current_user] = lambda: mock_current_user
+        client.app.dependency_overrides[get_current_user] = lambda: mock_current_user  # type: ignore
 
         response = client.post("/v1/auth/logout-access")
 
         assert response.status_code == 401
 
-    def test_logout_access_invalid_auth_header(self, client, mock_current_user):
+    def test_logout_access_invalid_auth_header(
+        self, client: TestClient, mock_current_user: TokenPayload
+    ) -> None:
         """Test logout-access with invalid Authorization header."""
         # Override the get_current_user dependency
         from app.services.authorization import get_current_user
 
-        client.app.dependency_overrides[get_current_user] = lambda: mock_current_user
+        client.app.dependency_overrides[get_current_user] = lambda: mock_current_user  # type: ignore
 
         response = client.post(
             "/v1/auth/logout-access",
@@ -649,12 +676,14 @@ class TestLogoutAccess:
 
         assert response.status_code == 401
 
-    def test_logout_access_missing_bearer_token(self, client, mock_current_user):
+    def test_logout_access_missing_bearer_token(
+        self, client: TestClient, mock_current_user: TokenPayload
+    ) -> None:
         """Test logout-access with Bearer prefix but no token."""
         # Override the get_current_user dependency
         from app.services.authorization import get_current_user
 
-        client.app.dependency_overrides[get_current_user] = lambda: mock_current_user
+        client.app.dependency_overrides[get_current_user] = lambda: mock_current_user  # type: ignore
 
         response = client.post(
             "/v1/auth/logout-access",
@@ -673,7 +702,9 @@ class TestLogoutAccess:
 class TestAuthRoutesIntegration:
     """Integration tests for auth routes via TestClient."""
 
-    def test_login_endpoint_via_client(self, client, mock_db, mock_user):
+    def test_login_endpoint_via_client(
+        self, client: TestClient, mock_db: MagicMock, mock_user: MagicMock
+    ) -> None:
         """Test login endpoint through TestClient."""
         mock_db.query.return_value.filter.return_value.first.return_value = mock_user
 
@@ -700,7 +731,7 @@ class TestAuthRoutesIntegration:
         assert response.status_code == 200
         assert "access_token" in response.json()
 
-    def test_refresh_endpoint_via_client(self, client, mock_db):
+    def test_refresh_endpoint_via_client(self, client: TestClient, mock_db: MagicMock) -> None:
         """Test refresh endpoint through TestClient."""
         with patch("app.routes.auth.AuthManager") as mock_auth_manager_class:
             mock_auth_manager = AsyncMock()
@@ -723,7 +754,9 @@ class TestAuthRoutesIntegration:
         assert response.status_code == 200
         assert "access_token" in response.json()
 
-    def test_logout_endpoint_via_client(self, client, mock_db, mock_current_user):
+    def test_logout_endpoint_via_client(
+        self, client: TestClient, mock_db: MagicMock, mock_current_user: TokenPayload
+    ) -> None:
         """Test logout endpoint through TestClient."""
         with patch("app.routes.auth.AuthManager") as mock_auth_manager_class:
             mock_auth_manager = AsyncMock()
@@ -734,7 +767,7 @@ class TestAuthRoutesIntegration:
             # Override the get_current_user dependency
             from app.services.authorization import get_current_user
 
-            client.app.dependency_overrides[get_current_user] = lambda: mock_current_user
+            client.app.dependency_overrides[get_current_user] = lambda: mock_current_user  # type: ignore[attr-defined]
 
             response = client.post(
                 "/v1/auth/logout",
@@ -746,7 +779,9 @@ class TestAuthRoutesIntegration:
 
         assert response.status_code == 204
 
-    def test_logout_access_endpoint_via_client(self, client, mock_db, mock_current_user):
+    def test_logout_access_endpoint_via_client(
+        self, client: TestClient, mock_db: MagicMock, mock_current_user: TokenPayload
+    ) -> None:
         """Test logout-access endpoint through TestClient."""
         with patch("app.routes.auth.AuthManager") as mock_auth_manager_class:
             mock_auth_manager = AsyncMock()
@@ -756,7 +791,7 @@ class TestAuthRoutesIntegration:
             # Override the get_current_user dependency
             from app.services.authorization import get_current_user
 
-            client.app.dependency_overrides[get_current_user] = lambda: mock_current_user
+            client.app.dependency_overrides[get_current_user] = lambda: mock_current_user  # type: ignore[attr-defined]
 
             response = client.post(
                 "/v1/auth/logout-access",

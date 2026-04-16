@@ -25,7 +25,7 @@ DB_USER, DB_PASSWORD, DB_HOST, DB_PORT, DB_NAME = match.groups()
 print(f"Connecting to PostgreSQL at {DB_HOST}:{DB_PORT} as user {DB_USER}")
 
 
-def recreate_database():
+def recreate_database() -> None:
     """
     Recreate the application database.
 
@@ -45,7 +45,7 @@ def recreate_database():
         _clear_all_tables()
 
 
-def _drop_and_create_database():
+def _drop_and_create_database() -> None:
     """Drop and recreate the database (requires superuser privileges)."""
     # Connect to default postgres database
     conn = psycopg2.connect(
@@ -73,7 +73,7 @@ def _drop_and_create_database():
     conn.close()
 
 
-def _clear_all_tables():
+def _clear_all_tables() -> None:
     """Clear all tables in the database (fallback method)."""
     # Connect to the target database
     conn = psycopg2.connect(

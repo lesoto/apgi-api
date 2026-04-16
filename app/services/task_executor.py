@@ -4,19 +4,20 @@ Task Executor Service
 Manages asynchronous task execution via Celery.
 """
 
+import asyncio
 import logging
 import uuid
 from datetime import datetime, timezone
-from typing import Any, Dict, Optional
-import time
+from typing import Any, Awaitable, Callable, Dict, Optional, TypeVar
 
 try:
     from celery.result import AsyncResult
-except ImportError as e:
+except ImportError:  # pragma: no cover
     # Handle potential celery import issues
-    import celery
+    import celery  # type: ignore
 
-    AsyncResult = celery.result.AsyncResult
+    AsyncResult = celery.result.AsyncResult  # type: ignore
+
 
 from app.celery_app import celery_app
 from app.database.connection import get_db_context
@@ -24,48 +25,16 @@ from app.database.models import Task, TaskStatus
 
 logger = logging.getLogger(__name__)
 
-
-def retry_with_backoff(func, max_retries=3, base_delay=1.0, max_delay=30.0, backoff_factor=2.0):
-    """
-    Retry a function with exponential backoff for transient failures.
-
-    Args:
-        func: Function to retry
-        max_retries: Maximum number of retry attempts
-        base_delay: Initial delay in seconds
-        max_delay: Maximum delay between retries
-        backoff_factor: Factor to multiply delay by each retry
-
-    Returns:
-        Result of the function call
-
-    Raises:
-        Last exception if all retries fail
-    """
-    last_exception = None
-    delay = base_delay
-
-    for attempt in range(max_retries + 1):
-        try:
-            return func()
-        except Exception as e:
-            last_exception = e
-            if attempt < max_retries:
-                logger.warning(f"Attempt {attempt + 1} failed, retrying in {delay:.1f}s: {str(e)}")
-                time.sleep(delay)
-                delay = min(delay * backoff_factor, max_delay)
-            else:
-                logger.error(f"All {max_retries + 1} attempts failed: {str(e)}")
-
-    if last_exception is not None:
-        raise last_exception
-
-    raise RuntimeError("All retries failed but no exception was captured")
+T = TypeVar("T")
 
 
 async def async_retry_with_backoff(
-    func, max_retries=3, base_delay=1.0, max_delay=30.0, backoff_factor=2.0
-):
+    func: Callable[[], Awaitable[T]],
+    max_retries: int = 3,
+    base_delay: float = 1.0,
+    max_delay: float = 30.0,
+    backoff_factor: float = 2.0,
+) -> T:
     """
     Async retry a function with exponential backoff for transient failures.
 
@@ -82,8 +51,6 @@ async def async_retry_with_backoff(
     Raises:
         Last exception if all retries fail
     """
-    import asyncio
-
     last_exception = None
     delay = base_delay
 
@@ -383,15 +350,17 @@ class TaskExecutor:
             # Submit task to Celery with retry for transient failures
             celery_task_name = self.TASK_MAP[task_type]
 
-            def submit_celery_task():
-                return celery_app.send_task(
+            async def submit_celery_task():
+                # Run synchronous celery send_task in thread pool to avoid blocking
+                return await asyncio.to_thread(
+                    celery_app.send_task,
                     celery_task_name,
                     args=[session_id, parameters],
                     task_id=task_id,
                 )
 
             try:
-                retry_with_backoff(submit_celery_task, max_retries=3, base_delay=0.5)
+                await async_retry_with_backoff(submit_celery_task, max_retries=3, base_delay=0.5)
                 logger.info(
                     f"Task {task_id} submitted immediately: {task_type} for session {session_id}"
                 )

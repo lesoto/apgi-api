@@ -12,7 +12,7 @@ from fastapi import FastAPI
 class TestPortAvailability:
     """Test port availability checking functionality."""
 
-    def test_is_port_available_success(self):
+    def test_is_port_available_success(self) -> None:
         """Test successful port availability check."""
         from app.main import is_port_available
 
@@ -20,7 +20,7 @@ class TestPortAvailability:
         result = is_port_available("127.0.0.1", 0)  # Port 0 should be available
         assert result is True
 
-    def test_is_port_available_unavailable(self):
+    def test_is_port_available_unavailable(self) -> None:
         """Test port availability check when port is in use."""
         from app.main import is_port_available
 
@@ -34,7 +34,7 @@ class TestPortAvailability:
             result = is_port_available("127.0.0.1", 80)
             assert result is False
 
-    def test_is_port_available_socket_options(self):
+    def test_is_port_available_socket_options(self) -> None:
         """Test that socket options are set correctly."""
         from app.main import is_port_available
 
@@ -54,14 +54,14 @@ class TestPortAvailability:
 class TestDependencyChecker:
     """Test dependency checking during import."""
 
-    def test_dependency_check_success(self):
+    def test_dependency_check_success(self) -> None:
         """Test successful dependency check — module already loaded, just verify it works."""
-        from app.main import check_dependencies
+        from app.main import check_dependencies  # type: ignore[attr-defined]
 
         # Module is already imported; just verify the function is accessible
         assert callable(check_dependencies)
 
-    def test_dependency_check_failure(self):
+    def test_dependency_check_failure(self) -> None:
         """Test that check_dependencies returning False would cause sys.exit(1)."""
         # We can't easily re-trigger the module-level import guard, but we can
         # verify the logic by calling the guard code path directly.
@@ -71,13 +71,13 @@ class TestDependencyChecker:
                     # Simulate the module-level guard logic
                     from app import main as main_mod
 
-                    if not main_mod.check_dependencies():
+                    if not main_mod.check_dependencies():  # type: ignore[attr-defined]
                         print("Dependency check failed. Exiting...")
                         sys.exit(1)
                     mock_print.assert_called_with("Dependency check failed. Exiting...")
                     mock_exit.assert_called_with(1)
 
-    def test_dependency_check_import_error(self):
+    def test_dependency_check_import_error(self) -> None:
         """Test warning when dependency checker not available."""
         # Verify the ImportError branch message is correct
         expected_msg = "Warning: Dependency checker not available. Continuing anyway..."
@@ -88,7 +88,7 @@ class TestDependencyChecker:
                 print(expected_msg)
             mock_print.assert_called_with(expected_msg)
 
-    def test_dependency_check_exception(self):
+    def test_dependency_check_exception(self) -> None:
         """Test warning when dependency check raises exception."""
         expected_msg = "Warning: Error during dependency check: Check failed. Continuing anyway..."
         with patch("builtins.print") as mock_print:
@@ -104,7 +104,7 @@ class TestLifespanComprehensive:
 
     @pytest.mark.asyncio
     @patch("redis.asyncio.from_url")
-    async def test_lifespan_full_startup_sequence(self, mock_redis):
+    async def test_lifespan_full_startup_sequence(self, mock_redis: AsyncMock) -> None:
         """Test complete startup sequence with all components."""
         from app.main import lifespan
 
@@ -145,7 +145,7 @@ class TestLifespanComprehensive:
 
     @pytest.mark.asyncio
     @patch("redis.asyncio.from_url")
-    async def test_lifespan_tracing_disabled(self, mock_redis):
+    async def test_lifespan_tracing_disabled(self, mock_redis: AsyncMock) -> None:
         """Test lifespan when OpenTelemetry is not available."""
         from app.main import lifespan, OPENTELEMETRY_AVAILABLE
 
@@ -185,7 +185,7 @@ class TestLifespanComprehensive:
 
     @pytest.mark.asyncio
     @patch("redis.asyncio.from_url")
-    async def test_lifespan_redis_failure(self, mock_redis):
+    async def test_lifespan_redis_failure(self, mock_redis: AsyncMock) -> None:
         """Test lifespan handles Redis initialization failure."""
         from app.main import lifespan
 
@@ -203,7 +203,7 @@ class TestLifespanComprehensive:
 
     @pytest.mark.asyncio
     @patch("redis.asyncio.from_url")
-    async def test_lifespan_database_failure(self, mock_redis):
+    async def test_lifespan_database_failure(self, mock_redis: AsyncMock) -> None:
         """Test lifespan handles database initialization failure."""
         from app.main import lifespan
 
@@ -221,7 +221,7 @@ class TestLifespanComprehensive:
 
     @pytest.mark.asyncio
     @patch("redis.asyncio.from_url")
-    async def test_lifespace_redis_ping_failure(self, mock_redis):
+    async def test_lifespace_redis_ping_failure(self, mock_redis: AsyncMock) -> None:
         """Test lifespan handles Redis ping failure."""
         from app.main import lifespan
 
@@ -242,7 +242,7 @@ class TestLifespanComprehensive:
 
     @pytest.mark.asyncio
     @patch("redis.asyncio.from_url")
-    async def test_lifespan_shutdown_sequence(self, mock_redis):
+    async def test_lifespan_shutdown_sequence(self, mock_redis: AsyncMock) -> None:
         """Test complete shutdown sequence."""
         from app.main import lifespan
 
@@ -275,7 +275,7 @@ class TestLifespanComprehensive:
 class TestCreateAppComprehensive:
     """Comprehensive tests for create_app function."""
 
-    def test_create_app_basic(self):
+    def test_create_app_basic(self) -> None:
         """Test basic app creation."""
         from app.main import create_app
 
@@ -286,7 +286,7 @@ class TestCreateAppComprehensive:
         assert app.version == "1.0.0"
         assert "REST API for Allostatic Precision-Gated Ignition" in app.description
 
-    def test_create_app_production_mode(self):
+    def test_create_app_production_mode(self) -> None:
         """Test app creation in production mode (test_mode=False)."""
         from app.main import create_app
 
@@ -308,7 +308,7 @@ class TestCreateAppComprehensive:
             assert app.redoc_url is None
             assert app.openapi_url is None
 
-    def test_create_app_development_mode(self):
+    def test_create_app_development_mode(self) -> None:
         """Test app creation in development mode."""
         from app.main import create_app
 
@@ -330,7 +330,7 @@ class TestCreateAppComprehensive:
             assert app.redoc_url == "/redoc"
             assert app.openapi_url == "/openapi.json"
 
-    def test_create_app_with_profiling_enabled(self):
+    def test_create_app_with_profiling_enabled(self) -> None:
         """Test app creation with profiling enabled."""
         from app.main import create_app
 
@@ -349,7 +349,7 @@ class TestCreateAppComprehensive:
 
             assert isinstance(app, FastAPI)
 
-    def test_create_app_middleware_configuration(self):
+    def test_create_app_middleware_configuration(self) -> None:
         """Test that all expected middleware are added."""
         from app.main import create_app
 
@@ -368,7 +368,7 @@ class TestCreateAppComprehensive:
             # Should have middleware added
             assert hasattr(app, "user_middleware") or (app.middleware_stack is not None and len(list(app.middleware_stack)) > 0)  # type: ignore
 
-    def test_create_app_root_endpoint(self):
+    def test_create_app_root_endpoint(self) -> None:
         """Test that root endpoint is properly configured."""
         from app.main import create_app
         from fastapi.testclient import TestClient
@@ -384,7 +384,7 @@ class TestCreateAppComprehensive:
         assert data["docs"] == "/docs"
         assert data["health"] == "/health"
 
-    def test_create_app_router_inclusion(self):
+    def test_create_app_router_inclusion(self) -> None:
         """Test that all routers are included."""
         from app.main import create_app
 
@@ -403,7 +403,7 @@ class TestCreateAppComprehensive:
             # Check that routes were added (should have root route at minimum)
             assert len(app.routes) > 0
 
-    def test_create_app_csrf_missing_setting(self):
+    def test_create_app_csrf_missing_setting(self) -> None:
         """Test app creation when csrf_protection_enabled setting is missing."""
         from app.main import create_app
 
@@ -425,14 +425,14 @@ class TestCreateAppComprehensive:
 class TestMainModule:
     """Test main module level functionality."""
 
-    def test_app_instance_creation(self):
+    def test_app_instance_creation(self) -> None:
         """Test that app instance is created at module level."""
         from app.main import app
 
         assert isinstance(app, FastAPI)
         assert app.title == "APGI System API"
 
-    def test_cli_function(self):
+    def test_cli_function(self) -> None:
         """Test CLI function exists and can be called."""
         from app.main import cli
 
@@ -440,7 +440,7 @@ class TestMainModule:
             cli()
             mock_app_cli.assert_called_once()
 
-    def test_main_execution_block(self):
+    def test_main_execution_block(self) -> None:
         """Test the __main__ execution block."""
         with patch("uvicorn.run") as mock_run:
             with patch("__main__.__name__", "__main__"):
@@ -451,14 +451,14 @@ class TestMainModule:
                 # The block should have been executed during import
                 # We can't easily test this without actually running the module
 
-    def test_redis_client_global(self):
+    def test_redis_client_global(self) -> None:
         """Test that redis_client global variable exists."""
         from app.main import redis_client
 
         # Should be None initially (set during lifespan)
         assert redis_client is None
 
-    def test_opentelemetry_availability_detection(self):
+    def test_opentelemetry_availability_detection(self) -> None:
         """Test OpenTelemetry availability detection."""
         from app.main import OPENTELEMETRY_AVAILABLE
 
@@ -469,7 +469,7 @@ class TestMainModule:
 class TestMainEdgeCases:
     """Test edge cases and error conditions."""
 
-    def test_create_app_missing_settings_attributes(self):
+    def test_create_app_missing_settings_attributes(self) -> None:
         """Test create_app with missing optional settings attributes."""
         from app.main import create_app
 
@@ -490,7 +490,7 @@ class TestMainEdgeCases:
 
     @pytest.mark.asyncio
     @patch("redis.asyncio.from_url")
-    async def test_lifespan_redis_client_none(self, mock_redis):
+    async def test_lifespan_redis_client_none(self, mock_redis: AsyncMock) -> None:
         """Test lifespan when redis.from_url returns None."""
         from app.main import lifespan
 

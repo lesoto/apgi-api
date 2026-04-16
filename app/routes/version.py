@@ -25,7 +25,7 @@ DEPRECATED_ENDPOINTS: Dict[str, Dict[str, str]] = {}
 
 
 @router.get("/version")
-async def get_version_info():
+async def get_version_info() -> JSONResponse:
     """
     Get API version information.
 

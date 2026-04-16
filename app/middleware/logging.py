@@ -60,19 +60,27 @@ class StructuredLogger:
 
     def info(self, message: str, **kwargs):
         """Log info message with structured data."""
-        self.logger.info(self._format_log_entry("INFO", message, **kwargs))
+        # Don't pass kwargs to underlying logger - they're embedded in JSON message
+        json_message = self._format_log_entry("INFO", message, **kwargs)
+        self.logger.info(json_message)
 
     def warning(self, message: str, **kwargs):
         """Log warning message with structured data."""
-        self.logger.warning(self._format_log_entry("WARNING", message, **kwargs))
+        # Don't pass kwargs to underlying logger - they're embedded in JSON message
+        json_message = self._format_log_entry("WARNING", message, **kwargs)
+        self.logger.warning(json_message)
 
     def error(self, message: str, **kwargs):
         """Log error message with structured data."""
-        self.logger.error(self._format_log_entry("ERROR", message, **kwargs))
+        # Don't pass kwargs to underlying logger - they're embedded in JSON message
+        json_message = self._format_log_entry("ERROR", message, **kwargs)
+        self.logger.error(json_message)
 
     def debug(self, message: str, **kwargs):
         """Log debug message with structured data."""
-        self.logger.debug(self._format_log_entry("DEBUG", message, **kwargs))
+        # Don't pass kwargs to underlying logger - they're embedded in JSON message
+        json_message = self._format_log_entry("DEBUG", message, **kwargs)
+        self.logger.debug(json_message)
 
 
 class RequestLoggingMiddleware(BaseHTTPMiddleware):
@@ -209,6 +217,7 @@ class ErrorLoggingHandler:
         if error_code:
             log_data["error_code"] = error_code
 
+        # Log the error with all context data as the structured message
         self.logger.error("Error occurred", **log_data)
 
 
@@ -223,12 +232,25 @@ def configure_structured_logging(log_level: str = "INFO"):
     Args:
         log_level: Logging level (DEBUG, INFO, WARNING, ERROR)
     """
-    # Set root logger level
-    logging.basicConfig(
-        level=getattr(logging, log_level.upper()),
-        format="%(message)s",  # Just output the message (already JSON formatted)
-        handlers=[logging.StreamHandler()],
-    )
+    import os
+
+    # Skip logging configuration in test mode to prevent LogRecord conflicts
+    if os.environ.get("TEST_MODE") == "true":
+        return
+
+    # Only configure if not already configured (e.g., by pytest)
+    root_logger = logging.getLogger()
+    if not root_logger.handlers:
+        try:
+            # Set root logger level
+            logging.basicConfig(
+                level=getattr(logging, log_level.upper()),
+                format="%(message)s",  # Just output the message (already JSON formatted)
+                handlers=[logging.StreamHandler()],
+            )
+        except Exception:
+            # If logging configuration fails, continue without it
+            pass
 
     # Disable uvicorn access logs (we handle them in middleware)
     logging.getLogger("uvicorn.access").disabled = True

@@ -6,6 +6,8 @@ endpoint configuration. Validates Requirements 3.14.
 """
 
 import os
+from typing import Generator
+
 import pytest
 from unittest.mock import patch
 from starlette.testclient import TestClient
@@ -29,7 +31,7 @@ except ImportError:
 
 
 @pytest.fixture
-def client():
+def client() -> Generator[TestClient, None, None]:
     """Create a test client with test_mode=True."""
     app = create_app(test_mode=True)
     with TestClient(app) as c:
@@ -40,7 +42,7 @@ class TestGetVersionInfo:
     """Test the /version endpoint."""
 
     @pytest.mark.asyncio
-    async def test_get_version_info_success(self):
+    async def test_get_version_info_success(self) -> None:
         """Test successful retrieval of version information."""
         response = await get_version_info()
 
@@ -70,7 +72,7 @@ class TestGetVersionInfo:
         assert data["api_spec_url"] == "/openapi.json"
         assert data["documentation_url"] == "/docs"
 
-    def test_get_version_info_via_client(self, client):
+    def test_get_version_info_via_client(self, client: TestClient) -> None:
         """Test /version endpoint via TestClient."""
         response = client.get("/v1/version")
 
@@ -83,7 +85,7 @@ class TestGetVersionInfo:
         assert "deprecated_versions" in data
         assert "timestamp" in data
 
-    def test_get_version_info_timestamp_format(self, client):
+    def test_get_version_info_timestamp_format(self, client: TestClient) -> None:
         """Test that timestamp is in ISO format with Z suffix."""
         response = client.get("/v1/version")
         data = response.json()
@@ -93,7 +95,7 @@ class TestGetVersionInfo:
         # Verify it's a valid ISO format timestamp
         assert "T" in timestamp
 
-    def test_get_version_info_with_env_vars(self, client):
+    def test_get_version_info_with_env_vars(self, client: TestClient) -> None:
         """Test version info respects environment variables."""
         with patch.dict(os.environ, {"API_VERSION": "2.0.0", "API_VERSION_PREFIX": "v2"}):
             # Re-import to get new env values
@@ -113,7 +115,7 @@ class TestGetClientDocumentation:
     """Test the /client-docs endpoint."""
 
     @pytest.mark.asyncio
-    async def test_get_client_docs_python_default(self):
+    async def test_get_client_docs_python_default(self) -> None:
         """Test client documentation with default Python language."""
         response = await get_client_documentation()
 
@@ -127,7 +129,7 @@ class TestGetClientDocumentation:
         assert "endpoints" in response
 
     @pytest.mark.asyncio
-    async def test_get_client_docs_python_explicit(self):
+    async def test_get_client_docs_python_explicit(self) -> None:
         """Test client documentation with explicit Python language."""
         response = await get_client_documentation(language="python")
 
@@ -137,7 +139,7 @@ class TestGetClientDocumentation:
         assert "import requests" in response["documentation"]["client_examples"]
 
     @pytest.mark.asyncio
-    async def test_get_client_docs_javascript(self):
+    async def test_get_client_docs_javascript(self) -> None:
         """Test client documentation for JavaScript."""
         response = await get_client_documentation(language="javascript")
 
@@ -147,7 +149,7 @@ class TestGetClientDocumentation:
         assert "fetch" in response["documentation"]["client_examples"]
 
     @pytest.mark.asyncio
-    async def test_get_client_docs_curl(self):
+    async def test_get_client_docs_curl(self) -> None:
         """Test client documentation for cURL."""
         response = await get_client_documentation(language="curl")
 
@@ -157,7 +159,7 @@ class TestGetClientDocumentation:
         assert "-X GET" in response["documentation"]["client_examples"]
 
     @pytest.mark.asyncio
-    async def test_get_client_docs_go(self):
+    async def test_get_client_docs_go(self) -> None:
         """Test client documentation for Go."""
         response = await get_client_documentation(language="go")
 
@@ -167,7 +169,7 @@ class TestGetClientDocumentation:
         assert "func main()" in response["documentation"]["client_examples"]
 
     @pytest.mark.asyncio
-    async def test_get_client_docs_unsupported_language(self):
+    async def test_client_docs_unsupported_language(self) -> None:
         """Test client documentation with unsupported language."""
         from fastapi.responses import JSONResponse
 
@@ -186,7 +188,7 @@ class TestGetClientDocumentation:
         assert "Unsupported language" in data["error"]
         assert "supported_languages" in data
 
-    def test_get_client_docs_via_client_python(self, client):
+    def test_get_client_docs_via_client_python(self, client: TestClient) -> None:
         """Test /client-docs endpoint via TestClient with Python."""
         response = client.get("/v1/client-docs?language=python")
 
@@ -196,7 +198,7 @@ class TestGetClientDocumentation:
         assert "documentation" in data
         assert "endpoints" in data
 
-    def test_get_client_docs_via_client_javascript(self, client):
+    def test_get_client_docs_via_client_javascript(self, client: TestClient) -> None:
         """Test /client-docs endpoint via TestClient with JavaScript."""
         response = client.get("/v1/client-docs?language=javascript")
 
@@ -204,7 +206,7 @@ class TestGetClientDocumentation:
         data = response.json()
         assert data["language"] == "javascript"
 
-    def test_get_client_docs_via_client_curl(self, client):
+    def test_get_client_docs_via_client_curl(self, client: TestClient) -> None:
         """Test /client-docs endpoint via TestClient with cURL."""
         response = client.get("/v1/client-docs?language=curl")
 
@@ -212,7 +214,7 @@ class TestGetClientDocumentation:
         data = response.json()
         assert data["language"] == "curl"
 
-    def test_get_client_docs_via_client_go(self, client):
+    def test_get_client_docs_via_client_go(self, client: TestClient) -> None:
         """Test /client-docs endpoint via TestClient with Go."""
         response = client.get("/v1/client-docs?language=go")
 
@@ -220,7 +222,7 @@ class TestGetClientDocumentation:
         data = response.json()
         assert data["language"] == "go"
 
-    def test_get_client_docs_via_client_unsupported(self, client):
+    def test_get_client_docs_via_client_unsupported(self, client: TestClient) -> None:
         """Test /client-docs endpoint with unsupported language."""
         response = client.get("/v1/client-docs?language=rust")
 
@@ -229,7 +231,7 @@ class TestGetClientDocumentation:
         assert "error" in data
         assert "supported_languages" in data
 
-    def test_get_client_docs_default_language(self, client):
+    def test_get_client_docs_default_language(self, client: TestClient) -> None:
         """Test /client-docs endpoint without language parameter defaults to Python."""
         response = client.get("/v1/client-docs")
 
@@ -237,7 +239,7 @@ class TestGetClientDocumentation:
         data = response.json()
         assert data["language"] == "python"
 
-    def test_get_client_docs_base_url_default(self, client):
+    def test_get_client_docs_base_url_default(self, client: TestClient) -> None:
         """Test that base_url defaults to localhost when not set."""
         with patch.dict(os.environ, {}, clear=False):
             if "API_BASE_URL" in os.environ:
@@ -248,7 +250,7 @@ class TestGetClientDocumentation:
             data = response.json()
             assert "base_url" in data
 
-    def test_get_client_docs_base_url_custom(self, client):
+    def test_get_client_docs_base_url_custom(self, client: TestClient) -> None:
         """Test that custom API_BASE_URL is used in documentation."""
         with patch.dict(os.environ, {"API_BASE_URL": "https://api.example.com"}):
             response = client.get("/v1/client-docs?language=python")
@@ -256,7 +258,7 @@ class TestGetClientDocumentation:
             data = response.json()
             assert data["base_url"] == "https://api.example.com"
 
-    def test_get_client_docs_base_url_invalid_fallback(self, client):
+    def test_get_client_docs_base_url_invalid_fallback(self, client: TestClient) -> None:
         """Test that invalid base_url falls back to localhost."""
         with patch.dict(os.environ, {"API_BASE_URL": "not-a-valid-url"}):
             response = client.get("/v1/client-docs?language=python")
@@ -265,7 +267,7 @@ class TestGetClientDocumentation:
             # Should fall back to default
             assert "base_url" in data
 
-    def test_get_client_docs_endpoints_structure(self, client):
+    def test_get_client_docs_endpoints_structure(self, client: TestClient) -> None:
         """Test that endpoints structure is correct."""
         response = client.get("/v1/client-docs?language=python")
 
@@ -280,7 +282,7 @@ class TestGetClientDocumentation:
         assert "sessions" in endpoints
         assert "dashboard" in endpoints
 
-    def test_get_client_docs_documentation_structure(self, client):
+    def test_get_client_docs_documentation_structure(self, client: TestClient) -> None:
         """Test that documentation structure is correct."""
         response = client.get("/v1/client-docs?language=python")
 
@@ -298,20 +300,20 @@ class TestGetClientDocumentation:
 class TestDeprecatedEndpointsConfiguration:
     """Test deprecated endpoints configuration functions."""
 
-    def test_configure_deprecated_endpoints_empty(self):
+    def test_configure_deprecated_endpoints_empty(self) -> None:
         """Test configuring empty deprecated endpoints."""
         configure_deprecated_endpoints({})
         result = get_deprecated_endpoints()
         assert result == {}
 
-    def test_configure_deprecated_endpoints_single(self):
+    def test_configure_deprecated_endpoints_single(self) -> None:
         """Test configuring a single deprecated endpoint."""
         config = {"/v1/old-endpoint": {"sunset": "2026-01-01", "replacement": "/v2/new-endpoint"}}
         configure_deprecated_endpoints(config)
         result = get_deprecated_endpoints()
         assert result == config
 
-    def test_configure_deprecated_endpoints_multiple(self):
+    def test_configure_deprecated_endpoints_multiple(self) -> None:
         """Test configuring multiple deprecated endpoints."""
         config = {
             "/v1/endpoint1": {"sunset": "2026-01-01", "replacement": "/v2/endpoint1"},
@@ -322,7 +324,7 @@ class TestDeprecatedEndpointsConfiguration:
         assert result == config
         assert len(result) == 2
 
-    def test_is_endpoint_deprecated_true(self):
+    def test_is_endpoint_deprecated_true(self) -> None:
         """Test checking if an endpoint is deprecated (true case)."""
         config = {"/v1/old-endpoint": {"sunset": "2026-01-01", "replacement": "/v2/new-endpoint"}}
         configure_deprecated_endpoints(config)
@@ -332,7 +334,7 @@ class TestDeprecatedEndpointsConfiguration:
         assert result["sunset"] == "2026-01-01"
         assert result["replacement"] == "/v2/new-endpoint"
 
-    def test_is_endpoint_deprecated_false(self):
+    def test_is_endpoint_deprecated_false(self) -> None:
         """Test checking if an endpoint is deprecated (false case)."""
         config = {"/v1/old-endpoint": {"sunset": "2026-01-01", "replacement": "/v2/new-endpoint"}}
         configure_deprecated_endpoints(config)
@@ -340,20 +342,20 @@ class TestDeprecatedEndpointsConfiguration:
         result = is_endpoint_deprecated("/v1/new-endpoint")
         assert result is None
 
-    def test_is_endpoint_deprecated_empty_config(self):
+    def test_is_endpoint_deprecated_empty_config(self) -> None:
         """Test checking deprecation with empty config."""
         configure_deprecated_endpoints({})
 
         result = is_endpoint_deprecated("/v1/any-endpoint")
         assert result is None
 
-    def test_get_deprecated_endpoints_empty(self):
+    def test_get_deprecated_endpoints_empty(self) -> None:
         """Test getting deprecated endpoints when none configured."""
         configure_deprecated_endpoints({})
         result = get_deprecated_endpoints()
         assert result == {}
 
-    def test_get_deprecated_endpoints_multiple(self):
+    def test_get_deprecated_endpoints_multiple(self) -> None:
         """Test getting multiple deprecated endpoints."""
         config = {
             "/v1/endpoint1": {"sunset": "2026-01-01", "replacement": "/v2/endpoint1"},
@@ -366,7 +368,7 @@ class TestDeprecatedEndpointsConfiguration:
         assert len(result) == 3
         assert all(key in result for key in config.keys())
 
-    def test_configure_deprecated_endpoints_overwrites_previous(self):
+    def test_configure_deprecated_endpoints_overwrites_previous(self) -> None:
         """Test that configuring endpoints overwrites previous configuration."""
         config1 = {"/v1/old1": {"sunset": "2026-01-01", "replacement": "/v2/new1"}}
         configure_deprecated_endpoints(config1)
@@ -380,7 +382,7 @@ class TestDeprecatedEndpointsConfiguration:
         assert "/v1/old2" in result
         assert "/v1/old1" not in result
 
-    def test_deprecated_endpoints_with_complex_info(self):
+    def test_deprecated_endpoints_with_complex_info(self) -> None:
         """Test deprecated endpoints with additional metadata."""
         config = {
             "/v1/old-endpoint": {
@@ -401,7 +403,7 @@ class TestDeprecatedEndpointsConfiguration:
 class TestVersionRoutesIntegration:
     """Integration tests for version routes."""
 
-    def test_version_endpoint_response_structure(self, client):
+    def test_version_endpoint_response_structure(self, client: TestClient) -> None:
         """Test complete response structure of /version endpoint."""
         response = client.get("/v1/version")
 
@@ -421,7 +423,7 @@ class TestVersionRoutesIntegration:
         for field in required_fields:
             assert field in data, f"Missing field: {field}"
 
-    def test_client_docs_all_languages(self, client):
+    def test_client_docs_all_languages(self, client: TestClient) -> None:
         """Test that all supported languages are accessible."""
         languages = ["python", "javascript", "curl", "go"]
 
@@ -431,7 +433,7 @@ class TestVersionRoutesIntegration:
             data = response.json()
             assert data["language"] == lang
 
-    def test_client_docs_contains_endpoints(self, client):
+    def test_client_docs_contains_endpoints(self, client: TestClient) -> None:
         """Test that client docs include endpoint information."""
         response = client.get("/v1/client-docs?language=python")
 
@@ -443,7 +445,7 @@ class TestVersionRoutesIntegration:
         assert len(endpoints) > 0
         assert all(isinstance(v, str) for v in endpoints.values())
 
-    def test_version_info_consistency(self, client):
+    def test_version_info_consistency(self, client: TestClient) -> None:
         """Test that version info is consistent across multiple calls."""
         response1 = client.get("/v1/version")
         response2 = client.get("/v1/version")

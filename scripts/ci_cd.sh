@@ -205,17 +205,17 @@ run_linting() {
     log_info "Checking code formatting with black..."
     execute python -m black --check --diff app/ tests/
 
-    # Run flake8 for linting
-    log_info "Running flake8 linting..."
-    execute python -m flake8 app/ tests/
+    # Run Ruff for fast linting (replaces flake8)
+    log_info "Running Ruff linting..."
+    execute python -m ruff check app/ tests/
 
-    # Run mypy for type checking
-    log_info "Running mypy type checking..."
-    execute python -m mypy app/
+    # Run mypy with strict mode for type checking
+    log_info "Running mypy type checking with strict mode..."
+    execute python -m mypy --strict app/ --ignore-missing-imports
 
-    # Check import sorting
-    log_info "Checking import sorting..."
-    execute python -m isort --check-only --diff app/ tests/
+    # Check import sorting with Ruff (replaces isort)
+    log_info "Checking import sorting with Ruff..."
+    execute python -m ruff check --select I app/ tests/
 
     log_success "Linting completed"
 }

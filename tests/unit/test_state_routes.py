@@ -11,6 +11,7 @@ Tests cover all 5 endpoints with success and error paths:
 
 import pytest
 from contextlib import asynccontextmanager
+from typing import Any, AsyncIterator
 from datetime import datetime, timezone, timedelta
 from unittest.mock import AsyncMock, MagicMock
 from fastapi.testclient import TestClient
@@ -19,10 +20,6 @@ from sqlalchemy.orm import Session
 from app.database.models import Session as SessionModel
 from app.models.schemas import TokenPayload
 from app.services.authorization import require_permission, Permission  # noqa: F401
-
-# ---------------------------------------------------------------------------
-# Shared helpers and fixtures
-# ---------------------------------------------------------------------------
 
 FAKE_USER = TokenPayload(
     user_id="user-123",
@@ -35,11 +32,11 @@ FAKE_USER = TokenPayload(
 
 
 @asynccontextmanager
-async def noop_lifespan(app):
+async def noop_lifespan(app: Any) -> AsyncIterator[Any]:
     yield
 
 
-def _make_session_model(session_id="sess-1", user_id="user-123"):
+def _make_session_model(session_id: str = "sess-1", user_id: str = "user-123") -> MagicMock:
     """Create a mock SessionModel."""
     m = MagicMock(spec=SessionModel)
     m.session_id = session_id
@@ -48,7 +45,7 @@ def _make_session_model(session_id="sess-1", user_id="user-123"):
     return m
 
 
-def _make_sim_session(session_id="sess-1"):
+def _make_sim_session(session_id: str = "sess-1") -> MagicMock:
     """Create a mock simulation session."""
     s = MagicMock()
     s.session_id = session_id
@@ -56,7 +53,7 @@ def _make_sim_session(session_id="sess-1"):
     return s
 
 
-def _make_query_chain(session_model):
+def _make_query_chain(session_model: MagicMock) -> MagicMock:
     """Create a mock query chain that returns the session_model."""
     q = MagicMock()
     q.filter.return_value.filter.return_value.first.return_value = session_model
@@ -64,17 +61,17 @@ def _make_query_chain(session_model):
 
 
 @pytest.fixture
-def mock_db():
+def mock_db() -> MagicMock:
     return MagicMock(spec=Session)
 
 
 @pytest.fixture
-def mock_manager():
+def mock_manager() -> AsyncMock:
     return AsyncMock()
 
 
 @pytest.fixture
-def client(mock_db, mock_manager):
+def client(mock_db: MagicMock, mock_manager: AsyncMock) -> TestClient:
     from app.main import create_app
     from app.database.connection import get_db
     from app.services.authorization import get_current_user
@@ -96,14 +93,16 @@ def client(mock_db, mock_manager):
 class TestGetSystemState:
     """Tests for the GET /{session_id}/state endpoint."""
 
-    def _setup_db(self, mock_db, user_id="user-123"):
+    def _setup_db(self, mock_db: MagicMock, user_id: str = "user-123") -> None:
         """Setup mock database with session."""
         session_model = _make_session_model(user_id=user_id)
         mock_db.query.return_value.filter.return_value.filter.return_value.first.return_value = (
             session_model
         )
 
-    def test_get_system_state_success(self, client, mock_manager, mock_db):
+    def test_get_system_state_success(
+        self, client: TestClient, mock_manager: AsyncMock, mock_db: MagicMock
+    ) -> None:
         """Test successful retrieval of complete system state."""
         self._setup_db(mock_db)
         sim_session = _make_sim_session()
@@ -149,7 +148,9 @@ class TestGetSystemState:
         assert data["body"]["heart_rate"] == 85.0
         assert data["workspace"]["is_broadcasting"] is True
 
-    def test_get_system_state_with_defaults(self, client, mock_manager, mock_db):
+    def test_get_system_state_with_defaults(
+        self, client: TestClient, mock_manager: AsyncMock, mock_db: MagicMock
+    ) -> None:
         """Test state retrieval with missing fields uses defaults."""
         self._setup_db(mock_db)
         sim_session = _make_sim_session()
@@ -165,7 +166,9 @@ class TestGetSystemState:
         assert data["body"]["cortisol"] == 0.1
         assert data["body"]["temperature"] == 37.0
 
-    def test_get_system_state_session_not_found_in_db(self, client, mock_db):
+    def test_get_system_state_session_not_found_in_db(
+        self, client: TestClient, mock_db: MagicMock
+    ) -> None:
         """Test 404 when session not found in database."""
         mock_db.query.return_value.filter.return_value.filter.return_value.first.return_value = None
         resp = client.get("/v1/sessions/nonexistent/state")
@@ -176,14 +179,18 @@ class TestGetSystemState:
         if "detail" in response_data:
             assert "not found" in response_data["detail"].lower()
 
-    def test_get_system_state_session_not_found_in_manager(self, client, mock_manager, mock_db):
+    def test_get_system_state_session_not_found_in_manager(
+        self, client: TestClient, mock_manager: AsyncMock, mock_db: MagicMock
+    ) -> None:
         """Test 404 when session not found in manager."""
         self._setup_db(mock_db)
         mock_manager.get_session.side_effect = ValueError("Session not found")
         resp = client.get("/v1/sessions/sess-1/state")
         assert resp.status_code == 404
 
-    def test_get_system_state_generic_error(self, client, mock_manager, mock_db):
+    def test_get_system_state_generic_error(
+        self, client: TestClient, mock_manager: AsyncMock, mock_db: MagicMock
+    ) -> None:
         """Test 500 on generic exception."""
         self._setup_db(mock_db)
         sim_session = _make_sim_session()
@@ -206,14 +213,16 @@ class TestGetSystemState:
 class TestGetIgnitionHistory:
     """Tests for the GET /{session_id}/ignition-history endpoint."""
 
-    def _setup_db(self, mock_db, user_id="user-123"):
+    def _setup_db(self, mock_db: MagicMock, user_id: str = "user-123") -> None:
         """Setup mock database with session."""
         session_model = _make_session_model(user_id=user_id)
         mock_db.query.return_value.filter.return_value.filter.return_value.first.return_value = (
             session_model
         )
 
-    def test_get_ignition_history_success(self, client, mock_manager, mock_db):
+    def test_get_ignition_history_success(
+        self, client: TestClient, mock_manager: AsyncMock, mock_db: MagicMock
+    ) -> None:
         """Test successful retrieval of ignition history."""
         self._setup_db(mock_db)
         sim_session = _make_sim_session()
@@ -234,7 +243,9 @@ class TestGetIgnitionHistory:
         assert data["events"][0]["time_ms"] == 100.0
         assert data["events"][1]["time_ms"] == 300.0
 
-    def test_get_ignition_history_with_time_filter_start(self, client, mock_manager, mock_db):
+    def test_get_ignition_history_with_time_filter_start(
+        self, client: TestClient, mock_manager: AsyncMock, mock_db: MagicMock
+    ) -> None:
         """Test ignition history with start_time filter."""
         self._setup_db(mock_db)
         sim_session = _make_sim_session()
@@ -254,7 +265,9 @@ class TestGetIgnitionHistory:
         assert len(data["events"]) == 1
         assert data["events"][0]["time_ms"] == 300.0
 
-    def test_get_ignition_history_with_time_filter_end(self, client, mock_manager, mock_db):
+    def test_get_ignition_history_with_time_filter_end(
+        self, client: TestClient, mock_manager: AsyncMock, mock_db: MagicMock
+    ) -> None:
         """Test ignition history with end_time filter."""
         self._setup_db(mock_db)
         sim_session = _make_sim_session()
@@ -274,7 +287,9 @@ class TestGetIgnitionHistory:
         assert len(data["events"]) == 1
         assert data["events"][0]["time_ms"] == 100.0
 
-    def test_get_ignition_history_with_both_time_filters(self, client, mock_manager, mock_db):
+    def test_get_ignition_history_with_both_time_filters(
+        self, client: TestClient, mock_manager: AsyncMock, mock_db: MagicMock
+    ) -> None:
         """Test ignition history with both start and end time filters."""
         self._setup_db(mock_db)
         sim_session = _make_sim_session()
@@ -295,7 +310,9 @@ class TestGetIgnitionHistory:
         assert data["events"][0]["time_ms"] == 200.0
         assert data["events"][1]["time_ms"] == 300.0
 
-    def test_get_ignition_history_limit_too_large(self, client, mock_manager, mock_db):
+    def test_get_ignition_history_limit_too_large(
+        self, client: TestClient, mock_manager: AsyncMock, mock_db: MagicMock
+    ) -> None:
         """Test 400 error when limit > 500."""
         self._setup_db(mock_db)
         resp = client.get("/v1/sessions/sess-1/ignition-history?limit=501")
@@ -306,7 +323,9 @@ class TestGetIgnitionHistory:
         if "detail" in response_data:
             assert "too large" in response_data["detail"].lower()
 
-    def test_get_ignition_history_limit_max_allowed(self, client, mock_manager, mock_db):
+    def test_get_ignition_history_limit_max_allowed(
+        self, client: TestClient, mock_manager: AsyncMock, mock_db: MagicMock
+    ) -> None:
         """Test that limit=500 is allowed."""
         self._setup_db(mock_db)
         sim_session = _make_sim_session()
@@ -316,7 +335,9 @@ class TestGetIgnitionHistory:
         resp = client.get("/v1/sessions/sess-1/ignition-history?limit=500")
         assert resp.status_code == 200
 
-    def test_get_ignition_history_pagination_cursor(self, client, mock_manager, mock_db):
+    def test_get_ignition_history_pagination_cursor(
+        self, client: TestClient, mock_manager: AsyncMock, mock_db: MagicMock
+    ) -> None:
         """Test pagination with cursor."""
         self._setup_db(mock_db)
         sim_session = _make_sim_session()
@@ -341,7 +362,9 @@ class TestGetIgnitionHistory:
         data = resp.json()
         assert len(data["events"]) == 3
 
-    def test_get_ignition_history_fallback_to_current_values(self, client, mock_manager, mock_db):
+    def test_get_ignition_history_fallback_to_current_values(
+        self, client: TestClient, mock_manager: AsyncMock, mock_db: MagicMock
+    ) -> None:
         """Test fallback to current values when historical data not available."""
         self._setup_db(mock_db)
         sim_session = _make_sim_session()
@@ -371,7 +394,9 @@ class TestGetIgnitionHistory:
         assert data["events"][0]["trigger_signal"] == 2.8
         assert data["events"][0]["threshold"] == 2.1
 
-    def test_get_ignition_history_with_next_cursor_generation(self, client, mock_manager, mock_db):
+    def test_get_ignition_history_with_next_cursor_generation(
+        self, client: TestClient, mock_manager: AsyncMock, mock_db: MagicMock
+    ) -> None:
         """Test that next cursor is generated when there are more events."""
         self._setup_db(mock_db)
         sim_session = _make_sim_session()
@@ -398,7 +423,9 @@ class TestGetIgnitionHistory:
         # Verify pagination info exists (next_cursor should be generated)
         # The response should have pagination info if there are more events
 
-    def test_get_ignition_history_cursor_with_valid_signature(self, client, mock_manager, mock_db):
+    def test_get_ignition_history_cursor_with_valid_signature(
+        self, client: TestClient, mock_manager: AsyncMock, mock_db: MagicMock
+    ) -> None:
         """Test pagination with valid cursor signature."""
         self._setup_db(mock_db)
         sim_session = _make_sim_session()
@@ -447,7 +474,9 @@ class TestGetIgnitionHistory:
         assert len(data["events"]) == 3
         assert data["events"][0]["time_ms"] == 300.0
 
-    def test_get_ignition_history_next_cursor_generation(self, client, mock_manager, mock_db):
+    def test_get_ignition_history_next_cursor_generation(
+        self, client: TestClient, mock_manager: AsyncMock, mock_db: MagicMock
+    ) -> None:
         """Test that next cursor is generated when has_more is True."""
         self._setup_db(mock_db)
         sim_session = _make_sim_session()
@@ -474,7 +503,9 @@ class TestGetIgnitionHistory:
         # The next_cursor should be generated since has_more is True
         # (5 events total, limit 2, so has_more = True)
 
-    def test_get_ignition_history_invalid_cursor(self, client, mock_manager, mock_db):
+    def test_get_ignition_history_invalid_cursor(
+        self, client: TestClient, mock_manager: AsyncMock, mock_db: MagicMock
+    ) -> None:
         """Test 400 error with invalid cursor."""
         self._setup_db(mock_db)
         sim_session = _make_sim_session()
@@ -490,7 +521,9 @@ class TestGetIgnitionHistory:
         if "detail" in response_data:
             assert "invalid cursor" in response_data["detail"].lower()
 
-    def test_get_ignition_history_invalid_cursor_signature(self, client, mock_manager, mock_db):
+    def test_get_ignition_history_invalid_cursor_signature(
+        self, client: TestClient, mock_manager: AsyncMock, mock_db: MagicMock
+    ) -> None:
         """Test 400 error with invalid cursor signature."""
         self._setup_db(mock_db)
         sim_session = _make_sim_session()
@@ -514,7 +547,9 @@ class TestGetIgnitionHistory:
         if "detail" in response_data:
             assert "invalid cursor" in response_data["detail"].lower()
 
-    def test_get_ignition_history_empty_history(self, client, mock_manager, mock_db):
+    def test_get_ignition_history_empty_history(
+        self, client: TestClient, mock_manager: AsyncMock, mock_db: MagicMock
+    ) -> None:
         """Test with empty history."""
         self._setup_db(mock_db)
         sim_session = _make_sim_session()
@@ -526,13 +561,17 @@ class TestGetIgnitionHistory:
         data = resp.json()
         assert len(data["events"]) == 0
 
-    def test_get_ignition_history_session_not_found(self, client, mock_db):
+    def test_get_ignition_history_session_not_found(
+        self, client: TestClient, mock_db: MagicMock
+    ) -> None:
         """Test 404 when session not found."""
         mock_db.query.return_value.filter.return_value.filter.return_value.first.return_value = None
         resp = client.get("/v1/sessions/nonexistent/ignition-history")
         assert resp.status_code == 404
 
-    def test_get_ignition_history_generic_error(self, client, mock_manager, mock_db):
+    def test_get_ignition_history_generic_error(
+        self, client: TestClient, mock_manager: AsyncMock, mock_db: MagicMock
+    ) -> None:
         """Test 500 on generic exception."""
         self._setup_db(mock_db)
         sim_session = _make_sim_session()
@@ -550,14 +589,16 @@ class TestGetIgnitionHistory:
 class TestGetInteroceptiveState:
     """Tests for the GET /{session_id}/interoception endpoint."""
 
-    def _setup_db(self, mock_db, user_id="user-123"):
+    def _setup_db(self, mock_db: MagicMock, user_id: str = "user-123") -> None:
         """Setup mock database with session."""
         session_model = _make_session_model(user_id=user_id)
         mock_db.query.return_value.filter.return_value.filter.return_value.first.return_value = (
             session_model
         )
 
-    def test_get_interoceptive_state_success(self, client, mock_manager, mock_db):
+    def test_get_interoceptive_state_success(
+        self, client: TestClient, mock_manager: AsyncMock, mock_db: MagicMock
+    ) -> None:
         """Test successful retrieval of interoceptive state."""
         self._setup_db(mock_db)
         sim_session = _make_sim_session()
@@ -577,7 +618,9 @@ class TestGetInteroceptiveState:
         assert data["cortisol"] == 0.18
         assert data["temperature"] == 37.2
 
-    def test_get_interoceptive_state_with_defaults(self, client, mock_manager, mock_db):
+    def test_get_interoceptive_state_with_defaults(
+        self, client: TestClient, mock_manager: AsyncMock, mock_db: MagicMock
+    ) -> None:
         """Test interoceptive state with missing body data uses defaults."""
         self._setup_db(mock_db)
         sim_session = _make_sim_session()
@@ -591,13 +634,17 @@ class TestGetInteroceptiveState:
         assert data["cortisol"] == 0.1
         assert data["temperature"] == 37.0
 
-    def test_get_interoceptive_state_session_not_found(self, client, mock_db):
+    def test_get_interoceptive_state_session_not_found(
+        self, client: TestClient, mock_db: MagicMock
+    ) -> None:
         """Test 404 when session not found."""
         mock_db.query.return_value.filter.return_value.filter.return_value.first.return_value = None
         resp = client.get("/v1/sessions/nonexistent/interoception")
         assert resp.status_code == 404
 
-    def test_get_interoceptive_state_generic_error(self, client, mock_manager, mock_db):
+    def test_get_interoceptive_state_generic_error(
+        self, client: TestClient, mock_manager: AsyncMock, mock_db: MagicMock
+    ) -> None:
         """Test 500 on generic exception."""
         self._setup_db(mock_db)
         sim_session = _make_sim_session()
@@ -606,7 +653,9 @@ class TestGetInteroceptiveState:
         resp = client.get("/v1/sessions/sess-1/interoception")
         assert resp.status_code == 500
 
-    def test_get_interoceptive_state_manager_error(self, client, mock_manager, mock_db):
+    def test_get_interoceptive_state_manager_error(
+        self, client: TestClient, mock_manager: AsyncMock, mock_db: MagicMock
+    ) -> None:
         """Test 404 when manager raises ValueError."""
         self._setup_db(mock_db)
         mock_manager.get_session.side_effect = ValueError("Session not found")
@@ -622,14 +671,16 @@ class TestGetInteroceptiveState:
 class TestGetPredictionErrors:
     """Tests for the GET /{session_id}/prediction-errors endpoint."""
 
-    def _setup_db(self, mock_db, user_id="user-123"):
+    def _setup_db(self, mock_db: MagicMock, user_id: str = "user-123") -> None:
         """Setup mock database with session."""
         session_model = _make_session_model(user_id=user_id)
         mock_db.query.return_value.filter.return_value.filter.return_value.first.return_value = (
             session_model
         )
 
-    def test_get_prediction_errors_success(self, client, mock_manager, mock_db):
+    def test_get_prediction_errors_success(
+        self, client: TestClient, mock_manager: AsyncMock, mock_db: MagicMock
+    ) -> None:
         """Test successful retrieval of prediction errors."""
         self._setup_db(mock_db)
         sim_session = _make_sim_session()
@@ -651,7 +702,9 @@ class TestGetPredictionErrors:
         assert data["prediction_errors"]["level_1"] == 0.5
         assert data["exteroceptive_stats"]["mean"] == 0.4
 
-    def test_get_prediction_errors_with_defaults(self, client, mock_manager, mock_db):
+    def test_get_prediction_errors_with_defaults(
+        self, client: TestClient, mock_manager: AsyncMock, mock_db: MagicMock
+    ) -> None:
         """Test prediction errors with missing data uses defaults."""
         self._setup_db(mock_db)
         sim_session = _make_sim_session()
@@ -667,13 +720,17 @@ class TestGetPredictionErrors:
         assert data["exteroceptive_stats"] == {}
         assert data["interoceptive_stats"] == {}
 
-    def test_get_prediction_errors_session_not_found(self, client, mock_db):
+    def test_get_prediction_errors_session_not_found(
+        self, client: TestClient, mock_db: MagicMock
+    ) -> None:
         """Test 404 when session not found."""
         mock_db.query.return_value.filter.return_value.filter.return_value.first.return_value = None
         resp = client.get("/v1/sessions/nonexistent/prediction-errors")
         assert resp.status_code == 404
 
-    def test_get_prediction_errors_generic_error(self, client, mock_manager, mock_db):
+    def test_get_prediction_errors_generic_error(
+        self, client: TestClient, mock_manager: AsyncMock, mock_db: MagicMock
+    ) -> None:
         """Test 500 on generic exception."""
         self._setup_db(mock_db)
         sim_session = _make_sim_session()
@@ -682,7 +739,9 @@ class TestGetPredictionErrors:
         resp = client.get("/v1/sessions/sess-1/prediction-errors")
         assert resp.status_code == 500
 
-    def test_get_prediction_errors_manager_error(self, client, mock_manager, mock_db):
+    def test_get_prediction_errors_manager_error(
+        self, client: TestClient, mock_manager: AsyncMock, mock_db: MagicMock
+    ) -> None:
         """Test 404 when manager raises ValueError."""
         self._setup_db(mock_db)
         mock_manager.get_session.side_effect = ValueError("Session not found")
@@ -698,14 +757,16 @@ class TestGetPredictionErrors:
 class TestGetSomaticMarkers:
     """Tests for the GET /{session_id}/somatic-markers endpoint."""
 
-    def _setup_db(self, mock_db, user_id="user-123"):
+    def _setup_db(self, mock_db: MagicMock, user_id: str = "user-123") -> None:
         """Setup mock database with session."""
         session_model = _make_session_model(user_id=user_id)
         mock_db.query.return_value.filter.return_value.filter.return_value.first.return_value = (
             session_model
         )
 
-    def test_get_somatic_markers_success(self, client, mock_manager, mock_db):
+    def test_get_somatic_markers_success(
+        self, client: TestClient, mock_manager: AsyncMock, mock_db: MagicMock
+    ) -> None:
         """Test successful retrieval of somatic markers."""
         self._setup_db(mock_db)
         sim_session = _make_sim_session()
@@ -737,7 +798,9 @@ class TestGetSomaticMarkers:
         assert data["retrieval_rate"] == 0.85
         assert len(data["markers"]) == 2
 
-    def test_get_somatic_markers_with_defaults(self, client, mock_manager, mock_db):
+    def test_get_somatic_markers_with_defaults(
+        self, client: TestClient, mock_manager: AsyncMock, mock_db: MagicMock
+    ) -> None:
         """Test somatic markers with missing data uses defaults."""
         self._setup_db(mock_db)
         sim_session = _make_sim_session()
@@ -755,13 +818,17 @@ class TestGetSomaticMarkers:
         assert data["retrieval_rate"] == 0.0
         assert data["markers"] == []
 
-    def test_get_somatic_markers_session_not_found(self, client, mock_db):
+    def test_get_somatic_markers_session_not_found(
+        self, client: TestClient, mock_db: MagicMock
+    ) -> None:
         """Test 404 when session not found."""
         mock_db.query.return_value.filter.return_value.filter.return_value.first.return_value = None
         resp = client.get("/v1/sessions/nonexistent/somatic-markers")
         assert resp.status_code == 404
 
-    def test_get_somatic_markers_generic_error(self, client, mock_manager, mock_db):
+    def test_get_somatic_markers_generic_error(
+        self, client: TestClient, mock_manager: AsyncMock, mock_db: MagicMock
+    ) -> None:
         """Test 500 on generic exception."""
         self._setup_db(mock_db)
         sim_session = _make_sim_session()
@@ -770,7 +837,9 @@ class TestGetSomaticMarkers:
         resp = client.get("/v1/sessions/sess-1/somatic-markers")
         assert resp.status_code == 500
 
-    def test_get_somatic_markers_manager_error(self, client, mock_manager, mock_db):
+    def test_get_somatic_markers_manager_error(
+        self, client: TestClient, mock_manager: AsyncMock, mock_db: MagicMock
+    ) -> None:
         """Test 404 when manager raises ValueError."""
         self._setup_db(mock_db)
         mock_manager.get_session.side_effect = ValueError("Session not found")
@@ -786,7 +855,7 @@ class TestGetSomaticMarkers:
 class TestStateRoutesPermissions:
     """Tests for permission validation on state routes."""
 
-    def test_state_endpoint_requires_session_read_permission(self, client):
+    def test_state_endpoint_requires_session_read_permission(self, client: TestClient) -> None:
         """Test that state endpoint requires SESSION_READ permission."""
         # This is enforced by the dependency, so we verify the endpoint is protected
         # by checking that the dependency is declared
@@ -806,7 +875,9 @@ class TestStateRoutesPermissions:
             # For now, just check that the function exists and is properly decorated
             assert get_system_state is not None
 
-    def test_ignition_history_endpoint_requires_session_read_permission(self, client):
+    def test_ignition_history_endpoint_requires_session_read_permission(
+        self, client: TestClient
+    ) -> None:
         """Test that ignition-history endpoint requires SESSION_READ permission."""
         from app.routes.state import get_ignition_history
 
@@ -819,7 +890,9 @@ class TestStateRoutesPermissions:
         else:
             assert get_ignition_history is not None
 
-    def test_interoception_endpoint_requires_session_read_permission(self, client):
+    def test_interoception_endpoint_requires_session_read_permission(
+        self, client: TestClient
+    ) -> None:
         """Test that interoception endpoint requires SESSION_READ permission."""
         from app.routes.state import get_interoceptive_state
 
@@ -832,7 +905,9 @@ class TestStateRoutesPermissions:
         else:
             assert get_interoceptive_state is not None
 
-    def test_prediction_errors_endpoint_requires_session_read_permission(self, client):
+    def test_prediction_errors_endpoint_requires_session_read_permission(
+        self, client: TestClient
+    ) -> None:
         """Test that prediction-errors endpoint requires SESSION_READ permission."""
         from app.routes.state import get_prediction_errors
 
@@ -845,7 +920,9 @@ class TestStateRoutesPermissions:
         else:
             assert get_prediction_errors is not None
 
-    def test_somatic_markers_endpoint_requires_session_read_permission(self, client):
+    def test_somatic_markers_endpoint_requires_session_read_permission(
+        self, client: TestClient
+    ) -> None:
         """Test that somatic-markers endpoint requires SESSION_READ permission."""
         from app.routes.state import get_somatic_markers
 

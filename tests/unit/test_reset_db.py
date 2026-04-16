@@ -8,6 +8,7 @@ Requirements: 1.9, 5.8
 import importlib
 import os
 import sys
+from typing import Any
 from unittest.mock import MagicMock, patch
 
 # ---------------------------------------------------------------------------
@@ -17,7 +18,7 @@ from unittest.mock import MagicMock, patch
 _DB_URL = "postgresql://user:pass@localhost:5432/dbname"
 
 
-def _load_reset_db(mock_psycopg2):
+def _load_reset_db(mock_psycopg2: MagicMock) -> Any:
     """Reload app.reset_db with mock_psycopg2 in sys.modules and DATABASE_URL set."""
     # Ensure InsufficientPrivilege is a real exception class (required for except clause)
     if not (
@@ -53,7 +54,7 @@ def _load_reset_db(mock_psycopg2):
 class TestRecreateDatabaseSuccess:
     """Test the happy path: drop and create succeeds."""
 
-    def test_success_calls_drop_and_create(self, mock_psycopg2):
+    def test_success_calls_drop_and_create(self, mock_psycopg2: MagicMock) -> None:
         mod = _load_reset_db(mock_psycopg2)
 
         mock_conn = MagicMock()
@@ -71,7 +72,7 @@ class TestRecreateDatabaseSuccess:
         mock_cursor.close.assert_called()
         mock_conn.close.assert_called()
 
-    def test_success_sets_isolation_level(self, mock_psycopg2):
+    def test_success_sets_isolation_level(self, mock_psycopg2: MagicMock) -> None:
         mod = _load_reset_db(mock_psycopg2)
 
         mock_conn = MagicMock()
@@ -87,7 +88,9 @@ class TestRecreateDatabaseSuccess:
 class TestRecreateDatabaseInsufficientPrivilege:
     """Test fallback to _clear_all_tables on InsufficientPrivilege."""
 
-    def test_insufficient_privilege_falls_back_to_clear_tables(self, mock_psycopg2):
+    def test_insufficient_privilege_falls_back_to_clear_tables(
+        self, mock_psycopg2: MagicMock
+    ) -> None:
         mod = _load_reset_db(mock_psycopg2)
 
         # Make InsufficientPrivilege a real exception subclass
@@ -113,7 +116,7 @@ class TestRecreateDatabaseInsufficientPrivilege:
 class TestRecreateDatabaseGenericError:
     """Test fallback to _clear_all_tables on generic Exception."""
 
-    def test_connection_error_falls_back(self, mock_psycopg2):
+    def test_connection_error_falls_back(self, mock_psycopg2: MagicMock) -> None:
         mod = _load_reset_db(mock_psycopg2)
         mock_psycopg2.connect.side_effect = Exception("Connection failed")
 
@@ -121,7 +124,7 @@ class TestRecreateDatabaseGenericError:
             mod.recreate_database()
             mock_clear.assert_called_once()
 
-    def test_cursor_error_falls_back(self, mock_psycopg2):
+    def test_cursor_error_falls_back(self, mock_psycopg2: MagicMock) -> None:
         mod = _load_reset_db(mock_psycopg2)
 
         mock_conn = MagicMock()

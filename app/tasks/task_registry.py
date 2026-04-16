@@ -84,7 +84,7 @@ def get_task_name(task_type: TaskType) -> str:
     return TASK_REGISTRY[task_type]
 
 
-def list_available_tasks() -> list:
+def list_available_tasks() -> list[str]:
     """
     Get a list of all available task types.
 

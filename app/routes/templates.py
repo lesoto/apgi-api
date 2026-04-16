@@ -29,7 +29,7 @@ _redis_client = None
 _session_manager = None
 
 
-def init_template_routes():
+def init_template_routes() -> None:
     """
     Initialize template routes.
 

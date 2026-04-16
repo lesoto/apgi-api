@@ -6,6 +6,7 @@ Tests universal properties of the configuration system.
 """
 
 import os
+from typing import Any
 import pytest
 from hypothesis import given, strategies as st, assume, settings
 from unittest.mock import patch, MagicMock
@@ -18,7 +19,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent.parent.parent / "app"))
 
 
-def reload_config_with_env(env_vars):
+def reload_config_with_env(env_vars: dict[str, str]) -> Any:
     """
     Helper function to reload config module with specific environment variables.
 
@@ -72,7 +73,7 @@ def reload_config_with_env(env_vars):
     ),
     bool_value=st.sampled_from(["true", "false", "True", "False", "TRUE", "FALSE"]),
 )
-def test_property_1_config_env_override(config_key, env_value, bool_value):
+def test_property_1_config_env_override(config_key: str, env_value: str, bool_value: str) -> None:
     """
     **Validates: Requirements 2.2**
 
@@ -184,7 +185,7 @@ def test_property_1_config_env_override(config_key, env_value, bool_value):
         ]
     )
 )
-def test_property_1_config_default_when_not_set(config_key):
+def test_property_1_config_default_when_not_set(config_key: str) -> None:
     """
     **Validates: Requirements 2.2**
 
@@ -242,7 +243,7 @@ def test_property_1_config_default_when_not_set(config_key):
         ]
     )
 )
-def test_property_2_config_validation_error_logging(validation_scenario):
+def test_property_2_config_validation_error_logging(validation_scenario: str) -> None:
     """
     **Validates: Requirements 2.5**
 

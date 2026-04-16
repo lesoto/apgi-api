@@ -6,15 +6,17 @@ Tests user management endpoints through HTTP requests with authentication.
 
 import pytest
 import uuid
+from typing import Any, Generator
 from unittest.mock import AsyncMock, MagicMock, patch
 from httpx import AsyncClient, ASGITransport
 from datetime import datetime
+from typing import AsyncGenerator
 
 
 @pytest.fixture
 async def authenticated_client(
-    test_environment, mock_database_connection, mock_user_management_service
-):
+    test_environment: None, mock_database_connection: None, mock_user_management_service: MagicMock
+) -> AsyncGenerator[AsyncClient, None]:
     """Create authenticated test client for user integration tests."""
     from app.main import create_app
     from app.services.auth_manager import AuthManager
@@ -56,7 +58,9 @@ async def authenticated_client(
 
 
 # Mock functions
-def create_user_mock(username, email, password, roles=None):
+def create_user_mock(
+    username: str, email: str, password: str, roles: list[str] | None = None
+) -> "MockUser":
     return MockUser(
         username=username,
         email=email,
@@ -69,7 +73,7 @@ def create_user_mock(username, email, password, roles=None):
     )
 
 
-def get_user_by_id_mock(user_id):
+def get_user_by_id_mock(user_id: str) -> MagicMock:
     user = MagicMock()
     user.user_id = user_id
     user.username = "test_user"
@@ -85,7 +89,7 @@ def get_user_by_id_mock(user_id):
 class MockUser:
     """Mock user object for testing."""
 
-    def __init__(self, **kwargs):
+    def __init__(self, **kwargs: Any) -> None:
         self.user_id = kwargs.get("user_id", str(uuid.uuid4()))
         self.username = kwargs.get("username", "test_user")
         self.email = kwargs.get("email", "test@example.com")
@@ -98,12 +102,12 @@ class MockUser:
         self.updated_at = datetime(2023, 1, 1, 0, 0, 0)
 
 
-def update_user_mock(**kwargs):
+def update_user_mock(**kwargs: Any) -> MockUser:
     return MockUser(**kwargs)
 
 
 @pytest.fixture
-def mock_user_management_service():
+def mock_user_management_service() -> Generator[MagicMock, None, None]:
     """Create mock UserManagementService for integration tests."""
     service = MagicMock()
     service.create_user = MagicMock(side_effect=create_user_mock)
@@ -130,7 +134,7 @@ class TestUserRoutesIntegration:
     """Integration tests for user management endpoints."""
 
     @pytest.mark.asyncio
-    async def test_register_user(self, mock_user_management_service):
+    async def test_register_user(self, mock_user_management_service: MagicMock) -> None:
         """Test user registration."""
         from app.main import create_app
         from httpx import AsyncClient, ASGITransport
@@ -162,7 +166,9 @@ class TestUserRoutesIntegration:
         )
 
     @pytest.mark.asyncio
-    async def test_get_user(self, authenticated_client, mock_user_management_service):
+    async def test_get_user(
+        self, authenticated_client: AsyncClient, mock_user_management_service: MagicMock
+    ) -> None:
         """Test getting user by ID with authentication."""
         user_id = str(uuid.uuid4())
 
@@ -184,9 +190,11 @@ class TestUserRoutesIntegration:
             assert data["email"] == "test@example.com"
 
     @pytest.mark.asyncio
-    async def test_update_user(self, authenticated_client, mock_user_management_service):
+    async def test_update_user(
+        self, authenticated_client: AsyncClient, mock_user_management_service: MagicMock
+    ) -> None:
         """Test updating user with authentication."""
-        from app.services.auth_manager import TokenPayload
+        from app.models.schemas import TokenPayload
         from datetime import timezone, timedelta
 
         mock_token_payload = TokenPayload(
@@ -219,7 +227,9 @@ class TestUserRoutesIntegration:
             assert "admin" in data["roles"]
 
     @pytest.mark.asyncio
-    async def test_delete_user(self, authenticated_client, mock_user_management_service):
+    async def test_delete_user(
+        self, authenticated_client: AsyncClient, mock_user_management_service: MagicMock
+    ) -> None:
         """Test deleting user with authentication."""
         with patch(
             "app.services.user_management.get_user_management_service",
@@ -232,7 +242,9 @@ class TestUserRoutesIntegration:
             assert response.status_code == 204
 
     @pytest.mark.asyncio
-    async def test_reset_password(self, authenticated_client, mock_user_management_service):
+    async def test_reset_password(
+        self, authenticated_client: AsyncClient, mock_user_management_service: MagicMock
+    ) -> None:
         """Test password reset with authentication."""
         with patch(
             "app.services.user_management.get_user_management_service",
@@ -251,7 +263,9 @@ class TestUserRoutesIntegration:
             assert "message" in data
 
     @pytest.mark.asyncio
-    async def test_get_user_stats(self, authenticated_client, mock_user_management_service):
+    async def test_get_user_stats(
+        self, authenticated_client: AsyncClient, mock_user_management_service: MagicMock
+    ) -> None:
         """Test getting user statistics with authentication."""
         with patch(
             "app.services.user_management.get_user_management_service",

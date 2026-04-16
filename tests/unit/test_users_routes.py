@@ -2,15 +2,15 @@
 Unit tests for app/routes/users.py
 """
 
+from typing import Any, AsyncGenerator
 import pytest
 from contextlib import asynccontextmanager
 from datetime import datetime, timezone, timedelta
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock, Mock, patch
 from fastapi.testclient import TestClient
 
 from app.models.schemas import TokenPayload
 
-# Valid password that passes all validators (upper, lower, digit, special char)
 VALID_PASSWORD = "Password1!"
 
 FAKE_USER = TokenPayload(
@@ -33,17 +33,17 @@ FAKE_VIEWER = TokenPayload(
 
 
 @asynccontextmanager
-async def noop_lifespan(app):
+async def noop_lifespan(app: Any) -> AsyncGenerator[None, None]:
     yield
 
 
 @pytest.fixture
-def db():
+def db() -> MagicMock:
     return MagicMock()
 
 
 @pytest.fixture
-def client(db):
+def client(db: MagicMock) -> TestClient:
     from app.main import create_app
     from app.database.connection import get_db
     from app.services.authorization import get_current_user
@@ -56,7 +56,7 @@ def client(db):
 
 
 @pytest.fixture
-def viewer_client(db):
+def viewer_client(db: MagicMock) -> TestClient:
     from app.main import create_app
     from app.database.connection import get_db
     from app.services.authorization import get_current_user
@@ -68,7 +68,7 @@ def viewer_client(db):
     return TestClient(app, raise_server_exceptions=False)
 
 
-def _mock_user(**kwargs):
+def _mock_user(**kwargs: Any) -> MagicMock:
     u = MagicMock()
     u.user_id = kwargs.get("user_id", "user-123")
     u.username = kwargs.get("username", "testuser")
@@ -91,7 +91,7 @@ def _mock_user(**kwargs):
 
 
 class TestRegisterUser:
-    def test_register_success(self, client, db):
+    def test_register_success(self, client: TestClient, db: MagicMock) -> None:
         mock_user = _mock_user()
         with patch("app.routes.users.get_user_management_service") as mock_svc_factory:
             mock_svc = MagicMock()
@@ -112,7 +112,7 @@ class TestRegisterUser:
         assert data["username"] == "testuser"
         assert "user_id" in data
 
-    def test_register_duplicate_user_400(self, client, db):
+    def test_register_duplicate_user_400(self, client: TestClient, db: MagicMock) -> None:
         with patch("app.routes.users.get_user_management_service") as mock_svc_factory:
             mock_svc = MagicMock()
             mock_svc.create_user.side_effect = ValueError("Username already exists")
@@ -129,7 +129,7 @@ class TestRegisterUser:
 
         assert resp.status_code == 400
 
-    def test_register_internal_error_500(self, client, db):
+    def test_register_internal_error_500(self, client: TestClient, db: MagicMock) -> None:
         with patch("app.routes.users.get_user_management_service") as mock_svc_factory:
             mock_svc = MagicMock()
             mock_svc.create_user.side_effect = RuntimeError("DB down")
@@ -153,7 +153,7 @@ class TestRegisterUser:
 
 
 class TestVerifyEmail:
-    def test_verify_email_invalid_token_400(self, client, db):
+    def test_verify_email_invalid_token_400(self, client: TestClient, db: MagicMock) -> None:
         db.query.return_value.filter.return_value.first.return_value = None
 
         resp = client.get("/v1/users/verify-email?token=badtoken")
@@ -161,7 +161,7 @@ class TestVerifyEmail:
         assert resp.status_code == 400
         assert "Invalid or expired" in resp.json()["error"]["message"]
 
-    def test_verify_email_success(self, client, db):
+    def test_verify_email_success(self, client: TestClient, db: MagicMock) -> None:
         mock_user = _mock_user()
         mock_user.email_verification_token = "goodtoken"
         mock_user.email_verification_expires_at = datetime.now(timezone.utc) + timedelta(hours=1)
@@ -172,7 +172,7 @@ class TestVerifyEmail:
         assert resp.status_code == 200
         assert "verified" in resp.json()["message"].lower()
 
-    def test_verify_email_commit_error_500(self, client, db):
+    def test_verify_email_commit_error_500(self, client: TestClient, db: MagicMock) -> None:
         mock_user = _mock_user()
         mock_user.email_verification_token = "goodtoken"
         mock_user.email_verification_expires_at = datetime.now(timezone.utc) + timedelta(hours=1)
@@ -190,7 +190,7 @@ class TestVerifyEmail:
 
 
 class TestCreateDefaultUser:
-    def test_create_default_user_success(self, client, db):
+    def test_create_default_user_success(self, client: TestClient, db: MagicMock) -> None:
         mock_user = _mock_user(username="admin", email="admin@example.com")
         with patch("app.routes.users.get_user_management_service") as mock_svc_factory:
             mock_svc = MagicMock()
@@ -203,7 +203,7 @@ class TestCreateDefaultUser:
         data = resp.json()
         assert data["username"] == "admin"
 
-    def test_create_default_user_error_500(self, client, db):
+    def test_create_default_user_error_500(self, client: TestClient, db: MagicMock) -> None:
         with patch("app.routes.users.get_user_management_service") as mock_svc_factory:
             mock_svc = MagicMock()
             mock_svc.create_default_user.side_effect = Exception("DB error")
@@ -220,7 +220,7 @@ class TestCreateDefaultUser:
 
 
 class TestListUsers:
-    def test_list_users_success(self, client, db):
+    def test_list_users_success(self, client: TestClient, db: MagicMock) -> None:
         mock_user = _mock_user()
         with patch("app.routes.users.get_user_management_service") as mock_svc_factory:
             mock_svc = MagicMock()
@@ -242,19 +242,19 @@ class TestListUsers:
         assert "users" in data
         assert len(data["users"]) == 1
 
-    def test_list_users_invalid_page_400(self, client, db):
+    def test_list_users_invalid_page_400(self, client: TestClient, db: MagicMock) -> None:
         resp = client.get("/v1/users/?page=0")
         assert resp.status_code == 400
 
-    def test_list_users_invalid_per_page_400(self, client, db):
+    def test_list_users_invalid_per_page_400(self, client: TestClient, db: MagicMock) -> None:
         resp = client.get("/v1/users/?per_page=0")
         assert resp.status_code == 400
 
-    def test_list_users_per_page_too_large_400(self, client, db):
+    def test_list_users_per_page_too_large_400(self, client: TestClient, db: MagicMock) -> None:
         resp = client.get("/v1/users/?per_page=101")
         assert resp.status_code == 400
 
-    def test_list_users_inactive_included(self, client, db):
+    def test_list_users_inactive_included(self, client: TestClient, db: MagicMock) -> None:
         mock_user = _mock_user()
         with patch("app.routes.users.get_user_management_service") as mock_svc_factory:
             mock_svc = MagicMock()
@@ -282,7 +282,7 @@ class TestListUsers:
 
 
 class TestGetCurrentUserProfile:
-    def test_get_me_success(self, client, db):
+    def test_get_me_success(self, client: TestClient, db: MagicMock) -> None:
         mock_user = _mock_user()
         with patch("app.routes.users.get_user_management_service") as mock_svc_factory:
             mock_svc = MagicMock()
@@ -294,7 +294,7 @@ class TestGetCurrentUserProfile:
         assert resp.status_code == 200
         assert resp.json()["username"] == "testuser"
 
-    def test_get_me_not_found_404(self, client, db):
+    def test_get_me_not_found_404(self, client: TestClient, db: MagicMock) -> None:
         with patch("app.routes.users.get_user_management_service") as mock_svc_factory:
             mock_svc = MagicMock()
             mock_svc.get_user.return_value = None
@@ -311,7 +311,7 @@ class TestGetCurrentUserProfile:
 
 
 class TestGetUserStats:
-    def test_get_stats_success(self, client, db):
+    def test_get_stats_success(self, client: TestClient, db: MagicMock) -> None:
         with patch("app.routes.users.get_user_management_service") as mock_svc_factory:
             mock_svc = MagicMock()
             mock_svc.get_user_stats.return_value = {
@@ -337,7 +337,7 @@ class TestGetUserStats:
 
 
 class TestGetUser:
-    def test_get_user_success(self, client, db):
+    def test_get_user_success(self, client: TestClient, db: Mock) -> None:
         mock_user = _mock_user()
         with patch("app.routes.users.get_user_management_service") as mock_svc_factory:
             mock_svc = MagicMock()
@@ -349,7 +349,7 @@ class TestGetUser:
         assert resp.status_code == 200
         assert resp.json()["user_id"] == "user-123"
 
-    def test_get_user_not_found_404(self, client, db):
+    def test_get_user_not_found_404(self, client: TestClient, db: Mock) -> None:
         with patch("app.routes.users.get_user_management_service") as mock_svc_factory:
             mock_svc = MagicMock()
             mock_svc.get_user.return_value = None
@@ -366,7 +366,7 @@ class TestGetUser:
 
 
 class TestPartialUpdateUser:
-    def test_patch_own_user_success(self, client, db):
+    def test_patch_own_user_success(self, client: TestClient, db: Mock) -> None:
         mock_user = _mock_user(email="updated@example.com")
         with patch("app.routes.users.get_user_management_service") as mock_svc_factory:
             mock_svc = MagicMock()
@@ -380,14 +380,14 @@ class TestPartialUpdateUser:
 
         assert resp.status_code == 200
 
-    def test_patch_other_user_as_viewer_403(self, viewer_client, db):
+    def test_patch_other_user_as_viewer_403(self, viewer_client: TestClient, db: Mock) -> None:
         resp = viewer_client.patch(
             "/v1/users/user-999",
             json={"email": "other@example.com"},
         )
         assert resp.status_code == 403
 
-    def test_patch_user_not_found_404(self, client, db):
+    def test_patch_user_not_found_404(self, client: TestClient, db: Mock) -> None:
         with patch("app.routes.users.get_user_management_service") as mock_svc_factory:
             mock_svc = MagicMock()
             mock_svc.update_user.side_effect = ValueError("User not found")
@@ -407,7 +407,7 @@ class TestPartialUpdateUser:
 
 
 class TestUpdateUser:
-    def test_put_own_user_success(self, client, db):
+    def test_put_own_user_success(self, client: TestClient, db: Mock) -> None:
         mock_user = _mock_user(email="updated@example.com")
         with patch("app.routes.users.get_user_management_service") as mock_svc_factory:
             mock_svc = MagicMock()
@@ -421,14 +421,14 @@ class TestUpdateUser:
 
         assert resp.status_code == 200
 
-    def test_put_other_user_as_viewer_403(self, viewer_client, db):
+    def test_put_other_user_as_viewer_403(self, viewer_client: TestClient, db: Mock) -> None:
         resp = viewer_client.put(
             "/v1/users/user-999",
             json={"email": "other@example.com"},
         )
         assert resp.status_code == 403
 
-    def test_put_user_not_found_404(self, client, db):
+    def test_put_user_not_found_404(self, client: TestClient, db: Mock) -> None:
         from app.exceptions import UserNotFoundError
 
         with patch("app.routes.users.get_user_management_service") as mock_svc_factory:
@@ -443,7 +443,7 @@ class TestUpdateUser:
 
         assert resp.status_code == 404
 
-    def test_put_user_internal_error_500(self, client, db):
+    def test_put_user_internal_error_500(self, client: TestClient, db: Mock) -> None:
         with patch("app.routes.users.get_user_management_service") as mock_svc_factory:
             mock_svc = MagicMock()
             mock_svc.update_user.side_effect = RuntimeError("DB error")
@@ -456,7 +456,7 @@ class TestUpdateUser:
 
         assert resp.status_code == 500
 
-    def test_put_admin_can_update_roles(self, client, db):
+    def test_put_admin_can_update_roles(self, client: TestClient, db: Mock) -> None:
         mock_user = _mock_user(roles=["viewer"])
         with patch("app.routes.users.get_user_management_service") as mock_svc_factory:
             mock_svc = MagicMock()
@@ -477,7 +477,7 @@ class TestUpdateUser:
 
 
 class TestRequestPasswordReset:
-    def test_request_reset_success(self, client, db):
+    def test_request_reset_success(self, client: TestClient, db: MagicMock) -> None:
         with patch("app.routes.users.get_user_management_service") as mock_svc_factory:
             mock_svc = MagicMock()
             mock_svc.request_password_reset.return_value = None
@@ -491,7 +491,9 @@ class TestRequestPasswordReset:
         assert resp.status_code == 200
         assert "password reset link" in resp.json()["message"].lower()
 
-    def test_request_reset_user_not_found_still_200(self, client, db):
+    def test_request_reset_user_not_found_still_200(
+        self, client: TestClient, db: MagicMock
+    ) -> None:
         from app.exceptions import UserNotFoundError
 
         with patch("app.routes.users.get_user_management_service") as mock_svc_factory:
@@ -507,7 +509,7 @@ class TestRequestPasswordReset:
         # Should still return 200 to avoid email enumeration
         assert resp.status_code == 200
 
-    def test_request_reset_internal_error_500(self, client, db):
+    def test_request_reset_internal_error_500(self, client: TestClient, db: MagicMock) -> None:
         with patch("app.routes.users.get_user_management_service") as mock_svc_factory:
             mock_svc = MagicMock()
             mock_svc.request_password_reset.side_effect = RuntimeError("SMTP down")
@@ -527,7 +529,7 @@ class TestRequestPasswordReset:
 
 
 class TestConfirmPasswordReset:
-    def test_confirm_reset_success(self, client, db):
+    def test_confirm_reset_success(self, client: TestClient, db: MagicMock) -> None:
         with patch("app.routes.users.get_user_management_service") as mock_svc_factory:
             mock_svc = MagicMock()
             mock_svc.confirm_password_reset.return_value = None
@@ -541,7 +543,7 @@ class TestConfirmPasswordReset:
         assert resp.status_code == 200
         assert "successfully" in resp.json()["message"].lower()
 
-    def test_confirm_reset_invalid_token_400(self, client, db):
+    def test_confirm_reset_invalid_token_400(self, client: TestClient, db: MagicMock) -> None:
         from app.exceptions import ValidationError
 
         with patch("app.routes.users.get_user_management_service") as mock_svc_factory:
@@ -558,7 +560,7 @@ class TestConfirmPasswordReset:
 
         assert resp.status_code == 400
 
-    def test_confirm_reset_internal_error_500(self, client, db):
+    def test_confirm_reset_internal_error_500(self, client: TestClient, db: MagicMock) -> None:
         with patch("app.routes.users.get_user_management_service") as mock_svc_factory:
             mock_svc = MagicMock()
             mock_svc.confirm_password_reset.side_effect = RuntimeError("DB error")
@@ -578,7 +580,7 @@ class TestConfirmPasswordReset:
 
 
 class TestResetUserPassword:
-    def test_reset_own_password_success(self, client, db):
+    def test_reset_own_password_success(self, client: TestClient, db: MagicMock) -> None:
         with patch("app.routes.users.get_user_management_service") as mock_svc_factory:
             mock_svc = MagicMock()
             mock_svc.reset_password.return_value = VALID_PASSWORD
@@ -592,14 +594,14 @@ class TestResetUserPassword:
         assert resp.status_code == 200
         assert resp.json()["user_id"] == "user-123"
 
-    def test_reset_other_user_as_viewer_403(self, viewer_client, db):
+    def test_reset_other_user_as_viewer_403(self, viewer_client: TestClient, db: MagicMock) -> None:
         resp = viewer_client.post(
             "/v1/users/user-999/reset-password",
             json={"new_password": VALID_PASSWORD},
         )
         assert resp.status_code == 403
 
-    def test_reset_password_user_not_found_404(self, client, db):
+    def test_reset_password_user_not_found_404(self, client: TestClient, db: MagicMock) -> None:
         from app.exceptions import UserNotFoundError
 
         with patch("app.routes.users.get_user_management_service") as mock_svc_factory:
@@ -614,7 +616,7 @@ class TestResetUserPassword:
 
         assert resp.status_code == 404
 
-    def test_reset_password_internal_error_500(self, client, db):
+    def test_reset_password_internal_error_500(self, client: TestClient, db: MagicMock) -> None:
         with patch("app.routes.users.get_user_management_service") as mock_svc_factory:
             mock_svc = MagicMock()
             mock_svc.reset_password.side_effect = RuntimeError("DB error")
@@ -634,7 +636,7 @@ class TestResetUserPassword:
 
 
 class TestEnrollMFA:
-    def test_enroll_mfa_success(self, client, db):
+    def test_enroll_mfa_success(self, client: TestClient, db: MagicMock) -> None:
         mock_user = _mock_user()
         with (
             patch("app.routes.users.get_user_management_service") as mock_svc_factory,
@@ -659,7 +661,7 @@ class TestEnrollMFA:
         assert "backup_codes" in data
         assert len(data["backup_codes"]) == 10
 
-    def test_enroll_mfa_internal_error_500(self, client, db):
+    def test_enroll_mfa_internal_error_500(self, client: TestClient, db: MagicMock) -> None:
         with (
             patch("app.routes.users.get_user_management_service") as mock_svc_factory,
             patch("app.routes.users.AuthManager") as mock_auth_cls,
@@ -679,7 +681,7 @@ class TestEnrollMFA:
 
 
 class TestEnableMFA:
-    def test_enable_mfa_success(self, client, db):
+    def test_enable_mfa_success(self, client: TestClient, db: Mock) -> None:
         mock_user = _mock_user(mfa_secret="JBSWY3DPEHPK3PXP", mfa_enabled=False)
         with (
             patch("app.routes.users.get_user_management_service") as mock_svc_factory,
@@ -698,7 +700,7 @@ class TestEnableMFA:
         assert resp.status_code == 200
         assert "enabled" in resp.json()["message"].lower()
 
-    def test_enable_mfa_not_enrolled_400(self, client, db):
+    def test_enable_mfa_not_enrolled_400(self, client: TestClient, db: Mock) -> None:
         mock_user = _mock_user(mfa_secret=None)
         with patch("app.routes.users.get_user_management_service") as mock_svc_factory:
             mock_svc = MagicMock()
@@ -710,7 +712,7 @@ class TestEnableMFA:
         assert resp.status_code == 400
         assert "enroll" in resp.json()["error"]["message"].lower()
 
-    def test_enable_mfa_invalid_code_400(self, client, db):
+    def test_enable_mfa_invalid_code_400(self, client: TestClient, db: Mock) -> None:
         mock_user = _mock_user(mfa_secret="JBSWY3DPEHPK3PXP", mfa_enabled=False)
         with (
             patch("app.routes.users.get_user_management_service") as mock_svc_factory,
@@ -729,7 +731,7 @@ class TestEnableMFA:
         assert resp.status_code == 400
         assert "invalid" in resp.json()["error"]["message"].lower()
 
-    def test_enable_mfa_internal_error_500(self, client, db):
+    def test_enable_mfa_internal_error_500(self, client: TestClient, db: Mock) -> None:
         with patch("app.routes.users.get_user_management_service") as mock_svc_factory:
             mock_svc = MagicMock()
             mock_svc.get_user.side_effect = RuntimeError("DB error")
@@ -746,7 +748,7 @@ class TestEnableMFA:
 
 
 class TestDisableMFA:
-    def test_disable_mfa_success(self, client, db):
+    def test_disable_mfa_success(self, client: TestClient, db: Mock) -> None:
         mock_user = _mock_user(mfa_enabled=True, password_hash="hashed")
         with (
             patch("app.routes.users.get_user_management_service") as mock_svc_factory,
@@ -765,7 +767,7 @@ class TestDisableMFA:
         assert resp.status_code == 200
         assert "disabled" in resp.json()["message"].lower()
 
-    def test_disable_mfa_not_enabled_400(self, client, db):
+    def test_disable_mfa_not_enabled_400(self, client: TestClient, db: Mock) -> None:
         mock_user = _mock_user(mfa_enabled=False)
         with patch("app.routes.users.get_user_management_service") as mock_svc_factory:
             mock_svc = MagicMock()
@@ -777,7 +779,7 @@ class TestDisableMFA:
         assert resp.status_code == 400
         assert "not enabled" in resp.json()["error"]["message"].lower()
 
-    def test_disable_mfa_wrong_password_400(self, client, db):
+    def test_disable_mfa_wrong_password_400(self, client: TestClient, db: Mock) -> None:
         mock_user = _mock_user(mfa_enabled=True, password_hash="hashed")
         with (
             patch("app.routes.users.get_user_management_service") as mock_svc_factory,
@@ -796,7 +798,7 @@ class TestDisableMFA:
         assert resp.status_code == 400
         assert "invalid password" in resp.json()["error"]["message"].lower()
 
-    def test_disable_mfa_internal_error_500(self, client, db):
+    def test_disable_mfa_internal_error_500(self, client: TestClient, db: MagicMock) -> None:
         with patch("app.routes.users.get_user_management_service") as mock_svc_factory:
             mock_svc = MagicMock()
             mock_svc.get_user.side_effect = RuntimeError("DB error")
@@ -813,7 +815,7 @@ class TestDisableMFA:
 
 
 class TestVerifyMFABackupCode:
-    def test_verify_backup_code_success(self, client, db):
+    def test_verify_backup_code_success(self, client: TestClient, db: MagicMock) -> None:
         import hashlib
 
         code = "ABCDEF12"  # 8 alphanumeric chars
@@ -829,7 +831,9 @@ class TestVerifyMFABackupCode:
         assert resp.status_code == 200
         assert "verified" in resp.json()["message"].lower()
 
-    def test_verify_backup_code_mfa_not_enabled_400(self, client, db):
+    def test_verify_backup_code_mfa_not_enabled_400(
+        self, client: TestClient, db: MagicMock
+    ) -> None:
         mock_user = _mock_user(mfa_enabled=False)
         with patch("app.routes.users.get_user_management_service") as mock_svc_factory:
             mock_svc = MagicMock()
@@ -840,7 +844,7 @@ class TestVerifyMFABackupCode:
 
         assert resp.status_code == 400
 
-    def test_verify_backup_code_no_codes_400(self, client, db):
+    def test_verify_backup_code_no_codes_400(self, client: TestClient, db: MagicMock) -> None:
         mock_user = _mock_user(mfa_enabled=True, mfa_backup_codes=None)
         with patch("app.routes.users.get_user_management_service") as mock_svc_factory:
             mock_svc = MagicMock()
@@ -851,7 +855,7 @@ class TestVerifyMFABackupCode:
 
         assert resp.status_code == 400
 
-    def test_verify_backup_code_invalid_code_400(self, client, db):
+    def test_verify_backup_code_invalid_code_400(self, client: TestClient, db: MagicMock) -> None:
         import hashlib
 
         hashed = hashlib.sha256("VALIDCOD".encode()).hexdigest()
@@ -866,7 +870,7 @@ class TestVerifyMFABackupCode:
         assert resp.status_code == 400
         assert "invalid backup code" in resp.json()["error"]["message"].lower()
 
-    def test_verify_backup_code_internal_error_500(self, client, db):
+    def test_verify_backup_code_internal_error_500(self, client: TestClient, db: MagicMock) -> None:
         with patch("app.routes.users.get_user_management_service") as mock_svc_factory:
             mock_svc = MagicMock()
             mock_svc.get_user.side_effect = RuntimeError("DB error")
@@ -883,7 +887,7 @@ class TestVerifyMFABackupCode:
 
 
 class TestRegenerateMFABackupCodes:
-    def test_regenerate_backup_codes_success(self, client, db):
+    def test_regenerate_backup_codes_success(self, client: TestClient, db: Mock) -> None:
         mock_user = _mock_user(mfa_enabled=True)
         with patch("app.routes.users.get_user_management_service") as mock_svc_factory:
             mock_svc = MagicMock()
@@ -897,7 +901,9 @@ class TestRegenerateMFABackupCodes:
         assert "backup_codes" in data
         assert len(data["backup_codes"]) == 10
 
-    def test_regenerate_backup_codes_mfa_not_enabled_400(self, client, db):
+    def test_regenerate_backup_codes_mfa_not_enabled_400(
+        self, client: TestClient, db: Mock
+    ) -> None:
         mock_user = _mock_user(mfa_enabled=False)
         with patch("app.routes.users.get_user_management_service") as mock_svc_factory:
             mock_svc = MagicMock()
@@ -909,7 +915,7 @@ class TestRegenerateMFABackupCodes:
         assert resp.status_code == 400
         assert "must be enabled" in resp.json()["error"]["message"].lower()
 
-    def test_regenerate_backup_codes_internal_error_500(self, client, db):
+    def test_regenerate_backup_codes_internal_error_500(self, client: TestClient, db: Mock) -> None:
         with patch("app.routes.users.get_user_management_service") as mock_svc_factory:
             mock_svc = MagicMock()
             mock_svc.get_user.side_effect = RuntimeError("DB error")
@@ -926,7 +932,7 @@ class TestRegenerateMFABackupCodes:
 
 
 class TestDeleteUser:
-    def test_delete_user_success(self, client, db):
+    def test_delete_user_success(self, client: TestClient, db: Mock) -> None:
         with patch("app.routes.users.get_user_management_service") as mock_svc_factory:
             mock_svc = MagicMock()
             mock_svc.delete_user.return_value = True
@@ -936,7 +942,7 @@ class TestDeleteUser:
 
         assert resp.status_code == 204
 
-    def test_delete_user_not_found_404(self, client, db):
+    def test_delete_user_not_found_404(self, client: TestClient, db: Mock) -> None:
         # Note: due to the route's exception handling, when delete_user returns False,
         # the HTTPException(404) is caught by the outer except and becomes 500.
         # This tests the actual behavior of the route.
@@ -950,7 +956,7 @@ class TestDeleteUser:
         # The route catches the HTTPException(404) and re-raises as 500
         assert resp.status_code == 500
 
-    def test_delete_user_internal_error_500(self, client, db):
+    def test_delete_user_internal_error_500(self, client: TestClient, db: Mock) -> None:
         with patch("app.routes.users.get_user_management_service") as mock_svc_factory:
             mock_svc = MagicMock()
             mock_svc.delete_user.side_effect = Exception("DB error")

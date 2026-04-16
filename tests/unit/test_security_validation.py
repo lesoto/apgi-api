@@ -126,7 +126,7 @@ class TestSecurityValidationMiddleware:
         data = {
             "username": "testuser",
             "email": "test@example.com",
-            "password": "SecurePassword123",
+            "password": "SecurePassword123!",
         }
         result = middleware._validate_registration_data(data)
         assert result["is_valid"] is True
@@ -253,7 +253,7 @@ class TestSecurityValidationMiddleware:
 
         assert exc_info.value.status_code == 422
         error_detail = str(exc_info.value.detail)
-        assert "Username contains invalid characters" in error_detail
+        assert "username contains invalid characters" in error_detail.lower()
 
     def test_middleware_initialization_enabled(self, mock_app):
         """Test middleware initialization with enabled validation."""
@@ -568,7 +568,7 @@ class TestValidateRequestAsync:
             return_value={"username": "testuser", "password": "password123"}
         )
 
-        result = await _comp_middleware._validate_request(mock_request)
+        result = await _comp_middleware._validate_request(mock_request, "127.0.0.1")
         assert result["is_valid"] is True
         assert result["error_message"] == ""
 
@@ -581,7 +581,7 @@ class TestValidateRequestAsync:
         mock_request.headers = Headers({"content-type": "application/json"})
         mock_request.json = AsyncMock(return_value={"password": "password123"})
 
-        result = await _comp_middleware._validate_request(mock_request)
+        result = await _comp_middleware._validate_request(mock_request, "127.0.0.1")
         assert result["is_valid"] is False
         assert "Username is required" in result["error_message"]
 
@@ -596,7 +596,7 @@ class TestValidateRequestAsync:
             return_value={"username": "admin'--", "password": "password123"}
         )
 
-        result = await _comp_middleware._validate_request(mock_request)
+        result = await _comp_middleware._validate_request(mock_request, "127.0.0.1")
         assert result["is_valid"] is False
         assert "invalid characters" in result["error_message"]
 
@@ -615,7 +615,7 @@ class TestValidateRequestAsync:
             }
         )
 
-        result = await _comp_middleware._validate_request(mock_request)
+        result = await _comp_middleware._validate_request(mock_request, "127.0.0.1")
         assert result["is_valid"] is True
 
     @pytest.mark.asyncio
@@ -627,7 +627,7 @@ class TestValidateRequestAsync:
         mock_request.headers = Headers({"content-type": "application/json"})
         mock_request.json = AsyncMock(return_value={"bio": "<script>alert('xss')</script>"})
 
-        result = await _comp_middleware._validate_request(mock_request)
+        result = await _comp_middleware._validate_request(mock_request, "127.0.0.1")
         assert result["is_valid"] is False
         assert "potentially dangerous content" in result["error_message"]
 
@@ -640,7 +640,7 @@ class TestValidateRequestAsync:
         mock_request.headers = Headers({})
         mock_request.query_params = {"search": "admin; DROP TABLE users"}
 
-        result = await _comp_middleware._validate_request(mock_request)
+        result = await _comp_middleware._validate_request(mock_request, "127.0.0.1")
         assert result["is_valid"] is False
 
     @pytest.mark.asyncio
@@ -684,7 +684,7 @@ class TestValidateRequestAsync:
         mock_request.headers = Headers({"content-type": "application/json"})
         mock_request.json = AsyncMock(side_effect=Exception("Invalid JSON"))
 
-        result = await _comp_middleware._validate_request(mock_request)
+        result = await _comp_middleware._validate_request(mock_request, "127.0.0.1")
         # Should return is_valid: False due to exception
         assert result["is_valid"] is False
 
@@ -844,7 +844,7 @@ class TestFormDataHandling:
         mock_request.form = AsyncMock(return_value=form_data)
         mock_request.json = AsyncMock(side_effect=Exception("Not JSON"))
 
-        result = await middleware._validate_request(mock_request)
+        result = await middleware._validate_request(mock_request, "127.0.0.1")
         assert result["is_valid"] is True
 
     @pytest.mark.asyncio
@@ -861,7 +861,7 @@ class TestFormDataHandling:
         mock_request.form = AsyncMock(return_value=None)
         mock_request.json = AsyncMock(side_effect=Exception("Not JSON"))
 
-        result = await middleware._validate_request(mock_request)
+        result = await middleware._validate_request(mock_request, "127.0.0.1")
         # Should fail because username is missing
         assert result["is_valid"] is False
 
@@ -879,7 +879,7 @@ class TestFormDataHandling:
         mock_request.form = AsyncMock(side_effect=Exception("Form parsing error"))
         mock_request.json = AsyncMock(side_effect=Exception("Not JSON"))
 
-        result = await middleware._validate_request(mock_request)
+        result = await middleware._validate_request(mock_request, "127.0.0.1")
         # Should handle exception gracefully
         assert result["is_valid"] is False
 
@@ -895,7 +895,7 @@ class TestFormDataHandling:
         mock_request.headers = Headers({})
         mock_request.query_params = None
 
-        result = await middleware._validate_request(mock_request)
+        result = await middleware._validate_request(mock_request, "127.0.0.1")
         # Should pass with empty data
         assert result["is_valid"] is True
 
@@ -942,14 +942,14 @@ class TestNonDictDataHandling:
         data = {"username": "test", "email": 123, "password": "SecurePass123"}
         result = middleware._validate_registration_data(data)
         assert result["is_valid"] is False
-        assert "Email is required" in result["error_message"]
+        assert "email must be a string" in result["error_message"].lower()
 
     def test_validate_registration_data_non_string_password(self, middleware):
         """Test registration validation with non-string password."""
         data = {"username": "test", "email": "test@example.com", "password": 123}
         result = middleware._validate_registration_data(data)
         assert result["is_valid"] is False
-        assert "Password is required" in result["error_message"]
+        assert "password must be a string" in result["error_message"].lower()
 
     def test_validate_user_profile_data_non_dict(self, middleware):
         """Test profile validation with non-dict data."""
@@ -1013,7 +1013,7 @@ class TestPathMatchingAndRouting:
         mock_request.headers = Headers({"content-type": "application/json"})
         mock_request.json = AsyncMock(return_value={"username": "test", "password": "pass"})
 
-        result = await middleware._validate_request(mock_request)
+        result = await middleware._validate_request(mock_request, "127.0.0.1")
         assert result["is_valid"] is True
 
     @pytest.mark.asyncio
@@ -1030,11 +1030,11 @@ class TestPathMatchingAndRouting:
             return_value={
                 "username": "test",
                 "email": "test@example.com",
-                "password": "SecurePass123",
+                "password": "SecurePass123!",
             }
         )
 
-        result = await middleware._validate_request(mock_request)
+        result = await middleware._validate_request(mock_request, "127.0.0.1")
         assert result["is_valid"] is True
 
     @pytest.mark.asyncio
@@ -1049,7 +1049,7 @@ class TestPathMatchingAndRouting:
         mock_request.headers = Headers({"content-type": "application/json"})
         mock_request.json = AsyncMock(return_value={"name": "Test User"})
 
-        result = await middleware._validate_request(mock_request)
+        result = await middleware._validate_request(mock_request, "127.0.0.1")
         assert result["is_valid"] is True
 
     @pytest.mark.asyncio
@@ -1064,7 +1064,7 @@ class TestPathMatchingAndRouting:
         mock_request.headers = Headers({})
         mock_request.query_params = {}
 
-        result = await middleware._validate_request(mock_request)
+        result = await middleware._validate_request(mock_request, "127.0.0.1")
         # Should use generic validation, not profile validation
         assert result["is_valid"] is True
 
@@ -1080,7 +1080,7 @@ class TestPathMatchingAndRouting:
         mock_request.headers = Headers({"content-type": "application/json"})
         mock_request.json = AsyncMock(return_value={"password": "NewSecurePass123"})
 
-        result = await middleware._validate_request(mock_request)
+        result = await middleware._validate_request(mock_request, "127.0.0.1")
         assert result["is_valid"] is True
 
     @pytest.mark.asyncio
@@ -1095,7 +1095,7 @@ class TestPathMatchingAndRouting:
         mock_request.headers = Headers({"content-type": "application/json"})
         mock_request.json = AsyncMock(return_value={"password": "short"})
 
-        result = await middleware._validate_request(mock_request)
+        result = await middleware._validate_request(mock_request, "127.0.0.1")
         assert result["is_valid"] is False
         assert "too short" in result["error_message"]
 
@@ -1111,7 +1111,7 @@ class TestPathMatchingAndRouting:
         mock_request.headers = Headers({"content-type": "application/json"})
         mock_request.json = AsyncMock(return_value={"field": "safe value"})
 
-        result = await middleware._validate_request(mock_request)
+        result = await middleware._validate_request(mock_request, "127.0.0.1")
         assert result["is_valid"] is True
 
 
@@ -1185,7 +1185,7 @@ class TestRegistrationDataValidation:
             "test@domain",
         ]
         for username in valid_usernames:
-            data = {"username": username, "email": "test@example.com", "password": "SecurePass123"}
+            data = {"username": username, "email": "test@example.com", "password": "SecurePass123!"}
             result = middleware._validate_registration_data(data)
             assert result["is_valid"] is True, f"Username '{username}' should be valid"
 
@@ -1397,7 +1397,7 @@ class TestExceptionHandling:
         mock_request.headers = Headers({"content-type": "application/json"})
         mock_request.json = AsyncMock(return_value={"username": "test"})
 
-        result = await middleware._validate_request(mock_request)
+        result = await middleware._validate_request(mock_request, "127.0.0.1")
         assert result["is_valid"] is False
         assert "Security validation failed" in result["error_message"]
 
@@ -1413,7 +1413,7 @@ class TestExceptionHandling:
         mock_request.headers = MagicMock(side_effect=RuntimeError("Headers access error"))
         mock_request.headers.get = MagicMock(side_effect=RuntimeError("Headers access error"))
 
-        result = await middleware._validate_request(mock_request)
+        result = await middleware._validate_request(mock_request, "127.0.0.1")
         assert result["is_valid"] is False
         assert "Security validation failed" in result["error_message"]
 
@@ -1455,4 +1455,4 @@ class TestRegistrationPasswordValidation:
         data = {"username": "testuser", "email": "test@example.com", "password": 12345}
         result = middleware._validate_registration_data(data)
         assert result["is_valid"] is False
-        assert "Password is required" in result["error_message"]
+        assert "password must be a string" in result["error_message"].lower()

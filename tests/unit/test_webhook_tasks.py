@@ -1,5 +1,7 @@
 """Test webhook tasks."""
 
+from __future__ import annotations
+
 import pytest
 from unittest.mock import MagicMock, patch, AsyncMock
 import asyncio
@@ -10,7 +12,7 @@ from app.tasks.webhook_tasks import process_pending_webhooks, _process_webhooks
 class TestWebhookTasks:
     """Test webhook tasks functionality."""
 
-    def test_process_pending_webhooks_task_exists(self):
+    def test_process_pending_webhooks_task_exists(self) -> None:
         """Test that the Celery task is properly defined."""
         assert callable(process_pending_webhooks)
         # Celery tasks have a 'run' method or are callable directly
@@ -18,7 +20,9 @@ class TestWebhookTasks:
 
     @patch("app.tasks.webhook_tasks.WebhookManager")
     @patch("app.tasks.webhook_tasks.SessionLocal")
-    def test_process_pending_webhooks_success(self, mock_session_local, mock_webhook_manager):
+    def test_process_pending_webhooks_success(
+        self, mock_session_local: MagicMock, mock_webhook_manager: MagicMock
+    ) -> None:
         """Test successful webhook processing."""
         # Setup mocks
         mock_db = MagicMock()
@@ -40,7 +44,9 @@ class TestWebhookTasks:
 
     @patch("app.tasks.webhook_tasks.WebhookManager")
     @patch("app.tasks.webhook_tasks.SessionLocal")
-    def test_process_pending_webhooks_exception(self, mock_session_local, mock_webhook_manager):
+    def test_process_pending_webhooks_exception(
+        self, mock_session_local: MagicMock, mock_webhook_manager: MagicMock
+    ) -> None:
         """Test webhook processing with exception."""
         # Setup mocks
         mock_db = MagicMock()
@@ -63,7 +69,9 @@ class TestWebhookTasks:
 
     @patch("app.tasks.webhook_tasks.WebhookManager")
     @patch("app.tasks.webhook_tasks.SessionLocal")
-    def test_process_pending_webhooks_logging(self, mock_session_local, mock_webhook_manager):
+    def test_process_pending_webhooks_logging(
+        self, mock_session_local: MagicMock, mock_webhook_manager: MagicMock
+    ) -> None:
         """Test that webhook processing is properly logged."""
         # Setup mocks
         mock_db = MagicMock()
@@ -81,7 +89,9 @@ class TestWebhookTasks:
 
     @patch("app.tasks.webhook_tasks.WebhookManager")
     @patch("app.tasks.webhook_tasks.SessionLocal")
-    def test_process_pending_webhooks_error_logging(self, mock_session_local, mock_webhook_manager):
+    def test_process_pending_webhooks_error_logging(
+        self, mock_session_local: MagicMock, mock_webhook_manager: MagicMock
+    ) -> None:
         """Test that webhook processing errors are properly logged."""
         # Setup mocks
         mock_db = MagicMock()
@@ -103,7 +113,9 @@ class TestWebhookTasks:
 
     @patch("app.tasks.webhook_tasks.WebhookManager")
     @patch("app.tasks.webhook_tasks.SessionLocal")
-    def test_process_webhooks_closes_database(self, mock_session_local, mock_webhook_manager):
+    def test_process_webhooks_closes_database(
+        self, mock_session_local: MagicMock, mock_webhook_manager: MagicMock
+    ) -> None:
         """Test that database connection is always closed."""
         # Setup mocks
         mock_db = MagicMock()
@@ -121,7 +133,9 @@ class TestWebhookTasks:
 
     @patch("app.tasks.webhook_tasks.WebhookManager")
     @patch("app.tasks.webhook_tasks.SessionLocal")
-    def test_process_webhooks_manager_parameters(self, mock_session_local, mock_webhook_manager):
+    def test_process_webhooks_manager_parameters(
+        self, mock_session_local: MagicMock, mock_webhook_manager: MagicMock
+    ) -> None:
         """Test that WebhookManager is called with correct parameters."""
         # Setup mocks
         mock_db = MagicMock()

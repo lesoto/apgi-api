@@ -182,7 +182,9 @@ WantedBy=multi-user.target
 
 ```bash
 # Check API health every 5 minutes
-*/5 * * * * /opt/apgi/scripts/health_check.sh --quiet || echo "API health check failed" | mail -s "APGI API Alert" admin@example.com
+*/5 * * * * /opt/apgi/scripts/health_check.sh --quiet || \
+  echo "API health check failed" | \
+  mail -s "APGI API Alert" admin@example.com
 ```
 
 ## Troubleshooting

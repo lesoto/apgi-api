@@ -8,6 +8,7 @@ Module-level patches (applied before any test file is imported by pytest):
 """
 
 import sys
+from typing import Any, Callable, Generator
 from unittest.mock import MagicMock, patch
 import pytest
 
@@ -37,7 +38,7 @@ if "stripe" not in sys.modules:
 
 
 @pytest.fixture(scope="function")
-def mock_psycopg2():
+def mock_psycopg2() -> Generator[MagicMock, None, None]:
     """Patch psycopg2 and sub-modules into sys.modules before any test imports them."""
     mock = MagicMock()
     mock.extensions = MagicMock()
@@ -59,7 +60,7 @@ def mock_psycopg2():
 
 
 @pytest.fixture(autouse=True, scope="function")
-def mock_opentelemetry():
+def mock_opentelemetry() -> Generator[dict[str, MagicMock], None, None]:
     """Patch all opentelemetry sub-modules into sys.modules."""
     otel_modules = [
         "opentelemetry",
@@ -98,7 +99,7 @@ def mock_opentelemetry():
 
 
 @pytest.fixture(autouse=True, scope="function")
-def mock_celery_app():
+def mock_celery_app() -> Generator[MagicMock, None, None]:
     """Patch app.celery_app into sys.modules to prevent broker connection at import time."""
     mock = MagicMock()
     sys.modules["app.celery_app"] = mock
@@ -109,12 +110,14 @@ def mock_celery_app():
 
 
 @pytest.fixture(autouse=True, scope="function")
-def mock_shared_task():
+def mock_shared_task() -> Generator[None, None, None]:
     """Patch celery.shared_task to return a decorator that preserves the function."""
 
-    def shared_task_decorator(name=None, **kwargs):
-        def decorator(func):
-            func.name = name or func.__name__
+    def shared_task_decorator(
+        name: str | None = None, **kwargs: Any
+    ) -> Callable[[Callable[..., Any]], Callable[..., Any]]:
+        def decorator(func: Callable[..., Any]) -> Callable[..., Any]:
+            func.name = name or func.__name__  # type: ignore
             return func
 
         return decorator

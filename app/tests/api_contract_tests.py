@@ -14,12 +14,14 @@ from app.main import app
 class APIContractTester:
     """Comprehensive API contract testing suite."""
 
-    def __init__(self, client: TestClient):
+    def __init__(self, client: TestClient) -> None:
         self.client = client
-        self.auth_token = None
-        self.session_id = None
+        self.auth_token: str | None = None
+        self.session_id: str | None = None
 
-    def authenticate(self, username: str = "test@example.com", password: str = "testpassword"):
+    def authenticate(
+        self, username: str = "test@example.com", password: str = "testpassword"
+    ) -> None:
         """Authenticate and get access token."""
         response = self.client.post(
             "/v1/auth/login", json={"username": username, "password": password}
@@ -27,15 +29,14 @@ class APIContractTester:
         assert response.status_code == 200
         data = response.json()
         self.auth_token = data["access_token"]
-        return self.auth_token
 
-    def get_auth_headers(self):
+    def get_auth_headers(self) -> dict[str, str]:
         """Get authorization headers."""
         if self.auth_token:
             return {"Authorization": f"Bearer {self.auth_token}"}
         return {}
 
-    def test_health_endpoints(self):
+    def test_health_endpoints(self) -> None:
         """Test health check endpoints."""
         # Health endpoint
         response = self.client.get("/health")
@@ -52,7 +53,7 @@ class APIContractTester:
         response = self.client.get("/health/live")
         assert response.status_code == 200
 
-    def test_root_endpoint(self):
+    def test_root_endpoint(self) -> None:
         """Test root endpoint."""
         response = self.client.get("/")
         assert response.status_code == 200
@@ -61,7 +62,7 @@ class APIContractTester:
         assert "version" in data
         assert "description" in data
 
-    def test_docs_endpoints(self):
+    def test_docs_endpoints(self) -> None:
         """Test documentation endpoints."""
         response = self.client.get("/docs")
         assert response.status_code == 200
@@ -76,7 +77,7 @@ class APIContractTester:
         assert "info" in data
         assert "paths" in data
 
-    def test_auth_endpoints(self):
+    def test_auth_endpoints(self) -> None:
         """Test authentication endpoints."""
         # Login with invalid credentials
         response = self.client.post(
@@ -98,7 +99,7 @@ class APIContractTester:
             # Authentication may not be set up for testing
             pass
 
-    def test_sessions_endpoints(self):
+    def test_sessions_endpoints(self) -> None:
         """Test session management endpoints."""
         headers = self.get_auth_headers()
 
@@ -120,7 +121,7 @@ class APIContractTester:
         else:
             assert response.status_code == 401
 
-    def test_tasks_endpoints(self):
+    def test_tasks_endpoints(self) -> None:
         """Test task management endpoints."""
         headers = self.get_auth_headers()
 
@@ -146,7 +147,7 @@ class APIContractTester:
             )
             assert response.status_code in [202, 400, 403, 422]
 
-    def test_metrics_endpoints(self):
+    def test_metrics_endpoints(self) -> None:
         """Test metrics endpoints."""
         headers = self.get_auth_headers()
 
@@ -163,7 +164,7 @@ class APIContractTester:
         else:
             assert response.status_code == 401
 
-    def test_error_responses(self):
+    def test_error_responses(self) -> None:
         """Test error response formats."""
         # Invalid endpoint
         response = self.client.get("/invalid/endpoint")
@@ -175,7 +176,7 @@ class APIContractTester:
         response = self.client.post("/health")
         assert response.status_code == 405
 
-    def test_rate_limiting(self):
+    def test_rate_limiting(self) -> None:
         """Test rate limiting functionality."""
         # Make multiple requests to trigger rate limiting
         for i in range(70):  # Exceed default limit of 60
@@ -188,7 +189,7 @@ class APIContractTester:
                 break
             assert response.status_code == 200
 
-    def test_response_headers(self):
+    def test_response_headers(self) -> None:
         """Test that responses include required headers."""
         response = self.client.get("/health")
         assert "X-API-Version" in response.headers
@@ -196,7 +197,7 @@ class APIContractTester:
         assert "X-RateLimit-Remaining" in response.headers
         assert "X-RateLimit-Reset" in response.headers
 
-    def run_full_test_suite(self):
+    def run_full_test_suite(self) -> None:
         """Run the complete API contract test suite."""
         print("Running API Contract Test Suite...")
 
@@ -241,23 +242,23 @@ class APIContractTester:
 
 # Pytest fixtures and tests
 @pytest.fixture
-def api_client():
+def api_client() -> TestClient:
     """Create test client."""
     return TestClient(app)
 
 
 @pytest.fixture
-def contract_tester(api_client):
+def contract_tester(api_client: TestClient) -> "APIContractTester":
     """Create API contract tester."""
     return APIContractTester(api_client)
 
 
-def test_api_contracts(contract_tester):
+def test_api_contracts(contract_tester: "APIContractTester") -> None:
     """Run comprehensive API contract tests."""
     contract_tester.run_full_test_suite()
 
 
-def test_individual_endpoints(contract_tester):
+def test_individual_endpoints(contract_tester: "APIContractTester") -> None:
     """Test individual endpoints for detailed validation."""
     # Health endpoints
     contract_tester.test_health_endpoints()

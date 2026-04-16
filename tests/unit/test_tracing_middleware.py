@@ -1,5 +1,7 @@
 """Tests for tracing middleware."""
 
+from __future__ import annotations
+
 from unittest.mock import MagicMock, patch
 import sys
 import pytest
@@ -27,7 +29,7 @@ from app.middleware.tracing import (
 
 class TestConfigureDistributedTracing:
     @patch("app.middleware.tracing.OPENTELEMETRY_AVAILABLE", False)
-    def test_configure_when_opentelemetry_not_available(self):
+    def test_configure_when_opentelemetry_not_available(self) -> None:
         configure_distributed_tracing()
 
     @patch("app.middleware.tracing.OPENTELEMETRY_AVAILABLE", True)
@@ -40,14 +42,14 @@ class TestConfigureDistributedTracing:
     @patch("app.middleware.tracing.RedisInstrumentor")
     def test_configure_with_console_exporter(
         self,
-        mock_redis_inst,
-        mock_sqlalchemy_inst,
-        mock_fastapi_inst,
-        mock_batch_processor,
-        mock_resource,
-        mock_tracer_provider,
-        mock_trace,
-    ):
+        mock_redis_inst: MagicMock,
+        mock_sqlalchemy_inst: MagicMock,
+        mock_fastapi_inst: MagicMock,
+        mock_batch_processor: MagicMock,
+        mock_resource: MagicMock,
+        mock_tracer_provider: MagicMock,
+        mock_trace: MagicMock,
+    ) -> None:
         mock_resource.create.return_value = MagicMock()
         mock_trace.get_tracer_provider.return_value = MagicMock()
         configure_distributed_tracing(
@@ -57,7 +59,7 @@ class TestConfigureDistributedTracing:
 
 
 class TestServerRequestHook:
-    def test_hook_with_route_info(self):
+    def test_hook_with_route_info(self) -> None:
         mock_span = MagicMock()
         mock_span.is_recording.return_value = True
         mock_scope = MagicMock()
@@ -71,7 +73,7 @@ class TestServerRequestHook:
 
 
 class TestClientRequestHook:
-    def test_hook_adds_method_and_url(self):
+    def test_hook_adds_method_and_url(self) -> None:
         mock_span = MagicMock()
         mock_span.is_recording.return_value = True
         _client_request_hook(mock_span, "GET", "http://example.com")
@@ -79,7 +81,7 @@ class TestClientRequestHook:
 
 
 class TestClientResponseHook:
-    def test_hook_adds_response_complete(self):
+    def test_hook_adds_response_complete(self) -> None:
         mock_span = MagicMock()
         mock_span.is_recording.return_value = True
         _client_response_hook(mock_span, {}, "body")
@@ -89,7 +91,7 @@ class TestClientResponseHook:
 class TestInstrumentApplication:
     @patch("app.middleware.tracing.OPENTELEMETRY_AVAILABLE", False)
     @patch("app.middleware.tracing.logger")
-    def test_instrument_when_opentelemetry_not_available(self, mock_logger):
+    def test_instrument_when_opentelemetry_not_available(self, mock_logger: MagicMock) -> None:
         instrument_application()
         mock_logger.warning.assert_called_once()
 
@@ -106,15 +108,15 @@ class TestConfigureDistributedTracingSuccessPath:
     @patch("app.middleware.tracing.logger")
     def test_configure_logs_success_message(
         self,
-        mock_logger,
-        mock_redis_inst,
-        mock_sqlalchemy_inst,
-        mock_fastapi_inst,
-        mock_batch_processor,
-        mock_resource,
-        mock_tracer_provider,
-        mock_trace,
-    ):
+        mock_logger: MagicMock,
+        mock_redis_inst: MagicMock,
+        mock_sqlalchemy_inst: MagicMock,
+        mock_fastapi_inst: MagicMock,
+        mock_batch_processor: MagicMock,
+        mock_resource: MagicMock,
+        mock_tracer_provider: MagicMock,
+        mock_trace: MagicMock,
+    ) -> None:
         mock_resource.create.return_value = MagicMock()
         mock_trace.get_tracer_provider.return_value = MagicMock()
         configure_distributed_tracing(
@@ -127,7 +129,7 @@ class TestConfigureDistributedTracingSuccessPath:
 
 
 class TestModuleLevelImports:
-    def test_jaeger_exporter_import_failure_handling(self):
+    def test_jaeger_exporter_import_failure_handling(self) -> None:
         import app.middleware.tracing as tracing_module
 
         assert hasattr(tracing_module, "JAEGER_EXPORTER_AVAILABLE")
@@ -151,17 +153,17 @@ class TestConfigureDistributedTracingWithJaeger:
     @patch("app.middleware.tracing.RedisInstrumentor")
     @patch("app.middleware.tracing.logger")
     def test_configure_with_jaeger_endpoint(
-        self,
-        mock_logger,
-        mock_redis_inst,
-        mock_sqlalchemy_inst,
-        mock_fastapi_inst,
-        mock_jaeger_exporter,
-        mock_batch_processor,
-        mock_resource,
-        mock_tracer_provider,
-        mock_trace,
-    ):
+        self: "TestConfigureDistributedTracingWithJaeger",
+        mock_logger: MagicMock,
+        mock_redis_inst: MagicMock,
+        mock_sqlalchemy_inst: MagicMock,
+        mock_fastapi_inst: MagicMock,
+        mock_jaeger_exporter: MagicMock,
+        mock_batch_processor: MagicMock,
+        mock_resource: MagicMock,
+        mock_tracer_provider: MagicMock,
+        mock_trace: MagicMock,
+    ) -> None:
         """Test configuration with Jaeger endpoint."""
         mock_resource.create.return_value = MagicMock()
         mock_tracer_provider_instance = MagicMock()
@@ -188,17 +190,17 @@ class TestConfigureDistributedTracingWithJaeger:
     @patch("app.middleware.tracing.RedisInstrumentor")
     @patch("app.middleware.tracing.logger")
     def test_configure_with_jaeger_endpoint_with_port(
-        self,
-        mock_logger,
-        mock_redis_inst,
-        mock_sqlalchemy_inst,
-        mock_fastapi_inst,
-        mock_jaeger_exporter,
-        mock_batch_processor,
-        mock_resource,
-        mock_tracer_provider,
-        mock_trace,
-    ):
+        self: "TestConfigureDistributedTracingWithJaeger",
+        mock_logger: MagicMock,
+        mock_redis_inst: MagicMock,
+        mock_sqlalchemy_inst: MagicMock,
+        mock_fastapi_inst: MagicMock,
+        mock_jaeger_exporter: MagicMock,
+        mock_batch_processor: MagicMock,
+        mock_resource: MagicMock,
+        mock_tracer_provider: MagicMock,
+        mock_trace: MagicMock,
+    ) -> None:
         """Test configuration with Jaeger endpoint including port."""
         mock_resource.create.return_value = MagicMock()
         mock_tracer_provider_instance = MagicMock()
@@ -227,16 +229,16 @@ class TestConfigureDistributedTracingWithJaeger:
     @patch("app.middleware.tracing.RedisInstrumentor")
     @patch("app.middleware.tracing.logger")
     def test_configure_with_jaeger_endpoint_not_available(
-        self,
-        mock_logger,
-        mock_redis_inst,
-        mock_sqlalchemy_inst,
-        mock_fastapi_inst,
-        mock_batch_processor,
-        mock_resource,
-        mock_tracer_provider,
-        mock_trace,
-    ):
+        self: "TestConfigureDistributedTracingWithJaeger",
+        mock_logger: MagicMock,
+        mock_redis_inst: MagicMock,
+        mock_sqlalchemy_inst: MagicMock,
+        mock_fastapi_inst: MagicMock,
+        mock_batch_processor: MagicMock,
+        mock_resource: MagicMock,
+        mock_tracer_provider: MagicMock,
+        mock_trace: MagicMock,
+    ) -> None:
         """Test configuration when Jaeger endpoint is configured but exporter not available."""
         mock_resource.create.return_value = MagicMock()
         mock_tracer_provider_instance = MagicMock()
@@ -267,17 +269,17 @@ class TestConfigureDistributedTracingWithOTLP:
     @patch("app.middleware.tracing.RedisInstrumentor")
     @patch("app.middleware.tracing.logger")
     def test_configure_with_otlp_endpoint(
-        self,
-        mock_logger,
-        mock_redis_inst,
-        mock_sqlalchemy_inst,
-        mock_fastapi_inst,
-        mock_otlp_exporter,
-        mock_batch_processor,
-        mock_resource,
-        mock_tracer_provider,
-        mock_trace,
-    ):
+        self: "TestConfigureDistributedTracingWithOTLP",
+        mock_logger: MagicMock,
+        mock_redis_inst: MagicMock,
+        mock_sqlalchemy_inst: MagicMock,
+        mock_fastapi_inst: MagicMock,
+        mock_otlp_exporter: MagicMock,
+        mock_batch_processor: MagicMock,
+        mock_resource: MagicMock,
+        mock_tracer_provider: MagicMock,
+        mock_trace: MagicMock,
+    ) -> None:
         """Test configuration with OTLP endpoint."""
         mock_resource.create.return_value = MagicMock()
         mock_tracer_provider_instance = MagicMock()
@@ -298,7 +300,7 @@ class TestConfigureDistributedTracingWithOTLP:
 class TestServerRequestHookEdgeCases:
     """Test edge cases for server request hook."""
 
-    def test_hook_with_no_route_info(self):
+    def test_hook_with_no_route_info(self: "TestServerRequestHookEdgeCases") -> None:
         """Test hook when route info is not available."""
         mock_span = MagicMock()
         mock_span.is_recording.return_value = True
@@ -310,7 +312,7 @@ class TestServerRequestHookEdgeCases:
         # Should not raise an exception
         assert mock_span.is_recording.called
 
-    def test_hook_with_user_info(self):
+    def test_hook_with_user_info(self: "TestServerRequestHookEdgeCases") -> None:
         """Test hook when user info is available."""
         mock_span = MagicMock()
         mock_span.is_recording.return_value = True
@@ -319,7 +321,7 @@ class TestServerRequestHookEdgeCases:
         mock_user.id = "user123"
         mock_user.username = "testuser"
 
-        def scope_get(key, default=None):
+        def scope_get(key: str, default: object = None) -> object:
             if key == "user":
                 return mock_user
             return default
@@ -331,7 +333,7 @@ class TestServerRequestHookEdgeCases:
         # Should set user attributes
         assert mock_span.set_attribute.called
 
-    def test_hook_with_span_not_recording(self):
+    def test_hook_with_span_not_recording(self: "TestServerRequestHookEdgeCases") -> None:
         """Test hook when span is not recording."""
         mock_span = MagicMock()
         mock_span.is_recording.return_value = False
@@ -342,7 +344,7 @@ class TestServerRequestHookEdgeCases:
         # Should not set attributes if not recording
         mock_span.set_attribute.assert_not_called()
 
-    def test_hook_with_scope_not_callable(self):
+    def test_hook_with_scope_not_callable(self: "TestServerRequestHookEdgeCases") -> None:
         """Test hook when scope.get is not callable."""
         mock_span = MagicMock()
         mock_span.is_recording.return_value = True
@@ -358,7 +360,7 @@ class TestServerRequestHookEdgeCases:
 class TestClientRequestHookEdgeCases:
     """Test edge cases for client request hook."""
 
-    def test_hook_with_span_not_recording(self):
+    def test_hook_with_span_not_recording(self: "TestClientRequestHookEdgeCases") -> None:
         """Test hook when span is not recording."""
         mock_span = MagicMock()
         mock_span.is_recording.return_value = False
@@ -368,7 +370,7 @@ class TestClientRequestHookEdgeCases:
         # Should not set attributes if not recording
         mock_span.set_attribute.assert_not_called()
 
-    def test_hook_with_various_methods(self):
+    def test_hook_with_various_methods(self: "TestClientRequestHookEdgeCases") -> None:
         """Test hook with various HTTP methods."""
         mock_span = MagicMock()
         mock_span.is_recording.return_value = True
@@ -383,7 +385,7 @@ class TestClientRequestHookEdgeCases:
 class TestClientResponseHookEdgeCases:
     """Test edge cases for client response hook."""
 
-    def test_hook_with_span_not_recording(self):
+    def test_hook_with_span_not_recording(self: "TestClientResponseHookEdgeCases") -> None:
         """Test hook when span is not recording."""
         mock_span = MagicMock()
         mock_span.is_recording.return_value = False
@@ -393,7 +395,7 @@ class TestClientResponseHookEdgeCases:
         # Should not set attributes if not recording
         mock_span.set_attribute.assert_not_called()
 
-    def test_hook_with_empty_response_body(self):
+    def test_hook_with_empty_response_body(self: "TestClientResponseHookEdgeCases") -> None:
         """Test hook with empty response body."""
         mock_span = MagicMock()
         mock_span.is_recording.return_value = True
@@ -409,7 +411,9 @@ class TestInstrumentApplicationWithSettings:
     @patch("app.middleware.tracing.OPENTELEMETRY_AVAILABLE", True)
     @patch("app.middleware.tracing.configure_distributed_tracing")
     @patch("app.middleware.tracing.logger")
-    def test_instrument_application_calls_configure(self, mock_logger, mock_configure):
+    def test_instrument_application_calls_configure(
+        self, mock_logger: MagicMock, mock_configure: MagicMock
+    ) -> None:
         """Test that instrument_application calls configure_distributed_tracing."""
         with patch("app.middleware.tracing.settings") as mock_settings:
             mock_settings.tracing_service_name = "test-service"
@@ -426,7 +430,9 @@ class TestInstrumentApplicationWithSettings:
     @patch("app.middleware.tracing.OPENTELEMETRY_AVAILABLE", True)
     @patch("app.middleware.tracing.configure_distributed_tracing")
     @patch("app.middleware.tracing.logger")
-    def test_instrument_application_with_custom_settings(self, mock_logger, mock_configure):
+    def test_instrument_application_with_custom_settings(
+        self, mock_logger: MagicMock, mock_configure: MagicMock
+    ) -> None:
         """Test instrument_application with custom settings."""
         with patch("app.middleware.tracing.settings") as mock_settings:
             mock_settings.tracing_service_name = "custom-service"
@@ -446,7 +452,9 @@ class TestInstrumentApplicationWithSettings:
     @patch("app.middleware.tracing.OPENTELEMETRY_AVAILABLE", True)
     @patch("app.middleware.tracing.configure_distributed_tracing")
     @patch("app.middleware.tracing.logger")
-    def test_instrument_application_logs_completion(self, mock_logger, mock_configure):
+    def test_instrument_application_logs_completion(
+        self, mock_logger: MagicMock, mock_configure: MagicMock
+    ) -> None:
         """Test that instrument_application logs completion."""
         with patch("app.middleware.tracing.settings") as mock_settings:
             mock_settings.tracing_service_name = "test-service"
@@ -464,7 +472,9 @@ class TestInstrumentApplicationWithSettings:
     @patch("app.middleware.tracing.OPENTELEMETRY_AVAILABLE", True)
     @patch("app.middleware.tracing.configure_distributed_tracing")
     @patch("app.middleware.tracing.logger")
-    def test_instrument_application_handles_import_error(self, mock_logger, mock_configure):
+    def test_instrument_application_handles_import_error(
+        self, mock_logger: MagicMock, mock_configure: MagicMock
+    ) -> None:
         """Test that instrument_application handles ImportError."""
         mock_configure.side_effect = ImportError("OpenTelemetry not available")
 
@@ -484,7 +494,9 @@ class TestInstrumentApplicationWithSettings:
     @patch("app.middleware.tracing.OPENTELEMETRY_AVAILABLE", True)
     @patch("app.middleware.tracing.configure_distributed_tracing")
     @patch("app.middleware.tracing.logger")
-    def test_instrument_application_handles_generic_exception(self, mock_logger, mock_configure):
+    def test_instrument_application_handles_generic_exception(
+        self, mock_logger: MagicMock, mock_configure: MagicMock
+    ) -> None:
         """Test that instrument_application handles generic exceptions."""
         mock_configure.side_effect = Exception("Configuration failed")
 
@@ -511,8 +523,12 @@ class TestConfigureDistributedTracingErrorHandling:
     @patch("app.middleware.tracing.Resource")
     @patch("app.middleware.tracing.logger")
     def test_configure_handles_exception(
-        self, mock_logger, mock_resource, mock_tracer_provider, mock_trace
-    ):
+        self,
+        mock_logger: MagicMock,
+        mock_resource: MagicMock,
+        mock_tracer_provider: MagicMock,
+        mock_trace: MagicMock,
+    ) -> None:
         """Test that configure_distributed_tracing handles exceptions."""
         mock_resource.create.side_effect = Exception("Resource creation failed")
 
@@ -533,15 +549,15 @@ class TestConfigureDistributedTracingErrorHandling:
     @patch("app.middleware.tracing.logger")
     def test_configure_handles_sqlalchemy_instrumentation_error(
         self,
-        mock_logger,
-        mock_redis_inst,
-        mock_sqlalchemy_inst,
-        mock_fastapi_inst,
-        mock_batch_processor,
-        mock_resource,
-        mock_tracer_provider,
-        mock_trace,
-    ):
+        mock_logger: MagicMock,
+        mock_redis_inst: MagicMock,
+        mock_sqlalchemy_inst: MagicMock,
+        mock_fastapi_inst: MagicMock,
+        mock_batch_processor: MagicMock,
+        mock_resource: MagicMock,
+        mock_tracer_provider: MagicMock,
+        mock_trace: MagicMock,
+    ) -> None:
         """Test that configure_distributed_tracing handles SQLAlchemy instrumentation errors."""
         mock_resource.create.return_value = MagicMock()
         mock_tracer_provider_instance = MagicMock()

@@ -5,33 +5,34 @@ Tests the actual task execution when APGI system is available (mocked).
 """
 
 import pytest
+from typing import Any, Generator
 from unittest.mock import MagicMock, patch, AsyncMock
 
 
 class MockTask:
     """Mock task class for testing."""
 
-    def __init__(self, **kwargs):
+    def __init__(self, **kwargs: Any) -> None:
         self.params = kwargs
 
-    def run_all_trials(self, apgi_system):
+    def run_all_trials(self, apgi_system: Any) -> dict[str, Any]:
         return {"trials": 10, "success_rate": 0.9}
 
 
 class MockAPGISystem:
     """Mock APGI system for testing."""
 
-    def __init__(self, config_path):
+    def __init__(self, config_path: str) -> None:
         self.config_path = config_path
 
 
-def mock_get_resource_path(path):
+def mock_get_resource_path(path: str) -> str:
     """Mock resource path getter."""
     return f"/app/resources/{path}"
 
 
 @pytest.fixture
-def mock_apgi_modules():
+def mock_apgi_modules() -> Generator[None, None, None]:
     """Fixture to mock all APGI modules."""
     with patch.dict(
         "sys.modules",
@@ -66,7 +67,7 @@ def mock_apgi_modules():
 
 
 @pytest.fixture
-def mock_task_record():
+def mock_task_record() -> MagicMock:
     """Mock task record for testing."""
     record = MagicMock()
     record.task_id = "test-task-id"
@@ -78,7 +79,7 @@ def mock_task_record():
 
 
 @pytest.fixture
-def mock_db(mock_task_record):
+def mock_db(mock_task_record: MagicMock) -> MagicMock:
     """Mock database session."""
     db = MagicMock()
     db.query.return_value.filter.return_value.first.return_value = mock_task_record
@@ -88,7 +89,7 @@ def mock_db(mock_task_record):
 class TestIowaGamblingTaskExecution:
     """Test Iowa Gambling task execution with mocked APGI system."""
 
-    def test_iowa_gambling_task_success(self, mock_apgi_modules):
+    def test_iowa_gambling_task_success(self, mock_apgi_modules: Any) -> None:
         """Test Iowa Gambling task returns unavailable response when APGI not available."""
         from app.tasks.experimental_tasks import (
             execute_iowa_gambling_task,
@@ -139,7 +140,7 @@ class TestIowaGamblingTaskExecution:
         assert result["results"]["trials"] == 10
         assert result["results"]["success_rate"] == 0.9
 
-    def test_iowa_gambling_task_unavailable(self):
+    def test_iowa_gambling_task_unavailable(self) -> None:
         """Test Iowa Gambling task when APGI system unavailable."""
         from app.tasks.experimental_tasks import execute_iowa_gambling_task
 
@@ -158,7 +159,7 @@ class TestIowaGamblingTaskExecution:
 class TestMaskingParadigmTaskExecution:
     """Test Masking Paradigm task execution."""
 
-    def test_masking_paradigm_task_unavailable(self):
+    def test_masking_paradigm_task_unavailable(self) -> None:
         """Test Masking Paradigm task when APGI system unavailable."""
         from app.tasks.experimental_tasks import execute_masking_paradigm_task
 
@@ -173,7 +174,7 @@ class TestMaskingParadigmTaskExecution:
 class TestAttentionalBlinkTaskExecution:
     """Test Attentional Blink task execution."""
 
-    def test_attentional_blink_task_unavailable(self):
+    def test_attentional_blink_task_unavailable(self) -> None:
         """Test Attentional Blink task when APGI system unavailable."""
         from app.tasks.experimental_tasks import execute_attentional_blink_task
 
@@ -188,7 +189,7 @@ class TestAttentionalBlinkTaskExecution:
 class TestChangeBlindnessTaskExecution:
     """Test Change Blindness task execution."""
 
-    def test_change_blindness_task_unavailable(self):
+    def test_change_blindness_task_unavailable(self) -> None:
         """Test Change Blindness task when APGI system unavailable."""
         from app.tasks.experimental_tasks import execute_change_blindness_task
 
@@ -203,7 +204,7 @@ class TestChangeBlindnessTaskExecution:
 class TestBinocularRivalryTaskExecution:
     """Test Binocular Rivalry task execution."""
 
-    def test_binocular_rivalry_task_unavailable(self):
+    def test_binocular_rivalry_task_unavailable(self) -> None:
         """Test Binocular Rivalry task when APGI system unavailable."""
         from app.tasks.experimental_tasks import execute_binocular_rivalry_task
 
@@ -218,13 +219,13 @@ class TestBinocularRivalryTaskExecution:
 class TestAPGITaskBaseClass:
     """Test APGITask base class."""
 
-    def test_apgi_task_class_exists(self):
+    def test_apgi_task_class_exists(self) -> None:
         """Test APGITask base class exists."""
         from app.tasks.experimental_tasks import APGITask
 
         assert APGITask is not None
 
-    def test_apgi_task_lazy_initialization(self):
+    def test_apgi_task_lazy_initialization(self) -> None:
         """Test APGI task lazy initialization property."""
         from app.tasks.experimental_tasks import APGITask
         from app.tasks import experimental_tasks
@@ -245,7 +246,7 @@ class TestTriggerWebhookOnCompletion:
     """Test trigger_webhook_on_completion function."""
 
     @pytest.mark.asyncio
-    async def test_trigger_webhook_task_not_found(self):
+    async def test_trigger_webhook_task_not_found(self) -> None:
         """Test webhook trigger when task not found."""
         from app.tasks.experimental_tasks import trigger_webhook_on_completion
 
@@ -258,7 +259,7 @@ class TestTriggerWebhookOnCompletion:
             await trigger_webhook_on_completion("nonexistent-task", {"status": "completed"})
 
     @pytest.mark.asyncio
-    async def test_trigger_webhook_success(self, mock_db):
+    async def test_trigger_webhook_success(self, mock_db: MagicMock) -> None:
         """Test successful webhook trigger."""
         from app.tasks.experimental_tasks import trigger_webhook_on_completion
 
@@ -281,7 +282,7 @@ class TestTriggerWebhookOnCompletion:
                 mock_webhook_manager.close.assert_called_once()
 
     @pytest.mark.asyncio
-    async def test_trigger_webhook_no_webhook_url(self, mock_db):
+    async def test_trigger_webhook_no_webhook_url(self, mock_db: MagicMock) -> None:
         """Test webhook trigger when no webhook URL configured."""
         from app.tasks.experimental_tasks import trigger_webhook_on_completion
 
@@ -295,7 +296,7 @@ class TestTriggerWebhookOnCompletion:
             await trigger_webhook_on_completion("test-task-id", {"status": "completed"})
 
     @pytest.mark.asyncio
-    async def test_trigger_webhook_task_executor_exception(self, mock_db):
+    async def test_trigger_webhook_task_executor_exception(self, mock_db: MagicMock) -> None:
         """Test webhook trigger when task executor fails."""
         from app.tasks.experimental_tasks import trigger_webhook_on_completion
         from app.services.task_executor import TaskExecutor
@@ -310,7 +311,7 @@ class TestTriggerWebhookOnCompletion:
                 await trigger_webhook_on_completion("test-task-id", {"status": "completed"})
 
     @pytest.mark.asyncio
-    async def test_trigger_webhook_failed_status(self, mock_db):
+    async def test_trigger_webhook_failed_status(self, mock_db: MagicMock) -> None:
         """Test webhook trigger with failed task status."""
         from app.tasks.experimental_tasks import trigger_webhook_on_completion
 
@@ -336,31 +337,31 @@ class TestTriggerWebhookOnCompletion:
 class TestExperimentalTaskParameters:
     """Test experimental task parameter extraction."""
 
-    def test_iowa_gambling_task_is_callable(self):
+    def test_iowa_gambling_task_is_callable(self) -> None:
         """Test Iowa Gambling task is callable."""
         from app.tasks.experimental_tasks import execute_iowa_gambling_task
 
         assert callable(execute_iowa_gambling_task)
 
-    def test_masking_paradigm_task_is_callable(self):
+    def test_masking_paradigm_task_is_callable(self) -> None:
         """Test Masking Paradigm task is callable."""
         from app.tasks.experimental_tasks import execute_masking_paradigm_task
 
         assert callable(execute_masking_paradigm_task)
 
-    def test_attentional_blink_task_is_callable(self):
+    def test_attentional_blink_task_is_callable(self) -> None:
         """Test Attentional Blink task is callable."""
         from app.tasks.experimental_tasks import execute_attentional_blink_task
 
         assert callable(execute_attentional_blink_task)
 
-    def test_change_blindness_task_is_callable(self):
+    def test_change_blindness_task_is_callable(self) -> None:
         """Test Change Blindness task is callable."""
         from app.tasks.experimental_tasks import execute_change_blindness_task
 
         assert callable(execute_change_blindness_task)
 
-    def test_binocular_rivalry_task_is_callable(self):
+    def test_binocular_rivalry_task_is_callable(self) -> None:
         """Test Binocular Rivalry task is callable."""
         from app.tasks.experimental_tasks import execute_binocular_rivalry_task
 
@@ -370,13 +371,13 @@ class TestExperimentalTaskParameters:
 class TestTaskRegistryIntegration:
     """Test task registry integration."""
 
-    def test_celery_app_import(self):
+    def test_celery_app_import(self) -> None:
         """Test that Celery app is available."""
         from app.tasks.experimental_tasks import celery_app
 
         assert celery_app is not None
 
-    def test_all_tasks_registered(self):
+    def test_all_tasks_registered(self) -> None:
         """Test all experimental tasks are registered."""
         from app.tasks.experimental_tasks import celery_app
 
@@ -399,13 +400,13 @@ class TestTaskRegistryIntegration:
 class TestWebhookTaskIntegration:
     """Test webhook task integration."""
 
-    def test_webhook_tasks_import(self):
+    def test_webhook_tasks_import(self) -> None:
         """Test webhook tasks are imported."""
         from app.tasks import webhook_tasks
 
         assert webhook_tasks is not None
 
-    def test_experimental_tasks_imports_webhook_manager(self):
+    def test_experimental_tasks_imports_webhook_manager(self) -> None:
         """Test experimental_tasks imports WebhookManager."""
         from app.tasks.experimental_tasks import WebhookManager
 

@@ -14,6 +14,7 @@ end-to-end, including:
 import pytest
 from unittest.mock import AsyncMock, patch, MagicMock
 from httpx import AsyncClient, ASGITransport
+from typing import AsyncGenerator
 
 from app.middleware.alerting import (
     AlertManager,
@@ -27,9 +28,9 @@ from app.middleware.alerting import (
 
 
 @pytest.fixture
-async def alert_manager():
+async def alert_manager() -> "AlertManager":
     """Create a test alert manager instance."""
-    manager = AlertManager()
+    manager = AlertManager()  # type: ignore[no-untyped-call]
 
     # Clear any existing channels
     manager.channels.clear()
@@ -42,7 +43,9 @@ async def alert_manager():
 
 
 @pytest.fixture
-async def client(test_environment, mock_database_connection):
+async def client(
+    test_environment: None, mock_database_connection: None
+) -> AsyncGenerator[AsyncClient, None]:
     """Create test client for monitoring/alerting tests."""
     from app.main import create_app
     from unittest.mock import AsyncMock, patch
@@ -63,7 +66,7 @@ class TestAlertManager:
     """Test alert manager functionality."""
 
     @pytest.mark.asyncio
-    async def test_alert_creation_and_sending(self, alert_manager):
+    async def test_alert_creation_and_sending(self, alert_manager: "AlertManager") -> None:
         """Test that alerts can be created and sent through channels."""
         # Create a mock notification channel
         mock_channel = AsyncMock()
@@ -85,7 +88,7 @@ class TestAlertManager:
         mock_channel.send_alert.assert_called_once_with(alert)
 
     @pytest.mark.asyncio
-    async def test_error_rate_alerting(self, alert_manager):
+    async def test_error_rate_alerting(self, alert_manager: "AlertManager") -> None:
         """Test that error rate monitoring triggers alerts."""
         # Create a mock notification channel
         mock_channel = AsyncMock()
@@ -106,7 +109,7 @@ class TestAlertManager:
         assert mock_channel.send_alert.call_count >= 1
 
     @pytest.mark.asyncio
-    async def test_custom_alert_triggering(self, alert_manager):
+    async def test_custom_alert_triggering(self, alert_manager: "AlertManager") -> None:
         """Test custom alert triggering."""
         # Create a mock notification channel
         mock_channel = AsyncMock()
@@ -132,7 +135,7 @@ class TestNotificationChannels:
     """Test notification channel implementations."""
 
     @pytest.mark.asyncio
-    async def test_webhook_channel_success(self):
+    async def test_webhook_channel_success(self) -> None:
         """Test webhook notification channel with successful delivery."""
         webhook_url = "https://example.com/webhook"
 
@@ -156,7 +159,7 @@ class TestNotificationChannels:
             assert "title" in call_args[1]["json"]
 
     @pytest.mark.asyncio
-    async def test_webhook_channel_failure(self):
+    async def test_webhook_channel_failure(self) -> None:
         """Test webhook notification channel with failure."""
         webhook_url = "https://example.com/webhook"
 
@@ -174,7 +177,7 @@ class TestNotificationChannels:
             assert result is False
 
     @pytest.mark.asyncio
-    async def test_pagerduty_channel_success(self):
+    async def test_pagerduty_channel_success(self) -> None:
         """Test PagerDuty notification channel."""
         integration_key = "test-integration-key"
 
@@ -185,13 +188,13 @@ class TestNotificationChannels:
         mock_client.post.return_value = mock_response
 
         class MockAsyncClient:
-            def __init__(self):
+            def __init__(self) -> None:
                 self.post = mock_client.post
 
-            async def __aenter__(self):
+            async def __aenter__(self) -> "MockAsyncClient":
                 return self
 
-            async def __aexit__(self, *args):
+            async def __aexit__(self, *args: object) -> None:
                 pass
 
         with patch("app.middleware.alerting.httpx") as mock_httpx:
@@ -213,7 +216,7 @@ class TestNotificationChannels:
             assert payload["payload"]["summary"] == "Test Alert"
 
     @pytest.mark.asyncio
-    async def test_teams_channel_success(self):
+    async def test_teams_channel_success(self) -> None:
         """Test Microsoft Teams notification channel."""
         webhook_url = "https://outlook.office.com/webhook/test"
 
@@ -244,7 +247,7 @@ class TestNotificationChannels:
             assert "Test Alert" in payload["summary"]
 
     @pytest.mark.asyncio
-    async def test_log_channel(self):
+    async def test_log_channel(self) -> None:
         """Test log notification channel."""
         with patch("app.middleware.alerting.logger") as mock_logger:
             channel = LogNotificationChannel()
@@ -266,21 +269,21 @@ class TestBusinessMetricsIntegration:
     """Test business metrics service integration."""
 
     @pytest.mark.asyncio
-    async def test_metrics_service_creation(self):
+    async def test_metrics_service_creation(self) -> None:
         """Test that business metrics service can be created."""
         from app.services.business_metrics import BusinessMetricsService
 
-        service = BusinessMetricsService()
+        service = BusinessMetricsService()  # type: ignore[no-untyped-call]
         assert service is not None
         assert hasattr(service, "cache_service")
         assert hasattr(service, "_generate_cache_key")
 
     @pytest.mark.asyncio
-    async def test_metrics_caching(self):
+    async def test_metrics_caching(self) -> None:
         """Test that metrics service uses caching."""
         from app.services.business_metrics import BusinessMetricsService
 
-        service = BusinessMetricsService()
+        service = BusinessMetricsService()  # type: ignore[no-untyped-call]
 
         # Test cache key generation
         key1 = service._generate_cache_key("test_method", "arg1", "arg2", kwarg1="value1")
@@ -291,11 +294,11 @@ class TestBusinessMetricsIntegration:
         assert key1 != key3  # Different inputs should generate different keys
 
     @pytest.mark.asyncio
-    async def test_overview_metrics_structure(self, mock_database_connection):
+    async def test_overview_metrics_structure(self, mock_database_connection: None) -> None:
         """Test that overview metrics returns expected structure."""
         from app.services.business_metrics import BusinessMetricsService
 
-        service = BusinessMetricsService()
+        service = BusinessMetricsService()  # type: ignore[no-untyped-call]
 
         # Mock the database context to return test data
         with patch("app.services.business_metrics.get_db_context") as mock_db_context:
@@ -353,7 +356,7 @@ class TestDistributedTracing:
     """Test distributed tracing integration."""
 
     @pytest.mark.asyncio
-    async def test_tracing_initialization(self):
+    async def test_tracing_initialization(self) -> None:
         """Test that tracing can be initialized."""
         from app.middleware.tracing import configure_distributed_tracing
 
@@ -368,7 +371,7 @@ class TestDistributedTracing:
                 raise
 
     @pytest.mark.asyncio
-    async def test_tracing_with_console_exporter(self):
+    async def test_tracing_with_console_exporter(self) -> None:
         """Test tracing with console exporter enabled."""
         from app.middleware.tracing import configure_distributed_tracing
 
@@ -385,7 +388,7 @@ class TestMetricsEndpoints:
     """Test metrics-related API endpoints."""
 
     @pytest.mark.asyncio
-    async def test_metrics_endpoint_access(self, client):
+    async def test_metrics_endpoint_access(self, client: AsyncClient) -> None:
         """Test that metrics endpoint is accessible."""
         # Note: This assumes a metrics endpoint exists
         # Adjust based on actual endpoint implementation
@@ -395,7 +398,7 @@ class TestMetricsEndpoints:
         assert response.status_code in [200, 401, 404]  # Expected responses
 
     @pytest.mark.asyncio
-    async def test_health_endpoint_with_monitoring(self, client):
+    async def test_health_endpoint_with_monitoring(self, client: AsyncClient) -> None:
         """Test health endpoint includes monitoring information."""
         from unittest.mock import AsyncMock, patch
 

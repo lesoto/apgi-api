@@ -72,8 +72,8 @@ class RateLimiter:
             current_count = results[1]
 
             # Check if over limit (current_count includes the request we just added)
-            allowed = current_count <= self.requests_per_minute
-            remaining = max(0, self.requests_per_minute - current_count)
+            allowed = current_count <= limit
+            remaining = max(0, limit - current_count)
             reset_time = 60 - (current_time % 60)
 
             return allowed, remaining, reset_time

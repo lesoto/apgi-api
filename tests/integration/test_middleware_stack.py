@@ -11,10 +11,13 @@ import os
 import jwt
 from datetime import datetime, timedelta, timezone
 from unittest.mock import patch, MagicMock, AsyncMock
-from typing import Optional
+from typing import Optional, Iterator
 
 import pytest
 from starlette.testclient import TestClient
+
+# Patch logging configuration before app import to prevent LogRecord conflicts
+patch("app.middleware.logging.configure_structured_logging", lambda *args, **kwargs: None).start()
 
 from app.main import create_app
 
@@ -24,7 +27,7 @@ from app.main import create_app
 def make_jwt(
     user_id: str = "test-user-123",
     username: str = "testuser",
-    roles: Optional[list] = None,
+    roles: Optional[list[str]] = None,
     secret: Optional[str] = None,
     expired: bool = False,
 ) -> str:
@@ -74,12 +77,14 @@ def make_jwt(
 
 
 @pytest.fixture
-def full_stack_client():
+def full_stack_client() -> Iterator[TestClient]:
     """
     Create a TestClient with the full middleware stack enabled (test_mode=False).
 
     Mocks Redis, database initialization, and cache service to avoid live infrastructure.
     """
+    # Set TEST_MODE to prevent logging configuration errors
+    os.environ["TEST_MODE"] = "true"
     # Mock Redis client - must be AsyncMock for async methods
     mock_redis = AsyncMock()
     mock_redis.ping = AsyncMock(return_value=True)
@@ -116,6 +121,7 @@ def full_stack_client():
         patch("app.routes.export.init_export_routes"),
         patch("app.routes.templates.init_template_routes"),
         patch("app.middleware.rate_limiting.RateLimiter", return_value=mock_rate_limiter),
+        patch("app.middleware.logging.RequestLoggingMiddleware", lambda app: None),
     ):
 
         app = create_app(test_mode=False)
@@ -131,7 +137,9 @@ def full_stack_client():
 class TestAuthenticationMiddleware:
     """Tests for authentication middleware (Requirement 7.1, 7.2)."""
 
-    def test_valid_jwt_token_returns_200_on_protected_endpoint(self, full_stack_client):
+    def test_valid_jwt_token_returns_200_on_protected_endpoint(
+        self, full_stack_client: TestClient
+    ) -> None:
         """
         Requirement 7.1: Valid JWT token should return 200 on protected endpoint.
 
@@ -151,7 +159,9 @@ class TestAuthenticationMiddleware:
         # The middleware should not reject valid tokens
         assert response.status_code in [200, 404]  # 404 if endpoint doesn't exist, 200 if it does
 
-    def test_missing_jwt_token_returns_401_on_protected_endpoint(self, full_stack_client):
+    def test_missing_jwt_token_returns_401_on_protected_endpoint(
+        self, full_stack_client: TestClient
+    ) -> None:
         """
         Requirement 7.2: Missing JWT token should return 401 on protected endpoint.
 
@@ -166,7 +176,7 @@ class TestAuthenticationMiddleware:
         assert response.status_code == 401
         assert "error" in response.json() or "detail" in response.json()
 
-    def test_expired_jwt_token_returns_401(self, full_stack_client):
+    def test_expired_jwt_token_returns_401(self, full_stack_client: TestClient) -> None:
         """
         Expired JWT token should return 401 Unauthorized.
 
@@ -183,7 +193,7 @@ class TestAuthenticationMiddleware:
         # Should be rejected with 401
         assert response.status_code == 401
 
-    def test_invalid_jwt_signature_returns_401(self, full_stack_client):
+    def test_invalid_jwt_signature_returns_401(self, full_stack_client: TestClient) -> None:
         """
         Invalid JWT signature should return 401 Unauthorized.
 
@@ -208,7 +218,7 @@ class TestAuthenticationMiddleware:
 class TestCSRFMiddleware:
     """Tests for CSRF middleware (Requirement 7.3)."""
 
-    def test_missing_csrf_token_returns_403_on_post(self, full_stack_client):
+    def test_missing_csrf_token_returns_403_on_post(self, full_stack_client: TestClient) -> None:
         """
         Requirement 7.3: Missing CSRF token on POST should return 403.
 
@@ -239,7 +249,7 @@ class TestCSRFMiddleware:
         # Should be rejected with 403 (CSRF token missing) or 401 (auth required)
         assert response.status_code in [401, 403]
 
-    def test_invalid_csrf_token_returns_403(self, full_stack_client):
+    def test_invalid_csrf_token_returns_403(self, full_stack_client: TestClient) -> None:
         """
         Invalid CSRF token should return 403 Forbidden.
 
@@ -270,7 +280,7 @@ class TestCSRFMiddleware:
 class TestSecurityValidationMiddleware:
     """Tests for security validation middleware (Requirement 7.4)."""
 
-    def test_sql_injection_pattern_returns_400(self, full_stack_client):
+    def test_sql_injection_pattern_returns_400(self, full_stack_client: TestClient) -> None:
         """
         Requirement 7.4: SQL injection pattern should return 400.
 
@@ -290,7 +300,7 @@ class TestSecurityValidationMiddleware:
         # Should be rejected with 400, 422 (validation error), 500 (unhandled), or 401
         assert response.status_code in [400, 422, 500, 401]
 
-    def test_xss_pattern_returns_400(self, full_stack_client):
+    def test_xss_pattern_returns_400(self, full_stack_client: TestClient) -> None:
         """
         XSS pattern should return 400 Bad Request.
 
@@ -309,7 +319,7 @@ class TestSecurityValidationMiddleware:
         # Should be rejected with 400, 422, 500, or 401
         assert response.status_code in [400, 422, 500, 401]
 
-    def test_clean_input_passes_validation(self, full_stack_client):
+    def test_clean_input_passes_validation(self, full_stack_client: TestClient) -> None:
         """
         Clean input should pass security validation.
 
@@ -331,7 +341,7 @@ class TestSecurityValidationMiddleware:
 class TestRateLimitingMiddleware:
     """Tests for rate limiting middleware (Requirement 7.5)."""
 
-    def test_exceeding_rate_limit_returns_429(self, full_stack_client):
+    def test_exceeding_rate_limit_returns_429(self, full_stack_client: TestClient) -> None:
         """
         Requirement 7.5: Exceeding rate limit should return 429.
 
@@ -352,7 +362,7 @@ class TestRateLimitingMiddleware:
         # The rate limit behavior depends on Redis availability
         assert response.status_code in [200, 404, 429]
 
-    def test_rate_limit_headers_present(self, full_stack_client):
+    def test_rate_limit_headers_present(self, full_stack_client: TestClient) -> None:
         """
         Rate limit headers should be present in response.
 
@@ -375,7 +385,9 @@ class TestRateLimitingMiddleware:
 class TestDeprecationMiddleware:
     """Tests for deprecation middleware (Requirement 7.6)."""
 
-    def test_deprecated_endpoint_includes_deprecation_header(self, full_stack_client):
+    def test_deprecated_endpoint_includes_deprecation_header(
+        self, full_stack_client: TestClient
+    ) -> None:
         """
         Requirement 7.6: Deprecated endpoint should include Deprecation header.
 
@@ -404,7 +416,9 @@ class TestDeprecationMiddleware:
             if response.status_code != 404:
                 assert "Deprecation" in response.headers or "Warning" in response.headers
 
-    def test_non_deprecated_endpoint_no_deprecation_header(self, full_stack_client):
+    def test_non_deprecated_endpoint_no_deprecation_header(
+        self, full_stack_client: TestClient
+    ) -> None:
         """
         Non-deprecated endpoint should not include Deprecation header.
 
@@ -425,7 +439,7 @@ class TestDeprecationMiddleware:
 class TestSecurityHeaders:
     """Tests for security headers middleware (Requirement 9.6)."""
 
-    def test_security_headers_present_on_all_responses(self, full_stack_client):
+    def test_security_headers_present_on_all_responses(self, full_stack_client: TestClient) -> None:
         """
         Security headers should be present on all responses.
 
@@ -445,7 +459,7 @@ class TestSecurityHeaders:
         assert "X-Frame-Options" in response.headers
         assert "Strict-Transport-Security" in response.headers
 
-    def test_security_headers_on_error_responses(self, full_stack_client):
+    def test_security_headers_on_error_responses(self, full_stack_client: TestClient) -> None:
         """
         Security headers should be present even on error responses.
 
@@ -463,7 +477,7 @@ class TestSecurityHeaders:
 class TestMiddlewareIntegration:
     """Integration tests for middleware stack interactions."""
 
-    def test_middleware_stack_order(self, full_stack_client):
+    def test_middleware_stack_order(self, full_stack_client: TestClient) -> None:
         """
         Middleware stack should process requests in correct order.
 
@@ -483,7 +497,7 @@ class TestMiddlewareIntegration:
         # Should be rejected by security validation (400/422/500) before reaching handler
         assert response.status_code in [400, 422, 500, 401]
 
-    def test_public_endpoints_bypass_auth(self, full_stack_client):
+    def test_public_endpoints_bypass_auth(self, full_stack_client: TestClient) -> None:
         """
         Public endpoints should bypass authentication middleware.
 
@@ -495,7 +509,7 @@ class TestMiddlewareIntegration:
         # Should succeed (200) or return service unavailable (503), not 401
         assert response.status_code in [200, 503]
 
-    def test_root_endpoint_accessible(self, full_stack_client):
+    def test_root_endpoint_accessible(self, full_stack_client: TestClient) -> None:
         """
         Root endpoint should be accessible.
 

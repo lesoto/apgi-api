@@ -100,7 +100,7 @@ def generate_secure_username(prefix: str = "user") -> str:
     return f"{prefix}_{random_suffix}"
 
 
-def init_db():
+def init_db() -> None:
     """
     Initialize database by creating all tables and default user.
 
@@ -125,6 +125,9 @@ def create_default_user():
 
     This ensures that the foreign key constraint for sessions
     can be satisfied when creating sessions without explicit user management.
+
+    SECURITY NOTE: Credentials are logged ONCE at WARNING level during creation.
+    In production, use the CLI bootstrap command or environment variables instead.
     """
     db = SessionLocal()
     try:
@@ -143,35 +146,6 @@ def create_default_user():
         secure_username = generate_secure_username("default")
         secure_password = generate_secure_password()
 
-        # Write credentials to secure temporary file with proper cleanup
-        import pathlib
-        import tempfile
-
-        # Use NamedTemporaryFile with delete=False so credentials can be retrieved
-        # The file will be cleaned up by OS on reboot
-        with tempfile.NamedTemporaryFile(
-            mode="w+",
-            prefix="apgi_default_user_",
-            suffix=".txt",
-            delete=False,
-            encoding="utf-8",
-        ) as temp_file:
-            secrets_content = f"""Generated default user credentials - STORE SECURELY
-Username: {secure_username}
-Password: {secure_password}
-NOTE: These credentials allow full system access - change immediately
-"""
-            temp_file.write(secrets_content)
-            temp_file.flush()
-
-            # Get the file path before it's deleted
-            secrets_file_path = pathlib.Path(temp_file.name)
-            secrets_file_path.chmod(0o600)
-
-            logger.info(
-                "Default user created: {secure_username}. Credentials written to secure temporary file for initial setup."
-            )
-
         # Import here to avoid circular import
         from app.services.auth_manager import AuthManager
 
@@ -188,7 +162,31 @@ NOTE: These credentials allow full system access - change immediately
 
         db.add(default_user)
         db.commit()
-        logger.info(f"Default user created with secure credentials: {secure_username}")
+
+        # Log credentials ONCE via structured logging with explicit warnings
+        # This is more secure than temp files as logs can be directed to secure sinks
+        logger.warning(
+            "DEFAULT_USER_CREATED",
+            extra={
+                "event": "default_user_created",
+                "username": secure_username,
+                "user_id": user_id,
+                "password": secure_password,  # Logged once for initial setup
+                "log_message": (
+                    f"Default user created: {secure_username}. "
+                    f"User ID: {user_id}. "
+                    f"Password shown once for initial setup. "
+                    "ACTION REQUIRED: Change password immediately via API or CLI. "
+                    "In production, use: python -m app.cli bootstrap-admin"
+                ),
+            },
+        )
+
+        logger.info(
+            "Default user created with secure credentials. "
+            "Password was logged once at WARNING level. "
+            "Search logs for 'DEFAULT_USER_CREATED' to retrieve."
+        )
 
     except Exception as e:
         db.rollback()
@@ -269,7 +267,7 @@ async def get_async_db_context() -> AsyncGenerator[Session, None]:
         db.close()
 
 
-def close_db():
+def close_db() -> None:
     """
     Close database connections.
 

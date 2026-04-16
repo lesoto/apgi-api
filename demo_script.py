@@ -76,7 +76,7 @@ class APIDemo:
             print(f"Request failed: {e}")
             return {}
 
-    def run_demo(self):
+    def run_demo(self) -> None:
         """Run the complete API demonstration."""
         print("=== APGI API Demonstration ===\n")
 

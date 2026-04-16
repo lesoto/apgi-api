@@ -35,7 +35,7 @@ from fastapi import HTTPException
 class TestServiceFactories:
     """Test the singleton service factory functions."""
 
-    def test_get_business_metrics_service_creates_instance(self):
+    def test_get_business_metrics_service_creates_instance(self) -> None:
         """First call creates an instance; subsequent calls return the same one."""
         from app.routes.metrics import get_business_metrics_service
         import app.routes.metrics as metrics_module
@@ -53,7 +53,7 @@ class TestServiceFactories:
         assert result1 is result2
         MockBMS.assert_called_once()
 
-    def test_get_business_metrics_service_reuses_existing(self):
+    def test_get_business_metrics_service_reuses_existing(self) -> None:
         """If the singleton already exists it is returned without re-creating."""
         from app.routes.metrics import get_business_metrics_service
         import app.routes.metrics as metrics_module
@@ -70,7 +70,7 @@ class TestServiceFactories:
         # Cleanup
         metrics_module._business_metrics_service = None
 
-    def test_get_profiling_service_creates_instance(self):
+    def test_get_profiling_service_creates_instance(self) -> None:
         """First call creates a ProfilingService; subsequent calls reuse it."""
         from app.routes.metrics import get_profiling_service
         import app.routes.metrics as metrics_module
@@ -87,7 +87,7 @@ class TestServiceFactories:
         assert result1 is result2
         MockPS.assert_called_once()
 
-    def test_get_profiling_service_reuses_existing(self):
+    def test_get_profiling_service_reuses_existing(self) -> None:
         """If the singleton already exists it is returned without re-creating."""
         from app.routes.metrics import get_profiling_service
         import app.routes.metrics as metrics_module
@@ -114,7 +114,7 @@ class TestMetricsEndpoint:
     """Tests for GET /v1/metrics (Prometheus)."""
 
     @pytest.mark.asyncio
-    async def test_metrics_endpoint_success(self):
+    async def test_metrics_endpoint_success(self) -> None:
         """metrics_endpoint() delegates to get_metrics_response()."""
         from app.routes.metrics import metrics_endpoint
 
@@ -129,7 +129,7 @@ class TestDashboardOverview:
     """Tests for GET /v1/dashboard/overview."""
 
     @pytest.mark.asyncio
-    async def test_get_dashboard_overview_success(self):
+    async def test_get_dashboard_overview_success(self) -> None:
         """Returns service result on success."""
         from app.routes.metrics import get_dashboard_overview
 
@@ -141,7 +141,7 @@ class TestDashboardOverview:
         assert result == {"total_requests": 100}
 
     @pytest.mark.asyncio
-    async def test_get_dashboard_overview_service_error(self):
+    async def test_get_dashboard_overview_service_error(self) -> None:
         """Service exception is converted to HTTP 500."""
         from app.routes.metrics import get_dashboard_overview
 
@@ -158,7 +158,7 @@ class TestDashboardSessions:
     """Tests for GET /v1/dashboard/sessions."""
 
     @pytest.mark.asyncio
-    async def test_valid_days(self):
+    async def test_valid_days(self) -> None:
         """Returns service result for a valid days parameter."""
         from app.routes.metrics import get_dashboard_sessions
 
@@ -171,7 +171,7 @@ class TestDashboardSessions:
         mock_service.get_session_metrics.assert_called_once_with(7)
 
     @pytest.mark.asyncio
-    async def test_days_below_minimum(self):
+    async def test_days_below_minimum(self) -> None:
         """days < 1 raises HTTP 400."""
         from app.routes.metrics import get_dashboard_sessions
 
@@ -182,7 +182,7 @@ class TestDashboardSessions:
         assert exc_info.value.status_code == 400
 
     @pytest.mark.asyncio
-    async def test_days_above_maximum(self):
+    async def test_days_above_maximum(self) -> None:
         """days > 365 raises HTTP 400."""
         from app.routes.metrics import get_dashboard_sessions
 
@@ -193,7 +193,7 @@ class TestDashboardSessions:
         assert exc_info.value.status_code == 400
 
     @pytest.mark.asyncio
-    async def test_service_error(self):
+    async def test_service_error(self) -> None:
         """Service exception is converted to HTTP 500."""
         from app.routes.metrics import get_dashboard_sessions
 
@@ -206,7 +206,7 @@ class TestDashboardSessions:
         assert exc_info.value.status_code == 500
 
     @pytest.mark.asyncio
-    async def test_http_exception_re_raised(self):
+    async def test_http_exception_re_raised(self) -> None:
         """HTTPException from service propagates unchanged."""
         from app.routes.metrics import get_dashboard_sessions
 
@@ -223,7 +223,7 @@ class TestDashboardTasks:
     """Tests for GET /v1/dashboard/tasks."""
 
     @pytest.mark.asyncio
-    async def test_valid_days(self):
+    async def test_valid_days(self) -> None:
         """Returns service result for valid days."""
         from app.routes.metrics import get_dashboard_tasks
 
@@ -235,7 +235,7 @@ class TestDashboardTasks:
         assert result == {"tasks": 5}
 
     @pytest.mark.asyncio
-    async def test_days_out_of_range(self):
+    async def test_days_out_of_range(self) -> None:
         """days=0 raises HTTP 400."""
         from app.routes.metrics import get_dashboard_tasks
 
@@ -246,7 +246,7 @@ class TestDashboardTasks:
         assert exc_info.value.status_code == 400
 
     @pytest.mark.asyncio
-    async def test_service_error(self):
+    async def test_service_error(self) -> None:
         """Service exception becomes HTTP 500."""
         from app.routes.metrics import get_dashboard_tasks
 
@@ -263,7 +263,7 @@ class TestDashboardUsers:
     """Tests for GET /v1/dashboard/users."""
 
     @pytest.mark.asyncio
-    async def test_valid_days(self):
+    async def test_valid_days(self) -> None:
         """Returns service result for valid days."""
         from app.routes.metrics import get_dashboard_users
 
@@ -275,7 +275,7 @@ class TestDashboardUsers:
         assert result == {"users": 20}
 
     @pytest.mark.asyncio
-    async def test_days_above_max(self):
+    async def test_days_above_max(self) -> None:
         """days > 365 raises HTTP 400."""
         from app.routes.metrics import get_dashboard_users
 
@@ -286,7 +286,7 @@ class TestDashboardUsers:
         assert exc_info.value.status_code == 400
 
     @pytest.mark.asyncio
-    async def test_service_error(self):
+    async def test_service_error(self) -> None:
         """Service exception becomes HTTP 500."""
         from app.routes.metrics import get_dashboard_users
 
@@ -303,7 +303,7 @@ class TestDashboardTemplates:
     """Tests for GET /v1/dashboard/templates."""
 
     @pytest.mark.asyncio
-    async def test_valid_days(self):
+    async def test_valid_days(self) -> None:
         """Returns service result for valid days."""
         from app.routes.metrics import get_dashboard_templates
 
@@ -315,7 +315,7 @@ class TestDashboardTemplates:
         assert result == {"templates": 3}
 
     @pytest.mark.asyncio
-    async def test_invalid_days(self):
+    async def test_invalid_days(self) -> None:
         """days=0 or days=400 raises HTTP 400."""
         from app.routes.metrics import get_dashboard_templates
 
@@ -326,7 +326,7 @@ class TestDashboardTemplates:
             assert exc_info.value.status_code == 400
 
     @pytest.mark.asyncio
-    async def test_service_error(self):
+    async def test_service_error(self) -> None:
         """Service exception becomes HTTP 500."""
         from app.routes.metrics import get_dashboard_templates
 
@@ -343,7 +343,7 @@ class TestCompleteDashboard:
     """Tests for GET /v1/dashboard."""
 
     @pytest.mark.asyncio
-    async def test_returns_cached_data(self):
+    async def test_returns_cached_data(self) -> None:
         """If cache contains data, service is NOT called."""
         from app.routes.metrics import get_complete_dashboard
 
@@ -361,7 +361,7 @@ class TestCompleteDashboard:
         mock_service.get_dashboard_data.assert_not_called()
 
     @pytest.mark.asyncio
-    async def test_computes_and_caches_when_no_cache(self):
+    async def test_computes_and_caches_when_no_cache(self) -> None:
         """If cache misses, service is called and result is cached."""
         from app.routes.metrics import get_complete_dashboard
 
@@ -381,7 +381,7 @@ class TestCompleteDashboard:
         mock_cache.set_api_response.assert_called_once()
 
     @pytest.mark.asyncio
-    async def test_no_cache_service(self):
+    async def test_no_cache_service(self) -> None:
         """When get_cache_service() returns None, service data is returned directly."""
         from app.routes.metrics import get_complete_dashboard
 
@@ -395,7 +395,7 @@ class TestCompleteDashboard:
         assert result == dashboard_data
 
     @pytest.mark.asyncio
-    async def test_invalid_days(self):
+    async def test_invalid_days(self) -> None:
         """days=0 raises HTTP 400."""
         from app.routes.metrics import get_complete_dashboard
 
@@ -407,7 +407,7 @@ class TestCompleteDashboard:
         assert exc_info.value.status_code == 400
 
     @pytest.mark.asyncio
-    async def test_service_error(self):
+    async def test_service_error(self) -> None:
         """Service exception becomes HTTP 500."""
         from app.routes.metrics import get_complete_dashboard
 
@@ -425,7 +425,7 @@ class TestDashboardHTML:
     """Tests for GET /v1/dashboard/html."""
 
     @pytest.mark.asyncio
-    async def test_returns_html_response(self):
+    async def test_returns_html_response(self) -> None:
         """Returns an HTMLResponse containing dashboard metrics."""
         from app.routes.metrics import get_dashboard_html
         from fastapi.responses import HTMLResponse
@@ -449,7 +449,7 @@ class TestDashboardHTML:
         assert b"APGI API Analytics Dashboard" in result.body
 
     @pytest.mark.asyncio
-    async def test_invalid_days(self):
+    async def test_invalid_days(self) -> None:
         """days=0 raises HTTP 400."""
         from app.routes.metrics import get_dashboard_html
 
@@ -460,7 +460,7 @@ class TestDashboardHTML:
         assert exc_info.value.status_code == 400
 
     @pytest.mark.asyncio
-    async def test_days_above_max(self):
+    async def test_days_above_max(self) -> None:
         """days > 365 raises HTTP 400."""
         from app.routes.metrics import get_dashboard_html
 
@@ -471,7 +471,7 @@ class TestDashboardHTML:
         assert exc_info.value.status_code == 400
 
     @pytest.mark.asyncio
-    async def test_service_error(self):
+    async def test_service_error(self) -> None:
         """Service exception becomes HTTP 500."""
         from app.routes.metrics import get_dashboard_html
 
@@ -484,7 +484,7 @@ class TestDashboardHTML:
         assert exc_info.value.status_code == 500
 
     @pytest.mark.asyncio
-    async def test_html_escaping(self):
+    async def test_html_escaping(self) -> None:
         """Special characters in metrics are HTML-escaped by html.escape()."""
         from app.routes.metrics import get_dashboard_html
 
@@ -508,7 +508,7 @@ class TestDashboardHTML:
         assert b"100" in result.body  # total_requests value is present
 
     @pytest.mark.asyncio
-    async def test_http_exception_re_raised(self):
+    async def test_http_exception_re_raised(self) -> None:
         """HTTPException from inside propagates unchanged."""
         from app.routes.metrics import get_dashboard_html
 
@@ -530,7 +530,7 @@ class TestMemoryTracing:
     """Tests for POST /v1/profiling/memory/start and /stop."""
 
     @pytest.mark.asyncio
-    async def test_start_memory_tracing_success(self):
+    async def test_start_memory_tracing_success(self) -> None:
         """start_memory_tracing() delegates to service and returns message."""
         from app.routes.metrics import start_memory_tracing
 
@@ -541,7 +541,7 @@ class TestMemoryTracing:
         assert result == {"message": "Memory tracing started successfully"}
 
     @pytest.mark.asyncio
-    async def test_start_memory_tracing_service_error(self):
+    async def test_start_memory_tracing_service_error(self) -> None:
         """Service exception becomes HTTP 500."""
         from app.routes.metrics import start_memory_tracing
 
@@ -554,7 +554,7 @@ class TestMemoryTracing:
         assert exc_info.value.status_code == 500
 
     @pytest.mark.asyncio
-    async def test_stop_memory_tracing_success(self):
+    async def test_stop_memory_tracing_success(self) -> None:
         """stop_memory_tracing() delegates to service and returns message."""
         from app.routes.metrics import stop_memory_tracing
 
@@ -565,7 +565,7 @@ class TestMemoryTracing:
         assert result == {"message": "Memory tracing stopped successfully"}
 
     @pytest.mark.asyncio
-    async def test_stop_memory_tracing_service_error(self):
+    async def test_stop_memory_tracing_service_error(self) -> None:
         """Service exception becomes HTTP 500."""
         from app.routes.metrics import stop_memory_tracing
 
@@ -582,7 +582,7 @@ class TestMemorySnapshot:
     """Tests for GET /v1/profiling/memory."""
 
     @pytest.mark.asyncio
-    async def test_get_memory_snapshot_success(self):
+    async def test_get_memory_snapshot_success(self) -> None:
         """Returns service result."""
         from app.routes.metrics import get_memory_snapshot
 
@@ -593,7 +593,7 @@ class TestMemorySnapshot:
         assert result == {"rss_mb": 100}
 
     @pytest.mark.asyncio
-    async def test_get_memory_snapshot_service_error(self):
+    async def test_get_memory_snapshot_service_error(self) -> None:
         """Service exception becomes HTTP 500."""
         from app.routes.metrics import get_memory_snapshot
 
@@ -610,7 +610,7 @@ class TestSystemPerformance:
     """Tests for GET /v1/profiling/system."""
 
     @pytest.mark.asyncio
-    async def test_get_system_performance_success(self):
+    async def test_get_system_performance_success(self) -> None:
         """Returns service result."""
         from app.routes.metrics import get_system_performance
 
@@ -621,7 +621,7 @@ class TestSystemPerformance:
         assert result == {"cpu": 10.0}
 
     @pytest.mark.asyncio
-    async def test_get_system_performance_service_error(self):
+    async def test_get_system_performance_service_error(self) -> None:
         """Service exception becomes HTTP 500."""
         from app.routes.metrics import get_system_performance
 
@@ -638,7 +638,7 @@ class TestPerformanceHistory:
     """Tests for GET /v1/profiling/history."""
 
     @pytest.mark.asyncio
-    async def test_valid_hours(self):
+    async def test_valid_hours(self) -> None:
         """Returns service result for valid hours."""
         from app.routes.metrics import get_performance_history
 
@@ -650,7 +650,7 @@ class TestPerformanceHistory:
         mock_service.get_performance_history.assert_called_once_with(2)
 
     @pytest.mark.asyncio
-    async def test_hours_below_minimum(self):
+    async def test_hours_below_minimum(self) -> None:
         """hours < 1 raises HTTP 400."""
         from app.routes.metrics import get_performance_history
 
@@ -661,7 +661,7 @@ class TestPerformanceHistory:
         assert exc_info.value.status_code == 400
 
     @pytest.mark.asyncio
-    async def test_hours_above_maximum(self):
+    async def test_hours_above_maximum(self) -> None:
         """hours > 24 raises HTTP 400."""
         from app.routes.metrics import get_performance_history
 
@@ -672,7 +672,7 @@ class TestPerformanceHistory:
         assert exc_info.value.status_code == 400
 
     @pytest.mark.asyncio
-    async def test_service_error(self):
+    async def test_service_error(self) -> None:
         """Service exception becomes HTTP 500."""
         from app.routes.metrics import get_performance_history
 
@@ -685,7 +685,7 @@ class TestPerformanceHistory:
         assert exc_info.value.status_code == 500
 
     @pytest.mark.asyncio
-    async def test_http_exception_re_raised(self):
+    async def test_http_exception_re_raised(self) -> None:
         """HTTPException from service propagates unchanged."""
         from app.routes.metrics import get_performance_history
 
@@ -702,7 +702,7 @@ class TestBottleneckAnalysis:
     """Tests for GET /v1/profiling/analysis."""
 
     @pytest.mark.asyncio
-    async def test_get_bottleneck_analysis_success(self):
+    async def test_get_bottleneck_analysis_success(self) -> None:
         """Returns service result."""
         from app.routes.metrics import get_bottleneck_analysis
 
@@ -713,7 +713,7 @@ class TestBottleneckAnalysis:
         assert result == {"bottlenecks": []}
 
     @pytest.mark.asyncio
-    async def test_get_bottleneck_analysis_service_error(self):
+    async def test_get_bottleneck_analysis_service_error(self) -> None:
         """Service exception becomes HTTP 500."""
         from app.routes.metrics import get_bottleneck_analysis
 
@@ -735,7 +735,7 @@ class TestBoundaryConditions:
     """Boundary tests for days/hours parameters."""
 
     @pytest.mark.asyncio
-    async def test_dashboard_sessions_boundary_days_1(self):
+    async def test_dashboard_sessions_boundary_days_1(self) -> None:
         """days=1 (minimum) is accepted."""
         from app.routes.metrics import get_dashboard_sessions
 
@@ -745,7 +745,7 @@ class TestBoundaryConditions:
         assert result == {}
 
     @pytest.mark.asyncio
-    async def test_dashboard_sessions_boundary_days_365(self):
+    async def test_dashboard_sessions_boundary_days_365(self) -> None:
         """days=365 (maximum) is accepted."""
         from app.routes.metrics import get_dashboard_sessions
 
@@ -755,7 +755,7 @@ class TestBoundaryConditions:
         assert result == {}
 
     @pytest.mark.asyncio
-    async def test_performance_history_boundary_hours_1(self):
+    async def test_performance_history_boundary_hours_1(self) -> None:
         """hours=1 (minimum) is accepted."""
         from app.routes.metrics import get_performance_history
 
@@ -765,7 +765,7 @@ class TestBoundaryConditions:
         assert result == {}
 
     @pytest.mark.asyncio
-    async def test_performance_history_boundary_hours_24(self):
+    async def test_performance_history_boundary_hours_24(self) -> None:
         """hours=24 (maximum) is accepted."""
         from app.routes.metrics import get_performance_history
 

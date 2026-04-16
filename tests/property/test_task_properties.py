@@ -5,6 +5,7 @@ Feature: api-migration
 Tests universal properties of task status and result retrieval.
 """
 
+from typing import Any
 import pytest
 from hypothesis import given, strategies as st, settings
 from unittest.mock import MagicMock
@@ -35,20 +36,20 @@ except ImportError:
         REVOKED = "REVOKED"
 
     class MockAsyncResult:
-        def __init__(self, task_id):
+        def __init__(self, task_id: str) -> None:
             self.id = task_id
             self.state = MockStates.PENDING
             self.status = MockStates.PENDING
             self.result = None
             self.info = None
 
-        def ready(self):
+        def ready(self) -> bool:
             return self.state in [MockStates.SUCCESS, MockStates.FAILURE, MockStates.REVOKED]
 
-        def successful(self):
+        def successful(self) -> bool:
             return self.state == MockStates.SUCCESS
 
-        def failed(self):
+        def failed(self) -> bool:
             return self.state == MockStates.FAILURE
 
     AsyncResult = MockAsyncResult
@@ -60,7 +61,9 @@ except ImportError:
 # ============================================================================
 
 
-def create_mock_async_result(task_id: str, state: str, result=None, info=None):
+def create_mock_async_result(
+    task_id: str, state: str, result: Any = None, info: Any = None
+) -> MagicMock:
     """Create a mock AsyncResult for testing."""
     mock_result = MagicMock(spec=AsyncResult)
     mock_result.id = task_id
@@ -95,7 +98,7 @@ def create_mock_async_result(task_id: str, state: str, result=None, info=None):
     task_id=st.uuids().map(str),
     task_state=st.sampled_from([states.PENDING, states.STARTED, states.SUCCESS, states.FAILURE]),
 )
-def test_property_14_task_status_retrieval(task_id, task_state):
+def test_property_14_task_status_retrieval(task_id: str, task_state: str) -> None:
     """
     **Validates: Requirements 15.4**
 
@@ -168,7 +171,9 @@ def test_property_14_task_status_retrieval(task_id, task_state):
         max_size=3,
     ),
 )
-def test_property_15_task_result_retrieval_completed(task_id, result_data):
+def test_property_15_task_result_retrieval_completed(
+    task_id: str, result_data: dict[str, Any]
+) -> None:
     """
     **Validates: Requirements 15.5**
 
@@ -234,7 +239,7 @@ def test_property_15_task_result_retrieval_completed(task_id, result_data):
         max_size=3,
     ),
 )
-def test_property_16_task_serialization_roundtrip(task_id, task_data):
+def test_property_16_task_serialization_roundtrip(task_id: str, task_data: dict[str, Any]) -> None:
     """
     **Validates: Requirements 15.8**
 

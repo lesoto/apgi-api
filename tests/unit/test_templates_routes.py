@@ -4,6 +4,7 @@ Comprehensive test suite for templates routes (100% coverage target)
 Tests all CRUD operations, error handling, pagination, and access control.
 """
 
+from typing import Any
 import pytest
 from datetime import datetime, timezone, timedelta
 from unittest.mock import MagicMock, patch, AsyncMock, PropertyMock
@@ -44,28 +45,28 @@ FAKE_OTHER_USER = TokenPayload(
 class MockQuery:
     """Custom mock query class that handles SQLAlchemy whereclause boolean evaluation."""
 
-    def __init__(self, has_whereclause=False):
+    def __init__(self, has_whereclause: bool = False) -> None:
         self._has_whereclause = has_whereclause
         self.whereclause = self if has_whereclause else None
 
-    def __bool__(self):
+    def __bool__(self) -> bool:
         return self._has_whereclause
 
-    def filter(self, *args, **kwargs):
+    def filter(self, *args: Any, **kwargs: Any) -> "MockQuery":
         return self
 
-    def count(self):
+    def count(self) -> int:
         return 2 if self._has_whereclause else 0
 
-    def offset(self, n):
+    def offset(self, n: int) -> "MockQuery":
         return self
 
-    def limit(self, n):
+    def limit(self, n: int) -> "MockQuery":
         return self
 
 
 @pytest.fixture
-def mock_template():
+def mock_template() -> MagicMock:
     """Create a mock template object."""
     from datetime import datetime, timezone
 
@@ -87,7 +88,7 @@ def mock_template():
 
 
 @pytest.fixture
-def mock_public_template():
+def mock_public_template() -> MagicMock:
     """Create a mock public template object."""
     from datetime import datetime, timezone
 
@@ -111,7 +112,7 @@ def mock_public_template():
 class TestInitTemplateRoutes:
     """Test init_template_routes function."""
 
-    def test_init_template_routes(self, caplog):
+    def test_init_template_routes(self, caplog: Any) -> None:
         """init_template_routes should log initialization message."""
         with caplog.at_level("INFO"):
             init_template_routes()
@@ -122,7 +123,7 @@ class TestListTemplates:
     """Test list_templates endpoint."""
 
     @pytest.mark.asyncio
-    async def test_list_templates_invalid_page_zero(self):
+    async def test_list_templates_invalid_page_zero(self) -> None:
         """Page < 1 should raise 400."""
         with pytest.raises(HTTPException) as exc_info:
             await list_templates(page=0, per_page=10, public_only=False, current_user=FAKE_USER)
@@ -130,14 +131,14 @@ class TestListTemplates:
         assert "Page must be >= 1" in exc_info.value.detail
 
     @pytest.mark.asyncio
-    async def test_list_templates_invalid_page_negative(self):
+    async def test_list_templates_invalid_page_negative(self) -> None:
         """Page < 0 should raise 400."""
         with pytest.raises(HTTPException) as exc_info:
             await list_templates(page=-1, per_page=10, public_only=False, current_user=FAKE_USER)
         assert exc_info.value.status_code == 400
 
     @pytest.mark.asyncio
-    async def test_list_templates_invalid_per_page_zero(self):
+    async def test_list_templates_invalid_per_page_zero(self) -> None:
         """Per page = 0 should raise 400."""
         with pytest.raises(HTTPException) as exc_info:
             await list_templates(page=1, per_page=0, public_only=False, current_user=FAKE_USER)
@@ -145,7 +146,7 @@ class TestListTemplates:
         assert "Per page must be between 1 and 100" in exc_info.value.detail
 
     @pytest.mark.asyncio
-    async def test_list_templates_invalid_per_page_too_large(self):
+    async def test_list_templates_invalid_per_page_too_large(self) -> None:
         """Per page > 100 should raise 400."""
         with pytest.raises(HTTPException) as exc_info:
             await list_templates(page=1, per_page=101, public_only=False, current_user=FAKE_USER)
@@ -153,7 +154,9 @@ class TestListTemplates:
         assert "Per page must be between 1 and 100" in exc_info.value.detail
 
     @pytest.mark.asyncio
-    async def test_list_templates_success_with_results(self, mock_template, mock_public_template):
+    async def test_list_templates_success_with_results(
+        self, mock_template: MagicMock, mock_public_template: MagicMock
+    ) -> None:
         """List templates should return user's templates and public templates."""
         mock_db = MagicMock()
         mock_result = MagicMock()
@@ -179,7 +182,7 @@ class TestListTemplates:
         assert response.pagination.per_page == 10
 
     @pytest.mark.asyncio
-    async def test_list_templates_public_only(self, mock_public_template):
+    async def test_list_templates_public_only(self, mock_public_template: MagicMock) -> None:
         """List templates with public_only=true should return only public templates."""
         mock_db = MagicMock()
         mock_result = MagicMock()
@@ -204,7 +207,7 @@ class TestListTemplates:
         assert len(response.templates) == 1
 
     @pytest.mark.asyncio
-    async def test_list_templates_empty_results(self):
+    async def test_list_templates_empty_results(self) -> None:
         """List templates with no results should return empty list."""
         mock_db = MagicMock()
         mock_result = MagicMock()
@@ -229,7 +232,7 @@ class TestListTemplates:
         assert response.pagination.total == 0
 
     @pytest.mark.asyncio
-    async def test_list_templates_database_error(self, caplog):
+    async def test_list_templates_database_error(self, caplog: Any) -> None:
         """Database error should raise 500."""
         with patch("app.routes.templates.get_async_db_context") as mock_db_context:
             mock_context_manager = MagicMock()
@@ -244,7 +247,7 @@ class TestListTemplates:
         assert "internal error" in exc_info.value.detail.lower()
 
     @pytest.mark.asyncio
-    async def test_list_templates_pagination_second_page(self, mock_template):
+    async def test_list_templates_pagination_second_page(self, mock_template: MagicMock) -> None:
         """List templates with page=2 should return second page."""
         mock_db = MagicMock()
         mock_result = MagicMock()
@@ -272,7 +275,7 @@ class TestCreateTemplate:
     """Test create_template endpoint."""
 
     @pytest.mark.asyncio
-    async def test_create_template_success(self, mock_template):
+    async def test_create_template_success(self, mock_template: MagicMock) -> None:
         """Create template with valid data should succeed."""
         from app.models.schemas import SessionTemplateCreateRequest
         from datetime import datetime, timezone
@@ -285,7 +288,7 @@ class TestCreateTemplate:
         mock_db.execute.return_value = mock_check_result
 
         # Mock db.refresh() to set created_at and updated_at like real database would
-        def mock_refresh(template):
+        def mock_refresh(template: MagicMock) -> None:
             template.created_at = datetime.now(timezone.utc)
             template.updated_at = datetime.now(timezone.utc)
             template.template_id = str(uuid4())
@@ -315,7 +318,7 @@ class TestCreateTemplate:
         assert response.user_id == str(FAKE_USER.user_id)
 
     @pytest.mark.asyncio
-    async def test_create_template_duplicate_name(self, mock_template):
+    async def test_create_template_duplicate_name(self, mock_template: MagicMock) -> None:
         """Create template with duplicate name should raise 409."""
         from app.models.schemas import SessionTemplateCreateRequest
 
@@ -349,7 +352,7 @@ class TestCreateTemplate:
         assert "already exists" in exc_info.value.detail.lower()
 
     @pytest.mark.asyncio
-    async def test_create_template_database_unique_constraint_error(self):
+    async def test_create_template_database_unique_constraint_error(self) -> None:
         """Database unique constraint error should raise 409."""
         from app.models.schemas import SessionTemplateCreateRequest
 
@@ -388,7 +391,7 @@ class TestCreateTemplate:
         assert exc_info.value.status_code == 409
 
     @pytest.mark.asyncio
-    async def test_create_template_database_foreign_key_error(self):
+    async def test_create_template_database_foreign_key_error(self) -> None:
         """Database foreign key error should raise 400."""
         from app.models.schemas import SessionTemplateCreateRequest
 
@@ -426,7 +429,7 @@ class TestCreateTemplate:
         assert "Invalid user reference" in exc_info.value.detail
 
     @pytest.mark.asyncio
-    async def test_create_template_database_check_constraint_error(self):
+    async def test_create_template_database_check_constraint_error(self) -> None:
         """Database check constraint error should raise 400."""
         from app.models.schemas import SessionTemplateCreateRequest
 
@@ -464,7 +467,7 @@ class TestCreateTemplate:
         assert "Invalid template data" in exc_info.value.detail
 
     @pytest.mark.asyncio
-    async def test_create_template_database_generic_error(self, caplog):
+    async def test_create_template_database_generic_error(self, caplog: Any) -> None:
         """Generic database error should raise 500."""
         from app.models.schemas import SessionTemplateCreateRequest
 
@@ -505,7 +508,7 @@ class TestGetTemplate:
     """Test get_template endpoint."""
 
     @pytest.mark.asyncio
-    async def test_get_template_success(self, mock_template):
+    async def test_get_template_success(self, mock_template: MagicMock) -> None:
         """Get existing template should succeed."""
         mock_db = MagicMock()
         mock_result = MagicMock()
@@ -526,7 +529,7 @@ class TestGetTemplate:
         assert response.name == mock_template.name
 
     @pytest.mark.asyncio
-    async def test_get_template_not_found(self):
+    async def test_get_template_not_found(self) -> None:
         """Get non-existent template should raise 404."""
         mock_db = MagicMock()
         mock_result = MagicMock()
@@ -545,7 +548,7 @@ class TestGetTemplate:
         assert exc_info.value.status_code == 404
 
     @pytest.mark.asyncio
-    async def test_get_template_access_denied_private(self, mock_template):
+    async def test_get_template_access_denied_private(self, mock_template: MagicMock) -> None:
         """Get private template of another user should raise 403."""
         mock_template.is_public = False
         mock_template.user_id = "different-user-id"
@@ -570,7 +573,7 @@ class TestGetTemplate:
         assert "Access denied" in exc_info.value.detail
 
     @pytest.mark.asyncio
-    async def test_get_template_public_access(self, mock_public_template):
+    async def test_get_template_public_access(self, mock_public_template: MagicMock) -> None:
         """Get public template of another user should succeed."""
         mock_db = MagicMock()
         mock_result = MagicMock()
@@ -590,7 +593,7 @@ class TestGetTemplate:
         assert response.is_public is True
 
     @pytest.mark.asyncio
-    async def test_get_template_owner_access(self, mock_template):
+    async def test_get_template_owner_access(self, mock_template: MagicMock) -> None:
         """Owner should be able to access their private template."""
         mock_template.is_public = False
 
@@ -612,7 +615,7 @@ class TestGetTemplate:
         assert response is not None
 
     @pytest.mark.asyncio
-    async def test_get_template_general_exception(self, caplog):
+    async def test_get_template_general_exception(self, caplog: Any) -> None:
         """General exception should raise 500."""
         with patch("app.routes.templates.get_async_db_context") as mock_db_context:
             mock_context_manager = MagicMock()
@@ -630,7 +633,7 @@ class TestUpdateTemplate:
     """Test update_template endpoint."""
 
     @pytest.mark.asyncio
-    async def test_update_template_success(self, mock_template):
+    async def test_update_template_success(self, mock_template: MagicMock) -> None:
         """Update template should succeed."""
         from app.models.schemas import SessionTemplateUpdateRequest
 
@@ -670,7 +673,7 @@ class TestUpdateTemplate:
         assert response.name == "Updated Template"
 
     @pytest.mark.asyncio
-    async def test_update_template_not_found(self):
+    async def test_update_template_not_found(self) -> None:
         """Update non-existent template should raise 404."""
         from app.models.schemas import SessionTemplateUpdateRequest
 
@@ -705,7 +708,7 @@ class TestUpdateTemplate:
         assert exc_info.value.status_code == 404
 
     @pytest.mark.asyncio
-    async def test_update_template_not_owner(self, mock_template):
+    async def test_update_template_not_owner(self, mock_template: MagicMock) -> None:
         """Update template when not owner should raise 403."""
         from app.models.schemas import SessionTemplateUpdateRequest
 
@@ -743,7 +746,7 @@ class TestUpdateTemplate:
         assert "Only template owner" in exc_info.value.detail
 
     @pytest.mark.asyncio
-    async def test_update_template_duplicate_name(self, mock_template):
+    async def test_update_template_duplicate_name(self, mock_template: MagicMock) -> None:
         """Update template with duplicate name should raise 409."""
         from app.models.schemas import SessionTemplateUpdateRequest
 
@@ -787,7 +790,7 @@ class TestUpdateTemplate:
         assert "already exists" in exc_info.value.detail.lower()
 
     @pytest.mark.asyncio
-    async def test_update_template_same_name(self, mock_template):
+    async def test_update_template_same_name(self, mock_template: MagicMock) -> None:
         """Update template keeping same name should succeed."""
         from app.models.schemas import SessionTemplateUpdateRequest
 
@@ -821,7 +824,7 @@ class TestUpdateTemplate:
         assert response is not None
 
     @pytest.mark.asyncio
-    async def test_update_template_partial_update(self, mock_template):
+    async def test_update_template_partial_update(self, mock_template: MagicMock) -> None:
         """Update template with partial fields should succeed."""
         from app.models.schemas import SessionTemplateUpdateRequest
 
@@ -860,7 +863,7 @@ class TestDeleteTemplate:
     """Test delete_template endpoint."""
 
     @pytest.mark.asyncio
-    async def test_delete_template_success(self, mock_template):
+    async def test_delete_template_success(self, mock_template: MagicMock) -> None:
         """Delete template should succeed."""
         mock_db = MagicMock()
         mock_result = MagicMock()
@@ -881,7 +884,7 @@ class TestDeleteTemplate:
         mock_db.delete.assert_called_once_with(mock_template)
 
     @pytest.mark.asyncio
-    async def test_delete_template_not_found(self):
+    async def test_delete_template_not_found(self) -> None:
         """Delete non-existent template should raise 404."""
         mock_db = MagicMock()
         mock_result = MagicMock()
@@ -900,7 +903,7 @@ class TestDeleteTemplate:
         assert exc_info.value.status_code == 404
 
     @pytest.mark.asyncio
-    async def test_delete_template_not_owner(self, mock_template):
+    async def test_delete_template_not_owner(self, mock_template: MagicMock) -> None:
         """Delete template when not owner should raise 403."""
         mock_template.user_id = "different-user-id"
 
@@ -927,7 +930,7 @@ class TestDeleteTemplate:
 class TestIntegrationWithFastAPI:
     """Integration tests using TestClient."""
 
-    def test_list_templates_endpoint(self):
+    def test_list_templates_endpoint(self) -> None:
         """Test list templates via HTTP endpoint."""
         from app.main import create_app
         from app.services.authorization import get_current_user, require_permission
@@ -940,7 +943,7 @@ class TestIntegrationWithFastAPI:
             resp = client.get("/v1/templates?page=1&per_page=10")
             assert resp.status_code in [200, 500]  # 500 if DB not available
 
-    def test_create_template_endpoint(self):
+    def test_create_template_endpoint(self) -> None:
         """Test create template via HTTP endpoint."""
         from app.main import create_app
         from app.services.authorization import get_current_user, require_permission
@@ -960,7 +963,7 @@ class TestIntegrationWithFastAPI:
             resp = client.post("/v1/templates", json=template_data)
             assert resp.status_code in [201, 409, 422, 500]
 
-    def test_get_template_endpoint(self):
+    def test_get_template_endpoint(self) -> None:
         """Test get template via HTTP endpoint."""
         from app.main import create_app
         from app.services.authorization import get_current_user, require_permission
@@ -973,7 +976,7 @@ class TestIntegrationWithFastAPI:
             resp = client.get("/v1/templates/test-template-id")
             assert resp.status_code in [200, 404, 500]
 
-    def test_update_template_endpoint(self):
+    def test_update_template_endpoint(self) -> None:
         """Test update template via HTTP endpoint."""
         from app.main import create_app
         from app.services.authorization import get_current_user, require_permission
@@ -988,7 +991,7 @@ class TestIntegrationWithFastAPI:
             resp = client.put("/v1/templates/test-template-id", json=update_data)
             assert resp.status_code in [200, 404, 403, 409, 500]
 
-    def test_delete_template_endpoint(self):
+    def test_delete_template_endpoint(self) -> None:
         """Test delete template via HTTP endpoint."""
         from app.main import create_app
         from app.services.authorization import get_current_user, require_permission
@@ -1006,7 +1009,7 @@ class TestExceptionHandlingAndEdgeCases:
     """Test exception handling and edge cases for 100% coverage."""
 
     @pytest.mark.asyncio
-    async def test_list_templates_exception_inside_try_block(self, caplog):
+    async def test_list_templates_exception_inside_try_block(self, caplog: Any) -> None:
         """Test exception handling in list_templates try block (Lines 137-142)."""
         mock_db = MagicMock()
         # Make db.execute raise an exception inside the try block
@@ -1025,7 +1028,7 @@ class TestExceptionHandlingAndEdgeCases:
         assert "internal error" in exc_info.value.detail.lower()
 
     @pytest.mark.asyncio
-    async def test_create_template_http_exception_reraise(self, mock_template):
+    async def test_create_template_http_exception_reraise(self, mock_template: MagicMock) -> None:
         """Test that HTTPException is re-raised in create_template (Lines 253-254)."""
         from app.models.schemas import SessionTemplateCreateRequest
 
@@ -1065,7 +1068,7 @@ class TestExceptionHandlingAndEdgeCases:
             assert "teapot" in exc_info.value.detail.lower()
 
     @pytest.mark.asyncio
-    async def test_get_template_exception_reraise(self, mock_template):
+    async def test_get_template_exception_reraise(self, mock_template: MagicMock) -> None:
         """Test that general exceptions are caught and converted to 500 in get_template."""
         mock_db = MagicMock()
 
@@ -1098,7 +1101,7 @@ class TestExceptionHandlingAndEdgeCases:
         type(mock_template).is_public = PropertyMock(return_value=False)
 
     @pytest.mark.asyncio
-    async def test_update_template_http_exception_reraise(self, mock_template):
+    async def test_update_template_http_exception_reraise(self, mock_template: MagicMock) -> None:
         """Test that HTTPException is re-raised in update_template (Lines 423-424)."""
         from app.models.schemas import SessionTemplateUpdateRequest
 
@@ -1138,7 +1141,7 @@ class TestExceptionHandlingAndEdgeCases:
             assert exc_info.value.status_code == 418
 
     @pytest.mark.asyncio
-    async def test_delete_template_http_exception_reraise(self, mock_template):
+    async def test_delete_template_http_exception_reraise(self, mock_template: MagicMock) -> None:
         """Test that HTTPException is re-raised in delete_template (Lines 472-473)."""
         mock_db = MagicMock()
 
@@ -1165,7 +1168,7 @@ class TestExceptionHandlingAndEdgeCases:
             assert exc_info.value.status_code == 418
 
     @pytest.mark.asyncio
-    async def test_update_template_with_all_fields(self, mock_template):
+    async def test_update_template_with_all_fields(self, mock_template: MagicMock) -> None:
         """Test updating all fields of a template."""
         from app.models.schemas import SessionTemplateUpdateRequest
 
@@ -1212,7 +1215,7 @@ class TestExceptionHandlingAndEdgeCases:
             assert mock_template.is_public is True
 
     @pytest.mark.asyncio
-    async def test_create_template_rollback_on_error(self):
+    async def test_create_template_rollback_on_error(self) -> None:
         """Test that rollback is called when commit fails."""
         from app.models.schemas import SessionTemplateCreateRequest
 
@@ -1247,7 +1250,7 @@ class TestExceptionHandlingAndEdgeCases:
             mock_db.rollback.assert_called_once()
 
     @pytest.mark.asyncio
-    async def test_list_templates_with_none_tags(self, mock_template):
+    async def test_list_templates_with_none_tags(self, mock_template: MagicMock) -> None:
         """Test list templates handles None tags gracefully."""
         mock_template.tags = None  # Set tags to None
 
@@ -1274,7 +1277,7 @@ class TestExceptionHandlingAndEdgeCases:
         assert response.templates[0].tags == []
 
     @pytest.mark.asyncio
-    async def test_update_template_no_name_change(self, mock_template):
+    async def test_update_template_no_name_change(self, mock_template: MagicMock) -> None:
         """Test update when name is not provided (None)."""
         from app.models.schemas import SessionTemplateUpdateRequest
 
@@ -1311,7 +1314,7 @@ class TestExceptionHandlingAndEdgeCases:
             assert response.description == "Updated Description"
 
     @pytest.mark.asyncio
-    async def test_list_templates_public_only_with_no_results(self):
+    async def test_list_templates_public_only_with_no_results(self) -> None:
         """Test public_only=true with no results."""
         mock_db = MagicMock()
         mock_result = MagicMock()
@@ -1336,7 +1339,7 @@ class TestExceptionHandlingAndEdgeCases:
         assert response.pagination.total == 0
 
     @pytest.mark.asyncio
-    async def test_delete_template_general_exception(self, caplog):
+    async def test_delete_template_general_exception(self, caplog: Any) -> None:
         """Test general exception handling in delete_template."""
         mock_db = MagicMock()
         mock_result = MagicMock()

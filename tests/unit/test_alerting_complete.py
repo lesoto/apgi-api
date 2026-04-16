@@ -722,7 +722,7 @@ class TestConfigureAlerting:
             assert len(alert_manager.channels) == 1
             mock_logger.info.assert_called()
 
-    def test_configure_alerting_with_slack(self):
+    def test_configure_alerting_with_slack(self) -> None:
         """Test configure_alerting with Slack webhooks."""
         configure_alerting(
             slack_webhook_urls=["https://hooks.slack.com/test"],
@@ -731,7 +731,7 @@ class TestConfigureAlerting:
 
         assert len(alert_manager.channels) == 1
 
-    def test_configure_alerting_with_pagerduty(self):
+    def test_configure_alerting_with_pagerduty(self) -> None:
         """Test configure_alerting with PagerDuty."""
         configure_alerting(
             pagerduty_integration_keys=["test-key"],
@@ -740,7 +740,7 @@ class TestConfigureAlerting:
 
         assert len(alert_manager.channels) == 1
 
-    def test_configure_alerting_with_teams(self):
+    def test_configure_alerting_with_teams(self) -> None:
         """Test configure_alerting with Microsoft Teams."""
         configure_alerting(
             teams_webhook_urls=["https://outlook.office.com/webhook/test"],
@@ -749,7 +749,7 @@ class TestConfigureAlerting:
 
         assert len(alert_manager.channels) == 1
 
-    def test_configure_alerting_with_email(self):
+    def test_configure_alerting_with_email(self) -> None:
         """Test configure_alerting with email config."""
         configure_alerting(
             email_config={
@@ -763,14 +763,14 @@ class TestConfigureAlerting:
 
         assert len(alert_manager.channels) == 1
 
-    def test_configure_alerting_with_log_channel(self):
+    def test_configure_alerting_with_log_channel(self) -> None:
         """Test configure_alerting with log channel enabled."""
         configure_alerting(enable_log_channel=True)
 
         # Should have at least one channel (the log channel)
         assert len(alert_manager.channels) >= 1
 
-    def test_configure_alerting_custom_thresholds(self):
+    def test_configure_alerting_custom_thresholds(self) -> None:
         """Test configure_alerting with custom thresholds."""
         configure_alerting(
             enable_log_channel=False,
@@ -783,7 +783,7 @@ class TestConfigureAlerting:
         assert alert_manager.error_rate_window == timedelta(minutes=2)
         assert alert_manager.alert_cooldown == timedelta(minutes=10)
 
-    def test_configure_alerting_multiple_channels(self):
+    def test_configure_alerting_multiple_channels(self) -> None:
         """Test configure_alerting with multiple channel types."""
         configure_alerting(
             webhook_urls=["https://example.com/webhook"],
@@ -800,7 +800,7 @@ class TestConfigureAlerting:
         # Should have 5 channels (webhook, slack, pagerduty, teams, email, log)
         assert len(alert_manager.channels) == 6
 
-    def test_configure_alerting_empty_lists(self):
+    def test_configure_alerting_empty_lists(self) -> None:
         """Test configure_alerting with empty lists doesn't add channels."""
         configure_alerting(
             webhook_urls=[],
@@ -816,7 +816,7 @@ class TestConfigureAlerting:
 class TestAlertDataclass:
     """Test Alert dataclass."""
 
-    def test_alert_to_dict(self):
+    def test_alert_to_dict(self) -> None:
         """Test alert to_dict conversion."""
         alert = Alert(
             title="Test Alert",

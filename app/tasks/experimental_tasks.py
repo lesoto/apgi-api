@@ -4,6 +4,8 @@ Experimental Task Celery Tasks
 Celery tasks for executing experimental paradigms (Iowa Gambling, Masking, Attentional Blink).
 """
 
+from __future__ import annotations
+
 import logging
 import sys
 from datetime import datetime, timezone
@@ -43,8 +45,29 @@ from app.services.webhook_manager import WebhookManager
 
 logger = logging.getLogger(__name__)
 
+# Explicit exports for mypy
+__all__ = [
+    "APGITask",
+    "execute_iowa_gambling_task",
+    "execute_masking_paradigm_task",
+    "execute_attentional_blink_task",
+    "execute_change_blindness_task",
+    "execute_binocular_rivalry_task",
+    "trigger_webhook_on_completion",
+    "APGI_SYSTEM_AVAILABLE",
+    "AttentionalBlinkTask",
+    "BinocularRivalryTask",
+    "ChangeBlindnessTask",
+    "IowaGamblingTask",
+    "MaskingParadigmTask",
+    "get_resource_path",
+    "APGISystem",
+    "celery_app",
+    "WebhookManager",
+]
 
-async def trigger_webhook_on_completion(task_id: str, result: Dict[str, Any]):
+
+async def trigger_webhook_on_completion(task_id: str, result: Dict[str, Any]) -> None:
     """
     Trigger webhook delivery when task completes and start dependent tasks.
 
@@ -117,13 +140,13 @@ async def trigger_webhook_on_completion(task_id: str, result: Dict[str, Any]):
         logger.error(f"Failed to trigger webhook for task {task_id}: {e}", exc_info=True)
 
 
-class APGITask(Task):
+class APGITask(Task):  # type: ignore[misc]
     """Base task class with APGI system initialization."""
 
-    _apgi_system = None
+    _apgi_system: Any = None
 
     @property
-    def apgi_system(self):
+    def apgi_system(self) -> Any:
         """Lazy initialization of APGI system."""
         if self._apgi_system is None:
             if not APGI_SYSTEM_AVAILABLE or APGISystem is None or get_resource_path is None:
@@ -137,8 +160,10 @@ class APGITask(Task):
 
 @celery_app.task(
     bind=True, base=APGITask, name="app.tasks.experimental_tasks.execute_iowa_gambling_task"
-)
-def execute_iowa_gambling_task(self, session_id: str, parameters: Dict[str, Any]) -> Dict[str, Any]:
+)  # type: ignore[misc]
+def execute_iowa_gambling_task(
+    self: Any, session_id: str, parameters: Dict[str, Any]
+) -> Dict[str, Any]:
     """
     Execute Iowa Gambling Task.
 
@@ -219,9 +244,9 @@ def execute_iowa_gambling_task(self, session_id: str, parameters: Dict[str, Any]
 
 @celery_app.task(
     bind=True, base=APGITask, name="app.tasks.experimental_tasks.execute_masking_paradigm_task"
-)
+)  # type: ignore[misc]
 def execute_masking_paradigm_task(
-    self, session_id: str, parameters: Dict[str, Any]
+    self: Any, session_id: str, parameters: Dict[str, Any]
 ) -> Dict[str, Any]:
     """
     Execute Masking Paradigm Task.
@@ -304,9 +329,9 @@ def execute_masking_paradigm_task(
 
 @celery_app.task(
     bind=True, base=APGITask, name="app.tasks.experimental_tasks.execute_attentional_blink_task"
-)
+)  # type: ignore[misc]
 def execute_attentional_blink_task(
-    self, session_id: str, parameters: Dict[str, Any]
+    self: Any, session_id: str, parameters: Dict[str, Any]
 ) -> Dict[str, Any]:
     """
     Execute Attentional Blink Task.
@@ -386,9 +411,9 @@ def execute_attentional_blink_task(
 
 @celery_app.task(
     bind=True, base=APGITask, name="app.tasks.experimental_tasks.execute_change_blindness_task"
-)
+)  # type: ignore[misc]
 def execute_change_blindness_task(
-    self, session_id: str, parameters: Dict[str, Any]
+    self: Any, session_id: str, parameters: Dict[str, Any]
 ) -> Dict[str, Any]:
     """
     Execute Change Blindness Task.
@@ -420,11 +445,12 @@ def execute_change_blindness_task(
 
         # Create task instance
         # noqa: E501 - Parameters are from external apgi_system classes
+        # type: ignore[arg-type] - External library parameters
         task = ChangeBlindnessTask(
-            image_size=image_size,
-            change_magnitude=change_magnitude,
-            flicker_duration_ms=flicker_duration_ms,
-            num_trials=num_trials,
+            image_size=image_size,  # type: ignore[arg-type]
+            change_magnitude=change_magnitude,  # type: ignore[arg-type]
+            flicker_duration_ms=flicker_duration_ms,  # type: ignore[arg-type]
+            num_trials=num_trials,  # type: ignore[arg-type]
         )
 
         # Run all trials
@@ -461,9 +487,9 @@ def execute_change_blindness_task(
 
 @celery_app.task(
     bind=True, base=APGITask, name="app.tasks.experimental_tasks.execute_binocular_rivalry_task"
-)
+)  # type: ignore[misc]
 def execute_binocular_rivalry_task(
-    self, session_id: str, parameters: Dict[str, Any]
+    self: Any, session_id: str, parameters: Dict[str, Any]
 ) -> Dict[str, Any]:
     """
     Execute Binocular Rivalry Task.
@@ -496,12 +522,13 @@ def execute_binocular_rivalry_task(
 
         # Create task instance
         # noqa: E501 - Parameters are from external apgi_system classes
+        # type: ignore[arg-type] - External library parameters
         task = BinocularRivalryTask(
-            pattern_size=pattern_size,
-            contrast_left=contrast_left,
-            contrast_right=contrast_right,
-            duration_seconds=duration_seconds,
-            sampling_rate_hz=sampling_rate_hz,
+            pattern_size=pattern_size,  # type: ignore[arg-type]
+            contrast_left=contrast_left,  # type: ignore[arg-type]
+            contrast_right=contrast_right,  # type: ignore[arg-type]
+            duration_seconds=duration_seconds,  # type: ignore[arg-type]
+            sampling_rate_hz=sampling_rate_hz,  # type: ignore[arg-type]
         )
 
         # Run all trials

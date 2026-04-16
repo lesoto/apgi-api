@@ -43,7 +43,7 @@ def mock_apgi_system():
 class TestIowaGamblingTask:
     """Tests for execute_iowa_gambling_task Celery task."""
 
-    def test_execute_iowa_gambling_task_apgi_unavailable(self, mock_celery_task):
+    def test_execute_iowa_gambling_task_apgi_unavailable(self, mock_celery_task: MagicMock) -> None:
         """Test when APGI system is not available (Lines 160-166)."""
         with patch("app.tasks.experimental_tasks.APGI_SYSTEM_AVAILABLE", False):
             with patch("app.tasks.experimental_tasks.IowaGamblingTask", None):
@@ -56,7 +56,9 @@ class TestIowaGamblingTask:
                 assert result["status"] == "failed"
                 assert "not available" in result["error"].lower()
 
-    def test_execute_iowa_gambling_task_success(self, mock_celery_task, mock_apgi_system):
+    def test_execute_iowa_gambling_task_success(
+        self, mock_celery_task: MagicMock, mock_apgi_system: MagicMock
+    ) -> None:
         """Test successful Iowa Gambling task execution."""
         with patch("app.tasks.experimental_tasks.APGI_SYSTEM_AVAILABLE", True):
             with patch("app.tasks.experimental_tasks.IowaGamblingTask") as mock_task_class:
@@ -88,7 +90,9 @@ class TestIowaGamblingTask:
                 assert result["task_type"] == "iowa_gambling"
                 assert result["session_id"] == "session-123"
 
-    def test_execute_iowa_gambling_task_exception(self, mock_celery_task, mock_apgi_system):
+    def test_execute_iowa_gambling_task_exception(
+        self, mock_celery_task: MagicMock, mock_apgi_system: MagicMock
+    ) -> None:
         """Test exception handling during task execution (Lines 200-207)."""
         with patch("app.tasks.experimental_tasks.APGI_SYSTEM_AVAILABLE", True):
             with patch("app.tasks.experimental_tasks.IowaGamblingTask") as mock_task_class:
@@ -116,7 +120,9 @@ class TestIowaGamblingTask:
 class TestMaskingParadigmTask:
     """Tests for execute_masking_paradigm_task Celery task."""
 
-    def test_execute_masking_paradigm_task_apgi_unavailable(self, mock_celery_task):
+    def test_execute_masking_paradigm_task_apgi_unavailable(
+        self, mock_celery_task: MagicMock
+    ) -> None:
         """Test when APGI system is not available."""
         with patch("app.tasks.experimental_tasks.APGI_SYSTEM_AVAILABLE", False):
             with patch("app.tasks.experimental_tasks.MaskingParadigmTask", None):
@@ -129,7 +135,9 @@ class TestMaskingParadigmTask:
                 assert result["status"] == "failed"
                 assert "not available" in result["error"].lower()
 
-    def test_execute_masking_paradigm_task_success(self, mock_celery_task, mock_apgi_system):
+    def test_execute_masking_paradigm_task_success(
+        self, mock_celery_task: MagicMock, mock_apgi_system: MagicMock
+    ) -> None:
         """Test successful Masking Paradigm task execution."""
         with patch("app.tasks.experimental_tasks.APGI_SYSTEM_AVAILABLE", True):
             with patch("app.tasks.experimental_tasks.MaskingParadigmTask") as mock_task_class:
@@ -159,7 +167,9 @@ class TestMaskingParadigmTask:
                 assert result["status"] == "completed"
                 assert result["task_type"] == "masking_paradigm"
 
-    def test_execute_masking_paradigm_task_exception(self, mock_celery_task, mock_apgi_system):
+    def test_execute_masking_paradigm_task_exception(
+        self, mock_celery_task: MagicMock, mock_apgi_system: MagicMock
+    ) -> None:
         """Test exception handling."""
         with patch("app.tasks.experimental_tasks.APGI_SYSTEM_AVAILABLE", True):
             with patch("app.tasks.experimental_tasks.MaskingParadigmTask") as mock_task_class:
@@ -187,7 +197,9 @@ class TestMaskingParadigmTask:
 class TestAttentionalBlinkTask:
     """Tests for execute_attentional_blink_task Celery task."""
 
-    def test_execute_attentional_blink_task_apgi_unavailable(self, mock_celery_task):
+    def test_execute_attentional_blink_task_apgi_unavailable(
+        self, mock_celery_task: MagicMock
+    ) -> None:
         """Test when APGI system is not available."""
         with patch("app.tasks.experimental_tasks.APGI_SYSTEM_AVAILABLE", False):
             with patch("app.tasks.experimental_tasks.AttentionalBlinkTask", None):
@@ -200,7 +212,9 @@ class TestAttentionalBlinkTask:
                 assert result["status"] == "failed"
                 assert "not available" in result["error"].lower()
 
-    def test_execute_attentional_blink_task_success(self, mock_celery_task, mock_apgi_system):
+    def test_execute_attentional_blink_task_success(
+        self, mock_celery_task: MagicMock, mock_apgi_system: MagicMock
+    ) -> None:
         """Test successful Attentional Blink task execution."""
         with patch("app.tasks.experimental_tasks.APGI_SYSTEM_AVAILABLE", True):
             with patch("app.tasks.experimental_tasks.AttentionalBlinkTask") as mock_task_class:
@@ -232,7 +246,9 @@ class TestAttentionalBlinkTask:
                 assert result["status"] == "completed"
                 assert result["task_type"] == "attentional_blink"
 
-    def test_execute_attentional_blink_task_exception(self, mock_celery_task, mock_apgi_system):
+    def test_execute_attentional_blink_task_exception(
+        self, mock_celery_task: MagicMock, mock_apgi_system: MagicMock
+    ) -> None:
         """Test exception handling."""
         with patch("app.tasks.experimental_tasks.APGI_SYSTEM_AVAILABLE", True):
             with patch("app.tasks.experimental_tasks.AttentionalBlinkTask") as mock_task_class:
@@ -260,7 +276,9 @@ class TestAttentionalBlinkTask:
 class TestChangeBlindnessTask:
     """Tests for execute_change_blindness_task Celery task."""
 
-    def test_execute_change_blindness_task_apgi_unavailable(self, mock_celery_task):
+    def test_execute_change_blindness_task_apgi_unavailable(
+        self, mock_celery_task: MagicMock
+    ) -> None:
         """Test when APGI system is not available."""
         with patch("app.tasks.experimental_tasks.APGI_SYSTEM_AVAILABLE", False):
             with patch("app.tasks.experimental_tasks.ChangeBlindnessTask", None):
@@ -273,7 +291,9 @@ class TestChangeBlindnessTask:
                 assert result["status"] == "failed"
                 assert "not available" in result["error"].lower()
 
-    def test_execute_change_blindness_task_success(self, mock_celery_task, mock_apgi_system):
+    def test_execute_change_blindness_task_success(
+        self, mock_celery_task: MagicMock, mock_apgi_system: MagicMock
+    ) -> None:
         """Test successful Change Blindness task execution."""
         with patch("app.tasks.experimental_tasks.APGI_SYSTEM_AVAILABLE", True):
             with patch("app.tasks.experimental_tasks.ChangeBlindnessTask") as mock_task_class:
@@ -301,7 +321,9 @@ class TestChangeBlindnessTask:
                 assert result["status"] == "completed"
                 assert result["task_type"] == "change_blindness"
 
-    def test_execute_change_blindness_task_exception(self, mock_celery_task, mock_apgi_system):
+    def test_execute_change_blindness_task_exception(
+        self, mock_celery_task: MagicMock, mock_apgi_system: MagicMock
+    ) -> None:
         """Test exception handling."""
         with patch("app.tasks.experimental_tasks.APGI_SYSTEM_AVAILABLE", True):
             with patch("app.tasks.experimental_tasks.ChangeBlindnessTask") as mock_task_class:
@@ -331,7 +353,9 @@ class TestChangeBlindnessTask:
 class TestBinocularRivalryTask:
     """Tests for execute_binocular_rivalry_task Celery task."""
 
-    def test_execute_binocular_rivalry_task_apgi_unavailable(self, mock_celery_task):
+    def test_execute_binocular_rivalry_task_apgi_unavailable(
+        self, mock_celery_task: MagicMock
+    ) -> None:
         """Test when APGI system is not available."""
         with patch("app.tasks.experimental_tasks.APGI_SYSTEM_AVAILABLE", False):
             with patch("app.tasks.experimental_tasks.BinocularRivalryTask", None):
@@ -344,7 +368,9 @@ class TestBinocularRivalryTask:
                 assert result["status"] == "failed"
                 assert "not available" in result["error"].lower()
 
-    def test_execute_binocular_rivalry_task_success(self, mock_celery_task, mock_apgi_system):
+    def test_execute_binocular_rivalry_task_success(
+        self, mock_celery_task: MagicMock, mock_apgi_system: MagicMock
+    ) -> None:
         """Test successful Binocular Rivalry task execution."""
         with patch("app.tasks.experimental_tasks.APGI_SYSTEM_AVAILABLE", True):
             with patch("app.tasks.experimental_tasks.BinocularRivalryTask") as mock_task_class:
@@ -376,7 +402,9 @@ class TestBinocularRivalryTask:
                 assert result["status"] == "completed"
                 assert result["task_type"] == "binocular_rivalry"
 
-    def test_execute_binocular_rivalry_task_exception(self, mock_celery_task, mock_apgi_system):
+    def test_execute_binocular_rivalry_task_exception(
+        self, mock_celery_task: MagicMock, mock_apgi_system: MagicMock
+    ) -> None:
         """Test exception handling."""
         with patch("app.tasks.experimental_tasks.APGI_SYSTEM_AVAILABLE", True):
             with patch("app.tasks.experimental_tasks.BinocularRivalryTask") as mock_task_class:
@@ -405,7 +433,7 @@ class TestWebhookIntegration:
     """Tests for webhook triggering on task completion."""
 
     @pytest.mark.asyncio
-    async def test_trigger_webhook_on_completion_success(self):
+    async def test_trigger_webhook_on_completion_success(self) -> None:
         """Test successful webhook triggering."""
         mock_db = MagicMock()
         mock_task = MagicMock()
@@ -436,7 +464,7 @@ class TestWebhookIntegration:
                     mock_db.commit.assert_called()
 
     @pytest.mark.asyncio
-    async def test_trigger_webhook_task_record_not_found(self):
+    async def test_trigger_webhook_task_record_not_found(self) -> None:
         """Test when task record is not found."""
         mock_db = MagicMock()
         mock_db.query.return_value.filter.return_value.first.return_value = None
@@ -448,7 +476,7 @@ class TestWebhookIntegration:
             mock_db.commit.assert_not_called()
 
     @pytest.mark.asyncio
-    async def test_trigger_webhook_exception(self):
+    async def test_trigger_webhook_exception(self) -> None:
         """Test exception handling in webhook trigger."""
         with patch("app.tasks.experimental_tasks.get_db", side_effect=Exception("Database error")):
             result = {"status": "completed"}
@@ -463,7 +491,7 @@ class TestWebhookIntegration:
 class TestAPGITaskBase:
     """Tests for APGITask base class."""
 
-    def test_apgi_system_import_error(self):
+    def test_apgi_system_import_error(self) -> None:
         """Test import error handling when APGI not available."""
         with patch("app.tasks.experimental_tasks.APGI_SYSTEM_AVAILABLE", False):
             with patch("app.tasks.experimental_tasks.APGISystem", None):

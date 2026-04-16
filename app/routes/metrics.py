@@ -6,6 +6,7 @@ Endpoints for exposing Prometheus metrics and business dashboard metrics.
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.responses import HTMLResponse
+from starlette.responses import Response as StarletteResponse
 from typing import Optional
 import json
 import logging
@@ -45,7 +46,7 @@ def get_profiling_service() -> ProfilingService:
 
 
 @router.get("/metrics")
-async def metrics_endpoint():
+async def metrics_endpoint() -> StarletteResponse:
     """
     Prometheus metrics endpoint.
 

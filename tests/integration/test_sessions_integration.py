@@ -12,7 +12,7 @@ from app.models.schemas import SessionCreateRequest
 
 
 @pytest.fixture
-def mock_db():
+def mock_db() -> MagicMock:
     """Mock database session."""
     db = MagicMock()
     db.query = MagicMock()
@@ -25,7 +25,7 @@ def mock_db():
 
 
 @pytest.fixture
-def mock_current_user():
+def mock_current_user() -> MagicMock:
     """Mock current authenticated user."""
     user = MagicMock()
     user.user_id = "user123"
@@ -35,7 +35,7 @@ def mock_current_user():
 
 
 @pytest.fixture
-def mock_request():
+def mock_request() -> MagicMock:
     """Mock FastAPI Request object."""
     request = MagicMock()
     request.client.host = "127.0.0.1"
@@ -43,21 +43,21 @@ def mock_request():
 
 
 @pytest.fixture
-def mock_manager():
+def mock_manager() -> MagicMock:
     """Mock SessionManager."""
     manager = MagicMock()
     return manager
 
 
 @pytest.fixture
-def mock_redis_client():
+def mock_redis_client() -> MagicMock:
     """Mock Redis client."""
     redis_client = MagicMock()
     return redis_client
 
 
 @pytest.fixture
-def mock_session_service():
+def mock_session_service() -> MagicMock:
     """Mock session service."""
     service = MagicMock()
     service.create_session = AsyncMock(
@@ -80,8 +80,13 @@ class TestSessionCreation:
 
     @pytest.mark.asyncio
     async def test_create_session_success(
-        self, mock_db, mock_current_user, mock_request, mock_manager, mock_redis_client
-    ):
+        self,
+        mock_db: MagicMock,
+        mock_current_user: MagicMock,
+        mock_request: MagicMock,
+        mock_manager: MagicMock,
+        mock_redis_client: MagicMock,
+    ) -> None:
         """Test successful session creation."""
         from app.routes.sessions import create_session
         from app.models.schemas import SessionCreateRequest
@@ -132,8 +137,13 @@ class TestSessionCreation:
 
     @pytest.mark.asyncio
     async def test_create_session_with_custom_expiry(
-        self, mock_db, mock_current_user, mock_request, mock_manager, mock_redis_client
-    ):
+        self,
+        mock_db: MagicMock,
+        mock_current_user: MagicMock,
+        mock_request: MagicMock,
+        mock_manager: MagicMock,
+        mock_redis_client: MagicMock,
+    ) -> None:
         """Test session creation with custom expiry."""
         from app.routes.sessions import create_session
 
@@ -181,8 +191,13 @@ class TestSessionCreation:
 
     @pytest.mark.asyncio
     async def test_create_session_invalid_device_type(
-        self, mock_db, mock_current_user, mock_request, mock_manager, mock_redis_client
-    ):
+        self,
+        mock_db: MagicMock,
+        mock_current_user: MagicMock,
+        mock_request: MagicMock,
+        mock_manager: MagicMock,
+        mock_redis_client: MagicMock,
+    ) -> None:
         """Test session creation with invalid device type."""
         from app.routes.sessions import create_session
 
@@ -228,8 +243,13 @@ class TestSessionCreation:
 
     @pytest.mark.asyncio
     async def test_create_session_concurrent_limit(
-        self, mock_db, mock_current_user, mock_request, mock_manager, mock_redis_client
-    ):
+        self,
+        mock_db: MagicMock,
+        mock_current_user: MagicMock,
+        mock_request: MagicMock,
+        mock_manager: MagicMock,
+        mock_redis_client: MagicMock,
+    ) -> None:
         """Test session creation respects concurrent session limit."""
         from app.routes.sessions import create_session
 
@@ -279,8 +299,8 @@ class TestSessionValidation:
 
     @pytest.mark.asyncio
     async def test_validate_session_ownership_success(
-        self, mock_db, mock_current_user, mock_manager
-    ):
+        self, mock_db: MagicMock, mock_current_user: MagicMock, mock_manager: MagicMock
+    ) -> None:
         """Test successful session ownership validation."""
         from app.routes.sessions import validate_session_ownership
 
@@ -306,8 +326,8 @@ class TestSessionValidation:
 
     @pytest.mark.asyncio
     async def test_validate_session_ownership_not_found(
-        self, mock_db, mock_current_user, mock_manager
-    ):
+        self, mock_db: MagicMock, mock_current_user: MagicMock, mock_manager: MagicMock
+    ) -> None:
         """Test validating ownership of non-existent session."""
         from app.routes.sessions import validate_session_ownership
         from fastapi import status
@@ -327,8 +347,8 @@ class TestSessionValidation:
 
     @pytest.mark.asyncio
     async def test_validate_session_ownership_unauthorized(
-        self, mock_db, mock_current_user, mock_manager
-    ):
+        self, mock_db: MagicMock, mock_current_user: MagicMock, mock_manager: MagicMock
+    ) -> None:
         """Test validating ownership of another user's session."""
         from app.routes.sessions import validate_session_ownership
         from fastapi import status
@@ -355,8 +375,8 @@ class TestSessionValidation:
 
     @pytest.mark.asyncio
     async def test_validate_session_ownership_admin_bypass(
-        self, mock_db, mock_current_user, mock_manager
-    ):
+        self, mock_db: MagicMock, mock_current_user: MagicMock, mock_manager: MagicMock
+    ) -> None:
         """Test that admin can validate any session ownership."""
         from app.routes.sessions import validate_session_ownership
 
@@ -384,7 +404,9 @@ class TestSessionDeletion:
     """Tests for session deletion endpoints."""
 
     @pytest.mark.asyncio
-    async def test_delete_session_success(self, mock_db, mock_current_user, mock_manager):
+    async def test_delete_session_success(
+        self, mock_db: MagicMock, mock_current_user: MagicMock, mock_manager: MagicMock
+    ) -> None:
         """Test successful session deletion."""
         from app.routes.sessions import delete_session
 
@@ -412,7 +434,9 @@ class TestSessionDeletion:
         mock_manager.delete_session.assert_called_once_with("session123")
 
     @pytest.mark.asyncio
-    async def test_delete_session_unauthorized(self, mock_db, mock_current_user, mock_manager):
+    async def test_delete_session_unauthorized(
+        self, mock_db: MagicMock, mock_current_user: MagicMock, mock_manager: MagicMock
+    ) -> None:
         """Test deleting another user's session."""
         from app.routes.sessions import delete_session
 
@@ -440,7 +464,9 @@ class TestSessionMaintenance:
     """Tests for session maintenance operations."""
 
     @pytest.mark.asyncio
-    async def test_session_state_updates(self, mock_db, mock_current_user, mock_manager):
+    async def test_session_state_updates(
+        self, mock_db: MagicMock, mock_current_user: MagicMock, mock_manager: MagicMock
+    ) -> None:
         """Test session state update operations."""
         from app.routes.sessions import (
             start_session,
@@ -510,7 +536,9 @@ class TestSessionList:
     """Tests for session list endpoints."""
 
     @pytest.mark.asyncio
-    async def test_list_sessions(self, mock_db, mock_current_user, mock_manager):
+    async def test_list_sessions(
+        self, mock_db: MagicMock, mock_current_user: MagicMock, mock_manager: MagicMock
+    ) -> None:
         """Test listing user's sessions."""
         from app.routes.sessions import list_sessions
         from app.models.schemas import SessionListResponse
@@ -546,7 +574,9 @@ class TestSessionList:
         assert result.sessions[1].session_id == "session456"
 
     @pytest.mark.asyncio
-    async def test_list_sessions_with_pagination(self, mock_db, mock_current_user, mock_manager):
+    async def test_list_sessions_with_pagination(
+        self, mock_db: MagicMock, mock_current_user: MagicMock, mock_manager: MagicMock
+    ) -> None:
         """Test listing sessions with pagination."""
         from app.routes.sessions import list_sessions
         from app.models.schemas import SessionListResponse
@@ -584,7 +614,9 @@ class TestSessionPersistence:
     """Tests for session persistence across requests."""
 
     @pytest.mark.asyncio
-    async def test_session_reset(self, mock_db, mock_current_user, mock_manager):
+    async def test_session_reset(
+        self, mock_db: MagicMock, mock_current_user: MagicMock, mock_manager: MagicMock
+    ) -> None:
         """Test resetting session to initial state."""
         from app.routes.sessions import reset_session
 

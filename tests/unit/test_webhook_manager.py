@@ -11,6 +11,7 @@ import asyncio
 import socket
 import pytest
 from datetime import datetime, timezone
+from typing import Any, Dict, List, Optional
 from unittest.mock import AsyncMock, MagicMock, patch
 
 # ---------------------------------------------------------------------------
@@ -33,16 +34,16 @@ def manager():
 
 def _make_delivery(
     *,
-    delivery_id="del-001",
-    task_id="task-001",
-    webhook_url="https://example.com/hook",
-    resolved_ip="93.184.216.34",
-    payload=None,
-    status="pending",
-    attempts=0,
-    retry_count=5,
-    retry_delays=None,
-):
+    delivery_id: str = "del-001",
+    task_id: str = "task-001",
+    webhook_url: str = "https://example.com/hook",
+    resolved_ip: str = "93.184.216.34",
+    payload: Optional[Dict[str, Any]] = None,
+    status: str = "pending",
+    attempts: int = 0,
+    retry_count: int = 5,
+    retry_delays: Optional[List[int]] = None,
+) -> MagicMock:
     """Build a MagicMock WebhookDelivery with realistic attributes."""
     d = MagicMock()
     d.delivery_id = delivery_id
@@ -266,14 +267,18 @@ class TestDeliverWebhookGuards:
         assert result is False
 
     @pytest.mark.asyncio
-    async def test_already_delivered_returns_true_immediately(self, manager, db):
+    async def test_already_delivered_returns_true_immediately(
+        self, manager: Any, db: MagicMock
+    ) -> None:
         d = _make_delivery(status="delivered")
         db.query.return_value.filter.return_value.first.return_value = d
         result = await manager.deliver_webhook(db, d.delivery_id)
         assert result is True
 
     @pytest.mark.asyncio
-    async def test_attempts_equal_retry_count_marks_dead_letter(self, manager, db):
+    async def test_attempts_equal_retry_count_marks_dead_letter(
+        self, manager: Any, db: MagicMock
+    ) -> None:
         d = _make_delivery(attempts=5, retry_count=5)
         db.query.return_value.filter.return_value.first.return_value = d
 
@@ -287,7 +292,9 @@ class TestDeliverWebhookGuards:
         mock_am.trigger_custom_alert.assert_awaited_once()
 
     @pytest.mark.asyncio
-    async def test_attempts_exceed_retry_count_marks_dead_letter(self, manager, db):
+    async def test_attempts_exceed_retry_count_marks_dead_letter(
+        self, manager: Any, db: MagicMock
+    ) -> None:
         d = _make_delivery(attempts=10, retry_count=5)
         db.query.return_value.filter.return_value.first.return_value = d
 
@@ -299,7 +306,7 @@ class TestDeliverWebhookGuards:
         assert d.status == "dead_letter"
 
     @pytest.mark.asyncio
-    async def test_missing_webhook_secret_causes_failure(self, manager, db):
+    async def test_missing_webhook_secret_causes_failure(self, manager: Any, db: MagicMock) -> None:
         d = _make_delivery(attempts=0, retry_count=5)
         db.query.return_value.filter.return_value.first.return_value = d
 
@@ -316,7 +323,9 @@ class TestDeliverWebhookGuards:
 # ---------------------------------------------------------------------------
 
 
-def _mock_aiohttp_session(response_status: int, response_text: str = "OK"):
+def _mock_aiohttp_session(
+    response_status: int, response_text: str = "OK"
+) -> tuple[MagicMock, MagicMock]:
     """Return a mock aiohttp.ClientSession context manager."""
     mock_response = MagicMock()
     mock_response.status = response_status
@@ -341,7 +350,9 @@ class TestDeliverWebhookSuccess:
 
     @pytest.mark.asyncio
     @patch("aiohttp.ClientSession")
-    async def test_http_200_marks_delivered(self, MockSession, manager, db):
+    async def test_http_200_marks_delivered(
+        self, MockSession: Any, manager: Any, db: MagicMock
+    ) -> None:
         d = _make_delivery(attempts=0, retry_count=5)
         db.query.return_value.filter.return_value.first.return_value = d
 
@@ -361,7 +372,9 @@ class TestDeliverWebhookSuccess:
 
     @pytest.mark.asyncio
     @patch("aiohttp.ClientSession")
-    async def test_http_201_marks_delivered(self, MockSession, manager, db):
+    async def test_http_201_marks_delivered(
+        self, MockSession: Any, manager: Any, db: MagicMock
+    ) -> None:
         d = _make_delivery(attempts=0, retry_count=5)
         db.query.return_value.filter.return_value.first.return_value = d
 
@@ -377,7 +390,9 @@ class TestDeliverWebhookSuccess:
 
     @pytest.mark.asyncio
     @patch("aiohttp.ClientSession")
-    async def test_response_body_truncated_when_too_large(self, MockSession, manager, db):
+    async def test_response_body_truncated_when_too_large(
+        self, MockSession: Any, manager: Any, db: MagicMock
+    ) -> None:
         from app.services.webhook_manager import WebhookManager
 
         d = _make_delivery(attempts=0, retry_count=5)
@@ -397,7 +412,9 @@ class TestDeliverWebhookSuccess:
 
     @pytest.mark.asyncio
     @patch("aiohttp.ClientSession")
-    async def test_hmac_signature_header_set(self, MockSession, manager, db):
+    async def test_hmac_signature_header_set(
+        self, MockSession: Any, manager: Any, db: MagicMock
+    ) -> None:
         """Verify X-Signature-256 header is included in the POST."""
         d = _make_delivery(attempts=0, retry_count=5)
         db.query.return_value.filter.return_value.first.return_value = d
@@ -427,7 +444,9 @@ class TestDeliverWebhookRetry:
 
     @pytest.mark.asyncio
     @patch("aiohttp.ClientSession")
-    async def test_http_500_with_retries_remaining_schedules_retry(self, MockSession, manager, db):
+    async def test_http_500_with_retries_remaining_schedules_retry(
+        self, MockSession: Any, manager: Any, db: MagicMock
+    ) -> None:
         d = _make_delivery(attempts=0, retry_count=5)
         db.query.return_value.filter.return_value.first.return_value = d
 
@@ -447,7 +466,9 @@ class TestDeliverWebhookRetry:
 
     @pytest.mark.asyncio
     @patch("aiohttp.ClientSession")
-    async def test_http_404_with_retries_remaining_schedules_retry(self, MockSession, manager, db):
+    async def test_http_404_with_retries_remaining_schedules_retry(
+        self, MockSession: Any, manager: Any, db: MagicMock
+    ) -> None:
         d = _make_delivery(attempts=2, retry_count=5)
         db.query.return_value.filter.return_value.first.return_value = d
 
@@ -464,7 +485,9 @@ class TestDeliverWebhookRetry:
 
     @pytest.mark.asyncio
     @patch("aiohttp.ClientSession")
-    async def test_http_500_last_attempt_marks_dead_letter(self, MockSession, manager, db):
+    async def test_http_500_last_attempt_marks_dead_letter(
+        self, MockSession: Any, manager: Any, db: MagicMock
+    ) -> None:
         # attempts=4, retry_count=5 → after increment attempts==5 == retry_count → dead_letter
         d = _make_delivery(attempts=4, retry_count=5)
         db.query.return_value.filter.return_value.first.return_value = d
@@ -486,7 +509,9 @@ class TestDeliverWebhookRetry:
 
     @pytest.mark.asyncio
     @patch("aiohttp.ClientSession")
-    async def test_retry_delay_uses_delay_index(self, MockSession, manager, db):
+    async def test_retry_delay_uses_delay_index(
+        self, MockSession: Any, manager: Any, db: MagicMock
+    ) -> None:
         """next_retry_at uses the correct delay from retry_delays list."""
         d = _make_delivery(attempts=1, retry_count=5, retry_delays=[5, 30, 300, 1800, 3600])
         db.query.return_value.filter.return_value.first.return_value = d
@@ -504,7 +529,9 @@ class TestDeliverWebhookRetry:
 
     @pytest.mark.asyncio
     @patch("aiohttp.ClientSession")
-    async def test_retry_delay_capped_at_last_element(self, MockSession, manager, db):
+    async def test_retry_delay_capped_at_last_element(
+        self, MockSession: Any, manager: Any, db: MagicMock
+    ) -> None:
         """When attempt index exceeds delay list length, use last delay."""
         d = _make_delivery(attempts=10, retry_count=20, retry_delays=[5, 30])
         db.query.return_value.filter.return_value.first.return_value = d
@@ -531,8 +558,8 @@ class TestDeliverWebhookExceptions:
     @pytest.mark.asyncio
     @patch("aiohttp.ClientSession")
     async def test_network_error_with_retries_remaining_schedules_retry(
-        self, MockSession, manager, db
-    ):
+        self, MockSession: Any, manager: Any, db: MagicMock
+    ) -> None:
         d = _make_delivery(attempts=0, retry_count=5)
         db.query.return_value.filter.return_value.first.return_value = d
 
@@ -558,7 +585,9 @@ class TestDeliverWebhookExceptions:
 
     @pytest.mark.asyncio
     @patch("aiohttp.ClientSession")
-    async def test_network_error_last_attempt_marks_dead_letter(self, MockSession, manager, db):
+    async def test_network_error_last_attempt_marks_dead_letter(
+        self, MockSession: Any, manager: Any, db: MagicMock
+    ) -> None:
         d = _make_delivery(attempts=4, retry_count=5)
         db.query.return_value.filter.return_value.first.return_value = d
 
@@ -583,7 +612,9 @@ class TestDeliverWebhookExceptions:
 
     @pytest.mark.asyncio
     @patch("aiohttp.ClientSession")
-    async def test_exception_sets_last_attempt_at(self, MockSession, manager, db):
+    async def test_exception_sets_last_attempt_at(
+        self, MockSession: Any, manager: Any, db: MagicMock
+    ) -> None:
         d = _make_delivery(attempts=0, retry_count=5)
         db.query.return_value.filter.return_value.first.return_value = d
 
@@ -606,7 +637,9 @@ class TestDeliverWebhookExceptions:
 
     @pytest.mark.asyncio
     @patch("aiohttp.ClientSession")
-    async def test_exception_error_message_stored(self, MockSession, manager, db):
+    async def test_exception_error_message_stored(
+        self, MockSession: Any, manager: Any, db: MagicMock
+    ) -> None:
         d = _make_delivery(attempts=0, retry_count=5)
         db.query.return_value.filter.return_value.first.return_value = d
 
@@ -639,7 +672,9 @@ class TestDeliverWebhookHttps:
     @pytest.mark.asyncio
     @patch("aiohttp.TCPConnector")
     @patch("aiohttp.ClientSession")
-    async def test_https_url_creates_ssl_connector(self, MockSession, MockConnector, manager, db):
+    async def test_https_url_creates_ssl_connector(
+        self, MockSession: Any, MockConnector: Any, manager: Any, db: MagicMock
+    ) -> None:
         d = _make_delivery(
             attempts=0,
             retry_count=5,
@@ -662,7 +697,9 @@ class TestDeliverWebhookHttps:
     @pytest.mark.asyncio
     @patch("aiohttp.TCPConnector")
     @patch("aiohttp.ClientSession")
-    async def test_http_url_creates_plain_connector(self, MockSession, MockConnector, manager, db):
+    async def test_http_url_creates_plain_connector(
+        self, MockSession: Any, MockConnector: Any, manager: Any, db: MagicMock
+    ) -> None:
         d = _make_delivery(
             attempts=0,
             retry_count=5,
@@ -691,7 +728,7 @@ class TestProcessPendingDeliveries:
     """Tests for WebhookManager.process_pending_deliveries."""
 
     @pytest.mark.asyncio
-    async def test_no_pending_returns_zero(self, manager, db):
+    async def test_no_pending_returns_zero(self, manager: Any, db: MagicMock) -> None:
         db.query.return_value.filter.return_value.all.return_value = []
 
         with patch.object(manager, "deliver_webhook", new_callable=AsyncMock) as mock_deliver:
@@ -701,7 +738,7 @@ class TestProcessPendingDeliveries:
         mock_deliver.assert_not_called()
 
     @pytest.mark.asyncio
-    async def test_single_pending_delivery_processed(self, manager, db):
+    async def test_single_pending_delivery_processed(self, manager: Any, db: MagicMock) -> None:
         d = _make_delivery()
         db.query.return_value.filter.return_value.all.return_value = [d]
 
@@ -713,7 +750,9 @@ class TestProcessPendingDeliveries:
         mock_deliver.assert_awaited_once_with(db, d.delivery_id)
 
     @pytest.mark.asyncio
-    async def test_multiple_pending_deliveries_all_processed(self, manager, db):
+    async def test_multiple_pending_deliveries_all_processed(
+        self, manager: Any, db: MagicMock
+    ) -> None:
         deliveries = [_make_delivery(delivery_id=f"del-{i}") for i in range(3)]
         db.query.return_value.filter.return_value.all.return_value = deliveries
 
@@ -725,7 +764,7 @@ class TestProcessPendingDeliveries:
         assert mock_deliver.await_count == 3
 
     @pytest.mark.asyncio
-    async def test_failed_deliveries_still_counted(self, manager, db):
+    async def test_failed_deliveries_still_counted(self, manager: Any, db: MagicMock) -> None:
         d1 = _make_delivery(delivery_id="del-1")
         d2 = _make_delivery(delivery_id="del-2")
         db.query.return_value.filter.return_value.all.return_value = [d1, d2]
@@ -738,7 +777,9 @@ class TestProcessPendingDeliveries:
         assert count == 2
 
     @pytest.mark.asyncio
-    async def test_query_filters_by_status_and_next_retry(self, manager, db):
+    async def test_query_filters_by_status_and_next_retry(
+        self, manager: Any, db: MagicMock
+    ) -> None:
         """Verify the query uses the correct filter conditions."""
         db.query.return_value.filter.return_value.all.return_value = []
 
@@ -759,16 +800,16 @@ class TestProcessPendingDeliveries:
 class TestWebhookManagerLifecycle:
     """Tests for async context manager and close() method."""
 
-    def test_async_context_manager_exits_cleanly(self, manager):
-        async def run():
+    def test_async_context_manager_exits_cleanly(self, manager: Any) -> None:
+        async def run() -> None:
             async with manager:
                 pass
             assert manager.session is None
 
         asyncio.run(run())
 
-    def test_close_with_open_session_closes_it(self, manager):
-        async def run():
+    def test_close_with_open_session_closes_it(self, manager: Any) -> None:
+        async def run() -> None:
             mock_session = AsyncMock()
             manager.session = mock_session
             await manager.close()
@@ -777,13 +818,13 @@ class TestWebhookManagerLifecycle:
 
         asyncio.run(run())
 
-    def test_close_without_session_is_noop(self, manager):
-        async def run():
+    def test_close_without_session_is_noop(self, manager: Any) -> None:
+        async def run() -> None:
             assert manager.session is None
             await manager.close()  # should not raise
             assert manager.session is None
 
         asyncio.run(run())
 
-    def test_initial_session_is_none(self, manager):
+    def test_initial_session_is_none(self, manager: Any) -> None:
         assert manager.session is None

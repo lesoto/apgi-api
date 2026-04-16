@@ -86,7 +86,7 @@ class TestCreateDatabase:
 
         mock_psycopg2.connect.assert_called_once()
 
-    def test_create_database_cursor_error(self, mock_psycopg2):
+    def test_create_database_cursor_error(self, mock_psycopg2: MagicMock) -> None:
         """Test handling when cursor creation fails."""
         import app.create_db as create_db_mod
 
@@ -101,7 +101,7 @@ class TestCreateDatabase:
         # Exception falls to outer except block; no finally, so close is NOT called
         mock_conn.close.assert_not_called()
 
-    def test_create_database_execute_error(self, mock_psycopg2):
+    def test_create_database_execute_error(self, mock_psycopg2: MagicMock) -> None:
         """Test handling when execute fails with a generic exception."""
         import app.create_db as create_db_mod
 
@@ -119,7 +119,7 @@ class TestCreateDatabase:
         mock_cursor.close.assert_not_called()
         mock_conn.close.assert_not_called()
 
-    def test_create_database_autocommit_set(self, mock_psycopg2):
+    def test_create_database_autocommit_set(self, mock_psycopg2: MagicMock) -> None:
         """Test that autocommit is set to True."""
         import app.create_db as create_db_mod
 
@@ -133,7 +133,7 @@ class TestCreateDatabase:
 
         assert mock_conn.autocommit
 
-    def test_create_database_multiple_statements(self, mock_psycopg2):
+    def test_create_database_multiple_statements(self, mock_psycopg2: MagicMock) -> None:
         """Test that all SQL statements are executed in correct order."""
         import app.create_db as create_db_mod
 

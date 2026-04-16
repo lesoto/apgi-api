@@ -17,7 +17,7 @@ import time
 import statistics
 import pytest
 from httpx import AsyncClient, ASGITransport
-from typing import List, Tuple
+from typing import List, Tuple, AsyncGenerator
 
 # Performance thresholds
 MAX_RESPONSE_TIME_P95_MS = 1500  # p95 should be under 1.5 seconds (includes middleware overhead)
@@ -28,7 +28,7 @@ MAX_ERROR_RATE = 0.05  # Maximum 5% error rate
 
 
 @pytest.fixture
-async def client():
+async def client() -> AsyncGenerator[AsyncClient, None]:
     """Create test client for load tests."""
     from app.main import create_app
 
@@ -106,7 +106,7 @@ class TestAPIHandlesExpectedLoad:
     """
 
     @pytest.mark.asyncio
-    async def test_health_endpoint_handles_concurrent_requests(self, client):
+    async def test_health_endpoint_handles_concurrent_requests(self, client: AsyncClient) -> None:
         """
         Test that health endpoint handles concurrent requests successfully.
 
@@ -135,7 +135,9 @@ class TestAPIHandlesExpectedLoad:
         print(f"Mean Response Time: {statistics.mean(response_times):.2f}ms")
 
     @pytest.mark.asyncio
-    async def test_readiness_endpoint_handles_concurrent_requests(self, client):
+    async def test_readiness_endpoint_handles_concurrent_requests(
+        self, client: AsyncClient
+    ) -> None:
         """
         Test that readiness endpoint handles concurrent requests.
 
@@ -154,7 +156,7 @@ class TestAPIHandlesExpectedLoad:
         ), f"Acceptable response rate {success_rate:.2%} is below threshold"
 
     @pytest.mark.asyncio
-    async def test_api_info_endpoint_handles_concurrent_requests(self, client):
+    async def test_api_info_endpoint_handles_concurrent_requests(self, client: AsyncClient) -> None:
         """
         Test that API info endpoint handles concurrent requests.
 
@@ -179,7 +181,7 @@ class TestResponseTimesUnderLoad:
     """
 
     @pytest.mark.asyncio
-    async def test_health_endpoint_response_time_under_load(self, client):
+    async def test_health_endpoint_response_time_under_load(self, client: AsyncClient) -> None:
         """
         Test that health endpoint response times are acceptable under load.
 
@@ -215,7 +217,7 @@ class TestResponseTimesUnderLoad:
         )
 
     @pytest.mark.asyncio
-    async def test_readiness_endpoint_response_time_under_load(self, client):
+    async def test_readiness_endpoint_response_time_under_load(self, client: AsyncClient) -> None:
         """
         Test that readiness endpoint response times are acceptable.
 
@@ -240,7 +242,7 @@ class TestResponseTimesUnderLoad:
         )
 
     @pytest.mark.asyncio
-    async def test_api_info_endpoint_response_time_under_load(self, client):
+    async def test_api_info_endpoint_response_time_under_load(self, client: AsyncClient) -> None:
         """
         Test that API info endpoint response times are acceptable.
 
@@ -271,7 +273,7 @@ class TestGracefulDegradationUnderOverload:
     """
 
     @pytest.mark.asyncio
-    async def test_health_endpoint_graceful_degradation(self, client):
+    async def test_health_endpoint_graceful_degradation(self, client: AsyncClient) -> None:
         """
         Test that health endpoint degrades gracefully under extreme load.
 
@@ -324,7 +326,7 @@ class TestGracefulDegradationUnderOverload:
         )
 
     @pytest.mark.asyncio
-    async def test_multiple_endpoints_under_load(self, client):
+    async def test_multiple_endpoints_under_load(self, client: AsyncClient) -> None:
         """
         Test that multiple endpoints can handle concurrent load.
 
@@ -364,7 +366,7 @@ class TestGracefulDegradationUnderOverload:
         assert success_rate >= 0.90, f"Success rate {success_rate:.1%} is too low under mixed load"
 
     @pytest.mark.asyncio
-    async def test_sustained_load(self, client):
+    async def test_sustained_load(self, client: AsyncClient) -> None:
         """
         Test that API can handle sustained load over time.
 

@@ -14,7 +14,7 @@ from app.services.webhook_manager import WebhookManager
 logger = logging.getLogger(__name__)
 
 
-async def _process_webhooks():
+async def _process_webhooks() -> int:
     db = SessionLocal()
     try:
         manager = WebhookManager()
@@ -29,6 +29,6 @@ async def _process_webhooks():
 
 
 @shared_task(name="process_pending_webhooks")
-def process_pending_webhooks():
+def process_pending_webhooks() -> int:
     """Celery task to process pending webhook deliveries."""
     return asyncio.run(_process_webhooks())

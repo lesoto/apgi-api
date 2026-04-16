@@ -155,7 +155,16 @@ class AuthManager:
             jti=jti,
         )
 
-        token = jwt.encode(payload.to_dict(), cast(str, self.secret_key), algorithm=self.algorithm)
+        # Add kid (Key ID) to header for provenance tracking
+        # In production, this would be a hash of the current key or a version identifier
+        headers = {"kid": f"apgi-{settings.environment}-v1"}
+
+        token = jwt.encode(
+            payload.to_dict(),
+            cast(str, self.secret_key),
+            algorithm=self.algorithm,
+            headers=headers,
+        )
 
         return token
 

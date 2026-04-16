@@ -11,7 +11,7 @@ from typing import Any
 from unittest.mock import MagicMock, patch
 from celery import states
 
-from app.services.task_executor import TaskExecutor, retry_with_backoff, async_retry_with_backoff
+from app.services.task_executor import TaskExecutor, async_retry_with_backoff
 from app.database.models import Task, TaskStatus
 
 # ============================================================================
@@ -19,59 +19,12 @@ from app.database.models import Task, TaskStatus
 # ============================================================================
 
 
-def test_retry_with_backoff_success():
-    """Test retry_with_backoff succeeds on first attempt."""
-    call_count = 0
-
-    def test_func():
-        nonlocal call_count
-        call_count += 1
-        return "success"
-
-    result = retry_with_backoff(test_func, max_retries=3)
-
-    assert result == "success"
-    assert call_count == 1
-
-
-def test_retry_with_backoff_retry_success():
-    """Test retry_with_backoff succeeds after retries."""
-    call_count = 0
-
-    def test_func():
-        nonlocal call_count
-        call_count += 1
-        if call_count < 3:
-            raise ValueError("Temporary failure")
-        return "success"
-
-    result = retry_with_backoff(test_func, max_retries=3)
-
-    assert result == "success"
-    assert call_count == 3
-
-
-def test_retry_with_backoff_all_fail():
-    """Test retry_with_backoff fails after all retries."""
-    call_count = 0
-
-    def test_func():
-        nonlocal call_count
-        call_count += 1
-        raise RuntimeError("Persistent failure")
-
-    with pytest.raises(RuntimeError, match="Persistent failure"):
-        retry_with_backoff(test_func, max_retries=2)
-
-    assert call_count == 3  # max_retries + 1
-
-
 @pytest.mark.asyncio
-async def test_async_retry_with_backoff_success():
+async def test_async_retry_with_backoff_success() -> None:
     """Test async_retry_with_backoff succeeds on first attempt."""
     call_count = 0
 
-    async def test_func():
+    async def test_func() -> str:
         nonlocal call_count
         call_count += 1
         return "success"
@@ -83,11 +36,11 @@ async def test_async_retry_with_backoff_success():
 
 
 @pytest.mark.asyncio
-async def test_async_retry_with_backoff_retry_success():
+async def test_async_retry_with_backoff_retry_success() -> None:
     """Test async_retry_with_backoff succeeds after retries."""
     call_count = 0
 
-    async def test_func():
+    async def test_func() -> str:
         nonlocal call_count
         call_count += 1
         if call_count < 3:
@@ -101,11 +54,11 @@ async def test_async_retry_with_backoff_retry_success():
 
 
 @pytest.mark.asyncio
-async def test_async_retry_with_backoff_all_fail():
+async def test_async_retry_with_backoff_all_fail() -> None:
     """Test async_retry_with_backoff fails after all retries."""
     call_count = 0
 
-    async def test_func():
+    async def test_func() -> None:
         nonlocal call_count
         call_count += 1
         raise RuntimeError("Persistent failure")
@@ -122,13 +75,13 @@ async def test_async_retry_with_backoff_all_fail():
 
 
 @pytest.fixture
-def task_executor():
+def task_executor() -> TaskExecutor:
     """Create TaskExecutor instance."""
     return TaskExecutor()
 
 
 @pytest.fixture
-def mock_db_session():
+def mock_db_session() -> MagicMock:
     """Create mock database session."""
     session = MagicMock()
     session.query.return_value.filter.return_value.first.return_value = None
@@ -138,7 +91,7 @@ def mock_db_session():
 
 
 @pytest.fixture
-def sample_task_record():
+def sample_task_record() -> Task:
     """Create sample task record."""
     return Task(
         task_id=str(uuid.uuid4()),
@@ -156,7 +109,9 @@ def sample_task_record():
 
 
 @pytest.mark.asyncio
-async def test_submit_task_valid_type(task_executor, mock_db_session):
+async def test_submit_task_valid_type(
+    task_executor: TaskExecutor, mock_db_session: MagicMock
+) -> None:
     """Test task submission with valid task type."""
     session_id = str(uuid.uuid4())
     user_id = str(uuid.uuid4())
@@ -727,20 +682,6 @@ def test_has_cycle_with_cycle(task_executor, mock_db_session):
 # ============================================================================
 # Additional coverage tests for uncovered paths
 # ============================================================================
-
-
-def test_retry_with_backoff_no_exception_captured():
-    """Test retry_with_backoff raises RuntimeError when no exception captured (edge case)."""
-    # This tests the unreachable path - we can't easily trigger it, but we can
-    # verify the function handles the case where last_exception is None
-    # by patching the internal state
-    import app.services.task_executor as te
-
-    original = te.retry_with_backoff
-
-    # Test that the function works normally
-    result = te.retry_with_backoff(lambda: "ok", max_retries=0)
-    assert result == "ok"
 
 
 @pytest.mark.asyncio

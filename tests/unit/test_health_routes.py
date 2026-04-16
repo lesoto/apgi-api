@@ -10,6 +10,7 @@ Validates: Requirements 3.12, 3.15
 import pytest
 from unittest.mock import MagicMock, patch, AsyncMock
 from starlette.testclient import TestClient
+from typing import Generator, Any
 
 try:
     # Ensure app modules can be imported
@@ -30,7 +31,7 @@ except ImportError:
 
 
 @pytest.fixture
-def mock_db():
+def mock_db() -> MagicMock:
     """Create a mock database session."""
     db = MagicMock()
     db.query = MagicMock()
@@ -42,7 +43,7 @@ def mock_db():
 
 
 @pytest.fixture
-def mock_redis_client():
+def mock_redis_client() -> AsyncMock:
     """Create a mock Redis client."""
     redis_client = AsyncMock()
     redis_client.ping = AsyncMock(return_value=True)
@@ -50,7 +51,7 @@ def mock_redis_client():
 
 
 @pytest.fixture
-def mock_health_service(mock_redis_client):
+def mock_health_service(mock_redis_client: AsyncMock) -> MagicMock:
     """Create a mock health check service."""
     from app.services.health_check import HealthCheckService
 
@@ -62,7 +63,7 @@ def mock_health_service(mock_redis_client):
 
 
 @pytest.fixture
-def client(mock_db, mock_health_service):
+def client(mock_db: MagicMock, mock_health_service: MagicMock) -> Generator[TestClient, None, None]:
     """Create a TestClient with mocked dependencies."""
     from app.main import create_app
     from app.database.connection import get_db
@@ -71,7 +72,7 @@ def client(mock_db, mock_health_service):
     app.dependency_overrides[get_db] = lambda: mock_db
 
     # Override the get_health_service dependency to return our mock
-    async def mock_get_health_service():
+    async def mock_get_health_service() -> Any:
         return mock_health_service
 
     app.dependency_overrides[get_health_service] = mock_get_health_service
@@ -88,7 +89,7 @@ def client(mock_db, mock_health_service):
 class TestInitHealthRoutes:
     """Test health routes initialization."""
 
-    def test_init_health_routes_creates_service(self, mock_redis_client):
+    def test_init_health_routes_creates_service(self, mock_redis_client: AsyncMock) -> None:
         """Test that init_health_routes creates a health service."""
         # Reset the global health_service
         import app.routes.health as health_module
@@ -105,7 +106,7 @@ class TestInitHealthRoutes:
         # Clean up
         health_module.health_service = None
 
-    def test_init_health_routes_multiple_calls(self, mock_redis_client):
+    def test_init_health_routes_multiple_calls(self, mock_redis_client: AsyncMock) -> None:
         """Test that multiple init calls replace the service."""
         import app.routes.health as health_module
 
@@ -137,7 +138,7 @@ class TestGetHealthService:
     """Test the get_health_service dependency."""
 
     @pytest.mark.asyncio
-    async def test_get_health_service_initialized(self, mock_health_service):
+    async def test_get_health_service_initialized(self, mock_health_service: MagicMock) -> None:
         """Test get_health_service returns service when initialized."""
         import app.routes.health as health_module
 
@@ -150,7 +151,7 @@ class TestGetHealthService:
         health_module.health_service = None
 
     @pytest.mark.asyncio
-    async def test_get_health_service_not_initialized(self):
+    async def test_get_health_service_not_initialized(self) -> None:
         """Test get_health_service raises 503 when not initialized."""
         import app.routes.health as health_module
 
@@ -176,7 +177,9 @@ class TestGetHealthService:
 class TestRootHealthCheck:
     """Test the /health endpoint."""
 
-    def test_health_check_all_healthy(self, client, mock_health_service):
+    def test_health_check_all_healthy(
+        self, client: TestClient, mock_health_service: MagicMock
+    ) -> None:
         """Test health check when all components are healthy."""
         mock_health_service.perform_health_check.return_value = {
             "status": "healthy",
@@ -211,7 +214,9 @@ class TestRootHealthCheck:
         assert data["dependencies"]["database"]["status"] == "healthy"
         assert data["dependencies"]["celery"]["status"] == "healthy"
 
-    def test_health_check_redis_unhealthy(self, client, mock_health_service):
+    def test_health_check_redis_unhealthy(
+        self, client: TestClient, mock_health_service: MagicMock
+    ) -> None:
         """Test health check when Redis is unhealthy."""
         mock_health_service.perform_health_check.return_value = {
             "status": "unhealthy",
@@ -241,7 +246,9 @@ class TestRootHealthCheck:
         assert data["status"] == "unhealthy"
         assert data["dependencies"]["redis"]["status"] == "unhealthy"
 
-    def test_health_check_database_unhealthy(self, client, mock_health_service):
+    def test_health_check_database_unhealthy(
+        self, client: TestClient, mock_health_service: MagicMock
+    ) -> None:
         """Test health check when database is unhealthy."""
         mock_health_service.perform_health_check.return_value = {
             "status": "unhealthy",
@@ -272,7 +279,9 @@ class TestRootHealthCheck:
         assert data["status"] == "unhealthy"
         assert data["dependencies"]["database"]["status"] == "unhealthy"
 
-    def test_health_check_redis_degraded(self, client, mock_health_service):
+    def test_health_check_redis_degraded(
+        self, client: TestClient, mock_health_service: MagicMock
+    ) -> None:
         """Test health check when Redis is degraded but not unhealthy."""
         mock_health_service.perform_health_check.return_value = {
             "status": "unhealthy",
@@ -301,7 +310,9 @@ class TestRootHealthCheck:
         data = response.json()
         assert data["dependencies"]["redis"]["status"] == "degraded"
 
-    def test_health_check_celery_optional(self, client, mock_health_service):
+    def test_health_check_celery_optional(
+        self, client: TestClient, mock_health_service: MagicMock
+    ) -> None:
         """Test health check when Celery is unavailable (optional)."""
         mock_health_service.perform_health_check.return_value = {
             "status": "healthy",
@@ -330,7 +341,9 @@ class TestRootHealthCheck:
         assert data["status"] == "healthy"
         assert data["dependencies"]["celery"]["status"] == "unknown"
 
-    def test_health_check_multiple_dependencies_unhealthy(self, client, mock_health_service):
+    def test_health_check_multiple_dependencies_unhealthy(
+        self, client: TestClient, mock_health_service: MagicMock
+    ) -> None:
         """Test health check when multiple dependencies are unhealthy."""
         mock_health_service.perform_health_check.return_value = {
             "status": "unhealthy",
@@ -357,7 +370,9 @@ class TestRootHealthCheck:
         data = response.json()
         assert data["status"] == "unhealthy"
 
-    def test_health_check_service_exception(self, client, mock_health_service):
+    def test_health_check_service_exception(
+        self, client: TestClient, mock_health_service: MagicMock
+    ) -> None:
         """Test health check when service raises an exception."""
         mock_health_service.perform_health_check.side_effect = Exception("Service error")
 
@@ -366,7 +381,9 @@ class TestRootHealthCheck:
         # Should return 500 due to unhandled exception
         assert response.status_code == 500
 
-    def test_health_check_response_structure(self, client, mock_health_service):
+    def test_health_check_response_structure(
+        self, client: TestClient, mock_health_service: MagicMock
+    ) -> None:
         """Test health check response has correct structure."""
         mock_health_service.perform_health_check.return_value = {
             "status": "healthy",
@@ -396,7 +413,9 @@ class TestRootHealthCheck:
 class TestReadinessCheck:
     """Test the /health/ready endpoint."""
 
-    def test_readiness_check_ready(self, client, mock_health_service):
+    def test_readiness_check_ready(
+        self, client: TestClient, mock_health_service: MagicMock
+    ) -> None:
         """Test readiness check when API is ready."""
         mock_health_service.perform_readiness_check.return_value = {
             "status": "ready",
@@ -423,7 +442,9 @@ class TestReadinessCheck:
         assert "timestamp" in data
         assert "dependencies" in data
 
-    def test_readiness_check_not_ready_redis(self, client, mock_health_service):
+    def test_readiness_check_not_ready_redis(
+        self, client: TestClient, mock_health_service: MagicMock
+    ) -> None:
         """Test readiness check when Redis is not ready."""
         mock_health_service.perform_readiness_check.return_value = {
             "status": "not_ready",
@@ -448,7 +469,9 @@ class TestReadinessCheck:
         assert data["status"] == "not_ready"
         assert data["dependencies"]["redis"]["status"] == "not_ready"
 
-    def test_readiness_check_not_ready_database(self, client, mock_health_service):
+    def test_readiness_check_not_ready_database(
+        self, client: TestClient, mock_health_service: MagicMock
+    ) -> None:
         """Test readiness check when database is not ready."""
         mock_health_service.perform_readiness_check.return_value = {
             "status": "not_ready",
@@ -473,7 +496,9 @@ class TestReadinessCheck:
         assert data["status"] == "not_ready"
         assert data["dependencies"]["database"]["status"] == "not_ready"
 
-    def test_readiness_check_degraded_redis(self, client, mock_health_service):
+    def test_readiness_check_degraded_redis(
+        self, client: TestClient, mock_health_service: MagicMock
+    ) -> None:
         """Test readiness check when Redis is degraded."""
         mock_health_service.perform_readiness_check.return_value = {
             "status": "not_ready",
@@ -497,7 +522,9 @@ class TestReadinessCheck:
         data = response.json()
         assert data["dependencies"]["redis"]["status"] == "degraded"
 
-    def test_readiness_check_both_not_ready(self, client, mock_health_service):
+    def test_readiness_check_both_not_ready(
+        self, client: TestClient, mock_health_service: MagicMock
+    ) -> None:
         """Test readiness check when both critical dependencies are not ready."""
         mock_health_service.perform_readiness_check.return_value = {
             "status": "not_ready",
@@ -520,7 +547,9 @@ class TestReadinessCheck:
         data = response.json()
         assert data["status"] == "not_ready"
 
-    def test_readiness_check_service_exception(self, client, mock_health_service):
+    def test_readiness_check_service_exception(
+        self, client: TestClient, mock_health_service: MagicMock
+    ) -> None:
         """Test readiness check when service raises an exception."""
         mock_health_service.perform_readiness_check.side_effect = Exception("Service error")
 
@@ -529,7 +558,9 @@ class TestReadinessCheck:
         # Should return 500 due to unhandled exception
         assert response.status_code == 500
 
-    def test_readiness_check_response_structure(self, client, mock_health_service):
+    def test_readiness_check_response_structure(
+        self, client: TestClient, mock_health_service: MagicMock
+    ) -> None:
         """Test readiness check response has correct structure."""
         mock_health_service.perform_readiness_check.return_value = {
             "status": "ready",
@@ -557,7 +588,7 @@ class TestReadinessCheck:
 class TestLivenessCheck:
     """Test the /health/live endpoint."""
 
-    def test_liveness_check_success(self, client):
+    def test_liveness_check_success(self, client: TestClient) -> None:
         """Test liveness check always returns 200."""
         response = client.get("/health/live")
 
@@ -566,7 +597,7 @@ class TestLivenessCheck:
         assert data["status"] == "alive"
         assert data["message"] == "API is running"
 
-    def test_liveness_check_no_dependencies(self, client):
+    def test_liveness_check_no_dependencies(self, client: TestClient) -> None:
         """Test liveness check does not check dependencies."""
         response = client.get("/health/live")
 
@@ -575,7 +606,7 @@ class TestLivenessCheck:
         # Should not have dependencies key
         assert "dependencies" not in data
 
-    def test_liveness_check_response_structure(self, client):
+    def test_liveness_check_response_structure(self, client: TestClient) -> None:
         """Test liveness check response has correct structure."""
         response = client.get("/health/live")
 
@@ -585,14 +616,14 @@ class TestLivenessCheck:
         assert "message" in data
         assert data["status"] == "alive"
 
-    def test_liveness_check_multiple_calls(self, client):
+    def test_liveness_check_multiple_calls(self, client: TestClient) -> None:
         """Test liveness check can be called multiple times."""
         for _ in range(5):
             response = client.get("/health/live")
             assert response.status_code == 200
             assert response.json()["status"] == "alive"
 
-    def test_liveness_check_no_service_dependency(self, client):
+    def test_liveness_check_no_service_dependency(self, client: TestClient) -> None:
         """Test liveness check does not depend on health service."""
         # Even if health service is not initialized, liveness should work
         response = client.get("/health/live")
@@ -609,7 +640,9 @@ class TestLivenessCheck:
 class TestHealthRoutesIntegration:
     """Integration tests for health routes."""
 
-    def test_health_endpoints_all_available(self, client, mock_health_service):
+    def test_health_endpoints_all_available(
+        self, client: TestClient, mock_health_service: MagicMock
+    ) -> None:
         """Test all health endpoints are available."""
         mock_health_service.perform_health_check.return_value = {
             "status": "healthy",
@@ -638,7 +671,9 @@ class TestHealthRoutesIntegration:
         assert ready_response.status_code == 200
         assert live_response.status_code == 200
 
-    def test_health_check_consistency(self, client, mock_health_service):
+    def test_health_check_consistency(
+        self, client: TestClient, mock_health_service: MagicMock
+    ) -> None:
         """Test health check returns consistent data."""
         health_data = {
             "status": "healthy",
@@ -656,7 +691,9 @@ class TestHealthRoutesIntegration:
 
         assert response1.json() == response2.json()
 
-    def test_readiness_check_consistency(self, client, mock_health_service):
+    def test_readiness_check_consistency(
+        self, client: TestClient, mock_health_service: MagicMock
+    ) -> None:
         """Test readiness check returns consistent data."""
         ready_data = {
             "status": "ready",
@@ -673,7 +710,9 @@ class TestHealthRoutesIntegration:
 
         assert response1.json() == response2.json()
 
-    def test_health_status_codes_correct(self, client, mock_health_service):
+    def test_health_status_codes_correct(
+        self, client: TestClient, mock_health_service: MagicMock
+    ) -> None:
         """Test health endpoints return correct status codes."""
         # Healthy
         mock_health_service.perform_health_check.return_value = {

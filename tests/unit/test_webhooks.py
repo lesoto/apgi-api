@@ -21,7 +21,7 @@ from app.routes.webhooks import (
     retry_dead_letter_delivery,
     purge_dead_letter_delivery,
 )
-from app.services.auth_manager import TokenPayload
+from app.models.schemas import TokenPayload
 from app.database.connection import get_db
 
 # ---------------------------------------------------------------------------
@@ -30,13 +30,13 @@ from app.database.connection import get_db
 
 
 @pytest.fixture
-def mock_db_session():
+def mock_db_session() -> MagicMock:
     """Create a mock database session."""
     return MagicMock()
 
 
 @pytest.fixture
-def mock_current_user():
+def mock_current_user() -> TokenPayload:
     """Create a mock current user with admin permissions."""
     return TokenPayload(
         user_id="admin_user_123",
@@ -47,7 +47,7 @@ def mock_current_user():
 
 
 @pytest.fixture
-def mock_webhook_delivery():
+def mock_webhook_delivery() -> MagicMock:
     """Create a mock webhook delivery database object."""
     delivery = MagicMock()
     delivery.delivery_id = "delivery_123"
@@ -67,7 +67,7 @@ def mock_webhook_delivery():
 
 
 @pytest.fixture
-def mock_dead_letter_delivery():
+def mock_dead_letter_delivery() -> MagicMock:
     """Create a mock dead-letter webhook delivery database object."""
     delivery = MagicMock()
     delivery.delivery_id = "dl_delivery_456"
@@ -85,10 +85,11 @@ def mock_dead_letter_delivery():
 
 
 from contextlib import asynccontextmanager
+from typing import Any, AsyncGenerator
 
 
 @asynccontextmanager
-async def noop_lifespan(app):
+async def noop_lifespan(app: Any) -> AsyncGenerator[None, None]:
     yield
 
 
@@ -101,7 +102,7 @@ ADMIN_USER = TokenPayload(
 
 
 @pytest.fixture
-def client(mock_db_session):
+def client(mock_db_session: MagicMock) -> TestClient:
     """TestClient with dependency overrides for route-level tests."""
     from app.main import create_app
     from app.services.authorization import get_current_user
@@ -124,8 +125,11 @@ class TestListWebhookDeliveries:
 
     @pytest.mark.asyncio
     async def test_list_webhook_deliveries_success(
-        self, mock_db_session, mock_current_user, mock_webhook_delivery
-    ):
+        self,
+        mock_db_session: MagicMock,
+        mock_current_user: TokenPayload,
+        mock_webhook_delivery: MagicMock,
+    ) -> None:
         """Test successful webhook delivery listing."""
         mock_db_session.query.return_value.count.return_value = 1
         mock_db_session.query.return_value.offset.return_value.limit.return_value.all.return_value = [
@@ -140,8 +144,11 @@ class TestListWebhookDeliveries:
 
     @pytest.mark.asyncio
     async def test_list_webhook_deliveries_with_status_filter(
-        self, mock_db_session, mock_current_user, mock_webhook_delivery
-    ):
+        self,
+        mock_db_session: MagicMock,
+        mock_current_user: TokenPayload,
+        mock_webhook_delivery: MagicMock,
+    ) -> None:
         """Test webhook delivery listing with status filter."""
         mock_db_session.query.return_value.filter.return_value.count.return_value = 1
         mock_db_session.query.return_value.filter.return_value.offset.return_value.limit.return_value.all.return_value = [
@@ -154,8 +161,8 @@ class TestListWebhookDeliveries:
 
     @pytest.mark.asyncio
     async def test_list_webhook_deliveries_invalid_status_filter(
-        self, mock_db_session, mock_current_user
-    ):
+        self, mock_db_session: MagicMock, mock_current_user: TokenPayload
+    ) -> None:
         """Test webhook delivery listing with invalid status filter."""
         with pytest.raises(HTTPException) as exc_info:
             await list_webhook_deliveries("invalid", 1, 10, mock_db_session, mock_current_user)
@@ -164,8 +171,8 @@ class TestListWebhookDeliveries:
 
     @pytest.mark.asyncio
     async def test_list_webhook_deliveries_page_less_than_one(
-        self, mock_db_session, mock_current_user
-    ):
+        self, mock_db_session: MagicMock, mock_current_user: TokenPayload
+    ) -> None:
         """Test webhook delivery listing with page < 1."""
         with pytest.raises(HTTPException) as exc_info:
             await list_webhook_deliveries(None, 0, 10, mock_db_session, mock_current_user)
@@ -174,8 +181,8 @@ class TestListWebhookDeliveries:
 
     @pytest.mark.asyncio
     async def test_list_webhook_deliveries_per_page_too_small(
-        self, mock_db_session, mock_current_user
-    ):
+        self, mock_db_session: MagicMock, mock_current_user: TokenPayload
+    ) -> None:
         """Test webhook delivery listing with per_page < 1."""
         with pytest.raises(HTTPException) as exc_info:
             await list_webhook_deliveries(None, 1, 0, mock_db_session, mock_current_user)
@@ -184,8 +191,8 @@ class TestListWebhookDeliveries:
 
     @pytest.mark.asyncio
     async def test_list_webhook_deliveries_per_page_too_large(
-        self, mock_db_session, mock_current_user
-    ):
+        self, mock_db_session: MagicMock, mock_current_user: TokenPayload
+    ) -> None:
         """Test webhook delivery listing with per_page > 100."""
         with pytest.raises(HTTPException) as exc_info:
             await list_webhook_deliveries(None, 1, 101, mock_db_session, mock_current_user)
@@ -193,7 +200,9 @@ class TestListWebhookDeliveries:
         assert exc_info.value.status_code == 400
 
     @pytest.mark.asyncio
-    async def test_list_webhook_deliveries_database_error(self, mock_db_session, mock_current_user):
+    async def test_list_webhook_deliveries_database_error(
+        self, mock_db_session: MagicMock, mock_current_user: TokenPayload
+    ) -> None:
         """Test webhook delivery listing with database error."""
         mock_db_session.query.side_effect = Exception("Database error")
 
@@ -213,8 +222,11 @@ class TestGetWebhookDelivery:
 
     @pytest.mark.asyncio
     async def test_get_webhook_delivery_success(
-        self, mock_db_session, mock_current_user, mock_webhook_delivery
-    ):
+        self,
+        mock_db_session: MagicMock,
+        mock_current_user: TokenPayload,
+        mock_webhook_delivery: MagicMock,
+    ) -> None:
         """Test successful webhook delivery retrieval."""
         mock_db_session.query.return_value.filter.return_value.first.return_value = (
             mock_webhook_delivery
@@ -226,7 +238,9 @@ class TestGetWebhookDelivery:
         assert result.task_id == "task_456"
 
     @pytest.mark.asyncio
-    async def test_get_webhook_delivery_not_found(self, mock_db_session, mock_current_user):
+    async def test_get_webhook_delivery_not_found(
+        self, mock_db_session: MagicMock, mock_current_user: TokenPayload
+    ) -> None:
         """Test webhook delivery retrieval when not found."""
         mock_db_session.query.return_value.filter.return_value.first.return_value = None
 
@@ -246,8 +260,11 @@ class TestRetryWebhookDelivery:
 
     @pytest.mark.asyncio
     async def test_retry_webhook_delivery_success(
-        self, mock_db_session, mock_current_user, mock_webhook_delivery
-    ):
+        self,
+        mock_db_session: MagicMock,
+        mock_current_user: TokenPayload,
+        mock_webhook_delivery: MagicMock,
+    ) -> None:
         """Test successful webhook delivery retry."""
         mock_db_session.query.return_value.filter.return_value.first.return_value = (
             mock_webhook_delivery
@@ -266,7 +283,9 @@ class TestRetryWebhookDelivery:
             assert result.success
 
     @pytest.mark.asyncio
-    async def test_retry_webhook_delivery_not_found(self, mock_db_session, mock_current_user):
+    async def test_retry_webhook_delivery_not_found(
+        self, mock_db_session: MagicMock, mock_current_user: TokenPayload
+    ) -> None:
         """Test webhook delivery retry when not found."""
         mock_db_session.query.return_value.filter.return_value.first.return_value = None
 
@@ -277,8 +296,11 @@ class TestRetryWebhookDelivery:
 
     @pytest.mark.asyncio
     async def test_retry_webhook_delivery_already_delivered(
-        self, mock_db_session, mock_current_user, mock_webhook_delivery
-    ):
+        self,
+        mock_db_session: MagicMock,
+        mock_current_user: TokenPayload,
+        mock_webhook_delivery: MagicMock,
+    ) -> None:
         """Test webhook delivery retry when already delivered."""
         mock_webhook_delivery.status = "delivered"
         mock_db_session.query.return_value.filter.return_value.first.return_value = (
@@ -292,8 +314,11 @@ class TestRetryWebhookDelivery:
 
     @pytest.mark.asyncio
     async def test_retry_webhook_delivery_max_attempts(
-        self, mock_db_session, mock_current_user, mock_webhook_delivery
-    ):
+        self,
+        mock_db_session: MagicMock,
+        mock_current_user: TokenPayload,
+        mock_webhook_delivery: MagicMock,
+    ) -> None:
         """Test webhook delivery retry when max attempts exceeded."""
         mock_webhook_delivery.attempts = 5
         mock_db_session.query.return_value.filter.return_value.first.return_value = (
@@ -310,8 +335,11 @@ class TestRetryWebhookDelivery:
 
     @pytest.mark.asyncio
     async def test_retry_webhook_delivery_error(
-        self, mock_db_session, mock_current_user, mock_webhook_delivery
-    ):
+        self,
+        mock_db_session: MagicMock,
+        mock_current_user: TokenPayload,
+        mock_webhook_delivery: MagicMock,
+    ) -> None:
         """Test webhook delivery retry with error."""
         mock_db_session.query.return_value.filter.return_value.first.return_value = (
             mock_webhook_delivery
@@ -338,8 +366,11 @@ class TestDeleteWebhookDelivery:
 
     @pytest.mark.asyncio
     async def test_delete_webhook_delivery_success(
-        self, mock_db_session, mock_current_user, mock_webhook_delivery
-    ):
+        self,
+        mock_db_session: MagicMock,
+        mock_current_user: TokenPayload,
+        mock_webhook_delivery: MagicMock,
+    ) -> None:
         """Test successful webhook delivery deletion."""
         mock_db_session.query.return_value.filter.return_value.first.return_value = (
             mock_webhook_delivery
@@ -352,7 +383,9 @@ class TestDeleteWebhookDelivery:
         mock_db_session.commit.assert_called_once()
 
     @pytest.mark.asyncio
-    async def test_delete_webhook_delivery_not_found(self, mock_db_session, mock_current_user):
+    async def test_delete_webhook_delivery_not_found(
+        self, mock_db_session: MagicMock, mock_current_user: TokenPayload
+    ) -> None:
         """Test webhook delivery deletion when not found."""
         mock_db_session.query.return_value.filter.return_value.first.return_value = None
 
@@ -363,8 +396,11 @@ class TestDeleteWebhookDelivery:
 
     @pytest.mark.asyncio
     async def test_delete_webhook_delivery_database_error(
-        self, mock_db_session, mock_current_user, mock_webhook_delivery
-    ):
+        self,
+        mock_db_session: MagicMock,
+        mock_current_user: TokenPayload,
+        mock_webhook_delivery: MagicMock,
+    ) -> None:
         """Test webhook delivery deletion with database error."""
         mock_db_session.query.return_value.filter.return_value.first.return_value = (
             mock_webhook_delivery
@@ -387,8 +423,11 @@ class TestListDeadLetterDeliveries:
 
     @pytest.mark.asyncio
     async def test_list_dead_letter_deliveries_success(
-        self, mock_db_session, mock_current_user, mock_dead_letter_delivery
-    ):
+        self,
+        mock_db_session: MagicMock,
+        mock_current_user: TokenPayload,
+        mock_dead_letter_delivery: MagicMock,
+    ) -> None:
         """Test successful dead-letter delivery listing."""
         mock_db_session.query.return_value.filter.return_value.count.return_value = 1
         mock_db_session.query.return_value.filter.return_value.offset.return_value.limit.return_value.all.return_value = [
@@ -402,7 +441,9 @@ class TestListDeadLetterDeliveries:
         assert result.pagination.total == 1
 
     @pytest.mark.asyncio
-    async def test_list_dead_letter_deliveries_empty(self, mock_db_session, mock_current_user):
+    async def test_list_dead_letter_deliveries_empty(
+        self, mock_db_session: MagicMock, mock_current_user: TokenPayload
+    ) -> None:
         """Test dead-letter delivery listing with no results."""
         mock_db_session.query.return_value.filter.return_value.count.return_value = 0
         mock_db_session.query.return_value.filter.return_value.offset.return_value.limit.return_value.all.return_value = (
@@ -416,8 +457,8 @@ class TestListDeadLetterDeliveries:
 
     @pytest.mark.asyncio
     async def test_list_dead_letter_deliveries_page_less_than_one(
-        self, mock_db_session, mock_current_user
-    ):
+        self, mock_db_session: MagicMock, mock_current_user: TokenPayload
+    ) -> None:
         """Test dead-letter delivery listing with page < 1."""
         with pytest.raises(HTTPException) as exc_info:
             await list_dead_letter_deliveries(0, 10, mock_db_session, mock_current_user)
@@ -426,8 +467,8 @@ class TestListDeadLetterDeliveries:
 
     @pytest.mark.asyncio
     async def test_list_dead_letter_deliveries_per_page_too_small(
-        self, mock_db_session, mock_current_user
-    ):
+        self, mock_db_session: MagicMock, mock_current_user: TokenPayload
+    ) -> None:
         """Test dead-letter delivery listing with per_page < 1."""
         with pytest.raises(HTTPException) as exc_info:
             await list_dead_letter_deliveries(1, 0, mock_db_session, mock_current_user)
@@ -436,8 +477,8 @@ class TestListDeadLetterDeliveries:
 
     @pytest.mark.asyncio
     async def test_list_dead_letter_deliveries_per_page_too_large(
-        self, mock_db_session, mock_current_user
-    ):
+        self, mock_db_session: MagicMock, mock_current_user: TokenPayload
+    ) -> None:
         """Test dead-letter delivery listing with per_page > 100."""
         with pytest.raises(HTTPException) as exc_info:
             await list_dead_letter_deliveries(1, 101, mock_db_session, mock_current_user)
@@ -446,8 +487,8 @@ class TestListDeadLetterDeliveries:
 
     @pytest.mark.asyncio
     async def test_list_dead_letter_deliveries_database_error(
-        self, mock_db_session, mock_current_user
-    ):
+        self, mock_db_session: MagicMock, mock_current_user: TokenPayload
+    ) -> None:
         """Test dead-letter delivery listing with database error."""
         mock_db_session.query.side_effect = Exception("Database error")
 
@@ -467,8 +508,11 @@ class TestRetryDeadLetterDelivery:
 
     @pytest.mark.asyncio
     async def test_retry_dead_letter_delivery_success(
-        self, mock_db_session, mock_current_user, mock_dead_letter_delivery
-    ):
+        self,
+        mock_db_session: MagicMock,
+        mock_current_user: TokenPayload,
+        mock_dead_letter_delivery: MagicMock,
+    ) -> None:
         """Test successful dead-letter delivery retry."""
         mock_db_session.query.return_value.filter.return_value.first.return_value = (
             mock_dead_letter_delivery
@@ -487,7 +531,9 @@ class TestRetryDeadLetterDelivery:
             assert result.success is True
 
     @pytest.mark.asyncio
-    async def test_retry_dead_letter_delivery_not_found(self, mock_db_session, mock_current_user):
+    async def test_retry_dead_letter_delivery_not_found(
+        self, mock_db_session: MagicMock, mock_current_user: TokenPayload
+    ) -> None:
         """Test dead-letter delivery retry when not found."""
         mock_db_session.query.return_value.filter.return_value.first.return_value = None
 
@@ -498,8 +544,11 @@ class TestRetryDeadLetterDelivery:
 
     @pytest.mark.asyncio
     async def test_retry_dead_letter_delivery_error(
-        self, mock_db_session, mock_current_user, mock_dead_letter_delivery
-    ):
+        self,
+        mock_db_session: MagicMock,
+        mock_current_user: TokenPayload,
+        mock_dead_letter_delivery: MagicMock,
+    ) -> None:
         """Test dead-letter delivery retry with delivery error."""
         mock_db_session.query.return_value.filter.return_value.first.return_value = (
             mock_dead_letter_delivery
@@ -528,8 +577,11 @@ class TestPurgeDeadLetterDelivery:
 
     @pytest.mark.asyncio
     async def test_purge_dead_letter_delivery_success(
-        self, mock_db_session, mock_current_user, mock_dead_letter_delivery
-    ):
+        self,
+        mock_db_session: MagicMock,
+        mock_current_user: TokenPayload,
+        mock_dead_letter_delivery: MagicMock,
+    ) -> None:
         """Test successful dead-letter delivery purge."""
         mock_db_session.query.return_value.filter.return_value.first.return_value = (
             mock_dead_letter_delivery
@@ -544,7 +596,9 @@ class TestPurgeDeadLetterDelivery:
         mock_db_session.commit.assert_called_once()
 
     @pytest.mark.asyncio
-    async def test_purge_dead_letter_delivery_not_found(self, mock_db_session, mock_current_user):
+    async def test_purge_dead_letter_delivery_not_found(
+        self, mock_db_session: MagicMock, mock_current_user: TokenPayload
+    ) -> None:
         """Test dead-letter delivery purge when not found."""
         mock_db_session.query.return_value.filter.return_value.first.return_value = None
 
@@ -555,8 +609,11 @@ class TestPurgeDeadLetterDelivery:
 
     @pytest.mark.asyncio
     async def test_purge_dead_letter_delivery_database_error(
-        self, mock_db_session, mock_current_user, mock_dead_letter_delivery
-    ):
+        self,
+        mock_db_session: MagicMock,
+        mock_current_user: TokenPayload,
+        mock_dead_letter_delivery: MagicMock,
+    ) -> None:
         """Test dead-letter delivery purge with database error."""
         mock_db_session.query.return_value.filter.return_value.first.return_value = (
             mock_dead_letter_delivery
@@ -577,7 +634,9 @@ class TestPurgeDeadLetterDelivery:
 class TestWebhookRoutesHTTP:
     """HTTP-level tests using TestClient to cover route wiring and response codes."""
 
-    def test_list_deliveries_200(self, client, mock_db_session, mock_webhook_delivery):
+    def test_list_deliveries_200(
+        self, client: TestClient, mock_db_session: MagicMock, mock_webhook_delivery: MagicMock
+    ) -> None:
         """GET /v1/webhooks/deliveries returns 200."""
         mock_db_session.query.return_value.count.return_value = 1
         mock_db_session.query.return_value.offset.return_value.limit.return_value.all.return_value = [
@@ -587,8 +646,8 @@ class TestWebhookRoutesHTTP:
         assert response.status_code == 200
 
     def test_list_deliveries_with_status_filter_200(
-        self, client, mock_db_session, mock_webhook_delivery
-    ):
+        self, client: TestClient, mock_db_session: MagicMock, mock_webhook_delivery: MagicMock
+    ) -> None:
         """GET /v1/webhooks/deliveries?status_filter=pending returns 200."""
         mock_db_session.query.return_value.filter.return_value.count.return_value = 1
         mock_db_session.query.return_value.filter.return_value.offset.return_value.limit.return_value.all.return_value = [
@@ -597,28 +656,38 @@ class TestWebhookRoutesHTTP:
         response = client.get("/v1/webhooks/deliveries?status_filter=pending")
         assert response.status_code == 200
 
-    def test_list_deliveries_invalid_status_400(self, client, mock_db_session):
+    def test_list_deliveries_invalid_status_400(
+        self, client: TestClient, mock_db_session: MagicMock
+    ) -> None:
         """GET /v1/webhooks/deliveries?status_filter=bad returns 400."""
         response = client.get("/v1/webhooks/deliveries?status_filter=bad")
         assert response.status_code == 400
 
-    def test_list_deliveries_invalid_page_400(self, client, mock_db_session):
+    def test_list_deliveries_invalid_page_400(
+        self, client: TestClient, mock_db_session: MagicMock
+    ) -> None:
         """GET /v1/webhooks/deliveries?page=0 returns 400."""
         response = client.get("/v1/webhooks/deliveries?page=0")
         assert response.status_code == 400
 
-    def test_list_deliveries_invalid_per_page_400(self, client, mock_db_session):
+    def test_list_deliveries_invalid_per_page_400(
+        self, client: TestClient, mock_db_session: MagicMock
+    ) -> None:
         """GET /v1/webhooks/deliveries?per_page=200 returns 400."""
         response = client.get("/v1/webhooks/deliveries?per_page=200")
         assert response.status_code == 400
 
-    def test_list_deliveries_db_error_500(self, client, mock_db_session):
+    def test_list_deliveries_db_error_500(
+        self, client: TestClient, mock_db_session: MagicMock
+    ) -> None:
         """GET /v1/webhooks/deliveries returns 500 on db error."""
         mock_db_session.query.side_effect = Exception("db error")
         response = client.get("/v1/webhooks/deliveries")
         assert response.status_code == 500
 
-    def test_get_delivery_200(self, client, mock_db_session, mock_webhook_delivery):
+    def test_get_delivery_200(
+        self, client: TestClient, mock_db_session: MagicMock, mock_webhook_delivery: MagicMock
+    ) -> None:
         """GET /v1/webhooks/deliveries/{id} returns 200."""
         mock_db_session.query.return_value.filter.return_value.first.return_value = (
             mock_webhook_delivery
@@ -626,13 +695,15 @@ class TestWebhookRoutesHTTP:
         response = client.get("/v1/webhooks/deliveries/delivery_123")
         assert response.status_code == 200
 
-    def test_get_delivery_404(self, client, mock_db_session):
+    def test_get_delivery_404(self, client: TestClient, mock_db_session: MagicMock) -> None:
         """GET /v1/webhooks/deliveries/{id} returns 404 when not found."""
         mock_db_session.query.return_value.filter.return_value.first.return_value = None
         response = client.get("/v1/webhooks/deliveries/nonexistent")
         assert response.status_code == 404
 
-    def test_retry_delivery_200(self, client, mock_db_session, mock_webhook_delivery):
+    def test_retry_delivery_200(
+        self, client: TestClient, mock_db_session: MagicMock, mock_webhook_delivery: MagicMock
+    ) -> None:
         """POST /v1/webhooks/deliveries/{id}/retry returns 200."""
         mock_db_session.query.return_value.filter.return_value.first.return_value = (
             mock_webhook_delivery
@@ -645,15 +716,15 @@ class TestWebhookRoutesHTTP:
             response = client.post("/v1/webhooks/deliveries/delivery_123/retry")
         assert response.status_code == 200
 
-    def test_retry_delivery_404(self, client, mock_db_session):
+    def test_retry_delivery_404(self, client: TestClient, mock_db_session: MagicMock) -> None:
         """POST /v1/webhooks/deliveries/{id}/retry returns 404 when not found."""
         mock_db_session.query.return_value.filter.return_value.first.return_value = None
         response = client.post("/v1/webhooks/deliveries/nonexistent/retry")
         assert response.status_code == 404
 
     def test_retry_delivery_400_already_delivered(
-        self, client, mock_db_session, mock_webhook_delivery
-    ):
+        self, client: TestClient, mock_db_session: MagicMock, mock_webhook_delivery: MagicMock
+    ) -> None:
         """POST /v1/webhooks/deliveries/{id}/retry returns 400 when already delivered."""
         mock_webhook_delivery.status = "delivered"
         mock_db_session.query.return_value.filter.return_value.first.return_value = (
@@ -662,7 +733,9 @@ class TestWebhookRoutesHTTP:
         response = client.post("/v1/webhooks/deliveries/delivery_123/retry")
         assert response.status_code == 400
 
-    def test_retry_delivery_400_max_attempts(self, client, mock_db_session, mock_webhook_delivery):
+    def test_retry_delivery_400_max_attempts(
+        self, client: TestClient, mock_db_session: MagicMock, mock_webhook_delivery: MagicMock
+    ) -> None:
         """POST /v1/webhooks/deliveries/{id}/retry returns 400 when max attempts exceeded."""
         mock_webhook_delivery.attempts = 100
         mock_db_session.query.return_value.filter.return_value.first.return_value = (
@@ -673,7 +746,9 @@ class TestWebhookRoutesHTTP:
             response = client.post("/v1/webhooks/deliveries/delivery_123/retry")
         assert response.status_code == 400
 
-    def test_retry_delivery_500_on_error(self, client, mock_db_session, mock_webhook_delivery):
+    def test_retry_delivery_500_on_error(
+        self, client: TestClient, mock_db_session: MagicMock, mock_webhook_delivery: MagicMock
+    ) -> None:
         """POST /v1/webhooks/deliveries/{id}/retry returns 500 on delivery error."""
         mock_db_session.query.return_value.filter.return_value.first.return_value = (
             mock_webhook_delivery
@@ -686,7 +761,9 @@ class TestWebhookRoutesHTTP:
             response = client.post("/v1/webhooks/deliveries/delivery_123/retry")
         assert response.status_code == 500
 
-    def test_delete_delivery_204(self, client, mock_db_session, mock_webhook_delivery):
+    def test_delete_delivery_204(
+        self, client: TestClient, mock_db_session: MagicMock, mock_webhook_delivery: MagicMock
+    ) -> None:
         """DELETE /v1/webhooks/deliveries/{id} returns 204."""
         mock_db_session.query.return_value.filter.return_value.first.return_value = (
             mock_webhook_delivery
@@ -694,13 +771,15 @@ class TestWebhookRoutesHTTP:
         response = client.delete("/v1/webhooks/deliveries/delivery_123")
         assert response.status_code == 204
 
-    def test_delete_delivery_404(self, client, mock_db_session):
+    def test_delete_delivery_404(self, client: TestClient, mock_db_session: MagicMock) -> None:
         """DELETE /v1/webhooks/deliveries/{id} returns 404 when not found."""
         mock_db_session.query.return_value.filter.return_value.first.return_value = None
         response = client.delete("/v1/webhooks/deliveries/nonexistent")
         assert response.status_code == 404
 
-    def test_delete_delivery_500_on_error(self, client, mock_db_session, mock_webhook_delivery):
+    def test_delete_delivery_500_on_error(
+        self, client: TestClient, mock_db_session: MagicMock, mock_webhook_delivery: MagicMock
+    ) -> None:
         """DELETE /v1/webhooks/deliveries/{id} returns 500 on db error."""
         mock_db_session.query.return_value.filter.return_value.first.return_value = (
             mock_webhook_delivery
@@ -709,7 +788,9 @@ class TestWebhookRoutesHTTP:
         response = client.delete("/v1/webhooks/deliveries/delivery_123")
         assert response.status_code == 500
 
-    def test_list_dead_letter_200(self, client, mock_db_session, mock_dead_letter_delivery):
+    def test_list_dead_letter_200(
+        self, client: TestClient, mock_db_session: MagicMock, mock_dead_letter_delivery: MagicMock
+    ) -> None:
         """GET /v1/webhooks/dead-letter returns 200."""
         mock_db_session.query.return_value.filter.return_value.count.return_value = 1
         mock_db_session.query.return_value.filter.return_value.offset.return_value.limit.return_value.all.return_value = [
@@ -718,28 +799,38 @@ class TestWebhookRoutesHTTP:
         response = client.get("/v1/webhooks/dead-letter")
         assert response.status_code == 200
 
-    def test_list_dead_letter_invalid_page_400(self, client, mock_db_session):
+    def test_list_dead_letter_invalid_page_400(
+        self, client: TestClient, mock_db_session: MagicMock
+    ) -> None:
         """GET /v1/webhooks/dead-letter?page=0 returns 400."""
         response = client.get("/v1/webhooks/dead-letter?page=0")
         assert response.status_code == 400
 
-    def test_list_dead_letter_invalid_per_page_400(self, client, mock_db_session):
+    def test_list_dead_letter_invalid_per_page_400(
+        self, client: TestClient, mock_db_session: MagicMock
+    ) -> None:
         """GET /v1/webhooks/dead-letter?per_page=0 returns 400."""
         response = client.get("/v1/webhooks/dead-letter?per_page=0")
         assert response.status_code == 400
 
-    def test_list_dead_letter_per_page_too_large_400(self, client, mock_db_session):
+    def test_list_dead_letter_per_page_too_large_400(
+        self, client: TestClient, mock_db_session: MagicMock
+    ) -> None:
         """GET /v1/webhooks/dead-letter?per_page=200 returns 400."""
         response = client.get("/v1/webhooks/dead-letter?per_page=200")
         assert response.status_code == 400
 
-    def test_list_dead_letter_db_error_500(self, client, mock_db_session):
+    def test_list_dead_letter_db_error_500(
+        self, client: TestClient, mock_db_session: MagicMock
+    ) -> None:
         """GET /v1/webhooks/dead-letter returns 500 on db error."""
         mock_db_session.query.side_effect = Exception("db error")
         response = client.get("/v1/webhooks/dead-letter")
         assert response.status_code == 500
 
-    def test_retry_dead_letter_200(self, client, mock_db_session, mock_dead_letter_delivery):
+    def test_retry_dead_letter_200(
+        self, client: TestClient, mock_db_session: MagicMock, mock_dead_letter_delivery: MagicMock
+    ) -> None:
         """POST /v1/webhooks/dead-letter/{id}/retry returns 200."""
         mock_db_session.query.return_value.filter.return_value.first.return_value = (
             mock_dead_letter_delivery
@@ -752,15 +843,15 @@ class TestWebhookRoutesHTTP:
             response = client.post("/v1/webhooks/dead-letter/dl_delivery_456/retry")
         assert response.status_code == 200
 
-    def test_retry_dead_letter_404(self, client, mock_db_session):
+    def test_retry_dead_letter_404(self, client: TestClient, mock_db_session: MagicMock) -> None:
         """POST /v1/webhooks/dead-letter/{id}/retry returns 404 when not found."""
         mock_db_session.query.return_value.filter.return_value.first.return_value = None
         response = client.post("/v1/webhooks/dead-letter/nonexistent/retry")
         assert response.status_code == 404
 
     def test_retry_dead_letter_500_on_error(
-        self, client, mock_db_session, mock_dead_letter_delivery
-    ):
+        self, client: TestClient, mock_db_session: MagicMock, mock_dead_letter_delivery: MagicMock
+    ) -> None:
         """POST /v1/webhooks/dead-letter/{id}/retry returns 500 on delivery error."""
         mock_db_session.query.return_value.filter.return_value.first.return_value = (
             mock_dead_letter_delivery
@@ -773,7 +864,9 @@ class TestWebhookRoutesHTTP:
             response = client.post("/v1/webhooks/dead-letter/dl_delivery_456/retry")
         assert response.status_code == 500
 
-    def test_purge_dead_letter_204(self, client, mock_db_session, mock_dead_letter_delivery):
+    def test_purge_dead_letter_204(
+        self, client: TestClient, mock_db_session: MagicMock, mock_dead_letter_delivery: MagicMock
+    ) -> None:
         """DELETE /v1/webhooks/dead-letter/{id} returns 204."""
         mock_db_session.query.return_value.filter.return_value.first.return_value = (
             mock_dead_letter_delivery
@@ -781,15 +874,15 @@ class TestWebhookRoutesHTTP:
         response = client.delete("/v1/webhooks/dead-letter/dl_delivery_456")
         assert response.status_code == 204
 
-    def test_purge_dead_letter_404(self, client, mock_db_session):
+    def test_purge_dead_letter_404(self, client: TestClient, mock_db_session: MagicMock) -> None:
         """DELETE /v1/webhooks/dead-letter/{id} returns 404 when not found."""
         mock_db_session.query.return_value.filter.return_value.first.return_value = None
         response = client.delete("/v1/webhooks/dead-letter/nonexistent")
         assert response.status_code == 404
 
     def test_purge_dead_letter_500_on_error(
-        self, client, mock_db_session, mock_dead_letter_delivery
-    ):
+        self, client: TestClient, mock_db_session: MagicMock, mock_dead_letter_delivery: MagicMock
+    ) -> None:
         """DELETE /v1/webhooks/dead-letter/{id} returns 500 on db error."""
         mock_db_session.query.return_value.filter.return_value.first.return_value = (
             mock_dead_letter_delivery

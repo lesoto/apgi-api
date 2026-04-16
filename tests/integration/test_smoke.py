@@ -16,10 +16,13 @@ to validate that all components are working together correctly.
 
 import pytest
 from httpx import AsyncClient, ASGITransport
+from typing import AsyncGenerator
 
 
 @pytest.fixture
-async def client(test_environment, mock_database_connection):
+async def client(
+    test_environment: None, mock_database_connection: None
+) -> AsyncGenerator[AsyncClient, None]:
     """Create test client for smoke tests."""
     from app.main import create_app
     from unittest.mock import AsyncMock, patch
@@ -48,7 +51,7 @@ class TestHealthEndpoints:
     """Test health check endpoints respond correctly."""
 
     @pytest.mark.asyncio
-    async def test_basic_health_check(self, client):
+    async def test_basic_health_check(self, client: AsyncClient) -> None:
         """
         Test that /health endpoint returns 200 OK.
 
@@ -77,7 +80,7 @@ class TestHealthEndpoints:
         assert "version" in data
 
     @pytest.mark.asyncio
-    async def test_readiness_check(self, client):
+    async def test_readiness_check(self, client: AsyncClient) -> None:
         """
         Test that /health/ready endpoint verifies dependencies.
 
@@ -99,7 +102,7 @@ class TestHealthEndpoints:
             assert data["status"] in ["not_ready", "degraded"]
 
     @pytest.mark.asyncio
-    async def test_health_service_not_initialized(self, client):
+    async def test_health_service_not_initialized(self, client: AsyncClient) -> None:
         """
         Test that health endpoints return 503 when health service is not initialized.
 
@@ -126,7 +129,7 @@ class TestHealthEndpoints:
             assert "Health service not initialized" in data["error"]["message"]
 
     @pytest.mark.asyncio
-    async def test_health_check_unhealthy(self, client):
+    async def test_health_check_unhealthy(self, client: AsyncClient) -> None:
         """
         Test that health endpoints return 503 when health check fails.
 
@@ -170,7 +173,9 @@ class TestHealthEndpoints:
             assert data["status"] == "not_ready"
 
     @pytest.mark.asyncio
-    async def test_health_check_celery_unhealthy_but_overall_healthy(self, client):
+    async def test_health_check_celery_unhealthy_but_overall_healthy(
+        self, client: AsyncClient
+    ) -> None:
         """
         Test that /health endpoint returns 200 when critical dependencies are healthy
         but Celery is unavailable (Celery is treated as optional).
@@ -206,10 +211,12 @@ class TestHealthEndpoints:
         assert data["dependencies"]["database"]["status"] == "healthy"
         assert data["dependencies"]["redis"]["status"] == "healthy"
 
+
+class TestAuthentication:
     """Test authentication flow works end-to-end."""
 
     @pytest.mark.asyncio
-    async def test_login_endpoint_exists(self, client):
+    async def test_login_endpoint_exists(self, client: AsyncClient) -> None:
         """
         Test that login endpoint exists and responds.
 
@@ -231,7 +238,7 @@ class TestHealthEndpoints:
         assert response.status_code in [200, 401]
 
     @pytest.mark.asyncio
-    async def test_refresh_endpoint_exists(self, client):
+    async def test_refresh_endpoint_exists(self, client: AsyncClient) -> None:
         """
         Test that token refresh endpoint exists.
 
@@ -247,7 +254,7 @@ class TestHealthEndpoints:
         assert response.status_code in [401, 422]
 
     @pytest.mark.asyncio
-    async def test_logout_endpoint_exists(self, client):
+    async def test_logout_endpoint_exists(self, client: AsyncClient) -> None:
         """
         Test that logout endpoint exists.
 
@@ -267,7 +274,7 @@ class TestSessionManagement:
     """Test session creation and management endpoints exist."""
 
     @pytest.mark.asyncio
-    async def test_session_create_endpoint_exists(self, client):
+    async def test_session_create_endpoint_exists(self, client: AsyncClient) -> None:
         """
         Test that session creation endpoint exists.
 
@@ -284,7 +291,7 @@ class TestSessionManagement:
         assert response.status_code in [200, 201, 401, 422]
 
     @pytest.mark.asyncio
-    async def test_session_get_endpoint_exists(self, client):
+    async def test_session_get_endpoint_exists(self, client: AsyncClient) -> None:
         """
         Test that session retrieval endpoint exists.
 
@@ -298,7 +305,7 @@ class TestSessionManagement:
         assert response.status_code in [401, 404]
 
     @pytest.mark.asyncio
-    async def test_session_start_endpoint_exists(self, client):
+    async def test_session_start_endpoint_exists(self, client: AsyncClient) -> None:
         """
         Test that session start endpoint exists.
 
@@ -310,7 +317,7 @@ class TestSessionManagement:
         assert response.status_code in [401, 404]
 
     @pytest.mark.asyncio
-    async def test_session_pause_endpoint_exists(self, client):
+    async def test_session_pause_endpoint_exists(self, client: AsyncClient) -> None:
         """
         Test that session pause endpoint exists.
 
@@ -321,7 +328,7 @@ class TestSessionManagement:
         assert response.status_code in [401, 404]
 
     @pytest.mark.asyncio
-    async def test_session_stop_endpoint_exists(self, client):
+    async def test_session_stop_endpoint_exists(self, client: AsyncClient) -> None:
         """
         Test that session stop endpoint exists.
 
@@ -332,7 +339,7 @@ class TestSessionManagement:
         assert response.status_code in [401, 404]
 
     @pytest.mark.asyncio
-    async def test_session_reset_endpoint_exists(self, client):
+    async def test_session_reset_endpoint_exists(self, client: AsyncClient) -> None:
         """
         Test that session reset endpoint exists.
 
@@ -343,7 +350,7 @@ class TestSessionManagement:
         assert response.status_code in [401, 404]
 
     @pytest.mark.asyncio
-    async def test_session_delete_endpoint_exists(self, client):
+    async def test_session_delete_endpoint_exists(self, client: AsyncClient) -> None:
         """
         Test that session deletion endpoint exists.
 
@@ -358,7 +365,7 @@ class TestTaskSubmissionAndRetrieval:
     """Test task submission and retrieval endpoints exist."""
 
     @pytest.mark.asyncio
-    async def test_list_tasks_endpoint_exists(self, client):
+    async def test_list_tasks_endpoint_exists(self, client: AsyncClient) -> None:
         """
         Test that task listing endpoint exists.
 
@@ -371,7 +378,7 @@ class TestTaskSubmissionAndRetrieval:
         assert response.status_code in [200, 401]
 
     @pytest.mark.asyncio
-    async def test_submit_task_endpoint_exists(self, client):
+    async def test_submit_task_endpoint_exists(self, client: AsyncClient) -> None:
         """
         Test that task submission endpoint exists.
 
@@ -386,7 +393,7 @@ class TestTaskSubmissionAndRetrieval:
         assert response.status_code in [401, 404, 422]
 
     @pytest.mark.asyncio
-    async def test_get_task_status_endpoint_exists(self, client):
+    async def test_get_task_status_endpoint_exists(self, client: AsyncClient) -> None:
         """
         Test that task status endpoint exists.
 
@@ -398,7 +405,7 @@ class TestTaskSubmissionAndRetrieval:
         assert response.status_code in [401, 404]
 
     @pytest.mark.asyncio
-    async def test_cancel_task_endpoint_exists(self, client):
+    async def test_cancel_task_endpoint_exists(self, client: AsyncClient) -> None:
         """
         Test that task cancellation endpoint exists.
 
@@ -414,7 +421,7 @@ class TestAPIStructure:
     """Test overall API structure and availability."""
 
     @pytest.mark.asyncio
-    async def test_root_endpoint(self, client):
+    async def test_root_endpoint(self, client: AsyncClient) -> None:
         """
         Test that root endpoint provides API information.
 
@@ -429,7 +436,7 @@ class TestAPIStructure:
         assert "docs" in data
 
     @pytest.mark.asyncio
-    async def test_openapi_docs_available(self, client):
+    async def test_openapi_docs_available(self, client: AsyncClient) -> None:
         """
         Test that OpenAPI documentation is available.
 
@@ -441,7 +448,7 @@ class TestAPIStructure:
         assert response.status_code in [200, 307]
 
     @pytest.mark.asyncio
-    async def test_version_endpoint(self, client):
+    async def test_version_endpoint(self, client: AsyncClient) -> None:
         """
         Test that version endpoint returns correct information.
 

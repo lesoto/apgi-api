@@ -7,9 +7,9 @@ Global exception handlers for consistent error responses across the API.
 import logging
 import uuid
 from datetime import datetime, timezone
-from typing import Union
+from typing import Any, Union
 
-from fastapi import Request, status
+from fastapi import Request, status, FastAPI
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 from pydantic import ValidationError as PydanticValidationError
@@ -233,7 +233,7 @@ async def unhandled_exception_handler(request: Request, exc: Exception) -> JSONR
 
                         # Remove sensitive fields recursively
 
-                        def redact_sensitive(data):
+                        def redact_sensitive(data: Any) -> None:
                             if isinstance(data, dict):
                                 for key, value in list(data.items()):
                                     if any(
@@ -287,7 +287,7 @@ async def unhandled_exception_handler(request: Request, exc: Exception) -> JSONR
     )
 
 
-def register_exception_handlers(app):
+def register_exception_handlers(app: FastAPI) -> None:
     """
     Register all exception handlers with the FastAPI application.
 
@@ -298,14 +298,14 @@ def register_exception_handlers(app):
         app: The FastAPI application instance
     """
     # Custom API errors
-    app.add_exception_handler(APIError, api_error_handler)
+    app.add_exception_handler(APIError, api_error_handler)  # type: ignore[arg-type]
 
     # Validation errors
-    app.add_exception_handler(RequestValidationError, validation_error_handler)
-    app.add_exception_handler(PydanticValidationError, validation_error_handler)
+    app.add_exception_handler(RequestValidationError, validation_error_handler)  # type: ignore[arg-type]
+    app.add_exception_handler(PydanticValidationError, validation_error_handler)  # type: ignore[arg-type]
 
     # HTTP exceptions
-    app.add_exception_handler(StarletteHTTPException, http_exception_handler)
+    app.add_exception_handler(StarletteHTTPException, http_exception_handler)  # type: ignore[arg-type]
 
     # Catch-all for unexpected exceptions
     app.add_exception_handler(Exception, unhandled_exception_handler)

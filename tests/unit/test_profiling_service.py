@@ -356,14 +356,14 @@ class TestProfilingServiceCore:
         """Mock profiling service."""
         return ProfilingService()
 
-    def test_profiling_service_initialization(self, mock_service):
+    def test_profiling_service_initialization(self, mock_service) -> None:
         """Test profiling service initialization."""
         assert mock_service.snapshots == []
         assert mock_service.max_snapshots == 1000
         assert mock_service.is_tracing_memory is False
         assert mock_service.memory_trace_started is False
 
-    def test_start_memory_tracing_success(self, mock_service):
+    def test_start_memory_tracing_success(self, mock_service) -> None:
         """Test successful memory tracing start."""
         with patch("app.services.profiling_service.tracemalloc.start") as mock_start:
             mock_service.start_memory_tracing()
@@ -371,7 +371,7 @@ class TestProfilingServiceCore:
             assert mock_service.is_tracing_memory is True
             mock_start.assert_called_once()
 
-    def test_start_memory_tracing_already_started(self, mock_service):
+    def test_start_memory_tracing_already_started(self, mock_service) -> None:
         """Test memory tracing start when already started."""
         mock_service.is_tracing_memory = True
 
@@ -380,7 +380,7 @@ class TestProfilingServiceCore:
 
         assert mock_service.is_tracing_memory is True
 
-    def test_stop_memory_tracing_success(self, mock_service):
+    def test_stop_memory_tracing_success(self, mock_service) -> None:
         """Test successful memory tracing stop."""
         mock_service.is_tracing_memory = True
         mock_service.memory_trace_started = True
@@ -391,7 +391,7 @@ class TestProfilingServiceCore:
             assert mock_service.is_tracing_memory is False
             mock_stop.assert_called_once()
 
-    def test_stop_memory_tracing_not_started(self, mock_service):
+    def test_stop_memory_tracing_not_started(self, mock_service) -> None:
         """Test memory tracing stop when not started."""
         mock_service.is_tracing_memory = False
 
@@ -400,13 +400,13 @@ class TestProfilingServiceCore:
 
         assert mock_service.is_tracing_memory is False
 
-    def test_get_memory_snapshot_not_started(self, mock_service):
+    def test_get_memory_snapshot_not_started(self, mock_service) -> None:
         """Test getting memory snapshot when tracing not started."""
         result = mock_service.get_memory_snapshot()
 
         assert result["error"] == "Memory tracing not started"
 
-    def test_get_memory_snapshot_success(self, mock_service):
+    def test_get_memory_snapshot_success(self, mock_service) -> None:
         """Test successful memory snapshot retrieval."""
         mock_service.memory_trace_started = True
         mock_stat = MagicMock()
@@ -429,7 +429,7 @@ class TestProfilingServiceCore:
         assert "current_mb" in result
         assert "peak_mb" in result
 
-    def test_get_memory_snapshot_failure(self, mock_service):
+    def test_get_memory_snapshot_failure(self, mock_service) -> None:
         """Test memory snapshot retrieval failure."""
         mock_service.memory_trace_started = True
 
@@ -442,7 +442,7 @@ class TestProfilingServiceCore:
             assert "error" in result
             assert "Memory error" in result["error"]
 
-    def test_record_performance_snapshot(self, mock_service):
+    def test_record_performance_snapshot(self, mock_service) -> None:
         """Test recording performance snapshot."""
         mock_service.record_performance_snapshot(
             cpu_percent=50.0,
@@ -458,7 +458,7 @@ class TestProfilingServiceCore:
         assert mock_service.snapshots[0].memory_mb == 512.0
         assert mock_service.snapshots[0].response_time_avg == 0.1
 
-    def test_record_performance_snapshot_max_snapshots(self, mock_service):
+    def test_record_performance_snapshot_max_snapshots(self, mock_service) -> None:
         """Test recording performance snapshot when max reached."""
         mock_service.max_snapshots = 2
 
@@ -473,13 +473,13 @@ class TestProfilingServiceCore:
         assert mock_service.snapshots[0].cpu_percent == 60.0  # Second snapshot
         assert mock_service.snapshots[1].cpu_percent == 70.0  # Third snapshot
 
-    def test_get_performance_history_empty(self, mock_service):
+    def test_get_performance_history_empty(self, mock_service) -> None:
         """Test getting performance history when no snapshots."""
         result = mock_service.get_performance_history(hours=1)
 
         assert result == []
 
-    def test_get_performance_history_success(self, mock_service):
+    def test_get_performance_history_success(self, mock_service) -> None:
         """Test successful performance history retrieval."""
         now = datetime.now(timezone.utc)
         mock_service.snapshots = [
@@ -518,7 +518,7 @@ class TestProfilingServiceCore:
         assert result[0]["cpu_percent"] == 60.0
         assert result[1]["cpu_percent"] == 70.0
 
-    def test_get_performance_history_different_hours(self, mock_service):
+    def test_get_performance_history_different_hours(self, mock_service) -> None:
         """Test performance history with different time periods."""
         now = datetime.now(timezone.utc)
         mock_service.snapshots = [
@@ -547,13 +547,13 @@ class TestProfilingServiceCore:
         assert len(result) == 1
         assert result[0]["cpu_percent"] == 60.0
 
-    def test_get_bottleneck_analysis_empty(self, mock_service):
+    def test_get_bottleneck_analysis_empty(self, mock_service) -> None:
         """Test bottleneck analysis when no snapshots available."""
         result = mock_service.get_bottleneck_analysis()
 
         assert result["error"] == "No performance snapshots available"
 
-    def test_get_bottleneck_analysis_success(self, mock_service):
+    def test_get_bottleneck_analysis_success(self, mock_service) -> None:
         """Test successful bottleneck analysis."""
         now = datetime.now(timezone.utc)
         mock_service.snapshots = [
@@ -592,7 +592,7 @@ class TestProfilingServiceCore:
         assert "average_cpu_percent" in result
         assert "average_memory_mb" in result
 
-    def test_performance_snapshot_dataclass(self):
+    def test_performance_snapshot_dataclass(self) -> None:
         """Test PerformanceSnapshot dataclass."""
         timestamp = datetime.now(timezone.utc)
         snapshot = PerformanceSnapshot(
@@ -610,7 +610,7 @@ class TestProfilingServiceCore:
         assert snapshot.memory_mb == 512.0
         assert snapshot.response_time_avg == 0.1
 
-    def test_profiling_result_dataclass(self):
+    def test_profiling_result_dataclass(self) -> None:
         """Test ProfilingResult dataclass."""
         function_stats = [{"function": "test_function", "calls": 5, "time": 0.1}]
         result = ProfilingResult(
@@ -627,7 +627,7 @@ class TestProfilingServiceCore:
         assert result.memory_peak == 1024
         assert result.duration == 0.5
 
-    def test_edge_case_max_snapshots_zero(self, mock_service):
+    def test_edge_case_max_snapshots_zero(self, mock_service) -> None:
         """Test edge case with max_snapshots set to zero."""
         mock_service.max_snapshots = 0
 
@@ -638,7 +638,7 @@ class TestProfilingServiceCore:
         # Due to Python's -0 == 0 behavior, snapshots are not pruned
         assert isinstance(mock_service.snapshots, list)
 
-    def test_edge_case_negative_hours(self, mock_service):
+    def test_edge_case_negative_hours(self, mock_service) -> None:
         """Test edge case with negative hours parameter."""
         # Add some snapshots
         mock_service.record_performance_snapshot(50.0, 512.0, 5, 3, 100, 0.1)

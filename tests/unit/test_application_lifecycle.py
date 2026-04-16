@@ -29,8 +29,8 @@ class TestApplicationStartup:
     @patch("app.main.create_app")
     def test_application_starts_with_valid_configuration(
         self,
-        mock_create_app,
-    ):
+        mock_create_app: MagicMock,
+    ) -> None:
         """Test that application starts successfully with valid configuration."""
         # Mock the create_app function to avoid import issues
         mock_app = MagicMock()
@@ -51,8 +51,8 @@ class TestApplicationStartup:
     @patch("app.main.create_app")
     def test_application_has_middleware_stack(
         self,
-        mock_create_app,
-    ):
+        mock_create_app: MagicMock,
+    ) -> None:
         """Test that application has middleware stack configured."""
         # Mock the create_app function to avoid import issues
         mock_app = MagicMock()
@@ -91,7 +91,11 @@ class TestLifespanStartup:
 
     @pytest.mark.asyncio
     @patch("redis.asyncio.from_url")
-    async def test_lifespan_initializes_database(self, mock_redis, mock_database_connection):
+    async def test_lifespan_initializes_database(
+        self,
+        mock_redis: AsyncMock,
+        mock_database_connection: tuple[MagicMock, MagicMock, MagicMock],
+    ) -> None:
         """Test that lifespan context initializes database on startup."""
         from app.main import lifespan
 
@@ -121,7 +125,11 @@ class TestLifespanStartup:
 
     @pytest.mark.asyncio
     @patch("redis.asyncio.from_url")
-    async def test_lifespan_initializes_redis(self, mock_redis, mock_database_connection):
+    async def test_lifespan_initializes_redis(
+        self,
+        mock_redis: AsyncMock,
+        mock_database_connection: tuple[MagicMock, MagicMock, MagicMock],
+    ) -> None:
         """Test that lifespan context initializes Redis on startup."""
         from app.main import lifespan
 
@@ -152,7 +160,7 @@ class TestLifespanStartup:
 class TestApplicationStartupValidation:
     """Test application refuses to start with invalid production configuration."""
 
-    def test_application_requires_secure_jwt_secret_in_production(self):
+    def test_application_requires_secure_jwt_secret_in_production(self) -> None:
         """Test that application validates JWT secret length in production."""
         # Test that short JWT secret is rejected
         with patch.dict(os.environ, {"ENVIRONMENT": "production", "JWT_SECRET_KEY": "short"}):
@@ -169,7 +177,11 @@ class TestGracefulShutdown:
 
     @pytest.mark.asyncio
     @patch("redis.asyncio.from_url")
-    async def test_shutdown_closes_database_connections(self, mock_redis, mock_database_connection):
+    async def test_shutdown_closes_database_connections(
+        self,
+        mock_redis: AsyncMock,
+        mock_database_connection: tuple[MagicMock, MagicMock, MagicMock],
+    ) -> None:
         """Test that graceful shutdown closes database connections."""
         from app.main import lifespan
 
@@ -198,7 +210,11 @@ class TestGracefulShutdown:
 
     @pytest.mark.asyncio
     @patch("redis.asyncio.from_url")
-    async def test_shutdown_closes_redis_connections(self, mock_redis, mock_database_connection):
+    async def test_shutdown_closes_redis_connections(
+        self,
+        mock_redis: AsyncMock,
+        mock_database_connection: tuple[MagicMock, MagicMock, MagicMock],
+    ) -> None:
         """Test that graceful shutdown closes Redis connections."""
         from app.main import lifespan
 
@@ -226,7 +242,11 @@ class TestGracefulShutdown:
 
     @pytest.mark.asyncio
     @patch("redis.asyncio.from_url")
-    async def test_shutdown_order_redis_before_database(self, mock_redis, mock_database_connection):
+    async def test_shutdown_order_redis_before_database(
+        self,
+        mock_redis: AsyncMock,
+        mock_database_connection: tuple[MagicMock, MagicMock, MagicMock],
+    ) -> None:
         """Test that shutdown closes Redis before database."""
         from app.main import lifespan
 
@@ -239,7 +259,7 @@ class TestGracefulShutdown:
         # Track call order
         call_order = []
 
-        async def track_redis_close():
+        async def track_redis_close() -> None:
             call_order.append("redis")
 
         mock_redis_client.aclose.side_effect = track_redis_close
@@ -268,8 +288,11 @@ class TestStartupFailureHandling:
     @patch("redis.asyncio.from_url")
     @patch("app.main.init_db")
     async def test_startup_fails_if_database_unavailable(
-        self, mock_init_db, mock_redis, mock_database_connection
-    ):
+        self,
+        mock_init_db: MagicMock,
+        mock_redis: AsyncMock,
+        mock_database_connection: tuple[MagicMock, MagicMock, MagicMock],
+    ) -> None:
         """Test that startup fails if database is unavailable."""
         from app.main import lifespan
 
@@ -292,8 +315,11 @@ class TestStartupFailureHandling:
     @patch("redis.asyncio.from_url")
     @patch("app.database.connection.init_db")
     async def test_startup_fails_if_redis_unavailable(
-        self, mock_init_db, mock_redis, mock_database_connection
-    ):
+        self,
+        mock_init_db: MagicMock,
+        mock_redis: AsyncMock,
+        mock_database_connection: tuple[MagicMock, MagicMock, MagicMock],
+    ) -> None:
         """Test that startup fails if Redis is unavailable."""
         from app.main import lifespan
 
@@ -312,7 +338,7 @@ class TestStartupFailureHandling:
 class TestInFlightRequestHandling:
     """Test graceful shutdown waits for in-flight requests."""
 
-    def test_application_has_lifespan_context(self):
+    def test_application_has_lifespan_context(self) -> None:
         """Test that application has lifespan context for graceful shutdown.
 
         Note: The actual implementation of waiting for in-flight requests

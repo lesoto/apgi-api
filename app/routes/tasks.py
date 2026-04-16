@@ -7,7 +7,8 @@ API endpoints for executing and managing experimental tasks.
 import logging
 from typing import Optional
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status, Request
+from starlette.responses import Response as StarletteResponse, JSONResponse
 
 from app.database.connection import get_db
 from app.database.models import Task as TaskModel, Session as SessionModel
@@ -56,7 +57,7 @@ def get_task_executor() -> TaskExecutor:
     return _task_executor
 
 
-def init_task_routes():
+def init_task_routes() -> None:
     """Initialize task routes with TaskExecutor."""
     global _task_executor
     _task_executor = TaskExecutor()
@@ -161,6 +162,7 @@ async def execute_task(
     dependencies=[Depends(require_permission(Permission.TASK_READ))],
 )
 async def get_task_status(
+    request: Request,
     task_id: str,
     executor: TaskExecutor = Depends(get_task_executor),
     current_user=Depends(get_current_user),
@@ -169,8 +171,10 @@ async def get_task_status(
     Get task status and results.
 
     Args:
+        request: HTTP request for conditional headers
         task_id: Task identifier
         executor: Task executor dependency
+        current_user: Current authenticated user
 
     Returns:
         TaskStatusResponse with current status and results if completed
@@ -182,8 +186,22 @@ async def get_task_status(
         # Get task status with ownership validation
         status_info = await executor.get_task_status(task_id, current_user.user_id)
 
+        # Implementation of ETag/conditional requests for completed tasks
+        # This helps with Action item 6 in APGI evaluation
+        if status_info["status"] in ["completed", "failed", "cancelled"]:
+            import hashlib
+            import json
+
+            # Generate stable ETag based on status and result data
+            etag_content = f"{status_info['status']}:{json.dumps(status_info.get('result', {}), sort_keys=True)}"
+            etag = f'W/"{hashlib.md5(etag_content.encode()).hexdigest()}"'
+
+            # Check If-None-Match header
+            if request.headers.get("if-none-match") == etag:
+                return StarletteResponse(status_code=status.HTTP_304_NOT_MODIFIED)
+
         # Build response
-        response = TaskStatusResponse(
+        response_data = TaskStatusResponse(
             task_id=task_id,
             status=status_info["status"],
             state=status_info.get("state"),
@@ -191,6 +209,12 @@ async def get_task_status(
             error=status_info.get("error"),
             info=status_info.get("info"),
         )
+
+        # Add ETag header for stable responses
+        response = JSONResponse(content=response_data.model_dump())
+        if status_info["status"] in ["completed", "failed", "cancelled"]:
+            response.headers["ETag"] = etag
+            response.headers["Cache-Control"] = "private, max-age=3600"  # Cache terminal states
 
         return response
     except ValueError as e:

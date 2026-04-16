@@ -10,6 +10,7 @@ from unittest.mock import MagicMock
 from datetime import datetime, timezone, timedelta
 from sqlalchemy.orm import Session
 from fastapi.testclient import TestClient
+from typing import Generator
 
 try:
     from app.main import create_app
@@ -28,7 +29,7 @@ except ImportError:
 
 
 @pytest.fixture
-def mock_db():
+def mock_db() -> MagicMock:
     """Create a mock database session."""
     db = MagicMock(spec=Session)
     db.query = MagicMock()
@@ -40,7 +41,7 @@ def mock_db():
 
 
 @pytest.fixture
-def mock_audit_log():
+def mock_audit_log() -> MagicMock:
     """Create a mock audit log entry."""
     log = MagicMock()
     log.audit_id = "audit_123"
@@ -57,7 +58,7 @@ def mock_audit_log():
 
 
 @pytest.fixture
-def mock_current_user():
+def mock_current_user() -> MagicMock:
     """Create a mock current user with admin permission."""
     user = MagicMock()
     user.user_id = "admin_user_123"
@@ -67,7 +68,7 @@ def mock_current_user():
 
 
 @pytest.fixture
-def client(mock_db, mock_current_user):
+def client(mock_db: MagicMock, mock_current_user: MagicMock) -> Generator[TestClient, None, None]:
     """Create a TestClient with mocked database and authentication dependencies."""
     app = create_app(test_mode=True)
     app.dependency_overrides[get_db] = lambda: mock_db
@@ -85,7 +86,9 @@ def client(mock_db, mock_current_user):
 class TestQueryAuditLogs:
     """Test the /v1/admin/audit-logs endpoint."""
 
-    def test_query_audit_logs_success_no_filters(self, client, mock_db, mock_audit_log):
+    def test_query_audit_logs_success_no_filters(
+        self, client: TestClient, mock_db: MagicMock, mock_audit_log: MagicMock
+    ) -> None:
         """Test successful query of audit logs without filters."""
         # Setup mock
         mock_query = MagicMock()
@@ -110,7 +113,9 @@ class TestQueryAuditLogs:
         assert data["logs"][0]["resource_type"] == "session"
         assert data["logs"][0]["status"] == "success"
 
-    def test_query_audit_logs_with_user_id_filter(self, client, mock_db, mock_audit_log):
+    def test_query_audit_logs_with_user_id_filter(
+        self, client: TestClient, mock_db: MagicMock, mock_audit_log: MagicMock
+    ) -> None:
         """Test query audit logs with user_id filter."""
         # Setup mock
         mock_query = MagicMock()
@@ -130,7 +135,9 @@ class TestQueryAuditLogs:
         # Verify filter was applied
         mock_query.filter.assert_called()
 
-    def test_query_audit_logs_with_action_filter(self, client, mock_db, mock_audit_log):
+    def test_query_audit_logs_with_action_filter(
+        self, client: TestClient, mock_db: MagicMock, mock_audit_log: MagicMock
+    ) -> None:
         """Test query audit logs with action filter."""
         # Setup mock
         mock_query = MagicMock()
@@ -148,7 +155,9 @@ class TestQueryAuditLogs:
         data = response.json()
         assert len(data["logs"]) == 1
 
-    def test_query_audit_logs_with_resource_type_filter(self, client, mock_db, mock_audit_log):
+    def test_query_audit_logs_with_resource_type_filter(
+        self, client: TestClient, mock_db: MagicMock, mock_audit_log: MagicMock
+    ) -> None:
         """Test query audit logs with resource_type filter."""
         # Setup mock
         mock_query = MagicMock()
@@ -166,7 +175,9 @@ class TestQueryAuditLogs:
         data = response.json()
         assert len(data["logs"]) == 1
 
-    def test_query_audit_logs_with_status_filter(self, client, mock_db, mock_audit_log):
+    def test_query_audit_logs_with_status_filter(
+        self, client: TestClient, mock_db: MagicMock, mock_audit_log: MagicMock
+    ) -> None:
         """Test query audit logs with status filter."""
         # Setup mock
         mock_query = MagicMock()
@@ -184,7 +195,9 @@ class TestQueryAuditLogs:
         data = response.json()
         assert len(data["logs"]) == 1
 
-    def test_query_audit_logs_with_multiple_filters(self, client, mock_db, mock_audit_log):
+    def test_query_audit_logs_with_multiple_filters(
+        self, client: TestClient, mock_db: MagicMock, mock_audit_log: MagicMock
+    ) -> None:
         """Test query audit logs with multiple filters applied."""
         # Setup mock
         mock_query = MagicMock()
@@ -204,7 +217,9 @@ class TestQueryAuditLogs:
         data = response.json()
         assert len(data["logs"]) == 1
 
-    def test_query_audit_logs_pagination_default(self, client, mock_db, mock_audit_log):
+    def test_query_audit_logs_pagination_default(
+        self, client: TestClient, mock_db: MagicMock, mock_audit_log: MagicMock
+    ) -> None:
         """Test pagination with default page and per_page values."""
         # Setup mock
         mock_query = MagicMock()
@@ -224,7 +239,9 @@ class TestQueryAuditLogs:
         assert data["pagination"]["per_page"] == 20
         assert data["pagination"]["total"] == 50
 
-    def test_query_audit_logs_pagination_custom_page(self, client, mock_db, mock_audit_log):
+    def test_query_audit_logs_pagination_custom_page(
+        self, client: TestClient, mock_db: MagicMock, mock_audit_log: MagicMock
+    ) -> None:
         """Test pagination with custom page number."""
         # Setup mock
         mock_query = MagicMock()
@@ -246,7 +263,9 @@ class TestQueryAuditLogs:
         # Verify offset was calculated correctly (page 2 with 20 per page = offset 20)
         mock_query.offset.assert_called_with(20)
 
-    def test_query_audit_logs_pagination_custom_per_page(self, client, mock_db, mock_audit_log):
+    def test_query_audit_logs_pagination_custom_per_page(
+        self, client: TestClient, mock_db: MagicMock, mock_audit_log: MagicMock
+    ) -> None:
         """Test pagination with custom per_page value."""
         # Setup mock
         mock_query = MagicMock()
@@ -264,7 +283,7 @@ class TestQueryAuditLogs:
         data = response.json()
         assert data["pagination"]["per_page"] == 50
 
-    def test_query_audit_logs_empty_result(self, client, mock_db):
+    def test_query_audit_logs_empty_result(self, client: TestClient, mock_db: MagicMock) -> None:
         """Test query audit logs with no results."""
         # Setup mock
         mock_query = MagicMock()
@@ -283,7 +302,9 @@ class TestQueryAuditLogs:
         assert len(data["logs"]) == 0
         assert data["pagination"]["total"] == 0
 
-    def test_query_audit_logs_multiple_entries(self, client, mock_db):
+    def test_query_audit_logs_multiple_entries(
+        self, client: TestClient, mock_db: MagicMock
+    ) -> None:
         """Test query audit logs returning multiple entries."""
         # Setup mock logs
         logs = []
@@ -320,7 +341,9 @@ class TestQueryAuditLogs:
             assert log_entry["audit_id"] == f"audit_{i}"
             assert log_entry["user_id"] == f"user_{i}"
 
-    def test_query_audit_logs_response_structure(self, client, mock_db, mock_audit_log):
+    def test_query_audit_logs_response_structure(
+        self, client: TestClient, mock_db: MagicMock, mock_audit_log: MagicMock
+    ) -> None:
         """Test that response has correct structure with all required fields."""
         # Setup mock
         mock_query = MagicMock()
@@ -360,7 +383,9 @@ class TestQueryAuditLogs:
         assert "per_page" in pagination
         assert "total" in pagination
 
-    def test_query_audit_logs_database_exception(self, client, mock_db):
+    def test_query_audit_logs_database_exception(
+        self, client: TestClient, mock_db: MagicMock
+    ) -> None:
         """Test handling of database exception."""
         # Setup mock to raise exception
         mock_db.query.side_effect = Exception("Database connection error")
@@ -374,7 +399,9 @@ class TestQueryAuditLogs:
         error_msg = data.get("detail") or data.get("error", {}).get("message", "")
         assert "Failed to retrieve audit logs" in error_msg
 
-    def test_query_audit_logs_sorting_by_timestamp(self, client, mock_db):
+    def test_query_audit_logs_sorting_by_timestamp(
+        self, client: TestClient, mock_db: MagicMock
+    ) -> None:
         """Test that results are sorted by timestamp in descending order."""
         # Setup mock logs with different timestamps
         logs = []
@@ -408,7 +435,9 @@ class TestQueryAuditLogs:
         # Verify order_by was called (sorting by timestamp descending)
         mock_query.order_by.assert_called()
 
-    def test_query_audit_logs_with_null_optional_fields(self, client, mock_db):
+    def test_query_audit_logs_with_null_optional_fields(
+        self, client: TestClient, mock_db: MagicMock
+    ) -> None:
         """Test handling of audit logs with null optional fields."""
         # Setup mock log with null optional fields
         log = MagicMock()
@@ -444,7 +473,9 @@ class TestQueryAuditLogs:
         assert log_entry["ip_address"] is None
         assert log_entry["user_agent"] is None
 
-    def test_query_audit_logs_with_complex_details(self, client, mock_db):
+    def test_query_audit_logs_with_complex_details(
+        self, client: TestClient, mock_db: MagicMock
+    ) -> None:
         """Test handling of audit logs with complex details JSON."""
         # Setup mock log with complex details
         log = MagicMock()
@@ -483,7 +514,9 @@ class TestQueryAuditLogs:
         assert log_entry["details"]["changes"]["status"]["old"] == "active"
         assert log_entry["details"]["changes"]["status"]["new"] == "paused"
 
-    def test_query_audit_logs_pagination_boundary_page_1(self, client, mock_db, mock_audit_log):
+    def test_query_audit_logs_pagination_boundary_page_1(
+        self, client: TestClient, mock_db: MagicMock, mock_audit_log: MagicMock
+    ) -> None:
         """Test pagination at boundary: page 1."""
         # Setup mock
         mock_query = MagicMock()
@@ -502,7 +535,9 @@ class TestQueryAuditLogs:
         # Offset should be 0 for page 1
         mock_query.offset.assert_called_with(0)
 
-    def test_query_audit_logs_pagination_max_per_page(self, client, mock_db, mock_audit_log):
+    def test_query_audit_logs_pagination_max_per_page(
+        self, client: TestClient, mock_db: MagicMock, mock_audit_log: MagicMock
+    ) -> None:
         """Test pagination with maximum per_page value (100)."""
         # Setup mock
         mock_query = MagicMock()
@@ -521,7 +556,9 @@ class TestQueryAuditLogs:
         assert data["pagination"]["per_page"] == 100
         mock_query.limit.assert_called_with(100)
 
-    def test_query_audit_logs_filter_combinations(self, client, mock_db, mock_audit_log):
+    def test_query_audit_logs_filter_combinations(
+        self, client: TestClient, mock_db: MagicMock, mock_audit_log: MagicMock
+    ) -> None:
         """Test various filter combinations."""
         # Setup mock
         mock_query = MagicMock()
@@ -547,7 +584,7 @@ class TestQueryAuditLogs:
         )
         assert response.status_code == 200
 
-    def test_query_audit_logs_failure_status(self, client, mock_db):
+    def test_query_audit_logs_failure_status(self, client: TestClient, mock_db: MagicMock) -> None:
         """Test query audit logs with failure status."""
         # Setup mock log with failure status
         log = MagicMock()
@@ -580,7 +617,9 @@ class TestQueryAuditLogs:
         assert data["logs"][0]["status"] == "failure"
         assert data["logs"][0]["action"] == "DELETE"
 
-    def test_query_audit_logs_large_page_number(self, client, mock_db):
+    def test_query_audit_logs_large_page_number(
+        self, client: TestClient, mock_db: MagicMock
+    ) -> None:
         """Test pagination with large page number beyond available data."""
         # Setup mock
         mock_query = MagicMock()

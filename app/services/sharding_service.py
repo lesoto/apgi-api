@@ -35,7 +35,7 @@ class ShardInfo:
 class DatabaseShardingService:
     """Service for managing database sharding operations."""
 
-    def __init__(self):
+    def __init__(self) -> None:
         # Default to single shard configuration
         self.shards: Dict[str, ShardConfig] = {}
         self.num_shards = getattr(settings, "database_shards_count", 1)
@@ -43,7 +43,7 @@ class DatabaseShardingService:
         # Initialize shards based on configuration
         self._initialize_shards()
 
-    def _initialize_shards(self):
+    def _initialize_shards(self) -> None:
         """Initialize shard configurations."""
         # If only one shard, use the main database URL
         if self.num_shards == 1:

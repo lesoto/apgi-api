@@ -6,19 +6,24 @@ Note: Celery is mocked globally in conftest.py, so we test module structure and
 error handling logic rather than calling task functions directly.
 """
 
+from __future__ import annotations
+
 import sys
 import pytest
+from typing import Any, Callable, Generator
 from unittest.mock import patch
 
 
 # Make Celery mock return actual decorated function
-def mock_celery_task_decorator(*args, bind=False, base=None, name=None, **kwargs):
+def mock_celery_task_decorator(
+    *args, bind: bool = False, base: object = None, name: str | None = None, **kwargs: Any
+) -> Callable[..., Any]:
     """Mock decorator that returns the actual function being decorated."""
 
-    def decorator(func):
-        func.name = name or func.__name__
-        func.bind = bind
-        func.base = base
+    def decorator(func: Callable[..., Any]) -> Callable[..., Any]:  # type: ignore[arg-type]
+        func.name = name or func.__name__  # type: ignore[attr-defined]
+        func.bind = bind  # type: ignore[attr-defined]
+        func.base = base  # type: ignore[attr-defined]
         return func
 
     if args and callable(args[0]):
@@ -27,14 +32,14 @@ def mock_celery_task_decorator(*args, bind=False, base=None, name=None, **kwargs
 
 
 @pytest.fixture(autouse=True, scope="module")
-def mock_celery_app_task():
+def mock_celery_app_task() -> Generator[None, None, None]:
     """Make celery_app.task return actual decorated functions."""
     with patch("app.celery_app.celery_app.task", side_effect=mock_celery_task_decorator):
         yield
 
 
 @pytest.fixture(autouse=True)
-def clear_modules():
+def clear_modules() -> Generator[None, None, None]:
     """Clear module cache before each test to ensure fresh imports."""
     # Clear any cached import of experimental_tasks
     if "app.tasks.experimental_tasks" in sys.modules:
@@ -47,7 +52,7 @@ def clear_modules():
 class TestAPGITaskUnavailablePaths:
     """Test APGITask base class behavior when APGI unavailable."""
 
-    def test_apgi_system_available_flag_is_false(self):
+    def test_apgi_system_available_flag_is_false(self) -> None:
         """Test APGI_SYSTEM_AVAILABLE is False when apgi_system not installed."""
         from app.tasks import experimental_tasks
 
@@ -55,7 +60,7 @@ class TestAPGITaskUnavailablePaths:
         # The flag reflects the state at import time
         assert experimental_tasks.APGI_SYSTEM_AVAILABLE is False
 
-    def test_apgi_task_classes_are_none_when_unavailable(self):
+    def test_apgi_task_classes_are_none_when_unavailable(self) -> None:
         """Test that APGI task classes are None when system unavailable."""
         from app.tasks import experimental_tasks
 
@@ -74,7 +79,7 @@ class TestAPGITaskUnavailablePaths:
 class TestAPGITaskBaseClass:
     """Test APGITask base class with mocked Celery."""
 
-    def test_apgi_task_class_exists(self):
+    def test_apgi_task_class_exists(self) -> None:
         """Test APGITask base class exists and can be instantiated."""
         from app.tasks.experimental_tasks import APGITask
 
@@ -86,7 +91,7 @@ class TestAPGITaskBaseClass:
 class TestCeleryTaskFunctionsExist:
     """Test that Celery task functions are defined when APGI unavailable."""
 
-    def test_execute_iowa_gambling_task_exists(self):
+    def test_execute_iowa_gambling_task_exists(self) -> None:
         """Test Iowa Gambling task function exists."""
         from app.tasks import experimental_tasks
 
@@ -95,28 +100,28 @@ class TestCeleryTaskFunctionsExist:
         assert hasattr(experimental_tasks.execute_iowa_gambling_task, "name")
         assert hasattr(experimental_tasks.execute_iowa_gambling_task, "run")
 
-    def test_execute_masking_paradigm_task_exists(self):
+    def test_execute_masking_paradigm_task_exists(self) -> None:
         """Test Masking Paradigm task function exists."""
         from app.tasks import experimental_tasks
 
         assert hasattr(experimental_tasks, "execute_masking_paradigm_task")
         assert hasattr(experimental_tasks.execute_masking_paradigm_task, "name")
 
-    def test_execute_attentional_blink_task_exists(self):
+    def test_execute_attentional_blink_task_exists(self) -> None:
         """Test Attentional Blink task function exists."""
         from app.tasks import experimental_tasks
 
         assert hasattr(experimental_tasks, "execute_attentional_blink_task")
         assert hasattr(experimental_tasks.execute_attentional_blink_task, "name")
 
-    def test_execute_change_blindness_task_exists(self):
+    def test_execute_change_blindness_task_exists(self) -> None:
         """Test Change Blindness task function exists."""
         from app.tasks import experimental_tasks
 
         assert hasattr(experimental_tasks, "execute_change_blindness_task")
         assert hasattr(experimental_tasks.execute_change_blindness_task, "name")
 
-    def test_execute_binocular_rivalry_task_exists(self):
+    def test_execute_binocular_rivalry_task_exists(self) -> None:
         """Test Binocular Rivalry task function exists."""
         from app.tasks import experimental_tasks
 
@@ -127,14 +132,14 @@ class TestCeleryTaskFunctionsExist:
 class TestTriggerWebhookFunction:
     """Test trigger_webhook_on_completion function."""
 
-    def test_trigger_webhook_is_async(self):
+    def test_trigger_webhook_is_async(self) -> None:
         """Test that trigger_webhook_on_completion is async."""
         import inspect
         from app.tasks.experimental_tasks import trigger_webhook_on_completion
 
         assert inspect.iscoroutinefunction(trigger_webhook_on_completion)
 
-    def test_trigger_webhook_accepts_parameters(self):
+    def test_trigger_webhook_accepts_parameters(self) -> None:
         """Test trigger_webhook_on_completion accepts required parameters."""
         import inspect
         from app.tasks.experimental_tasks import trigger_webhook_on_completion
@@ -148,7 +153,7 @@ class TestTriggerWebhookFunction:
 class TestModuleImports:
     """Test module can be imported even when APGI unavailable."""
 
-    def test_module_imports_successfully(self):
+    def test_module_imports_successfully(self) -> None:
         """Test that experimental_tasks module imports without error."""
         # When running with mocked apgi_system from conftest.py,
         # the module imports successfully regardless of APGI availability

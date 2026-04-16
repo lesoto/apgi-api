@@ -7,12 +7,15 @@ through HTTP requests with authentication.
 
 import pytest
 import uuid
+from typing import AsyncGenerator
 from unittest.mock import AsyncMock, MagicMock
 from httpx import AsyncClient, ASGITransport
 
 
 @pytest.fixture
-async def authenticated_client(test_environment, mock_database_connection):
+async def authenticated_client(
+    test_environment: None, mock_database_connection: None
+) -> AsyncGenerator[AsyncClient, None]:
     """Create authenticated test client for task integration tests."""
     from app.main import create_app
     from app.services.auth_manager import AuthManager
@@ -48,7 +51,7 @@ async def authenticated_client(test_environment, mock_database_connection):
 
 
 @pytest.fixture
-def mock_task_executor():
+def mock_task_executor() -> MagicMock:
     """Create mock TaskExecutor for integration tests."""
     executor = MagicMock()
     executor.list_available_tasks = AsyncMock(
@@ -81,7 +84,9 @@ class TestTaskRoutesIntegration:
     """Integration tests for task management endpoints."""
 
     @pytest.mark.asyncio
-    async def test_list_tasks_authenticated(self, authenticated_client, mock_task_executor):
+    async def test_list_tasks_authenticated(
+        self, authenticated_client: AsyncClient, mock_task_executor: MagicMock
+    ) -> None:
         """Test listing available tasks with authentication."""
         from app.routes.tasks import init_task_routes
 
@@ -101,7 +106,9 @@ class TestTaskRoutesIntegration:
         assert data["tasks"][0]["task_type"] == "iowa_gambling"
 
     @pytest.mark.asyncio
-    async def test_execute_task_authenticated(self, authenticated_client, mock_task_executor):
+    async def test_execute_task_authenticated(
+        self, authenticated_client: AsyncClient, mock_task_executor: MagicMock
+    ) -> None:
         """Test successful task submission with authentication."""
         from app.routes.tasks import init_task_routes
 
@@ -135,8 +142,8 @@ class TestTaskRoutesIntegration:
 
     @pytest.mark.asyncio
     async def test_execute_task_invalid_type_authenticated(
-        self, authenticated_client, mock_task_executor
-    ):
+        self, authenticated_client: AsyncClient, mock_task_executor: MagicMock
+    ) -> None:
         """Test task submission with invalid task type."""
         from app.routes.tasks import init_task_routes
 
@@ -161,7 +168,9 @@ class TestTaskRoutesIntegration:
         assert data["error"]["message"] == "Invalid task type"
 
     @pytest.mark.asyncio
-    async def test_get_task_status_authenticated(self, authenticated_client, mock_task_executor):
+    async def test_get_task_status_authenticated(
+        self, authenticated_client: AsyncClient, mock_task_executor: MagicMock
+    ) -> None:
         """Test getting task status with authentication."""
         from app.routes.tasks import init_task_routes
 
@@ -183,7 +192,9 @@ class TestTaskRoutesIntegration:
         assert data["result"]["accuracy"] == 0.85
 
     @pytest.mark.asyncio
-    async def test_cancel_task_authenticated(self, authenticated_client, mock_task_executor):
+    async def test_cancel_task_authenticated(
+        self, authenticated_client: AsyncClient, mock_task_executor: MagicMock
+    ) -> None:
         """Test cancelling a task with authentication."""
         from app.routes.tasks import init_task_routes
 
@@ -206,8 +217,8 @@ class TestTaskRoutesIntegration:
 
     @pytest.mark.asyncio
     async def test_get_task_status_not_found_authenticated(
-        self, authenticated_client, mock_task_executor
-    ):
+        self, authenticated_client: AsyncClient, mock_task_executor: MagicMock
+    ) -> None:
         """Test getting status of non-existent task."""
         from app.routes.tasks import init_task_routes
 
@@ -229,8 +240,8 @@ class TestTaskRoutesIntegration:
 
     @pytest.mark.asyncio
     async def test_cancel_task_not_found_authenticated(
-        self, authenticated_client, mock_task_executor
-    ):
+        self, authenticated_client: AsyncClient, mock_task_executor: MagicMock
+    ) -> None:
         """Test cancelling non-existent task."""
         from app.routes.tasks import init_task_routes
 
@@ -254,7 +265,9 @@ class TestTaskRoutesIntegration:
         assert data["error"]["message"] == f"Task {task_id} not found"
 
     @pytest.mark.asyncio
-    async def test_task_submission_celery_integration(self, authenticated_client):
+    async def test_task_submission_celery_integration(
+        self, authenticated_client: AsyncClient
+    ) -> None:
         """Test that task submission properly integrates with Celery."""
         from unittest.mock import patch, MagicMock
         from app.routes.tasks import init_task_routes

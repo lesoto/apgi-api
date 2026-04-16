@@ -6,7 +6,6 @@ import uuid
 
 from app.services.task_executor import (
     TaskExecutor,
-    retry_with_backoff,
 )
 from app.database.models import TaskStatus
 
@@ -200,84 +199,3 @@ class TestTaskExecutor:
         assert has_cycle_a is False
         assert has_cycle_b is False
         assert has_cycle_c is False  # C has no dependencies, so no cycle
-
-
-class TestRetryWithBackoff:
-    """Test retry_with_backoff decorator function."""
-
-    def test_retry_success_on_first_attempt(self):
-        """Test successful function on first attempt."""
-        mock_func = MagicMock(return_value="success")
-
-        result = retry_with_backoff(mock_func)
-
-        assert result == "success"
-        mock_func.assert_called_once()
-
-    def test_retry_success_after_attempts(self):
-        """Test function succeeds after some retries."""
-        call_count = 0
-
-        def failing_func():
-            nonlocal call_count
-            call_count += 1
-            if call_count < 3:
-                raise ValueError("Temporary failure")
-            return "success"
-
-        result = retry_with_backoff(failing_func, max_retries=3)
-
-        assert result == "success"
-        assert call_count == 3
-
-    def test_retry_exhausts_attempts(self):
-        """Test function fails after all retries."""
-
-        def always_failing_func():
-            raise ValueError("Permanent failure")
-
-        with pytest.raises(ValueError, match="Permanent failure"):
-            retry_with_backoff(always_failing_func, max_retries=2)
-
-    def test_retry_with_custom_delay(self):
-        """Test retry with custom delay parameters."""
-        call_count = 0
-
-        def timing_func():
-            nonlocal call_count
-            call_count += 1
-            if call_count < 2:
-                raise ValueError("Temporary failure")
-            return "success"
-
-        with patch("time.sleep") as mock_sleep:
-            retry_with_backoff(timing_func, max_retries=2, base_delay=0.1, backoff_factor=2.0)
-
-        # Verify sleep was called with correct delays
-        # The function sleeps with base_delay (0.1) first, then updates delay for next attempt
-        assert mock_sleep.call_count == 1
-        mock_sleep.assert_called_with(0.1)  # First sleep is base_delay before update
-
-    def test_retry_respects_max_delay(self):
-        """Test retry respects maximum delay limit."""
-        call_count = 0
-
-        def slow_failing_func():
-            nonlocal call_count
-            call_count += 1
-            raise ValueError("Temporary failure")
-
-        with patch("time.sleep") as mock_sleep:
-            with pytest.raises(ValueError):
-                retry_with_backoff(
-                    slow_failing_func,
-                    max_retries=4,
-                    base_delay=10.0,
-                    max_delay=15.0,
-                    backoff_factor=2.0,
-                )
-
-        # Verify sleep never exceeds max_delay
-        sleep_calls = [call[0][0] for call in mock_sleep.call_args_list]
-        for delay in sleep_calls:
-            assert delay <= 15.0

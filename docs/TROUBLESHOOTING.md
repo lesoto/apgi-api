@@ -1,6 +1,7 @@
 # Troubleshooting Guide
 
-This guide provides solutions to common issues encountered when deploying and operating the APGI Standalone API.
+This guide provides solutions to common issues encountered when deploying
+and operating the APGI Standalone API.
 
 ## Table of Contents
 
@@ -405,7 +406,8 @@ alembic upgrade head
 **Error Message:**
 
 ```text
-redis.exceptions.ConnectionError: Error 111 connecting to redis:6379. Connection refused.
+redis.exceptions.ConnectionError: Error 111 connecting to redis:6379.
+Connection refused.
 ```
 
 **Diagnosis:**
@@ -512,7 +514,8 @@ maxmemory-policy allkeys-lru  # Evict least recently used keys
 
 ```python
 # Set shorter TTL for session cache
-redis_client.setex(f"session:{session_id}", 3600, session_data)  # 1 hour instead of 24
+redis_client.setex(f"session:{session_id}", 3600, session_data)
+# 1 hour instead of 24
 ```
 
 ## Authentication Issues
@@ -537,7 +540,6 @@ redis_client.setex(f"session:{session_id}", 3600, session_data)  # 1 hour instea
 ```bash
 # Decode JWT token (without verification)
 python -c "import jwt; print(jwt.decode('YOUR_TOKEN', options={'verify_signature': False}))"
-
 # Check token expiration
 # exp field should be in the future
 ```
@@ -572,6 +574,8 @@ ntpdate -s time.nist.gov
 # Or use NTP service
 systemctl start ntpd
 ```
+
+## CSRF Issues
 
 ### CSRF Token Validation Failed
 
@@ -1343,7 +1347,8 @@ docker network inspect <network-name>
 SELECT * FROM sessions WHERE user_id NOT IN (SELECT user_id FROM users);
 
 -- Check for duplicate records
-SELECT session_id, COUNT(*) FROM sessions GROUP BY session_id HAVING COUNT(*) > 1;
+SELECT session_id, COUNT(*) FROM sessions
+GROUP BY session_id HAVING COUNT(*) > 1;
 
 -- Check data integrity
 SELECT * FROM sessions WHERE created_at > updated_at;

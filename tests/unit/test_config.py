@@ -21,7 +21,7 @@ from app.config import Settings
 class TestConfigValidSettings:
     """Test valid configuration scenarios."""
 
-    def test_development_environment_valid_settings(self):
+    def test_development_environment_valid_settings(self) -> None:
         """Test that valid settings in development environment initialize without error."""
         with patch.dict(
             os.environ,
@@ -39,7 +39,7 @@ class TestConfigValidSettings:
             assert settings.jwt_secret_key == "valid-secret-key-that-is-long-enough-32chars!"
             assert settings.database_url == "postgresql://localhost/test_db"
 
-    def test_staging_environment_valid_settings(self):
+    def test_staging_environment_valid_settings(self) -> None:
         """Test that valid settings in staging environment initialize without error."""
         with patch.dict(
             os.environ,
@@ -57,7 +57,7 @@ class TestConfigValidSettings:
             settings = Settings()
             assert settings.environment == "staging"
 
-    def test_production_environment_valid_settings(self):
+    def test_production_environment_valid_settings(self) -> None:
         """Test that valid settings in production environment initialize without error."""
         with patch.dict(
             os.environ,
@@ -79,7 +79,7 @@ class TestConfigValidSettings:
             settings = Settings()
             assert settings.environment == "production"
 
-    def test_default_values_applied(self):
+    def test_default_values_applied(self) -> None:
         """Test that default values are applied when env vars are not set."""
         with patch.dict(
             os.environ,
@@ -103,7 +103,7 @@ class TestConfigValidSettings:
 class TestConfigJWTSecretValidation:
     """Test JWT secret key validation in production."""
 
-    def test_jwt_secret_missing_in_production_raises_error(self):
+    def test_jwt_secret_missing_in_production_raises_error(self) -> None:
         """Test that missing JWT_SECRET_KEY in production raises ValueError."""
         with patch.dict(
             os.environ,
@@ -128,7 +128,7 @@ class TestConfigJWTSecretValidation:
             with pytest.raises((ValueError, UnboundLocalError)):
                 Settings()
 
-    def test_jwt_secret_too_short_in_production_raises_error(self):
+    def test_jwt_secret_too_short_in_production_raises_error(self) -> None:
         """Test that JWT_SECRET_KEY shorter than 32 characters in production raises ValueError."""
         with patch.dict(
             os.environ,
@@ -150,7 +150,7 @@ class TestConfigJWTSecretValidation:
             with pytest.raises(ValueError, match="JWT_SECRET_KEY is shorter than 32 characters"):
                 Settings()
 
-    def test_jwt_secret_insecure_default_in_production_raises_error(self):
+    def test_jwt_secret_insecure_default_in_production_raises_error(self) -> None:
         """Test that known insecure JWT_SECRET_KEY values in production raise ValueError."""
         with patch.dict(
             os.environ,
@@ -174,7 +174,7 @@ class TestConfigJWTSecretValidation:
             ):
                 Settings()
 
-    def test_jwt_secret_insecure_prefix_in_production_raises_error(self):
+    def test_jwt_secret_insecure_prefix_in_production_raises_error(self) -> None:
         """Test that JWT_SECRET_KEY with insecure prefix in production raises ValueError."""
         with patch.dict(
             os.environ,
@@ -202,7 +202,7 @@ class TestConfigJWTSecretValidation:
 class TestConfigProductionValidation:
     """Test production environment-specific validation."""
 
-    def test_production_missing_database_url_raises_error(self):
+    def test_production_missing_database_url_raises_error(self) -> None:
         """Test that production without DATABASE_URL raises ValueError."""
         with patch.dict(
             os.environ,
@@ -224,7 +224,7 @@ class TestConfigProductionValidation:
             with pytest.raises(ValueError, match="DATABASE_URL is not configured for production"):
                 Settings()
 
-    def test_production_localhost_database_url_raises_error(self):
+    def test_production_localhost_database_url_raises_error(self) -> None:
         """Test that production with localhost DATABASE_URL raises ValueError."""
         with patch.dict(
             os.environ,
@@ -246,7 +246,7 @@ class TestConfigProductionValidation:
             with pytest.raises(ValueError, match="DATABASE_URL is not configured for production"):
                 Settings()
 
-    def test_production_missing_redis_url_raises_error(self):
+    def test_production_missing_redis_url_raises_error(self) -> None:
         """Test that production without REDIS_URL raises ValueError."""
         with patch.dict(
             os.environ,
@@ -268,7 +268,7 @@ class TestConfigProductionValidation:
             with pytest.raises(ValueError, match="REDIS_URL is not configured for production"):
                 Settings()
 
-    def test_production_localhost_base_url_raises_error(self):
+    def test_production_localhost_base_url_raises_error(self) -> None:
         """Test that production with localhost BASE_URL raises ValueError."""
         with patch.dict(
             os.environ,
@@ -290,7 +290,7 @@ class TestConfigProductionValidation:
             with pytest.raises(ValueError, match="BASE_URL is set to localhost in production"):
                 Settings()
 
-    def test_production_missing_stripe_secret_key_raises_error(self):
+    def test_production_missing_stripe_secret_key_raises_error(self) -> None:
         """Test that production without valid STRIPE_SECRET_KEY raises ValueError."""
         with patch.dict(
             os.environ,
@@ -314,7 +314,7 @@ class TestConfigProductionValidation:
             ):
                 Settings()
 
-    def test_production_missing_stripe_publishable_key_raises_error(self):
+    def test_production_missing_stripe_publishable_key_raises_error(self) -> None:
         """Test that production without valid STRIPE_PUBLISHABLE_KEY raises ValueError."""
         with patch.dict(
             os.environ,
@@ -338,7 +338,7 @@ class TestConfigProductionValidation:
             ):
                 Settings()
 
-    def test_production_missing_stripe_webhook_secret_raises_error(self):
+    def test_production_missing_stripe_webhook_secret_raises_error(self) -> None:
         """Test that production without STRIPE_WEBHOOK_SECRET raises ValueError."""
         with patch.dict(
             os.environ,
@@ -362,7 +362,7 @@ class TestConfigProductionValidation:
             ):
                 Settings()
 
-    def test_production_missing_smtp_server_raises_error(self):
+    def test_production_missing_smtp_server_raises_error(self) -> None:
         """Test that production without SMTP_SERVER raises ValueError."""
         with patch.dict(
             os.environ,
@@ -384,7 +384,7 @@ class TestConfigProductionValidation:
             with pytest.raises(ValueError, match="SMTP_SERVER is not configured for production"):
                 Settings()
 
-    def test_production_missing_cors_origins_raises_error(self):
+    def test_production_missing_cors_origins_raises_error(self) -> None:
         """Test that production without CORS_ORIGINS raises ValueError."""
         with patch.dict(
             os.environ,
@@ -412,7 +412,7 @@ class TestConfigProductionValidation:
 class TestConfigCORSValidation:
     """Test CORS configuration validation."""
 
-    def test_cors_wildcard_with_credentials_in_production_raises_error(self):
+    def test_cors_wildcard_with_credentials_in_production_raises_error(self) -> None:
         """Test that CORS wildcard with credentials enabled in production raises ValueError."""
         with patch.dict(
             os.environ,
@@ -435,7 +435,7 @@ class TestConfigCORSValidation:
             with pytest.raises(ValueError, match="CORS origins are set to wildcard"):
                 Settings()
 
-    def test_cors_wildcard_in_production_raises_error(self):
+    def test_cors_wildcard_in_production_raises_error(self) -> None:
         """Test that CORS wildcard in production raises ValueError."""
         with patch.dict(
             os.environ,
@@ -457,7 +457,7 @@ class TestConfigCORSValidation:
             with pytest.raises(ValueError, match="CORS origins are set to wildcard"):
                 Settings()
 
-    def test_cors_wildcard_in_development_warns(self):
+    def test_cors_wildcard_in_development_warns(self) -> None:
         """Test that CORS wildcard in development issues a warning."""
         with patch.dict(
             os.environ,
@@ -477,7 +477,7 @@ class TestConfigCORSValidation:
                     "CORS origins are set to wildcard" in str(warning.message) for warning in w
                 )
 
-    def test_cors_specific_origins_valid(self):
+    def test_cors_specific_origins_valid(self) -> None:
         """Test that specific CORS origins are valid."""
         with patch.dict(
             os.environ,
@@ -509,9 +509,9 @@ class TestConfigEnvironmentValidation:
             },
         ):
             with pytest.raises(ValueError, match="Invalid ENVIRONMENT"):
-                Settings()
+                Settings()  # type: ignore
 
-    def test_prod_alias_accepted(self):
+    def test_prod_alias_accepted(self) -> None:
         """Test that 'prod' is accepted as alias for 'production'."""
         with patch.dict(
             os.environ,
@@ -530,14 +530,14 @@ class TestConfigEnvironmentValidation:
                 "SMTP_SERVER": "smtp.example.com",
             },
         ):
-            settings = Settings()
+            settings = Settings()  # type: ignore
             assert settings.environment == "prod"
 
 
 class TestConfigLoggingValidation:
     """Test logging level validation."""
 
-    def test_invalid_log_level_raises_error(self):
+    def test_invalid_log_level_raises_error(self) -> None:
         """Test that invalid LOG_LEVEL raises ValueError."""
         with patch.dict(
             os.environ,
@@ -550,9 +550,9 @@ class TestConfigLoggingValidation:
             },
         ):
             with pytest.raises(ValueError, match="Invalid LOG_LEVEL"):
-                Settings()
+                Settings()  # type: ignore
 
-    def test_valid_log_levels(self):
+    def test_valid_log_levels(self) -> None:
         """Test that all valid log levels are accepted."""
         valid_levels = ["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"]
         for level in valid_levels:
@@ -566,10 +566,10 @@ class TestConfigLoggingValidation:
                     "LOG_LEVEL": level,
                 },
             ):
-                settings = Settings()
+                settings = Settings()  # type: ignore
                 assert settings.log_level == level
 
-    def test_default_log_level_development(self):
+    def test_default_log_level_development(self) -> None:
         """Test that default log level in development is DEBUG."""
         with patch.dict(
             os.environ,
@@ -581,10 +581,10 @@ class TestConfigLoggingValidation:
             },
         ):
             os.environ.pop("LOG_LEVEL", None)
-            settings = Settings()
+            settings = Settings()  # type: ignore
             assert settings.log_level == "DEBUG"
 
-    def test_default_log_level_staging(self):
+    def test_default_log_level_staging(self) -> None:
         """Test that default log level in staging is INFO."""
         with patch.dict(
             os.environ,
@@ -600,10 +600,10 @@ class TestConfigLoggingValidation:
             },
         ):
             os.environ.pop("LOG_LEVEL", None)
-            settings = Settings()
+            settings = Settings()  # type: ignore
             assert settings.log_level == "INFO"
 
-    def test_default_log_level_production(self):
+    def test_default_log_level_production(self) -> None:
         """Test that default log level in production is WARNING."""
         with patch.dict(
             os.environ,
@@ -623,14 +623,14 @@ class TestConfigLoggingValidation:
             },
         ):
             os.environ.pop("LOG_LEVEL", None)
-            settings = Settings()
+            settings = Settings()  # type: ignore
             assert settings.log_level == "WARNING"
 
 
 class TestConfigParsingAndDefaults:
     """Test configuration parsing and default values."""
 
-    def test_cors_origins_parsing(self):
+    def test_cors_origins_parsing(self) -> None:
         """Test that CORS_ORIGINS are parsed correctly from comma-separated string."""
         with patch.dict(
             os.environ,
@@ -642,13 +642,13 @@ class TestConfigParsingAndDefaults:
                 "CORS_ORIGINS": "https://example.com, https://app.example.com , https://admin.example.com",
             },
         ):
-            settings = Settings()
+            settings = Settings()  # type: ignore
             assert len(settings.cors_origins) == 3
             assert "https://example.com" in settings.cors_origins
             assert "https://app.example.com" in settings.cors_origins
             assert "https://admin.example.com" in settings.cors_origins
 
-    def test_numeric_settings_parsing(self):
+    def test_numeric_settings_parsing(self) -> None:
         """Test that numeric settings are parsed correctly."""
         with patch.dict(
             os.environ,
@@ -663,13 +663,13 @@ class TestConfigParsingAndDefaults:
                 "RATE_LIMIT_PER_MINUTE": "120",
             },
         ):
-            settings = Settings()
+            settings = Settings()  # type: ignore
             assert settings.port == 9000
             assert settings.pool_size == 50
             assert settings.max_overflow == 100
             assert settings.rate_limit_per_minute == 120
 
-    def test_boolean_settings_parsing(self):
+    def test_boolean_settings_parsing(self) -> None:
         """Test that boolean settings are parsed correctly."""
         with patch.dict(
             os.environ,
@@ -683,7 +683,7 @@ class TestConfigParsingAndDefaults:
                 "PROFILING_ENABLED": "true",
             },
         ):
-            settings = Settings()
+            settings = Settings()  # type: ignore
             assert settings.rate_limit_enabled is False
             assert settings.schema_validation_enabled is True
             assert settings.profiling_enabled is True

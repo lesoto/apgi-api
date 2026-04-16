@@ -6,6 +6,7 @@ Tests state access endpoints through HTTP requests with authentication.
 
 import pytest
 import uuid
+from typing import AsyncGenerator
 from datetime import datetime, timedelta, timezone
 from unittest.mock import MagicMock, patch
 from httpx import AsyncClient, ASGITransport
@@ -13,10 +14,13 @@ from sqlalchemy.orm import Session
 
 
 @pytest.fixture
-async def authenticated_client(test_environment, mock_database_connection):
+async def authenticated_client(
+    test_environment: None, mock_database_connection: None
+) -> AsyncGenerator[AsyncClient, None]:
     """Create authenticated test client for state integration tests."""
     from app.main import create_app
-    from app.services.auth_manager import AuthManager, TokenPayload
+    from app.services.auth_manager import AuthManager
+    from app.models.schemas import TokenPayload
     from unittest.mock import AsyncMock
 
     # Mock Redis for the lifespan
@@ -137,7 +141,7 @@ class TestStateRoutesIntegration:
     """Integration tests for state access endpoints."""
 
     @pytest.mark.asyncio
-    async def test_get_system_state_authenticated(self, authenticated_client):
+    async def test_get_system_state_authenticated(self, authenticated_client: AsyncClient) -> None:
         """Test getting complete system state with authentication."""
         session_id = str(uuid.uuid4())
 
@@ -155,7 +159,9 @@ class TestStateRoutesIntegration:
         assert "self_model" in data
 
     @pytest.mark.asyncio
-    async def test_get_ignition_history_authenticated(self, authenticated_client):
+    async def test_get_ignition_history_authenticated(
+        self, authenticated_client: AsyncClient
+    ) -> None:
         """Test getting ignition event history with authentication."""
         session_id = str(uuid.uuid4())
 
@@ -167,7 +173,9 @@ class TestStateRoutesIntegration:
         assert "pagination" in data
 
     @pytest.mark.asyncio
-    async def test_get_interoceptive_state_authenticated(self, authenticated_client):
+    async def test_get_interoceptive_state_authenticated(
+        self, authenticated_client: AsyncClient
+    ) -> None:
         """Test getting interoceptive body state with authentication."""
         session_id = str(uuid.uuid4())
 
@@ -180,7 +188,9 @@ class TestStateRoutesIntegration:
         assert "temperature" in data
 
     @pytest.mark.asyncio
-    async def test_get_prediction_errors_authenticated(self, authenticated_client):
+    async def test_get_prediction_errors_authenticated(
+        self, authenticated_client: AsyncClient
+    ) -> None:
         """Test getting prediction errors with authentication."""
         session_id = str(uuid.uuid4())
 
@@ -193,7 +203,9 @@ class TestStateRoutesIntegration:
         assert "prediction_errors" in data
 
     @pytest.mark.asyncio
-    async def test_get_somatic_markers_authenticated(self, authenticated_client):
+    async def test_get_somatic_markers_authenticated(
+        self, authenticated_client: AsyncClient
+    ) -> None:
         """Test getting somatic markers with authentication."""
         session_id = str(uuid.uuid4())
 

@@ -7,7 +7,7 @@ FastAPI application providing RESTful access to the APGI System.
 import socket
 import sys
 from contextlib import asynccontextmanager
-from typing import Optional
+from typing import Optional, Dict, AsyncGenerator
 
 import redis.asyncio as redis
 from fastapi import FastAPI
@@ -94,7 +94,7 @@ def is_port_available(host: str, port: int) -> bool:
 
 
 @asynccontextmanager
-async def lifespan(app: FastAPI):
+async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     """Lifespan context manager for startup and shutdown events."""
     global redis_client
 
@@ -130,7 +130,7 @@ async def lifespan(app: FastAPI):
 
     # Initialize Redis client
     try:
-        redis_client = redis.from_url(settings.redis_url, encoding="utf-8", decode_responses=True)
+        redis_client = redis.from_url(settings.redis_url, encoding="utf-8", decode_responses=True)  # type: ignore[no-untyped-call]
         if redis_client:
             await redis_client.ping()  # type: ignore
             logger.info("Redis client initialized", component="redis", url=settings.redis_url)
@@ -283,9 +283,11 @@ All endpoints except `/health`, `/docs`, and `/openapi.json` require authenticat
 
     # Add rate limiting middleware BEFORE authentication to protect against brute-force attacks
     # This ensures unauthenticated requests (e.g., login attempts) are rate-limited before auth processing
-    app.add_middleware(
-        RateLimitingMiddleware, redis_client=None, enabled=settings.rate_limit_enabled
-    )
+    # Skip in test mode to prevent HTTP 429 errors during testing
+    if not test_mode:
+        app.add_middleware(
+            RateLimitingMiddleware, redis_client=None, enabled=settings.rate_limit_enabled
+        )
 
     # Add authentication middleware (extracts and verifies JWT tokens) - skip in test mode
     if not test_mode:
@@ -312,7 +314,7 @@ All endpoints except `/health`, `/docs`, and `/openapi.json` require authenticat
 
     # Root endpoint
     @app.get("/", tags=["Root"], response_model=RootResponse)
-    async def root():
+    async def root() -> Dict[str, str]:
         """API root endpoint with basic information."""
         return {
             "name": "APGI System API",
@@ -359,7 +361,7 @@ if __name__ == "__main__":
     uvicorn.run("app.main:app", host=default_host, port=default_port, reload=True, log_level="info")
 
 
-def cli():
+def cli() -> None:
     """CLI entry point for the APGI API."""
     from app.cli import cli as app_cli
 

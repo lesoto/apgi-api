@@ -10,6 +10,7 @@ from typing import Optional
 import asyncio
 
 from app.services.health_check import HealthCheckService
+from redis.asyncio import Redis
 
 router = APIRouter(tags=["Health"])
 
@@ -44,7 +45,7 @@ async def get_health_service() -> HealthCheckService:
     return health_service
 
 
-def init_health_routes(redis_client):
+def init_health_routes(redis_client: Redis) -> None:
     """
     Initialize health routes with Redis client.
 
@@ -56,7 +57,9 @@ def init_health_routes(redis_client):
 
 
 @router.get("/health")
-async def root_health_check(health_service: HealthCheckService = Depends(get_health_service)):
+async def root_health_check(
+    health_service: HealthCheckService = Depends(get_health_service),
+) -> JSONResponse:
     """
     Comprehensive health check endpoint at root path.
 
@@ -82,7 +85,9 @@ async def root_health_check(health_service: HealthCheckService = Depends(get_hea
 
 
 @router.get("/health/ready")
-async def readiness_check(health_service: HealthCheckService = Depends(get_health_service)):
+async def readiness_check(
+    health_service: HealthCheckService = Depends(get_health_service),
+) -> JSONResponse:
     """
     Readiness probe endpoint.
 
@@ -106,7 +111,7 @@ async def readiness_check(health_service: HealthCheckService = Depends(get_healt
 
 
 @router.get("/health/live")
-async def liveness_check():
+async def liveness_check() -> JSONResponse:
     """
     Liveness probe endpoint.
 
