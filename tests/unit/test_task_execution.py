@@ -6,7 +6,7 @@ Tests task submission, status checking, result retrieval, and timeout handling.
 
 import pytest
 import uuid
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from typing import Any
 from unittest.mock import MagicMock, patch
 from celery import states
@@ -150,7 +150,9 @@ async def test_submit_task_valid_type(
 
 
 @pytest.mark.asyncio
-async def test_submit_task_with_webhook(task_executor, mock_db_session):
+async def test_submit_task_with_webhook(
+    task_executor: TaskExecutor, mock_db_session: MagicMock
+) -> None:
     """Test task submission with webhook URL."""
     session_id = str(uuid.uuid4())
     user_id = str(uuid.uuid4())
@@ -176,7 +178,7 @@ async def test_submit_task_with_webhook(task_executor, mock_db_session):
 
 
 @pytest.mark.asyncio
-async def test_submit_task_invalid_type(task_executor):
+async def test_submit_task_invalid_type(task_executor: TaskExecutor) -> None:
     """Test task submission with invalid task type."""
     session_id = str(uuid.uuid4())
     user_id = str(uuid.uuid4())
@@ -196,7 +198,9 @@ async def test_submit_task_invalid_type(task_executor):
 
 
 @pytest.mark.asyncio
-async def test_submit_task_all_types(task_executor, mock_db_session):
+async def test_submit_task_all_types(
+    task_executor: TaskExecutor, mock_db_session: MagicMock
+) -> None:
     """Test task submission for all available task types."""
     session_id = str(uuid.uuid4())
     user_id = str(uuid.uuid4())
@@ -230,9 +234,11 @@ async def test_submit_task_all_types(task_executor, mock_db_session):
 
 
 @pytest.mark.asyncio
-async def test_get_task_status_pending(task_executor, mock_db_session, sample_task_record):
+async def test_get_task_status_pending(
+    task_executor: TaskExecutor, mock_db_session: MagicMock, sample_task_record: Task
+) -> None:
     """Test getting status of pending task."""
-    sample_task_record.status = TaskStatus.PENDING.value
+    sample_task_record.status = TaskStatus.PENDING.value  # type: ignore[assignment]
     user_id = str(uuid.uuid4())
 
     mock_db_session.query.return_value.join.return_value.filter.return_value.filter.return_value.first.return_value = (
@@ -248,7 +254,7 @@ async def test_get_task_status_pending(task_executor, mock_db_session, sample_ta
             mock_result.info = None
             mock_async_result.return_value = mock_result
 
-            status = await task_executor.get_task_status(sample_task_record.task_id, user_id)
+            status = await task_executor.get_task_status(str(sample_task_record.task_id), user_id)
 
             assert status["status"] == TaskStatus.PENDING.value
             assert status["state"] == states.PENDING
@@ -257,9 +263,11 @@ async def test_get_task_status_pending(task_executor, mock_db_session, sample_ta
 
 
 @pytest.mark.asyncio
-async def test_get_task_status_running(task_executor, mock_db_session, sample_task_record):
+async def test_get_task_status_running(
+    task_executor: TaskExecutor, mock_db_session: MagicMock, sample_task_record: Task
+) -> None:
     """Test getting status of running task."""
-    sample_task_record.status = TaskStatus.RUNNING.value
+    sample_task_record.status = TaskStatus.RUNNING.value  # type: ignore[assignment]
     user_id = str(uuid.uuid4())
 
     mock_db_session.query.return_value.join.return_value.filter.return_value.filter.return_value.first.return_value = (
@@ -275,7 +283,7 @@ async def test_get_task_status_running(task_executor, mock_db_session, sample_ta
             mock_result.info = {"progress": 50}
             mock_async_result.return_value = mock_result
 
-            status = await task_executor.get_task_status(sample_task_record.task_id, user_id)
+            status = await task_executor.get_task_status(str(sample_task_record.task_id), user_id)
 
             assert status["status"] == TaskStatus.RUNNING.value
             assert status["state"] == "STARTED"
@@ -283,10 +291,12 @@ async def test_get_task_status_running(task_executor, mock_db_session, sample_ta
 
 
 @pytest.mark.asyncio
-async def test_get_task_status_completed(task_executor, mock_db_session, sample_task_record):
+async def test_get_task_status_completed(
+    task_executor: TaskExecutor, mock_db_session: MagicMock, sample_task_record: Task
+) -> None:
     """Test getting status of completed task."""
-    sample_task_record.status = TaskStatus.COMPLETED.value
-    sample_task_record.result_data = {"results": {"accuracy": 0.85}}
+    sample_task_record.status = TaskStatus.COMPLETED.value  # type: ignore[assignment]
+    sample_task_record.result_data = {"results": {"accuracy": 0.85}}  # type: ignore[assignment]
     user_id = str(uuid.uuid4())
 
     mock_db_session.query.return_value.join.return_value.filter.return_value.filter.return_value.first.return_value = (
@@ -302,7 +312,7 @@ async def test_get_task_status_completed(task_executor, mock_db_session, sample_
             mock_result.info = None
             mock_async_result.return_value = mock_result
 
-            status = await task_executor.get_task_status(sample_task_record.task_id, user_id)
+            status = await task_executor.get_task_status(str(sample_task_record.task_id), user_id)
 
             assert status["status"] == TaskStatus.COMPLETED.value
             assert status["state"] == states.SUCCESS
@@ -310,10 +320,12 @@ async def test_get_task_status_completed(task_executor, mock_db_session, sample_
 
 
 @pytest.mark.asyncio
-async def test_get_task_status_failed(task_executor, mock_db_session, sample_task_record):
+async def test_get_task_status_failed(
+    task_executor: TaskExecutor, mock_db_session: MagicMock, sample_task_record: Task
+) -> None:
     """Test getting status of failed task."""
-    sample_task_record.status = TaskStatus.FAILED.value
-    sample_task_record.error_message = "Task execution failed"
+    sample_task_record.status = TaskStatus.FAILED.value  # type: ignore[assignment]
+    sample_task_record.error_message = "Task execution failed"  # type: ignore[assignment]
     user_id = str(uuid.uuid4())
 
     mock_db_session.query.return_value.join.return_value.filter.return_value.filter.return_value.first.return_value = (
@@ -329,7 +341,7 @@ async def test_get_task_status_failed(task_executor, mock_db_session, sample_tas
             mock_result.info = None
             mock_async_result.return_value = mock_result
 
-            status = await task_executor.get_task_status(sample_task_record.task_id, user_id)
+            status = await task_executor.get_task_status(str(sample_task_record.task_id), user_id)
 
             assert status["status"] == TaskStatus.FAILED.value
             assert status["state"] == states.FAILURE
@@ -337,7 +349,9 @@ async def test_get_task_status_failed(task_executor, mock_db_session, sample_tas
 
 
 @pytest.mark.asyncio
-async def test_get_task_status_not_found(task_executor, mock_db_session):
+async def test_get_task_status_not_found(
+    task_executor: TaskExecutor, mock_db_session: MagicMock
+) -> None:
     """Test getting status of non-existent task."""
     task_id = str(uuid.uuid4())
     user_id = str(uuid.uuid4())
@@ -362,10 +376,12 @@ async def test_get_task_status_not_found(task_executor, mock_db_session):
 
 
 @pytest.mark.asyncio
-async def test_get_task_result_success(task_executor, mock_db_session, sample_task_record):
+async def test_get_task_result_success(
+    task_executor: TaskExecutor, mock_db_session: MagicMock, sample_task_record: Task
+) -> None:
     """Test retrieving result from successful task."""
-    sample_task_record.status = TaskStatus.COMPLETED.value
-    sample_task_record.result_data = {
+    sample_task_record.status = TaskStatus.COMPLETED.value  # type: ignore[assignment]
+    sample_task_record.result_data = {  # type: ignore[assignment]
         "task_type": "iowa_gambling",
         "results": {
             "total_trials": 100,
@@ -387,7 +403,7 @@ async def test_get_task_result_success(task_executor, mock_db_session, sample_ta
             mock_result.state = states.SUCCESS
             mock_async_result.return_value = mock_result
 
-            status = await task_executor.get_task_status(sample_task_record.task_id, user_id)
+            status = await task_executor.get_task_status(str(sample_task_record.task_id), user_id)
 
             # Verify result is returned
             assert status["result"] is not None
@@ -397,10 +413,12 @@ async def test_get_task_result_success(task_executor, mock_db_session, sample_ta
 
 
 @pytest.mark.asyncio
-async def test_get_task_result_not_completed(task_executor, mock_db_session, sample_task_record):
+async def test_get_task_result_not_completed(
+    task_executor: TaskExecutor, mock_db_session: MagicMock, sample_task_record: Task
+) -> None:
     """Test retrieving result from incomplete task."""
-    sample_task_record.status = TaskStatus.RUNNING.value
-    sample_task_record.result_data = None
+    sample_task_record.status = TaskStatus.RUNNING.value  # type: ignore[assignment]
+    sample_task_record.result_data = None  # type: ignore[assignment]
     user_id = str(uuid.uuid4())
 
     mock_db_session.query.return_value.join.return_value.filter.return_value.filter.return_value.first.return_value = (
@@ -415,7 +433,7 @@ async def test_get_task_result_not_completed(task_executor, mock_db_session, sam
             mock_result.state = states.STARTED
             mock_async_result.return_value = mock_result
 
-            status = await task_executor.get_task_status(sample_task_record.task_id, user_id)
+            status = await task_executor.get_task_status(str(sample_task_record.task_id), user_id)
 
             # Verify result is None for incomplete task
             assert status["result"] is None
@@ -427,7 +445,7 @@ async def test_get_task_result_not_completed(task_executor, mock_db_session, sam
 
 
 @pytest.mark.asyncio
-async def test_task_timeout_configuration(task_executor):
+async def test_task_timeout_configuration(task_executor: TaskExecutor) -> None:
     """Test that Celery is configured with appropriate timeouts."""
     # The celery_app is mocked in conftest.py, so we just verify the mock is accessible
     from app.celery_app import celery_app
@@ -437,10 +455,12 @@ async def test_task_timeout_configuration(task_executor):
 
 
 @pytest.mark.asyncio
-async def test_get_task_status_timeout(task_executor, mock_db_session, sample_task_record):
+async def test_get_task_status_timeout(
+    task_executor: TaskExecutor, mock_db_session: MagicMock, sample_task_record: Task
+) -> None:
     """Test getting status of task that exceeded timeout."""
-    sample_task_record.status = TaskStatus.FAILED.value
-    sample_task_record.error_message = "Task exceeded time limit"
+    sample_task_record.status = TaskStatus.FAILED.value  # type: ignore[assignment]
+    sample_task_record.error_message = "Task exceeded time limit"  # type: ignore[assignment]
     user_id = str(uuid.uuid4())
 
     mock_db_session.query.return_value.join.return_value.filter.return_value.filter.return_value.first.return_value = (
@@ -455,7 +475,7 @@ async def test_get_task_status_timeout(task_executor, mock_db_session, sample_ta
             mock_result.state = states.FAILURE
             mock_async_result.return_value = mock_result
 
-            status = await task_executor.get_task_status(sample_task_record.task_id, user_id)
+            status = await task_executor.get_task_status(str(sample_task_record.task_id), user_id)
 
             assert status["status"] == TaskStatus.FAILED.value
             assert "time limit" in status["error"]
@@ -467,9 +487,11 @@ async def test_get_task_status_timeout(task_executor, mock_db_session, sample_ta
 
 
 @pytest.mark.asyncio
-async def test_cancel_task_success(task_executor, mock_db_session, sample_task_record):
+async def test_cancel_task_success(
+    task_executor: TaskExecutor, mock_db_session: MagicMock, sample_task_record: Task
+) -> None:
     """Test cancelling a running task."""
-    sample_task_record.status = TaskStatus.RUNNING.value
+    sample_task_record.status = TaskStatus.RUNNING.value  # type: ignore[assignment]
     user_id = str(uuid.uuid4())
 
     mock_db_session.query.return_value.join.return_value.filter.return_value.filter.return_value.first.return_value = (
@@ -480,10 +502,10 @@ async def test_cancel_task_success(task_executor, mock_db_session, sample_task_r
         mock_get_db.return_value.__enter__.return_value = mock_db_session
 
         with patch("app.services.task_executor.celery_app.control.revoke") as mock_revoke:
-            result = await task_executor.cancel_task(sample_task_record.task_id, user_id)
+            result = await task_executor.cancel_task(str(sample_task_record.task_id), user_id)
 
             # Verify task was revoked
-            mock_revoke.assert_called_once_with(sample_task_record.task_id, terminate=True)
+            mock_revoke.assert_called_once_with(str(sample_task_record.task_id), terminate=True)
 
             # Verify database was updated
             assert sample_task_record.status == TaskStatus.CANCELLED.value
@@ -495,7 +517,9 @@ async def test_cancel_task_success(task_executor, mock_db_session, sample_task_r
 
 
 @pytest.mark.asyncio
-async def test_cancel_task_not_found(task_executor, mock_db_session):
+async def test_cancel_task_not_found(
+    task_executor: TaskExecutor, mock_db_session: MagicMock
+) -> None:
     """Test cancelling non-existent task."""
     task_id = str(uuid.uuid4())
     user_id = str(uuid.uuid4())
@@ -519,7 +543,7 @@ async def test_cancel_task_not_found(task_executor, mock_db_session):
 
 
 @pytest.mark.asyncio
-async def test_list_available_tasks(task_executor):
+async def test_list_available_tasks(task_executor: TaskExecutor) -> None:
     """Test listing all available task types."""
     result = await task_executor.list_available_tasks()
 
@@ -545,7 +569,9 @@ async def test_list_available_tasks(task_executor):
 
 
 @pytest.mark.asyncio
-async def test_check_and_start_pending_tasks(task_executor, mock_db_session):
+async def test_check_and_start_pending_tasks(
+    task_executor: TaskExecutor, mock_db_session: MagicMock
+) -> None:
     """Test checking and starting pending tasks."""
     session_id = str(uuid.uuid4())
     pending_task = Task(
@@ -580,7 +606,9 @@ async def test_check_and_start_pending_tasks(task_executor, mock_db_session):
                 assert pending_task.status == TaskStatus.RUNNING.value
 
 
-def test_can_start_task_no_dependencies(task_executor, mock_db_session):
+def test_can_start_task_no_dependencies(
+    task_executor: TaskExecutor, mock_db_session: MagicMock
+) -> None:
     """Test _can_start_task with no dependencies."""
     task_id = str(uuid.uuid4())
 
@@ -594,7 +622,9 @@ def test_can_start_task_no_dependencies(task_executor, mock_db_session):
         assert result is True
 
 
-def test_can_start_task_with_completed_dependency(task_executor, mock_db_session):
+def test_can_start_task_with_completed_dependency(
+    task_executor: TaskExecutor, mock_db_session: MagicMock
+) -> None:
     """Test _can_start_task with completed dependency."""
     task_id = str(uuid.uuid4())
     prereq_task_id = str(uuid.uuid4())
@@ -619,7 +649,9 @@ def test_can_start_task_with_completed_dependency(task_executor, mock_db_session
         assert result is True
 
 
-def test_can_start_task_with_pending_dependency(task_executor, mock_db_session):
+def test_can_start_task_with_pending_dependency(
+    task_executor: TaskExecutor, mock_db_session: MagicMock
+) -> None:
     """Test _can_start_task with pending dependency."""
     task_id = str(uuid.uuid4())
     prereq_task_id = str(uuid.uuid4())
@@ -644,7 +676,7 @@ def test_can_start_task_with_pending_dependency(task_executor, mock_db_session):
         assert result is False
 
 
-def test_has_cycle_no_cycle(task_executor, mock_db_session):
+def test_has_cycle_no_cycle(task_executor: TaskExecutor, mock_db_session: MagicMock) -> None:
     """Test _has_cycle with no cycle."""
     task_id = str(uuid.uuid4())
 
@@ -658,7 +690,7 @@ def test_has_cycle_no_cycle(task_executor, mock_db_session):
         assert result is False
 
 
-def test_has_cycle_with_cycle(task_executor, mock_db_session):
+def test_has_cycle_with_cycle(task_executor: TaskExecutor, mock_db_session: MagicMock) -> None:
     """Test _has_cycle with a cycle."""
     task_id = str(uuid.uuid4())
     dep_task_id = str(uuid.uuid4())
@@ -685,11 +717,11 @@ def test_has_cycle_with_cycle(task_executor, mock_db_session):
 
 
 @pytest.mark.asyncio
-async def test_async_retry_with_backoff_no_exception_captured():
+async def test_async_retry_with_backoff_no_exception_captured() -> None:
     """Test async_retry_with_backoff handles edge case."""
     import app.services.task_executor as te
 
-    async def ok_func():
+    async def ok_func() -> str:
         return "ok"
 
     result = await te.async_retry_with_backoff(ok_func, max_retries=0)
@@ -697,7 +729,7 @@ async def test_async_retry_with_backoff_no_exception_captured():
 
 
 @pytest.mark.asyncio
-async def test_submit_task_invalid_priority(task_executor):
+async def test_submit_task_invalid_priority(task_executor: TaskExecutor) -> None:
     """Test submit_task raises ValueError for invalid priority."""
     session_id = str(uuid.uuid4())
     user_id = str(uuid.uuid4())
@@ -713,7 +745,9 @@ async def test_submit_task_invalid_priority(task_executor):
 
 
 @pytest.mark.asyncio
-async def test_submit_task_session_not_found(task_executor, mock_db_session):
+async def test_submit_task_session_not_found(
+    task_executor: TaskExecutor, mock_db_session: MagicMock
+) -> None:
     """Test submit_task raises ValueError when session not found."""
     session_id = str(uuid.uuid4())
     user_id = str(uuid.uuid4())
@@ -736,7 +770,9 @@ async def test_submit_task_session_not_found(task_executor, mock_db_session):
 
 
 @pytest.mark.asyncio
-async def test_submit_task_celery_failure_marks_task_failed(task_executor, mock_db_session):
+async def test_submit_task_celery_failure_marks_task_failed(
+    task_executor: TaskExecutor, mock_db_session: MagicMock
+) -> None:
     """Test submit_task marks task as failed when Celery submission fails."""
     session_id = str(uuid.uuid4())
     user_id = str(uuid.uuid4())
@@ -753,7 +789,7 @@ async def test_submit_task_celery_failure_marks_task_failed(task_executor, mock_
 
     call_count = [0]
 
-    def db_context_factory():
+    def db_context_factory() -> Any:
         call_count[0] += 1
         return mock_db_session.__class__()
 
@@ -772,7 +808,9 @@ async def test_submit_task_celery_failure_marks_task_failed(task_executor, mock_
                 )
 
 
-def test_can_start_task_prerequisite_not_found(task_executor, mock_db_session):
+def test_can_start_task_prerequisite_not_found(
+    task_executor: TaskExecutor, mock_db_session: MagicMock
+) -> None:
     """Test _can_start_task returns False when prerequisite task doesn't exist."""
     task_id = str(uuid.uuid4())
     prereq_task_id = str(uuid.uuid4())
@@ -793,7 +831,9 @@ def test_can_start_task_prerequisite_not_found(task_executor, mock_db_session):
         assert result is False
 
 
-def test_can_start_task_failure_dependency_type(task_executor, mock_db_session):
+def test_can_start_task_failure_dependency_type(
+    task_executor: TaskExecutor, mock_db_session: MagicMock
+) -> None:
     """Test _can_start_task with failure dependency type."""
     task_id = str(uuid.uuid4())
     prereq_task_id = str(uuid.uuid4())
@@ -816,7 +856,9 @@ def test_can_start_task_failure_dependency_type(task_executor, mock_db_session):
         assert result is True
 
 
-def test_can_start_task_failure_dependency_not_failed(task_executor, mock_db_session):
+def test_can_start_task_failure_dependency_not_failed(
+    task_executor: TaskExecutor, mock_db_session: MagicMock
+) -> None:
     """Test _can_start_task with failure dependency type when prereq is not failed returns False."""
     task_id = str(uuid.uuid4())
     prereq_task_id = str(uuid.uuid4())
@@ -840,7 +882,7 @@ def test_can_start_task_failure_dependency_not_failed(task_executor, mock_db_ses
         assert result is False
 
 
-def test_has_cycle_with_rec_stack(task_executor, mock_db_session):
+def test_has_cycle_with_rec_stack(task_executor: TaskExecutor, mock_db_session: MagicMock) -> None:
     """Test _has_cycle detects cycle when prereq is in rec_stack."""
     task_id = str(uuid.uuid4())
     dep_task_id = str(uuid.uuid4())
@@ -862,7 +904,9 @@ def test_has_cycle_with_rec_stack(task_executor, mock_db_session):
 
 
 @pytest.mark.asyncio
-async def test_check_and_start_pending_tasks_celery_failure(task_executor, mock_db_session):
+async def test_check_and_start_pending_tasks_celery_failure(
+    task_executor: TaskExecutor, mock_db_session: MagicMock
+) -> None:
     """Test check_and_start_pending_tasks marks task as failed when Celery fails."""
     session_id = str(uuid.uuid4())
     pending_task = Task(
@@ -893,11 +937,11 @@ async def test_check_and_start_pending_tasks_celery_failure(task_executor, mock_
 
 @pytest.mark.asyncio
 async def test_get_task_status_celery_failure_updates_db(
-    task_executor, mock_db_session, sample_task_record
-):
+    task_executor: TaskExecutor, mock_db_session: MagicMock, sample_task_record: Task
+) -> None:
     """Test get_task_status updates DB when Celery reports FAILURE and task not yet failed."""
-    sample_task_record.status = TaskStatus.RUNNING.value  # Not yet failed in DB
-    sample_task_record.error_message = None
+    sample_task_record.status = TaskStatus.RUNNING.value  # type: ignore[assignment]
+    sample_task_record.error_message = None  # type: ignore[assignment]
     user_id = str(uuid.uuid4())
 
     mock_db_session.query.return_value.join.return_value.filter.return_value.filter.return_value.first.return_value = (
@@ -913,7 +957,7 @@ async def test_get_task_status_celery_failure_updates_db(
             mock_result.result = Exception("Worker crashed")
             mock_async_result.return_value = mock_result
 
-            status = await task_executor.get_task_status(sample_task_record.task_id, user_id)
+            status = await task_executor.get_task_status(str(sample_task_record.task_id), user_id)
 
             # The task record status should be updated to FAILED
             assert sample_task_record.status == TaskStatus.FAILED.value
@@ -922,11 +966,11 @@ async def test_get_task_status_celery_failure_updates_db(
 
 @pytest.mark.asyncio
 async def test_get_task_status_celery_failure_no_result(
-    task_executor, mock_db_session, sample_task_record
-):
+    task_executor: TaskExecutor, mock_db_session: MagicMock, sample_task_record: Task
+) -> None:
     """Test get_task_status when Celery FAILURE has no result."""
-    sample_task_record.status = TaskStatus.RUNNING.value
-    sample_task_record.error_message = None
+    sample_task_record.status = TaskStatus.RUNNING.value  # type: ignore[assignment]
+    sample_task_record.error_message = None  # type: ignore[assignment]
     user_id = str(uuid.uuid4())
 
     mock_db_session.query.return_value.join.return_value.filter.return_value.filter.return_value.first.return_value = (
@@ -942,7 +986,7 @@ async def test_get_task_status_celery_failure_no_result(
             mock_result.result = None  # No result
             mock_async_result.return_value = mock_result
 
-            status = await task_executor.get_task_status(sample_task_record.task_id, user_id)
+            status = await task_executor.get_task_status(str(sample_task_record.task_id), user_id)
 
             # Task should be marked as failed
             assert sample_task_record.status == TaskStatus.FAILED.value
@@ -950,14 +994,12 @@ async def test_get_task_status_celery_failure_no_result(
 
 @pytest.mark.asyncio
 async def test_get_task_status_running_task_timeout(
-    task_executor, mock_db_session, sample_task_record
-):
+    task_executor: TaskExecutor, mock_db_session: MagicMock, sample_task_record: Task
+) -> None:
     """Test get_task_status marks running task as failed when it exceeds timeout."""
-    from datetime import timedelta
-
-    sample_task_record.status = TaskStatus.RUNNING.value
-    sample_task_record.error_message = None
-    sample_task_record.started_at = datetime.now(timezone.utc) - timedelta(seconds=99999)
+    sample_task_record.status = TaskStatus.RUNNING.value  # type: ignore[assignment]
+    sample_task_record.error_message = ""  # type: ignore[assignment]
+    sample_task_record.started_at = datetime.now(timezone.utc) - timedelta(seconds=2)  # type: ignore[assignment]
     user_id = str(uuid.uuid4())
 
     mock_db_session.query.return_value.join.return_value.filter.return_value.filter.return_value.first.return_value = (
@@ -976,7 +1018,9 @@ async def test_get_task_status_running_task_timeout(
             with patch("app.config.settings") as mock_settings:
                 mock_settings.task_timeout_seconds = 1  # Very short timeout
 
-                status = await task_executor.get_task_status(sample_task_record.task_id, user_id)
+                status = await task_executor.get_task_status(
+                    str(sample_task_record.task_id), user_id
+                )
 
             assert sample_task_record.status == TaskStatus.FAILED.value
             assert "timed out" in sample_task_record.error_message

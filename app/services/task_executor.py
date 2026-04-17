@@ -14,9 +14,9 @@ try:
     from celery.result import AsyncResult
 except ImportError:  # pragma: no cover
     # Handle potential celery import issues
-    import celery  # type: ignore
+    import celery
 
-    AsyncResult = celery.result.AsyncResult  # type: ignore
+    AsyncResult = celery.result.AsyncResult
 
 
 from app.celery_app import celery_app
@@ -350,7 +350,7 @@ class TaskExecutor:
             # Submit task to Celery with retry for transient failures
             celery_task_name = self.TASK_MAP[task_type]
 
-            async def submit_celery_task():
+            async def submit_celery_task() -> AsyncResult:
                 # Run synchronous celery send_task in thread pool to avoid blocking
                 return await asyncio.to_thread(
                     celery_app.send_task,
@@ -486,7 +486,7 @@ class TaskExecutor:
                     # Start the task with retry for transient failures
                     celery_task_name = self.TASK_MAP[task.task_type]  # type: ignore
 
-                    def start_celery_task():
+                    def start_celery_task() -> AsyncResult:
                         return celery_app.send_task(
                             celery_task_name,
                             args=[task.session_id, task.parameters],
@@ -495,7 +495,7 @@ class TaskExecutor:
 
                     try:
                         # Wrap the sync function in an async function for retry
-                        async def start_celery_task_async():
+                        async def start_celery_task_async() -> AsyncResult:
                             return start_celery_task()
 
                         await async_retry_with_backoff(

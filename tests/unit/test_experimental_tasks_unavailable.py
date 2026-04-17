@@ -16,14 +16,14 @@ from unittest.mock import patch
 
 # Make Celery mock return actual decorated function
 def mock_celery_task_decorator(
-    *args, bind: bool = False, base: object = None, name: str | None = None, **kwargs: Any
+    *args: Any, bind: bool = False, base: Any = None, name: str | None = None, **kwargs: Any
 ) -> Callable[..., Any]:
     """Mock decorator that returns the actual function being decorated."""
 
-    def decorator(func: Callable[..., Any]) -> Callable[..., Any]:  # type: ignore[arg-type]
-        func.name = name or func.__name__  # type: ignore[attr-defined]
-        func.bind = bind  # type: ignore[attr-defined]
-        func.base = base  # type: ignore[attr-defined]
+    def decorator(func: Callable[..., Any]) -> Callable[..., Any]:
+        setattr(func, "name", name or func.__name__)
+        setattr(func, "bind", bind)
+        setattr(func, "base", base)
         return func
 
     if args and callable(args[0]):

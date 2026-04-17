@@ -37,9 +37,9 @@ class Alert:
     message: str
     severity: AlertSeverity
     timestamp: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
-    metadata: Dict = field(default_factory=dict)
+    metadata: Dict[str, Any] = field(default_factory=dict)
 
-    def to_dict(self) -> Dict:
+    def to_dict(self) -> Dict[str, Any]:
         """Convert alert to dictionary."""
         return {
             "title": self.title,
@@ -576,11 +576,11 @@ class AlertTemplate:
     message_template: str
     severity: AlertSeverity = AlertSeverity.ERROR
 
-    def format_title(self, **kwargs) -> str:
+    def format_title(self, **kwargs: Any) -> str:
         """Format alert title using template."""
         return self.title_template.format(**kwargs)
 
-    def format_message(self, **kwargs) -> str:
+    def format_message(self, **kwargs: Any) -> str:
         """Format alert message using template."""
         return self.message_template.format(**kwargs)
 
@@ -712,7 +712,7 @@ class AlertManager:
     Supports advanced features like escalation, templates, and rule-based alerting.
     """
 
-    def __init__(self):
+    def __init__(self) -> None:
         """Initialize alert manager."""
         self.channels: List[NotificationChannel] = []
         self.rules: List[AlertRule] = []
@@ -726,7 +726,7 @@ class AlertManager:
         self.error_rate_window = timedelta(minutes=1)
         self.alert_cooldown = timedelta(minutes=5)  # Don't spam alerts
 
-    def add_channel(self, channel: NotificationChannel):
+    def add_channel(self, channel: NotificationChannel) -> None:
         """
         Add a notification channel.
 
@@ -740,7 +740,7 @@ class AlertManager:
             total_channels=len(self.channels),
         )
 
-    def add_rule(self, rule: AlertRule):
+    def add_rule(self, rule: AlertRule) -> None:
         """
         Add an alert rule.
 
@@ -754,7 +754,7 @@ class AlertManager:
             total_rules=len(self.rules),
         )
 
-    async def check_rules(self):
+    async def check_rules(self) -> None:
         """
         Check all alert rules and trigger alerts as needed.
         """
@@ -763,7 +763,7 @@ class AlertManager:
             if alert:
                 await self._send_alert(alert)
 
-    async def escalate_alerts(self):
+    async def escalate_alerts(self) -> None:
         """
         Check active alerts and escalate them according to their policies.
         """
@@ -802,8 +802,8 @@ class AlertManager:
                     )
 
     async def record_error(
-        self, error_type: str, error_message: str, metadata: Optional[Dict] = None
-    ):
+        self, error_type: str, error_message: str, metadata: Optional[Dict[str, Any]] = None
+    ) -> None:
         """
         Record an error and check if alert should be triggered.
 
@@ -837,8 +837,12 @@ class AlertManager:
                 )
 
     async def _trigger_high_error_rate_alert(
-        self, error_type: str, error_count: int, error_message: str, metadata: Optional[Dict]
-    ):
+        self,
+        error_type: str,
+        error_count: int,
+        error_message: str,
+        metadata: Optional[Dict[str, Any]],
+    ) -> None:
         """
         Trigger alert for high error rate.
 
@@ -882,8 +886,8 @@ class AlertManager:
         title: str,
         message: str,
         severity: AlertSeverity = AlertSeverity.ERROR,
-        metadata: Optional[Dict] = None,
-    ):
+        metadata: Optional[Dict[str, Any]] = None,
+    ) -> None:
         """
         Trigger a custom alert.
 
@@ -897,7 +901,7 @@ class AlertManager:
 
         await self._send_alert(alert)
 
-    async def _send_alert(self, alert: Alert):
+    async def _send_alert(self, alert: Alert) -> None:
         """
         Send alert through all configured channels.
 
@@ -937,7 +941,7 @@ def configure_alerting(
     error_rate_threshold: int = 10,
     error_rate_window_minutes: int = 1,
     alert_cooldown_minutes: int = 5,
-):
+) -> None:
     """
     Configure the alerting system with advanced features.
 

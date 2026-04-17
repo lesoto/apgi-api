@@ -17,7 +17,7 @@ from app.tasks.experimental_tasks import (
 
 
 @pytest.fixture
-def mock_celery_task():
+def mock_celery_task() -> MagicMock:
     """Create a mock Celery task instance that mimics APGITask."""
     task = MagicMock(spec=APGITask)
     task.request = MagicMock()
@@ -26,7 +26,7 @@ def mock_celery_task():
 
 
 @pytest.fixture
-def mock_apgi_system():
+def mock_apgi_system() -> MagicMock:
     """Create a fully mocked APGI system."""
     system = MagicMock()
     system.run_all_trials = MagicMock(

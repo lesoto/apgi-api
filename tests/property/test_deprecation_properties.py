@@ -13,6 +13,7 @@ import sys
 from pathlib import Path
 from io import StringIO
 import logging
+from typing import Any, Dict
 
 # Add app directory to path for imports
 sys.path.insert(0, str(Path(__file__).parent.parent.parent / "app"))
@@ -26,7 +27,7 @@ from app.middleware.deprecation import DeprecationMiddleware
 # ============================================================================
 
 
-def create_test_app_with_deprecation(deprecated_endpoints=None):
+def create_test_app_with_deprecation(deprecated_endpoints: Dict[str, Any] | None = None) -> FastAPI:
     """Create a test FastAPI app with deprecation middleware."""
     app = FastAPI()
 
@@ -38,26 +39,26 @@ def create_test_app_with_deprecation(deprecated_endpoints=None):
 
     # Add test endpoints
     @app.get("/v1/old-endpoint")
-    async def old_endpoint():
+    async def old_endpoint() -> Dict[str, str]:
         return {"message": "This is a deprecated endpoint"}
 
     @app.get("/v1/new-endpoint")
-    async def new_endpoint():
+    async def new_endpoint() -> Dict[str, str]:
         return {"message": "This is a new endpoint"}
 
     @app.get("/v1/sessions/{session_id}")
-    async def get_session(session_id: str):
+    async def get_session(session_id: str) -> Dict[str, str]:
         return {"session_id": session_id, "status": "active"}
 
     @app.post("/v1/legacy-action")
-    async def legacy_action():
+    async def legacy_action() -> Dict[str, str]:
         return {"result": "action completed"}
 
     return app
 
 
 @contextmanager
-def capture_deprecation_logs():
+def capture_deprecation_logs() -> Any:
     """Context manager to capture deprecation logs."""
     logger = logging.getLogger("app.deprecation")
     string_io = StringIO()
@@ -67,10 +68,10 @@ def capture_deprecation_logs():
     logger.setLevel(logging.INFO)
 
     class LogCapture:
-        def get_logs(self):
+        def get_logs(self) -> str:
             return string_io.getvalue()
 
-        def get_log_entries(self):
+        def get_log_entries(self) -> list[Dict[str, Any]]:
             """Parse JSON log entries."""
             logs = self.get_logs()
             entries = []
@@ -104,8 +105,8 @@ def capture_deprecation_logs():
     replacement_path=st.sampled_from(["/v2/old-endpoint", "/v2/new-action", "/v1/new-endpoint"]),
 )
 def test_property_17_deprecation_headers_on_deprecated_endpoints(
-    endpoint_path, sunset_date, replacement_path
-):
+    endpoint_path: str, sunset_date: str, replacement_path: str
+) -> None:
     """
     **Validates: Requirements 16.3, 16.6**
 
@@ -183,7 +184,7 @@ def test_property_17_deprecation_headers_on_deprecated_endpoints(
 @given(
     endpoint_path=st.sampled_from(["/v1/new-endpoint"]),
 )
-def test_property_17_no_deprecation_headers_on_active_endpoints(endpoint_path):
+def test_property_17_no_deprecation_headers_on_active_endpoints(endpoint_path: str) -> None:
     """
     **Validates: Requirements 16.3, 16.6**
 
@@ -227,7 +228,9 @@ def test_property_17_no_deprecation_headers_on_active_endpoints(endpoint_path):
     ),  # ASCII printable
     sunset_date=st.sampled_from(["2026-01-01", "2025-12-31"]),
 )
-def test_property_17_deprecation_headers_on_parameterized_endpoints(session_id, sunset_date):
+def test_property_17_deprecation_headers_on_parameterized_endpoints(
+    session_id: str, sunset_date: str
+) -> None:
     """
     **Validates: Requirements 16.3, 16.6**
 
@@ -270,7 +273,7 @@ def test_property_17_deprecation_headers_on_parameterized_endpoints(session_id, 
 @given(
     sunset_date=st.sampled_from(["2026-01-01", "2025-12-31"]),
 )
-def test_property_17_deprecation_headers_minimal_configuration(sunset_date):
+def test_property_17_deprecation_headers_minimal_configuration(sunset_date: str) -> None:
     """
     **Validates: Requirements 16.3, 16.6**
 
@@ -317,7 +320,7 @@ def test_property_17_deprecation_headers_minimal_configuration(sunset_date):
     endpoint_path=st.sampled_from(["/v1/old-endpoint", "/v1/legacy-action"]),
     sunset_date=st.sampled_from(["2026-01-01", "2025-12-31"]),
 )
-def test_property_18_deprecated_endpoint_logging(endpoint_path, sunset_date):
+def test_property_18_deprecated_endpoint_logging(endpoint_path: str, sunset_date: str) -> None:
     """
     **Validates: Requirements 16.4**
 
@@ -375,7 +378,9 @@ def test_property_18_deprecated_endpoint_logging(endpoint_path, sunset_date):
     endpoint_path=st.sampled_from(["/v1/old-endpoint"]),
     method=st.sampled_from(["GET", "POST"]),
 )
-def test_property_18_deprecated_endpoint_logging_includes_method(endpoint_path, method):
+def test_property_18_deprecated_endpoint_logging_includes_method(
+    endpoint_path: str, method: str
+) -> None:
     """
     **Validates: Requirements 16.4**
 
@@ -419,7 +424,7 @@ def test_property_18_deprecated_endpoint_logging_includes_method(endpoint_path, 
         min_size=1, max_size=50, alphabet=st.characters(whitelist_categories=("L", "N"))
     ),
 )
-def test_property_18_deprecated_endpoint_logging_parameterized(session_id):
+def test_property_18_deprecated_endpoint_logging_parameterized(session_id: str) -> None:
     """
     **Validates: Requirements 16.4**
 
@@ -466,7 +471,7 @@ def test_property_18_deprecated_endpoint_logging_parameterized(session_id):
 @given(
     endpoint_path=st.sampled_from(["/v1/new-endpoint"]),
 )
-def test_property_18_no_logging_for_active_endpoints(endpoint_path):
+def test_property_18_no_logging_for_active_endpoints(endpoint_path: str) -> None:
     """
     **Validates: Requirements 16.4**
 

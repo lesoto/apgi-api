@@ -5,8 +5,8 @@ Provides Prometheus metrics for monitoring API performance and health.
 """
 
 import time
-import psutil  # type: ignore
-from typing import Callable
+import psutil
+from typing import Any, Awaitable, Callable
 
 from fastapi import Request
 from prometheus_client import CONTENT_TYPE_LATEST, Counter, Gauge, Histogram, generate_latest
@@ -186,7 +186,9 @@ class PrometheusMetricsMiddleware(BaseHTTPMiddleware):
     def __init__(self, app: ASGIApp):
         super().__init__(app)
 
-    async def dispatch(self, request: Request, call_next: Callable) -> StarletteResponse:
+    async def dispatch(
+        self, request: Request, call_next: Callable[[Any], Awaitable[StarletteResponse]]
+    ) -> StarletteResponse:
         """
         Process request and collect metrics.
 
@@ -200,7 +202,7 @@ class PrometheusMetricsMiddleware(BaseHTTPMiddleware):
         # Skip metrics collection for the metrics endpoint itself
         if request.url.path == "/metrics":
             response = await call_next(request)
-            return response  # type: ignore
+            return response
 
         # Normalize endpoint path (remove IDs for better aggregation)
         endpoint = self._normalize_endpoint(request.url.path)
@@ -237,7 +239,7 @@ class PrometheusMetricsMiddleware(BaseHTTPMiddleware):
             # Update system metrics
             self._update_system_metrics()
 
-            return response  # type: ignore
+            return response
 
         except Exception as e:
             # Record error metrics
@@ -302,7 +304,7 @@ class PrometheusMetricsMiddleware(BaseHTTPMiddleware):
 
         return False
 
-    def _update_system_metrics(self):
+    def _update_system_metrics(self) -> None:
         """Update system-level metrics (memory and CPU usage)."""
         try:
             # Memory usage
@@ -323,7 +325,7 @@ class MetricsCollector:
     """
 
     @staticmethod
-    def set_active_sessions(count: int):
+    def set_active_sessions(count: int) -> None:
         """
         Update the active sessions gauge.
 
@@ -333,7 +335,7 @@ class MetricsCollector:
         active_sessions.set(count)
 
     @staticmethod
-    def set_task_queue_length(count: int):
+    def set_task_queue_length(count: int) -> None:
         """
         Update the task queue length gauge.
 
@@ -343,7 +345,7 @@ class MetricsCollector:
         task_queue_length.set(count)
 
     @staticmethod
-    def increment_error(error_type: str, endpoint: str):
+    def increment_error(error_type: str, endpoint: str) -> None:
         """
         Increment error counter.
 
@@ -354,12 +356,12 @@ class MetricsCollector:
         error_counter.labels(error_type=error_type, endpoint=endpoint).inc()
 
     @staticmethod
-    def record_user_registration():
+    def record_user_registration() -> None:
         """Increment user registration counter."""
         user_registrations.inc()
 
     @staticmethod
-    def record_user_login(login_method: str = "password"):
+    def record_user_login(login_method: str = "password") -> None:
         """
         Increment user login counter.
 
@@ -369,12 +371,12 @@ class MetricsCollector:
         user_logins.labels(login_method=login_method).inc()
 
     @staticmethod
-    def record_user_logout():
+    def record_user_logout() -> None:
         """Increment user logout counter."""
         user_logouts.inc()
 
     @staticmethod
-    def set_active_users(count: int):
+    def set_active_users(count: int) -> None:
         """
         Update active users gauge.
 
@@ -384,7 +386,7 @@ class MetricsCollector:
         active_users.set(count)
 
     @staticmethod
-    def record_session_created(session_type: str = "default"):
+    def record_session_created(session_type: str = "default") -> None:
         """
         Increment session creation counter.
 
@@ -394,7 +396,7 @@ class MetricsCollector:
         sessions_created.labels(session_type=session_type).inc()
 
     @staticmethod
-    def record_session_completed(session_type: str = "default"):
+    def record_session_completed(session_type: str = "default") -> None:
         """
         Increment session completion counter.
 
@@ -404,7 +406,9 @@ class MetricsCollector:
         sessions_completed.labels(session_type=session_type).inc()
 
     @staticmethod
-    def record_session_failed(session_type: str = "default", failure_reason: str = "unknown"):
+    def record_session_failed(
+        session_type: str = "default", failure_reason: str = "unknown"
+    ) -> None:
         """
         Increment session failure counter.
 
@@ -415,7 +419,7 @@ class MetricsCollector:
         sessions_failed.labels(session_type=session_type, failure_reason=failure_reason).inc()
 
     @staticmethod
-    def record_session_duration(session_type: str, duration_seconds: float):
+    def record_session_duration(session_type: str, duration_seconds: float) -> None:
         """
         Record session duration.
 
@@ -426,7 +430,7 @@ class MetricsCollector:
         session_duration.labels(session_type=session_type).observe(duration_seconds)
 
     @staticmethod
-    def record_task_created(task_type: str):
+    def record_task_created(task_type: str) -> None:
         """
         Increment task creation counter.
 
@@ -436,7 +440,7 @@ class MetricsCollector:
         tasks_created.labels(task_type=task_type).inc()
 
     @staticmethod
-    def record_task_completed(task_type: str):
+    def record_task_completed(task_type: str) -> None:
         """
         Increment task completion counter.
 
@@ -446,7 +450,7 @@ class MetricsCollector:
         tasks_completed.labels(task_type=task_type).inc()
 
     @staticmethod
-    def record_task_failed(task_type: str, failure_reason: str = "unknown"):
+    def record_task_failed(task_type: str, failure_reason: str = "unknown") -> None:
         """
         Increment task failure counter.
 
@@ -457,7 +461,7 @@ class MetricsCollector:
         tasks_failed.labels(task_type=task_type, failure_reason=failure_reason).inc()
 
     @staticmethod
-    def record_task_duration(task_type: str, duration_seconds: float):
+    def record_task_duration(task_type: str, duration_seconds: float) -> None:
         """
         Record task execution duration.
 
@@ -468,7 +472,7 @@ class MetricsCollector:
         task_duration.labels(task_type=task_type).observe(duration_seconds)
 
     @staticmethod
-    def record_task_queue_wait_time(task_type: str, wait_seconds: float):
+    def record_task_queue_wait_time(task_type: str, wait_seconds: float) -> None:
         """
         Record time task spent waiting in queue.
 
@@ -479,7 +483,7 @@ class MetricsCollector:
         task_queue_wait_time.labels(task_type=task_type).observe(wait_seconds)
 
     @staticmethod
-    def record_export_requested(export_format: str):
+    def record_export_requested(export_format: str) -> None:
         """
         Increment export request counter.
 
@@ -489,7 +493,7 @@ class MetricsCollector:
         exports_requested.labels(export_format=export_format).inc()
 
     @staticmethod
-    def record_export_completed(export_format: str):
+    def record_export_completed(export_format: str) -> None:
         """
         Increment export completion counter.
 
@@ -499,7 +503,7 @@ class MetricsCollector:
         exports_completed.labels(export_format=export_format).inc()
 
     @staticmethod
-    def update_database_metrics(active: int, idle: int, used: int, overflow: int):
+    def update_database_metrics(active: int, idle: int, used: int, overflow: int) -> None:
         """
         Update database connection pool metrics.
 
@@ -515,7 +519,9 @@ class MetricsCollector:
         database_connections_overflow.set(overflow)
 
     @staticmethod
-    def update_redis_metrics(connections: int, memory_bytes: int, keys: int, hit_rate: float):
+    def update_redis_metrics(
+        connections: int, memory_bytes: int, keys: int, hit_rate: float
+    ) -> None:
         """
         Update Redis metrics.
 
@@ -531,7 +537,9 @@ class MetricsCollector:
         redis_hit_rate.set(hit_rate)
 
     @staticmethod
-    def update_celery_metrics(active_workers: int, active_tasks: int, scheduled: int, queued: int):
+    def update_celery_metrics(
+        active_workers: int, active_tasks: int, scheduled: int, queued: int
+    ) -> None:
         """
         Update Celery metrics.
 
@@ -547,22 +555,22 @@ class MetricsCollector:
         celery_queued_tasks.set(queued)
 
     @staticmethod
-    def record_cache_hit():
+    def record_cache_hit() -> None:
         """Increment cache hit counter."""
         cache_hits.inc()
 
     @staticmethod
-    def record_cache_miss():
+    def record_cache_miss() -> None:
         """Increment cache miss counter."""
         cache_misses.inc()
 
     @staticmethod
-    def record_cache_set():
+    def record_cache_set() -> None:
         """Increment cache set counter."""
         cache_sets.inc()
 
     @staticmethod
-    def record_auth_attempt(result: str):
+    def record_auth_attempt(result: str) -> None:
         """
         Record authentication attempt.
 
@@ -572,17 +580,17 @@ class MetricsCollector:
         auth_attempts.labels(result=result).inc()
 
     @staticmethod
-    def record_token_issued():
+    def record_token_issued() -> None:
         """Increment token issued counter."""
         auth_tokens_issued.inc()
 
     @staticmethod
-    def record_token_revoked():
+    def record_token_revoked() -> None:
         """Increment token revoked counter."""
         auth_tokens_revoked.inc()
 
     @staticmethod
-    def record_rate_limit_exceeded(endpoint: str):
+    def record_rate_limit_exceeded(endpoint: str) -> None:
         """
         Record rate limit violation.
 
@@ -592,7 +600,7 @@ class MetricsCollector:
         rate_limit_exceeded.labels(endpoint=endpoint).inc()
 
     @staticmethod
-    def record_rate_limit_allowed(endpoint: str):
+    def record_rate_limit_allowed(endpoint: str) -> None:
         """
         Record allowed request under rate limit.
 

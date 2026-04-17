@@ -6,6 +6,7 @@ Tests universal properties of schema serialization and deserialization.
 """
 
 from hypothesis import given, strategies as st, settings
+from hypothesis.strategies import SearchStrategy
 import pytest
 import sys
 from pathlib import Path
@@ -37,7 +38,7 @@ from app.models.schemas import (
 # ============================================================================
 
 
-def user_create_request_strategy():
+def user_create_request_strategy() -> SearchStrategy:
     """Generate valid UserCreateRequest instances."""
     # Username: 3-50 chars, alphanumeric with underscores or dashes
     username_strategy = st.text(
@@ -47,7 +48,7 @@ def user_create_request_strategy():
     )
 
     # Password: must have uppercase, lowercase, digit, special char, no weak patterns, no sequential
-    def is_valid_password(p):
+    def is_valid_password(p: str) -> bool:
         # Check basic requirements
         if not (
             any(c.isupper() for c in p)
@@ -147,7 +148,7 @@ def user_create_request_strategy():
     )
 
 
-def user_response_strategy():
+def user_response_strategy() -> SearchStrategy:
     """Generate valid UserResponse instances."""
     return st.builds(
         UserResponse,
@@ -166,7 +167,7 @@ def user_response_strategy():
     )
 
 
-def user_update_request_strategy():
+def user_update_request_strategy() -> SearchStrategy:
     """Generate valid UserUpdateRequest instances."""
     return st.builds(
         UserUpdateRequest,
@@ -185,7 +186,7 @@ def user_update_request_strategy():
     )
 
 
-def session_create_request_strategy():
+def session_create_request_strategy() -> SearchStrategy:
     """Generate valid SessionCreateRequest instances."""
     # config_path must end with .yaml or .yml
     config_path_strategy = (
@@ -200,7 +201,7 @@ def session_create_request_strategy():
 
     # Use a composite strategy that ensures at least one field is provided
     @st.composite
-    def session_create_request_composite(draw):
+    def session_create_request_composite(draw: st.DrawFn) -> SessionCreateRequest:
         choice = draw(st.integers(min_value=0, max_value=1))
         template_id = draw(st.uuids().map(str))
         config_path = draw(config_path_strategy)
@@ -226,7 +227,7 @@ def session_create_request_strategy():
     return session_create_request_composite()
 
 
-def session_response_strategy():
+def session_response_strategy() -> SearchStrategy:
     """Generate valid SessionResponse instances."""
     return st.builds(
         SessionResponse,
@@ -239,7 +240,7 @@ def session_response_strategy():
     )
 
 
-def session_template_create_request_strategy():
+def session_template_create_request_strategy() -> SearchStrategy:
     """Generate valid SessionTemplateCreateRequest instances."""
     # config_path must end with .yaml or .yml
     config_path_strategy = (
@@ -254,7 +255,7 @@ def session_template_create_request_strategy():
 
     # Use a composite strategy that ensures at least one field is provided
     @st.composite
-    def session_template_create_request_composite(draw):
+    def session_template_create_request_composite(draw: st.DrawFn) -> SessionTemplateCreateRequest:
         choice = draw(st.integers(min_value=0, max_value=0))  # Only config_path for now
         name = draw(
             st.text(
@@ -295,7 +296,7 @@ def session_template_create_request_strategy():
     return session_template_create_request_composite()
 
 
-def session_template_response_strategy():
+def session_template_response_strategy() -> SearchStrategy:
     """Generate valid SessionTemplateResponse instances."""
     return st.builds(
         SessionTemplateResponse,
@@ -332,7 +333,7 @@ def session_template_response_strategy():
     )
 
 
-def task_submit_request_strategy():
+def task_submit_request_strategy() -> SearchStrategy:
     """Generate valid TaskSubmitRequest instances."""
     return st.builds(
         TaskSubmitRequest,
@@ -342,7 +343,7 @@ def task_submit_request_strategy():
     )
 
 
-def task_status_response_strategy():
+def task_status_response_strategy() -> SearchStrategy:
     """Generate valid TaskStatusResponse instances."""
     return st.builds(
         TaskStatusResponse,
@@ -354,7 +355,7 @@ def task_status_response_strategy():
     )
 
 
-def task_dependency_create_request_strategy():
+def task_dependency_create_request_strategy() -> SearchStrategy:
     """Generate valid TaskDependencyCreateRequest instances."""
     return st.builds(
         TaskDependencyCreateRequest,
@@ -363,7 +364,7 @@ def task_dependency_create_request_strategy():
     )
 
 
-def webhook_delivery_response_strategy():
+def webhook_delivery_response_strategy() -> SearchStrategy:
     """Generate valid WebhookDeliveryResponse instances."""
     return st.builds(
         WebhookDeliveryResponse,
@@ -376,7 +377,7 @@ def webhook_delivery_response_strategy():
     )
 
 
-def webhook_retry_response_strategy():
+def webhook_retry_response_strategy() -> SearchStrategy:
     """Generate valid WebhookRetryResponse instances."""
     return st.builds(
         WebhookRetryResponse,
@@ -398,7 +399,7 @@ def webhook_retry_response_strategy():
 @pytest.mark.property
 @settings(max_examples=50)
 @given(user_create_request_strategy())
-def test_property_1_user_create_request_dict_round_trip(instance):
+def test_property_1_user_create_request_dict_round_trip(instance: UserCreateRequest) -> None:
     """
     **Validates: Requirements 6.1, 12.1**
 
@@ -418,7 +419,7 @@ def test_property_1_user_create_request_dict_round_trip(instance):
 @pytest.mark.property
 @settings(max_examples=50)
 @given(user_response_strategy())
-def test_property_1_user_response_dict_round_trip(instance):
+def test_property_1_user_response_dict_round_trip(instance: UserResponse) -> None:
     """
     **Validates: Requirements 6.1, 12.1**
 
@@ -438,7 +439,7 @@ def test_property_1_user_response_dict_round_trip(instance):
 @pytest.mark.property
 @settings(max_examples=50)
 @given(user_update_request_strategy())
-def test_property_1_user_update_request_dict_round_trip(instance):
+def test_property_1_user_update_request_dict_round_trip(instance: UserUpdateRequest) -> None:
     """
     **Validates: Requirements 6.1, 12.1**
 
@@ -458,7 +459,7 @@ def test_property_1_user_update_request_dict_round_trip(instance):
 @pytest.mark.property
 @settings(max_examples=50)
 @given(session_create_request_strategy())
-def test_property_1_session_create_request_dict_round_trip(instance):
+def test_property_1_session_create_request_dict_round_trip(instance: SessionCreateRequest) -> None:
     """
     **Validates: Requirements 6.1, 12.1**
 
@@ -478,7 +479,7 @@ def test_property_1_session_create_request_dict_round_trip(instance):
 @pytest.mark.property
 @settings(max_examples=50)
 @given(session_response_strategy())
-def test_property_1_session_response_dict_round_trip(instance):
+def test_property_1_session_response_dict_round_trip(instance: SessionResponse) -> None:
     """
     **Validates: Requirements 6.1, 12.1**
 
@@ -498,7 +499,9 @@ def test_property_1_session_response_dict_round_trip(instance):
 @pytest.mark.property
 @settings(max_examples=50)
 @given(session_template_create_request_strategy())
-def test_property_1_session_template_create_request_dict_round_trip(instance):
+def test_property_1_session_template_create_request_dict_round_trip(
+    instance: SessionTemplateCreateRequest,
+) -> None:
     """
     **Validates: Requirements 6.1, 12.1**
 
@@ -519,7 +522,9 @@ def test_property_1_session_template_create_request_dict_round_trip(instance):
 @pytest.mark.property
 @settings(max_examples=50)
 @given(session_template_response_strategy())
-def test_property_1_session_template_response_dict_round_trip(instance):
+def test_property_1_session_template_response_dict_round_trip(
+    instance: SessionTemplateResponse,
+) -> None:
     """
     **Validates: Requirements 6.1, 12.1**
 
@@ -540,7 +545,7 @@ def test_property_1_session_template_response_dict_round_trip(instance):
 @pytest.mark.property
 @settings(max_examples=50)
 @given(task_submit_request_strategy())
-def test_property_1_task_submit_request_dict_round_trip(instance):
+def test_property_1_task_submit_request_dict_round_trip(instance: TaskSubmitRequest) -> None:
     """
     **Validates: Requirements 6.1, 12.1**
 
@@ -560,7 +565,7 @@ def test_property_1_task_submit_request_dict_round_trip(instance):
 @pytest.mark.property
 @settings(max_examples=50)
 @given(task_status_response_strategy())
-def test_property_1_task_status_response_dict_round_trip(instance):
+def test_property_1_task_status_response_dict_round_trip(instance: TaskStatusResponse) -> None:
     """
     **Validates: Requirements 6.1, 12.1**
 
@@ -580,7 +585,9 @@ def test_property_1_task_status_response_dict_round_trip(instance):
 @pytest.mark.property
 @settings(max_examples=50)
 @given(task_dependency_create_request_strategy())
-def test_property_1_task_dependency_create_request_dict_round_trip(instance):
+def test_property_1_task_dependency_create_request_dict_round_trip(
+    instance: TaskDependencyCreateRequest,
+) -> None:
     """
     **Validates: Requirements 6.1, 12.1**
 
@@ -601,7 +608,9 @@ def test_property_1_task_dependency_create_request_dict_round_trip(instance):
 @pytest.mark.property
 @settings(max_examples=50)
 @given(webhook_delivery_response_strategy())
-def test_property_1_webhook_delivery_response_dict_round_trip(instance):
+def test_property_1_webhook_delivery_response_dict_round_trip(
+    instance: WebhookDeliveryResponse,
+) -> None:
     """
     **Validates: Requirements 6.1, 12.1**
 
@@ -622,7 +631,7 @@ def test_property_1_webhook_delivery_response_dict_round_trip(instance):
 @pytest.mark.property
 @settings(max_examples=50)
 @given(webhook_retry_response_strategy())
-def test_property_1_webhook_retry_response_dict_round_trip(instance):
+def test_property_1_webhook_retry_response_dict_round_trip(instance: WebhookRetryResponse) -> None:
     """
     **Validates: Requirements 6.1, 12.1**
 

@@ -9,7 +9,7 @@ import secrets
 import string
 import uuid
 from contextlib import contextmanager, asynccontextmanager
-from typing import Generator, AsyncGenerator
+from typing import Generator, AsyncGenerator, Any
 
 from sqlalchemy import create_engine
 from sqlalchemy.orm import Session, sessionmaker
@@ -119,7 +119,7 @@ def init_db() -> None:
         raise
 
 
-def create_default_user():
+def create_default_user() -> None:
     """
     Create a default user for session management with secure random credentials.
 
@@ -280,7 +280,7 @@ def close_db() -> None:
         logger.error(f"Error closing database connections: {e}")
 
 
-def get_pool_status() -> dict:
+def get_pool_status() -> dict[str, Any]:
     """
     Get database connection pool status for monitoring.
 
@@ -321,7 +321,7 @@ def get_pool_status() -> dict:
     return status
 
 
-def log_pool_status():
+def log_pool_status() -> None:
     """
     Log current database connection pool status.
     """

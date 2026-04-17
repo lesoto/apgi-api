@@ -185,29 +185,29 @@ class DatabaseStateTester:
 class TestDataManager:
     """Manager for test data setup and cleanup in E2E tests."""
 
-    def __init__(self):
-        self.created_users = []
-        self.created_sessions = []
-        self.created_tasks = []
-        self.created_templates = []
+    def __init__(self) -> None:
+        self.created_users: list[str] = []
+        self.created_sessions: list[str] = []
+        self.created_tasks: list[str] = []
+        self.created_templates: list[str] = []
 
-    def track_user(self, user_id: str):
+    def track_user(self, user_id: str) -> None:
         """Track a created user for cleanup."""
         self.created_users.append(user_id)
 
-    def track_session(self, session_id: str):
+    def track_session(self, session_id: str) -> None:
         """Track a created session for cleanup."""
         self.created_sessions.append(session_id)
 
-    def track_task(self, task_id: str):
+    def track_task(self, task_id: str) -> None:
         """Track a created task for cleanup."""
         self.created_tasks.append(task_id)
 
-    def track_template(self, template_id: str):
+    def track_template(self, template_id: str) -> None:
         """Track a created template for cleanup."""
         self.created_templates.append(template_id)
 
-    def cleanup_tracked_data(self):
+    def cleanup_tracked_data(self) -> None:
         """Clean up all tracked test data."""
         logger.info("Cleaning up tracked test data...")
 
@@ -334,19 +334,19 @@ import pytest
 
 
 @pytest.fixture
-def db_state_tester():
+def db_state_tester() -> DatabaseStateTester:
     """Fixture providing database state testing utilities."""
     return database_state_tester
 
 
 @pytest.fixture
-def test_data_mgr():
+def test_data_mgr() -> TestDataManager:
     """Fixture providing test data management utilities."""
     return test_data_manager
 
 
 @pytest.fixture(autouse=True)
-def cleanup_test_data():
+def cleanup_test_data() -> Generator[None, None, None]:
     """Auto-cleanup fixture for test data."""
     yield
     # Cleanup happens in the TestDataManager context manager

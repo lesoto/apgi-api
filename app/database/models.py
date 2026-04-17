@@ -130,7 +130,7 @@ class User(Base):  # type: ignore[misc, valid-type]
     )
     api_keys = relationship("APIKey", back_populates="user", cascade="all, delete-orphan")
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         return f"<User(user_id={self.user_id}, username={self.username})>"
 
 
@@ -185,7 +185,7 @@ class SessionTemplate(Base):  # type: ignore[misc, valid-type]
         Index("idx_session_templates_created_at", "created_at"),
     )
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         return f"<SessionTemplate(template_id={self.template_id}, name={self.name})>"
 
 
@@ -270,7 +270,7 @@ class Session(Base):  # type: ignore[misc, valid-type]
         Index("idx_sessions_template", "template_id"),
     )
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         return f"<Session(session_id={self.session_id}, state={self.state})>"
 
 
@@ -345,7 +345,7 @@ class Task(Base):  # type: ignore[misc, valid-type]
         Index("idx_tasks_priority", "priority"),
     )
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         return f"<Task(task_id={self.task_id}, type={self.task_type}, status={self.status})>"
 
 
@@ -399,7 +399,7 @@ class TaskDependency(Base):  # type: ignore[misc, valid-type]
         ),
     )
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         return f"<TaskDependency(dependent={self.dependent_task_id}, prerequisite={self.prerequisite_task_id})>"
 
 
@@ -436,7 +436,7 @@ class SessionData(Base):  # type: ignore[misc, valid-type]
         Index("idx_session_data_time", "time_ms"),
     )
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         return f"<SessionData(id={self.id}, session_id={self.session_id}, time_ms={self.time_ms})>"
 
 
@@ -481,7 +481,7 @@ class RefreshToken(Base):  # type: ignore[misc, valid-type]
         Index("idx_refresh_tokens_expires", "expires_at"),
     )
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         return f"<RefreshToken(token_id={self.token_id}, user_id={self.user_id})>"
 
 
@@ -535,7 +535,7 @@ class APIKey(Base):  # type: ignore[misc, valid-type]
         Index("idx_api_keys_active", "is_active"),
     )
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         return f"<APIKey(key_id={self.key_id}, name={self.name})>"
 
 
@@ -592,7 +592,7 @@ class WebhookDelivery(Base):  # type: ignore[misc, valid-type]
         Index("idx_webhook_deliveries_next_retry", "next_retry_at"),
     )
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         return f"<WebhookDelivery(delivery_id={self.delivery_id}, status={self.status})>"
 
 
@@ -642,7 +642,7 @@ class AuditLog(Base):  # type: ignore[misc, valid-type]
         Index("idx_audit_logs_timestamp", "timestamp"),
     )
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         return f"<AuditLog(audit_id={self.audit_id}, user_id={self.user_id}, action={self.action})>"
 
 
@@ -773,5 +773,5 @@ class ProcessedWebhookEvent(Base):  # type: ignore[misc, valid-type]
         comment="When the event was successfully processed",
     )
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         return f"<ProcessedWebhookEvent(event_id={self.event_id}, type={self.event_type})>"

@@ -1,10 +1,10 @@
 import asyncio
 import os
-from playwright.async_api import async_playwright  # type: ignore
+from playwright.async_api import async_playwright
 import time
 
 
-async def take_screenshots():
+async def take_screenshots() -> None:
     async with async_playwright() as p:
         # Launch browser
         browser = await p.chromium.launch(headless=True)

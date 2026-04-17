@@ -13,6 +13,7 @@ This module tests:
 
 import pytest
 from datetime import timedelta
+from typing import Generator, Any
 from unittest.mock import AsyncMock, MagicMock, patch
 
 from app.middleware.alerting import (
@@ -34,7 +35,7 @@ class TestSlackNotificationChannel:
     """Test Slack notification channel."""
 
     @pytest.mark.asyncio
-    async def test_slack_channel_success(self):
+    async def test_slack_channel_success(self) -> None:
         """Test Slack channel with successful delivery."""
         webhook_url = "https://hooks.slack.com/services/test"
 
@@ -62,7 +63,7 @@ class TestSlackNotificationChannel:
             assert call_args[0][0] == webhook_url
 
     @pytest.mark.asyncio
-    async def test_slack_channel_failure(self):
+    async def test_slack_channel_failure(self) -> None:
         """Test Slack channel with failure response."""
         webhook_url = "https://hooks.slack.com/services/test"
 
@@ -82,7 +83,7 @@ class TestSlackNotificationChannel:
             assert result is False
 
     @pytest.mark.asyncio
-    async def test_slack_channel_exception(self):
+    async def test_slack_channel_exception(self) -> None:
         """Test Slack channel with exception."""
         webhook_url = "https://hooks.slack.com/services/test"
 
@@ -99,7 +100,7 @@ class TestSlackNotificationChannel:
             result = await channel.send_alert(alert)
             assert result is False
 
-    def test_severity_to_color(self):
+    def test_severity_to_color(self) -> None:
         """Test severity to color mapping."""
         channel = SlackNotificationChannel("https://test.com")
 
@@ -114,7 +115,7 @@ class TestEmailNotificationChannel:
     """Test email notification channel."""
 
     @pytest.mark.asyncio
-    async def test_email_channel_success(self):
+    async def test_email_channel_success(self) -> None:
         """Test email channel with successful delivery."""
         with patch("smtplib.SMTP") as mock_smtp_class:
             mock_server = MagicMock()
@@ -147,7 +148,7 @@ class TestEmailNotificationChannel:
             mock_server.quit.assert_called_once()
 
     @pytest.mark.asyncio
-    async def test_email_channel_no_recipients(self):
+    async def test_email_channel_no_recipients(self) -> None:
         """Test email channel with no recipients configured."""
         channel = EmailNotificationChannel(
             smtp_server="smtp.test.com",
@@ -160,7 +161,7 @@ class TestEmailNotificationChannel:
         assert result is False
 
     @pytest.mark.asyncio
-    async def test_email_channel_exception(self):
+    async def test_email_channel_exception(self) -> None:
         """Test email channel with SMTP exception."""
         with patch("smtplib.SMTP") as mock_smtp_class:
             mock_smtp_class.side_effect = Exception("SMTP connection failed")
@@ -180,7 +181,7 @@ class TestWebhookNotificationChannel:
     """Test Webhook notification channel."""
 
     @pytest.mark.asyncio
-    async def test_webhook_channel_exception(self):
+    async def test_webhook_channel_exception(self) -> None:
         """Test webhook channel exception handling (lines 121-128)."""
         from app.middleware.alerting import WebhookNotificationChannel
 
@@ -200,7 +201,7 @@ class TestWebhookNotificationChannel:
             assert result is False
 
     @pytest.mark.asyncio
-    async def test_webhook_non_success_status(self):
+    async def test_webhook_non_success_status(self) -> None:
         """Test webhook channel with non-success status (lines 112-119)."""
         from app.middleware.alerting import WebhookNotificationChannel
 
@@ -226,7 +227,7 @@ class TestLogNotificationChannel:
     """Test log notification channel."""
 
     @pytest.mark.asyncio
-    async def test_log_channel_success(self):
+    async def test_log_channel_success(self) -> None:
         """Test log channel success."""
         with patch("app.middleware.alerting.logger") as mock_logger:
             channel = LogNotificationChannel()
@@ -242,7 +243,7 @@ class TestLogNotificationChannel:
             mock_logger.error.assert_called_once()
 
     @pytest.mark.asyncio
-    async def test_log_channel_exception(self):
+    async def test_log_channel_exception(self) -> None:
         """Test log channel when logger fails."""
         with patch("app.middleware.alerting.logger") as mock_logger:
             mock_logger.error.side_effect = Exception("Logger error")
@@ -257,7 +258,7 @@ class TestLogNotificationChannel:
 class TestAlertTemplate:
     """Test alert template functionality."""
 
-    def test_template_format_title(self):
+    def test_template_format_title(self) -> None:
         """Test formatting alert title with template."""
         template = AlertTemplate(
             name="test_template",
@@ -269,7 +270,7 @@ class TestAlertTemplate:
         title = template.format_title(service="auth-service")
         assert title == "Error in auth-service"
 
-    def test_template_format_message(self):
+    def test_template_format_message(self) -> None:
         """Test formatting alert message with template."""
         template = AlertTemplate(
             name="test_template",
@@ -281,7 +282,7 @@ class TestAlertTemplate:
         message = template.format_message(error_message="Connection timeout")
         assert message == "An error occurred: Connection timeout"
 
-    def test_template_default_severity(self):
+    def test_template_default_severity(self) -> None:
         """Test default severity is ERROR."""
         template = AlertTemplate(
             name="test_template",
@@ -294,7 +295,7 @@ class TestAlertTemplate:
 class TestAlertEscalationPolicy:
     """Test alert escalation policy."""
 
-    def test_escalation_policy_no_rules(self):
+    def test_escalation_policy_no_rules(self) -> None:
         """Test escalation policy with no escalation rules."""
         policy = AlertEscalationPolicy(
             initial_severity=AlertSeverity.WARNING,
@@ -304,7 +305,7 @@ class TestAlertEscalationPolicy:
         severity = policy.get_severity_at_time(alert_age_seconds=300)
         assert severity == AlertSeverity.WARNING
 
-    def test_escalation_policy_with_rules(self):
+    def test_escalation_policy_with_rules(self) -> None:
         """Test escalation policy with escalation rules."""
         # Note: AlertSeverity uses string values, so comparison is alphabetical
         # "critical" (99) < "error" (101) < "info" (105) < "warning" (119)
@@ -327,7 +328,7 @@ class TestAlertEscalationPolicy:
         # At second threshold - INFO ('i') > ERROR ('e') alphabetically
         assert policy.get_severity_at_time(alert_age_seconds=600) == AlertSeverity.INFO
 
-    def test_escalation_policy_string_severity(self):
+    def test_escalation_policy_string_severity(self) -> None:
         """Test escalation policy with string severity values."""
         policy = AlertEscalationPolicy(
             initial_severity=AlertSeverity.INFO,
@@ -340,7 +341,7 @@ class TestAlertEscalationPolicy:
         severity = policy.get_severity_at_time(alert_age_seconds=150)
         assert severity == AlertSeverity.WARNING
 
-    def test_escalation_policy_invalid_severity_skipped(self):
+    def test_escalation_policy_invalid_severity_skipped(self) -> None:
         """Test that invalid severity values are skipped."""
         policy = AlertEscalationPolicy(
             initial_severity=AlertSeverity.INFO,
@@ -357,7 +358,7 @@ class TestAlertRule:
     """Test alert rule functionality."""
 
     @pytest.mark.asyncio
-    async def test_alert_rule_triggers_when_condition_true(self):
+    async def test_alert_rule_triggers_when_condition_true(self) -> None:
         """Test alert rule triggers when condition returns True."""
         template = AlertTemplate(
             name="test_template",
@@ -366,7 +367,7 @@ class TestAlertRule:
             severity=AlertSeverity.WARNING,
         )
 
-        async def async_condition():
+        async def async_condition() -> dict[str, Any]:
             return {"cpu_percent": 85}
 
         rule = AlertRule(
@@ -383,7 +384,7 @@ class TestAlertRule:
         assert "rule_name" in alert.metadata
 
     @pytest.mark.asyncio
-    async def test_alert_rule_no_trigger_when_condition_false(self):
+    async def test_alert_rule_no_trigger_when_condition_false(self) -> None:
         """Test alert rule doesn't trigger when condition returns False."""
         template = AlertTemplate(
             name="test_template",
@@ -391,7 +392,7 @@ class TestAlertRule:
             message_template="Test message",
         )
 
-        async def async_condition_false():
+        async def async_condition_false() -> bool:
             return False
 
         rule = AlertRule(
@@ -404,7 +405,7 @@ class TestAlertRule:
         assert alert is None
 
     @pytest.mark.asyncio
-    async def test_alert_rule_respects_cooldown(self):
+    async def test_alert_rule_respects_cooldown(self) -> None:
         """Test alert rule respects cooldown period."""
         template = AlertTemplate(
             name="test_template",
@@ -412,7 +413,7 @@ class TestAlertRule:
             message_template="Test message",
         )
 
-        async def async_condition_true():
+        async def async_condition_true() -> bool:
             return True
 
         rule = AlertRule(
@@ -431,10 +432,10 @@ class TestAlertRule:
         assert alert2 is None
 
     @pytest.mark.asyncio
-    async def test_alert_rule_async_condition(self):
+    async def test_alert_rule_async_condition(self) -> None:
         """Test alert rule with async condition."""
 
-        async def async_condition():
+        async def async_condition() -> dict[str, Any]:
             return {"value": 42}
 
         template = AlertTemplate(
@@ -455,10 +456,10 @@ class TestAlertRule:
         assert "42" in alert.title
 
     @pytest.mark.asyncio
-    async def test_alert_rule_condition_exception(self):
+    async def test_alert_rule_condition_exception(self) -> None:
         """Test alert rule handles condition exception gracefully."""
 
-        async def failing_condition():
+        async def failing_condition() -> None:
             raise ValueError("Test error")
 
         template = AlertTemplate(
@@ -482,7 +483,7 @@ class TestAlertManagerAdvanced:
     """Test advanced AlertManager functionality."""
 
     @pytest.fixture
-    def fresh_alert_manager(self):
+    def fresh_alert_manager(self) -> AlertManager:
         """Create a fresh alert manager for testing."""
         manager = AlertManager()
         manager.channels.clear()
@@ -493,7 +494,7 @@ class TestAlertManagerAdvanced:
         return manager
 
     @pytest.mark.asyncio
-    async def test_check_rules_triggers_alerts(self, fresh_alert_manager):
+    async def test_check_rules_triggers_alerts(self, fresh_alert_manager: AlertManager) -> None:
         """Test check_rules triggers alerts when rules fire."""
         mock_channel = AsyncMock()
         mock_channel.send_alert.return_value = True
@@ -505,7 +506,7 @@ class TestAlertManagerAdvanced:
             message_template="Test message",
         )
 
-        async def async_condition_true():
+        async def async_condition_true() -> bool:
             return True
 
         rule = AlertRule(
@@ -522,7 +523,9 @@ class TestAlertManagerAdvanced:
         mock_channel.send_alert.assert_called_once()
 
     @pytest.mark.asyncio
-    async def test_check_rules_no_trigger_when_condition_false(self, fresh_alert_manager):
+    async def test_check_rules_no_trigger_when_condition_false(
+        self, fresh_alert_manager: AlertManager
+    ) -> None:
         """Test check_rules doesn't trigger when condition is false."""
         mock_channel = AsyncMock()
         fresh_alert_manager.add_channel(mock_channel)
@@ -533,7 +536,7 @@ class TestAlertManagerAdvanced:
             message_template="Test message",
         )
 
-        async def async_condition_false():
+        async def async_condition_false() -> bool:
             return False
 
         rule = AlertRule(
@@ -549,7 +552,7 @@ class TestAlertManagerAdvanced:
         mock_channel.send_alert.assert_not_called()
 
     @pytest.mark.asyncio
-    async def test_escalate_alerts_with_policy(self, fresh_alert_manager):
+    async def test_escalate_alerts_with_policy(self, fresh_alert_manager: AlertManager) -> None:
         """Test escalate_alerts escalates alerts with escalation policy."""
         mock_channel = AsyncMock()
         mock_channel.send_alert.return_value = True
@@ -586,7 +589,7 @@ class TestAlertManagerAdvanced:
         assert "[ESCALATED]" in call_args.title
 
     @pytest.mark.asyncio
-    async def test_escalate_alerts_no_policy(self, fresh_alert_manager):
+    async def test_escalate_alerts_no_policy(self, fresh_alert_manager: AlertManager) -> None:
         """Test escalate_alerts skips alerts without policy."""
         mock_channel = AsyncMock()
         fresh_alert_manager.add_channel(mock_channel)
@@ -605,7 +608,7 @@ class TestAlertManagerAdvanced:
         mock_channel.send_alert.assert_not_called()
 
     @pytest.mark.asyncio
-    async def test_trigger_custom_alert(self, fresh_alert_manager):
+    async def test_trigger_custom_alert(self, fresh_alert_manager: AlertManager) -> None:
         """Test trigger_custom_alert sends custom alert."""
         mock_channel = AsyncMock()
         mock_channel.send_alert.return_value = True
@@ -624,7 +627,7 @@ class TestAlertManagerAdvanced:
         assert call_args.severity == AlertSeverity.CRITICAL
 
     @pytest.mark.asyncio
-    async def test_send_alert_no_channels(self, fresh_alert_manager):
+    async def test_send_alert_no_channels(self, fresh_alert_manager: AlertManager) -> None:
         """Test _send_alert logs warning when no channels configured."""
         with patch("app.middleware.alerting.logger") as mock_logger:
             alert = Alert(title="Test", message="Test", severity=AlertSeverity.ERROR)
@@ -634,7 +637,7 @@ class TestAlertManagerAdvanced:
             assert "No notification channels configured" in str(mock_logger.warning.call_args)
 
     @pytest.mark.asyncio
-    async def test_send_alert_multiple_channels(self, fresh_alert_manager):
+    async def test_send_alert_multiple_channels(self, fresh_alert_manager: AlertManager) -> None:
         """Test _send_alert sends to multiple channels concurrently."""
         mock_channel1 = AsyncMock()
         mock_channel1.send_alert.return_value = True
@@ -651,7 +654,9 @@ class TestAlertManagerAdvanced:
         mock_channel2.send_alert.assert_called_once_with(alert)
 
     @pytest.mark.asyncio
-    async def test_record_error_triggers_high_rate_alert(self, fresh_alert_manager):
+    async def test_record_error_triggers_high_rate_alert(
+        self, fresh_alert_manager: AlertManager
+    ) -> None:
         """Test record_error triggers alert when error rate is high."""
         mock_channel = AsyncMock()
         mock_channel.send_alert.return_value = True
@@ -670,7 +675,7 @@ class TestAlertManagerAdvanced:
         assert mock_channel.send_alert.call_count >= 1
 
     @pytest.mark.asyncio
-    async def test_record_error_respects_cooldown(self, fresh_alert_manager):
+    async def test_record_error_respects_cooldown(self, fresh_alert_manager: AlertManager) -> None:
         """Test record_error respects alert cooldown."""
         mock_channel = AsyncMock()
         mock_channel.send_alert.return_value = True
@@ -696,7 +701,7 @@ class TestConfigureAlerting:
     """Test configure_alerting function."""
 
     @pytest.fixture(autouse=True)
-    def reset_alert_manager(self):
+    def reset_alert_manager(self) -> Generator[None, None, None]:
         """Reset global alert manager before each test."""
         alert_manager.channels.clear()
         alert_manager.rules.clear()
@@ -711,7 +716,7 @@ class TestConfigureAlerting:
         alert_manager.error_counts.clear()
         alert_manager.alert_cooldowns.clear()
 
-    def test_configure_alerting_with_webhook(self):
+    def test_configure_alerting_with_webhook(self) -> None:
         """Test configure_alerting with webhook URLs."""
         with patch("app.middleware.alerting.logger") as mock_logger:
             configure_alerting(

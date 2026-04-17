@@ -6,7 +6,7 @@ prerequisite checking, and dependency-based task scheduling.
 """
 
 import logging
-from typing import Optional, Set, List
+from typing import Dict, Optional, Set, List
 
 from app.database.connection import get_db_context
 from app.database.models import Task, TaskDependency, TaskStatus
@@ -24,9 +24,9 @@ class DependencyManager:
     - Managing task dependency relationships
     """
 
-    def __init__(self):
+    def __init__(self) -> None:
         """Initialize the dependency manager."""
-        self._cycle_check_cache: dict = {}
+        self._cycle_check_cache: Dict[str, bool] = {}
 
     def can_start_task(self, task_id: str) -> bool:
         """
@@ -99,7 +99,7 @@ class DependencyManager:
             )
 
             for dep in dependencies:
-                prereq_id = dep.prerequisite_task_id
+                prereq_id = str(dep.prerequisite_task_id)
                 if prereq_id not in visited:
                     if self.has_cycle(prereq_id, visited, rec_stack):
                         return True
@@ -135,7 +135,7 @@ class DependencyManager:
                 )
 
                 for dep in dependencies:
-                    prereq_id = dep.prerequisite_task_id
+                    prereq_id = str(dep.prerequisite_task_id)
                     traverse(prereq_id)
                     if prereq_id not in chain:
                         chain.append(prereq_id)
@@ -159,7 +159,7 @@ class DependencyManager:
                 .filter(TaskDependency.prerequisite_task_id == task_id)
                 .all()
             )
-            return [dep.dependent_task_id for dep in dependents]
+            return [str(dep.dependent_task_id) for dep in dependents]
 
     def validate_new_dependency(self, dependent_task_id: str, prerequisite_task_id: str) -> bool:
         """
@@ -208,7 +208,7 @@ class DependencyManager:
 
             ready_tasks = []
             for task in pending_tasks:
-                if self.can_start_task(task.task_id):
+                if self.can_start_task(str(task.task_id)):
                     ready_tasks.append(task)
 
             return ready_tasks

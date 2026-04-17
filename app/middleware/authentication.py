@@ -5,19 +5,20 @@ Middleware to extract and verify JWT tokens from Authorization headers.
 """
 
 import logging
-from typing import Optional
+from typing import Any, Awaitable, Callable, Optional
 from dataclasses import dataclass
 from datetime import datetime, timezone, timedelta
 import asyncio
-
-from fastapi import Request
+from fastapi import Request, Response
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.responses import JSONResponse
+from starlette.types import ASGIApp
 
 from app.database.models import APIKey
 from app.database.connection import SessionLocal
 from app.exceptions import ExpiredTokenError, InvalidTokenError
-from app.services.auth_manager import AuthManager, TokenPayload
+from app.services.auth_manager import AuthManager
+from app.models.schemas import TokenPayload
 
 logger = logging.getLogger(__name__)
 
@@ -73,7 +74,7 @@ class AuthenticationMiddleware(BaseHTTPMiddleware):
 
     _redis_client = None
 
-    def __init__(self, app):
+    def __init__(self, app: ASGIApp) -> None:
         """
         Initialize authentication middleware.
 
@@ -83,7 +84,7 @@ class AuthenticationMiddleware(BaseHTTPMiddleware):
         super().__init__(app)
 
     @classmethod
-    def set_redis_client(cls, redis_client):
+    def set_redis_client(cls, redis_client: Any) -> None:
         """
         Set Redis client for token revocation checking.
 
@@ -92,7 +93,9 @@ class AuthenticationMiddleware(BaseHTTPMiddleware):
         """
         cls._redis_client = redis_client
 
-    async def dispatch(self, request: Request, call_next):
+    async def dispatch(
+        self, request: Request, call_next: Callable[[Request], Awaitable[Response]]
+    ) -> Response:
         """
         Process request and verify authentication.
 
@@ -246,8 +249,6 @@ class AuthenticationMiddleware(BaseHTTPMiddleware):
         if payload.jti and self._redis_client:
             revoked = await self._redis_client.exists(f"revoked_access_tokens:{payload.jti}")
             if revoked:
-                from app.services.auth_manager import InvalidTokenError
-
                 raise InvalidTokenError("Token has been revoked")
 
         return payload
@@ -257,7 +258,7 @@ class AuthenticationMiddleware(BaseHTTPMiddleware):
         Blocking JWT decode and basic validation (without revocation check).
         """
         import jwt
-        from app.services.auth_manager import TokenPayload, InvalidTokenError, ExpiredTokenError
+        from app.services.auth_manager import TokenPayload
         from app.config import settings as _settings
         from datetime import timezone, datetime
 

@@ -804,16 +804,16 @@ def delete_temporary_items(
     max_depth: Optional[int] = None,
     config: Optional[Dict[str, Any]] = None,
     backup_dir: Optional[str] = None,
-):
+) -> None:
     """Enhanced deletion of temporary directories and files with safety checks."""
     if config is None:
         config = DEFAULT_CONFIG
 
-    temp_dir_names = set(cast(list, config.get("temp_dirs", list(TEMP_DIR_NAMES))))
-    temp_file_patterns = cast(list, config.get("temp_files", TEMP_FILE_PATTERNS))
-    essential_files = set(cast(list, config.get("essential_files", list(ESSENTIAL_FILES))))
-    essential_dirs = set(cast(list, config.get("essential_dirs", list(ESSENTIAL_DIRS))))
-    skip_traverse_dirs = set(cast(list, config.get("skip_dirs", list(SKIP_TRAVERSE_DIRS))))
+    temp_dir_names = set(cast(list[str], config.get("temp_dirs", list(TEMP_DIR_NAMES))))
+    temp_file_patterns = cast(list[str], config.get("temp_files", TEMP_FILE_PATTERNS))
+    essential_files = set(cast(list[str], config.get("essential_files", list(ESSENTIAL_FILES))))
+    essential_dirs = set(cast(list[str], config.get("essential_dirs", list(ESSENTIAL_DIRS))))
+    skip_traverse_dirs = set(cast(list[str], config.get("skip_dirs", list(SKIP_TRAVERSE_DIRS))))
     safe_mode = cast(bool, config.get("safe_mode", True))
     backup_before_delete = cast(bool, config.get("backup_before_delete", False))
 
@@ -934,7 +934,7 @@ def delete_temporary_items(
             print(f"Skipped {skipped_essential} essential items")
 
 
-def prune_empty_dirs(root_dir: str, dry_run: bool = False, verbose: bool = True):
+def prune_empty_dirs(root_dir: str, dry_run: bool = False, verbose: bool = True) -> None:
     """Remove empty directories after cleanup."""
     for dirpath, dirnames, filenames in os.walk(root_dir, topdown=False):
         # don't prune the root itself
@@ -953,7 +953,7 @@ def prune_empty_dirs(root_dir: str, dry_run: bool = False, verbose: bool = True)
             print(f"Error pruning directory {dirpath}: {e}")
 
 
-def clean_special_cases(root_dir: str, dry_run: bool = False, verbose: bool = True):
+def clean_special_cases(root_dir: str, dry_run: bool = False, verbose: bool = True) -> int:
     """Handle special cleanup cases that might be missed by pattern matching."""
     special_patterns = [
         # Python cache directories with various naming patterns
@@ -1034,7 +1034,7 @@ def clean_special_cases(root_dir: str, dry_run: bool = False, verbose: bool = Tr
 
 def clear_log_files(
     root_dir: str, delete_logs_dir: bool = False, dry_run: bool = False, verbose: bool = True
-):
+) -> None:
     """Either truncate files under a `logs` dir, or delete the logs directory entirely.
 
     - If delete_logs_dir is True, the whole logs directory is removed.
@@ -1077,7 +1077,7 @@ def clear_log_files(
                 print(f"Error clearing {file_path}: {str(e)}")
 
 
-def parse_args(argv: Optional[List[str]] = None):
+def parse_args(argv: Optional[List[str]] = None) -> argparse.Namespace:
     p = argparse.ArgumentParser(
         description="Enhanced APGI API temporary file and folder cleaner with safety checks",
         formatter_class=argparse.RawDescriptionHelpFormatter,
@@ -1206,7 +1206,7 @@ Safety Features:
     return p.parse_args(argv)
 
 
-def main(argv: Optional[List[str]] = None):
+def main(argv: Optional[List[str]] = None) -> int:
     args = parse_args(argv)
     current_dir = os.path.dirname(os.path.abspath(__file__))
     root_directory = os.path.abspath(args.root) if args.root else current_dir

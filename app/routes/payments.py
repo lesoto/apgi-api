@@ -5,6 +5,8 @@ API endpoints for creating Stripe PaymentIntents.
 """
 
 import logging
+from typing import Any
+
 import stripe
 from datetime import timezone
 from pydantic import BaseModel
@@ -44,7 +46,7 @@ PRODUCT_CATALOGUE = {
 
 
 class PaymentIntentCreateRequest(BaseModel):
-    items: list[dict]
+    items: list[dict[str, Any]]
     currency: str = "usd"
 
 
@@ -60,7 +62,7 @@ class PaymentIntentCreateResponse(BaseModel):
     description="Creates a PaymentIntent for the APGI Subscription checkout flow.",
     dependencies=[Depends(require_permission(Permission.SESSION_READ))],
 )
-async def create_payment_intent(request: PaymentIntentCreateRequest):
+async def create_payment_intent(request: PaymentIntentCreateRequest) -> PaymentIntentCreateResponse:
     """
     Generate a Stripe PaymentIntent for the frontend.
     """
@@ -115,7 +117,7 @@ async def create_payment_intent(request: PaymentIntentCreateRequest):
     summary="Handle Stripe webhooks",
     description="Processes Stripe webhook events including refunds, disputes, and subscriptions.",
 )
-async def stripe_webhook(request: Request, db: Session = Depends(get_db)):
+async def stripe_webhook(request: Request, db: Session = Depends(get_db)) -> dict[str, str]:
     """
     Handle Stripe webhook events.
 
@@ -144,7 +146,7 @@ async def stripe_webhook(request: Request, db: Session = Depends(get_db)):
 
         # Verify the webhook signature
         try:
-            event = stripe.Webhook.construct_event(payload, sig_header, endpoint_secret)
+            event = stripe.Webhook.construct_event(payload, sig_header, endpoint_secret)  # type: ignore[no-untyped-call]
         except ValueError as e:
             logger.warning(f"Invalid Stripe webhook payload: {e}")
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid payload")
@@ -217,7 +219,7 @@ async def stripe_webhook(request: Request, db: Session = Depends(get_db)):
         )
 
 
-async def _handle_payment_succeeded(db: Session, payment_intent: dict) -> bool:
+async def _handle_payment_succeeded(db: Session, payment_intent: dict[str, Any]) -> bool:
     """Handle successful payment intent."""
     try:
         payment_intent_id = payment_intent.get("id")
@@ -281,7 +283,7 @@ async def _handle_payment_succeeded(db: Session, payment_intent: dict) -> bool:
         return False
 
 
-async def _handle_payment_failed(db: Session, payment_intent: dict) -> bool:
+async def _handle_payment_failed(db: Session, payment_intent: dict[str, Any]) -> bool:
     """Handle failed payment intent."""
     try:
         payment_intent_id = payment_intent.get("id")
@@ -326,7 +328,7 @@ async def _handle_payment_failed(db: Session, payment_intent: dict) -> bool:
         return False
 
 
-async def _handle_dispute_created(db: Session, dispute: dict) -> bool:
+async def _handle_dispute_created(db: Session, dispute: dict[str, Any]) -> bool:
     """Handle charge dispute creation."""
     try:
         dispute_id = dispute.get("id")
@@ -352,7 +354,7 @@ async def _handle_dispute_created(db: Session, dispute: dict) -> bool:
         return False
 
 
-async def _handle_dispute_closed(db: Session, dispute: dict) -> bool:
+async def _handle_dispute_closed(db: Session, dispute: dict[str, Any]) -> bool:
     """Handle charge dispute resolution."""
     try:
         dispute_id = dispute.get("id")
@@ -373,7 +375,7 @@ async def _handle_dispute_closed(db: Session, dispute: dict) -> bool:
         return False
 
 
-async def _handle_refund(db: Session, charge: dict, refund_amount: int) -> bool:
+async def _handle_refund(db: Session, charge: dict[str, Any], refund_amount: int) -> bool:
     """Handle charge refund."""
     try:
         charge_id = charge.get("id")
@@ -414,7 +416,9 @@ async def _handle_refund(db: Session, charge: dict, refund_amount: int) -> bool:
         return False
 
 
-async def _handle_subscription_event(db: Session, event_type: str, subscription: dict) -> bool:
+async def _handle_subscription_event(
+    db: Session, event_type: str, subscription: dict[str, Any]
+) -> bool:
     """Handle subscription lifecycle events."""
     try:
         subscription_id = subscription.get("id")

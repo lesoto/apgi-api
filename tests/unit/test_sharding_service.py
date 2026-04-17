@@ -11,13 +11,13 @@ from app.services.sharding_service import DatabaseShardingService, ShardConfig, 
 
 
 @pytest.fixture
-def sharding_service():
+def sharding_service() -> DatabaseShardingService:
     """Create DatabaseShardingService instance."""
     return DatabaseShardingService()
 
 
 @pytest.fixture
-def mock_settings():
+def mock_settings() -> MagicMock:
     """Create mock settings."""
     settings = MagicMock()
     settings.database_url = "sqlite:///test.db"
@@ -28,7 +28,7 @@ def mock_settings():
 class TestDatabaseShardingService:
     """Test DatabaseShardingService functionality."""
 
-    def test_init_single_shard(self, mock_settings):
+    def test_init_single_shard(self, mock_settings: MagicMock) -> None:
         """Test initialization with single shard."""
         with patch("app.services.sharding_service.settings", mock_settings):
             service = DatabaseShardingService()
@@ -38,7 +38,7 @@ class TestDatabaseShardingService:
             assert service.shards["shard_0"].database_url == "sqlite:///test.db"
             assert service.num_shards == 1
 
-    def test_init_multiple_shards(self, mock_settings):
+    def test_init_multiple_shards(self, mock_settings: MagicMock) -> None:
         """Test initialization with multiple shards."""
         mock_settings.database_shards_count = 3
 
@@ -49,13 +49,15 @@ class TestDatabaseShardingService:
             assert all(f"shard_{i}" in service.shards for i in range(3))
             assert service.num_shards == 3
 
-    def test_get_shard_for_user_single_shard(self, sharding_service):
+    def test_get_shard_for_user_single_shard(
+        self, sharding_service: DatabaseShardingService
+    ) -> None:
         """Test shard assignment for single shard setup."""
         shard_id = sharding_service.get_shard_for_user("user123")
 
         assert shard_id == "shard_0"
 
-    def test_get_shard_for_user_multiple_shards(self, mock_settings):
+    def test_get_shard_for_user_multiple_shards(self, mock_settings: MagicMock) -> None:
         """Test shard assignment for multiple shard setup."""
         mock_settings.database_shards_count = 4
 
@@ -70,7 +72,7 @@ class TestDatabaseShardingService:
             assert shard1 == shard2
             assert shard1 in [f"shard_{i}" for i in range(4)]
 
-    def test_get_shard_config_existing(self, sharding_service):
+    def test_get_shard_config_existing(self, sharding_service: DatabaseShardingService) -> None:
         """Test getting config for existing shard."""
         config = sharding_service.get_shard_config("shard_0")
 
@@ -78,13 +80,13 @@ class TestDatabaseShardingService:
         assert config.shard_id == "shard_0"
         assert isinstance(config, ShardConfig)
 
-    def test_get_shard_config_nonexistent(self, sharding_service):
+    def test_get_shard_config_nonexistent(self, sharding_service: DatabaseShardingService) -> None:
         """Test getting config for non-existent shard."""
         config = sharding_service.get_shard_config("shard_999")
 
         assert config is None
 
-    def test_get_all_shards_single_shard(self, sharding_service):
+    def test_get_all_shards_single_shard(self, sharding_service: DatabaseShardingService) -> None:
         """Test getting all shards for single shard setup."""
         shards = sharding_service.get_all_shards()
 
@@ -93,7 +95,7 @@ class TestDatabaseShardingService:
         assert shards[0].shard_id == "shard_0"
         assert shards[0].is_active is True
 
-    def test_get_all_shards_multiple_shards(self, mock_settings):
+    def test_get_all_shards_multiple_shards(self, mock_settings: MagicMock) -> None:
         """Test getting all shards for multiple shard setup."""
         mock_settings.database_shards_count = 2
 
@@ -112,7 +114,7 @@ class TestDatabaseShardingService:
                 assert len(shard.user_range_start) > 0
                 assert len(shard.user_range_end) > 0
 
-    def test_migrate_user_data(self, sharding_service):
+    def test_migrate_user_data(self, sharding_service: DatabaseShardingService) -> None:
         """Test user data migration (placeholder implementation)."""
         result = sharding_service.migrate_user_data("user123", "shard_0", "shard_1")
 
@@ -122,7 +124,7 @@ class TestDatabaseShardingService:
         assert result["to_shard"] == "shard_1"
         assert result["status"] == "not_implemented"
 
-    def test_get_shard_stats(self, sharding_service):
+    def test_get_shard_stats(self, sharding_service: DatabaseShardingService) -> None:
         """Test getting shard statistics."""
         stats = sharding_service.get_shard_stats()
 
@@ -139,7 +141,9 @@ class TestDatabaseShardingService:
         assert stats["sharding_strategy"] == "consistent_hashing"
         assert stats["shard_key"] == "user_id"
 
-    def test_validate_sharding_setup_single_shard(self, sharding_service):
+    def test_validate_sharding_setup_single_shard(
+        self, sharding_service: DatabaseShardingService
+    ) -> None:
         """Test sharding setup validation for single shard."""
         result = sharding_service.validate_sharding_setup()
 
@@ -150,7 +154,9 @@ class TestDatabaseShardingService:
         assert result["shard_count"] == 1
         assert result["configured_shards"] == 1
 
-    def test_validate_sharding_setup_multiple_shards_same_url(self, mock_settings):
+    def test_validate_sharding_setup_multiple_shards_same_url(
+        self, mock_settings: MagicMock
+    ) -> None:
         """Test sharding setup validation for multiple shards with same URL."""
         mock_settings.database_shards_count = 3
         # Configure mock to return None for shard URLs, so all use same database_url
@@ -169,7 +175,7 @@ class TestDatabaseShardingService:
             assert "shard_count" in result
             assert "configured_shards" in result
 
-    def test_shard_config_dataclass(self):
+    def test_shard_config_dataclass(self) -> None:
         """Test ShardConfig dataclass."""
         config = ShardConfig(
             shard_id="test_shard", database_url="sqlite:///test.db", weight=2, is_read_replica=True
@@ -180,7 +186,7 @@ class TestDatabaseShardingService:
         assert config.weight == 2
         assert config.is_read_replica is True
 
-    def test_shard_info_dataclass(self):
+    def test_shard_info_dataclass(self) -> None:
         """Test ShardInfo dataclass."""
         info = ShardInfo(
             shard_id="test_shard",
@@ -200,7 +206,7 @@ class TestDatabaseShardingService:
 class TestShardConfig:
     """Test ShardConfig dataclass."""
 
-    def test_default_values(self):
+    def test_default_values(self) -> None:
         """Test default values for ShardConfig."""
         config = ShardConfig(shard_id="test", database_url="sqlite:///test.db")
 
@@ -213,7 +219,7 @@ class TestShardConfig:
 class TestShardInfo:
     """Test ShardInfo dataclass."""
 
-    def test_default_values(self):
+    def test_default_values(self) -> None:
         """Test default values for ShardInfo."""
         info = ShardInfo(
             shard_id="test",

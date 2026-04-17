@@ -23,7 +23,7 @@ from app.exceptions import APIError
 class TestGenerateRequestId:
     """Test request ID generation."""
 
-    def test_generate_request_id_unique(self):
+    def test_generate_request_id_unique(self) -> None:
         """Test that request IDs are unique."""
         id1 = generate_request_id()
         id2 = generate_request_id()
@@ -31,7 +31,7 @@ class TestGenerateRequestId:
         assert id1.startswith("req_")
         assert len(id1) == 16  # "req_" + 12 hex chars
 
-    def test_generate_request_id_format(self):
+    def test_generate_request_id_format(self) -> None:
         """Test request ID format."""
         request_id = generate_request_id()
         assert request_id.startswith("req_")
@@ -42,7 +42,7 @@ class TestApiErrorHandler:
     """Test API error handler."""
 
     @pytest.mark.asyncio
-    async def test_api_error_handler_with_request_id(self):
+    async def test_api_error_handler_with_request_id(self) -> None:
         """Test API error handler with existing request ID."""
         mock_request = MagicMock(spec=Request)
         mock_request.state.request_id = "req_test123"
@@ -68,7 +68,7 @@ class TestApiErrorHandler:
         assert "req_test123" in data
 
     @pytest.mark.asyncio
-    async def test_api_error_handler_without_request_id(self):
+    async def test_api_error_handler_without_request_id(self) -> None:
         """Test API error handler generates request ID."""
         mock_request = MagicMock(spec=Request)
         mock_request.state = MagicMock()
@@ -95,7 +95,7 @@ class TestApiErrorHandler:
         assert "req_" in data
 
     @pytest.mark.asyncio
-    async def test_api_error_handler_logging(self):
+    async def test_api_error_handler_logging(self) -> None:
         """Test that API error handler logs errors."""
         mock_request = MagicMock(spec=Request)
         mock_request.state.request_id = "req_test123"
@@ -119,7 +119,7 @@ class TestValidationErrorHandler:
     """Test validation error handler."""
 
     @pytest.mark.asyncio
-    async def test_validation_error_handler_request_validation(self):
+    async def test_validation_error_handler_request_validation(self) -> None:
         """Test handling RequestValidationError."""
         mock_request = MagicMock(spec=Request)
         mock_request.state.request_id = "req_test123"
@@ -152,7 +152,7 @@ class TestValidationErrorHandler:
         assert "field2" in data
 
     @pytest.mark.asyncio
-    async def test_validation_error_handler_logging(self):
+    async def test_validation_error_handler_logging(self) -> None:
         """Test that validation errors are logged."""
         mock_request = MagicMock(spec=Request)
         mock_request.state.request_id = "req_test123"
@@ -171,7 +171,7 @@ class TestValidationErrorHandler:
             mock_logger.warning.assert_called_once()
 
     @pytest.mark.asyncio
-    async def test_validation_error_handler_nested_location(self):
+    async def test_validation_error_handler_nested_location(self) -> None:
         """Test handling nested field locations."""
         mock_request = MagicMock(spec=Request)
         mock_request.state.request_id = "req_test123"
@@ -198,7 +198,7 @@ class TestHttpExceptionHandler:
     """Test HTTP exception handler."""
 
     @pytest.mark.asyncio
-    async def test_http_exception_handler_400(self):
+    async def test_http_exception_handler_400(self) -> None:
         """Test handling 400 Bad Request."""
         mock_request = MagicMock(spec=Request)
         mock_request.state.request_id = "req_test123"
@@ -220,7 +220,7 @@ class TestHttpExceptionHandler:
         assert "Bad request" in data
 
     @pytest.mark.asyncio
-    async def test_http_exception_handler_404(self):
+    async def test_http_exception_handler_404(self) -> None:
         """Test handling 404 Not Found."""
         mock_request = MagicMock(spec=Request)
         mock_request.state.request_id = "req_test123"
@@ -241,7 +241,7 @@ class TestHttpExceptionHandler:
         assert "NOT_FOUND" in data
 
     @pytest.mark.asyncio
-    async def test_http_exception_handler_500(self):
+    async def test_http_exception_handler_500(self) -> None:
         """Test handling 500 Internal Server Error."""
         mock_request = MagicMock(spec=Request)
         mock_request.state.request_id = "req_test123"
@@ -262,7 +262,7 @@ class TestHttpExceptionHandler:
         assert "INTERNAL_SERVER_ERROR" in data
 
     @pytest.mark.asyncio
-    async def test_http_exception_handler_unknown_status(self):
+    async def test_http_exception_handler_unknown_status(self) -> None:
         """Test handling unknown status code."""
         mock_request = MagicMock(spec=Request)
         mock_request.state.request_id = "req_test123"
@@ -283,7 +283,7 @@ class TestHttpExceptionHandler:
         assert "HTTP_ERROR" in data
 
     @pytest.mark.asyncio
-    async def test_http_exception_handler_logging_error(self):
+    async def test_http_exception_handler_logging_error(self) -> None:
         """Test that 5xx errors are logged as ERROR."""
         mock_request = MagicMock(spec=Request)
         mock_request.state.request_id = "req_test123"
@@ -301,7 +301,7 @@ class TestHttpExceptionHandler:
             assert call_args[0][0] == 40  # logging.ERROR
 
     @pytest.mark.asyncio
-    async def test_http_exception_handler_logging_warning(self):
+    async def test_http_exception_handler_logging_warning(self) -> None:
         """Test that 4xx errors are logged as WARNING."""
         mock_request = MagicMock(spec=Request)
         mock_request.state.request_id = "req_test123"
@@ -323,7 +323,7 @@ class TestUnhandledExceptionHandler:
     """Test unhandled exception handler."""
 
     @pytest.mark.asyncio
-    async def test_unhandled_exception_handler_basic(self):
+    async def test_unhandled_exception_handler_basic(self) -> None:
         """Test basic unhandled exception handling."""
         mock_request = MagicMock(spec=Request)
         mock_request.state.request_id = "req_test123"
@@ -349,7 +349,7 @@ class TestUnhandledExceptionHandler:
         assert "req_test123" in data
 
     @pytest.mark.asyncio
-    async def test_unhandled_exception_handler_generates_ids(self):
+    async def test_unhandled_exception_handler_generates_ids(self) -> None:
         """Test that error ID and request ID are generated."""
         mock_request = MagicMock(spec=Request)
         mock_request.state = MagicMock()
@@ -376,7 +376,7 @@ class TestUnhandledExceptionHandler:
         assert "err_" in data  # error ID
 
     @pytest.mark.asyncio
-    async def test_unhandled_exception_handler_with_json_body(self):
+    async def test_unhandled_exception_handler_with_json_body(self) -> None:
         """Test handling JSON request body."""
         mock_request = MagicMock(spec=Request)
         mock_request.state.request_id = "req_test123"
@@ -396,7 +396,7 @@ class TestUnhandledExceptionHandler:
         assert response.status_code == 500
 
     @pytest.mark.asyncio
-    async def test_unhandled_exception_handler_sensitive_data_redaction(self):
+    async def test_unhandled_exception_handler_sensitive_data_redaction(self) -> None:
         """Test that sensitive data is redacted from body."""
         mock_request = MagicMock(spec=Request)
         mock_request.state.request_id = "req_test123"
@@ -418,7 +418,7 @@ class TestUnhandledExceptionHandler:
         assert response.status_code == 500
 
     @pytest.mark.asyncio
-    async def test_unhandled_exception_handler_large_body(self):
+    async def test_unhandled_exception_handler_large_body(self) -> None:
         """Test handling of large request body."""
         mock_request = MagicMock(spec=Request)
         mock_request.state.request_id = "req_test123"
@@ -438,7 +438,7 @@ class TestUnhandledExceptionHandler:
         assert response.status_code == 500
 
     @pytest.mark.asyncio
-    async def test_unhandled_exception_handler_form_data(self):
+    async def test_unhandled_exception_handler_form_data(self) -> None:
         """Test handling form data."""
         mock_request = MagicMock(spec=Request)
         mock_request.state.request_id = "req_test123"
@@ -461,7 +461,7 @@ class TestUnhandledExceptionHandler:
         assert response.status_code == 500
 
     @pytest.mark.asyncio
-    async def test_unhandled_exception_handler_sensitive_headers(self):
+    async def test_unhandled_exception_handler_sensitive_headers(self) -> None:
         """Test that sensitive headers are excluded."""
         mock_request = MagicMock(spec=Request)
         mock_request.state.request_id = "req_test123"
@@ -487,7 +487,7 @@ class TestUnhandledExceptionHandler:
         assert response.status_code == 500
 
     @pytest.mark.asyncio
-    async def test_unhandled_exception_handler_with_alerting(self):
+    async def test_unhandled_exception_handler_with_alerting(self) -> None:
         """Test that error is recorded for alerting when configured."""
         mock_request = MagicMock(spec=Request)
         mock_request.state.request_id = "req_test123"
@@ -509,7 +509,7 @@ class TestUnhandledExceptionHandler:
         mock_alert_mgr.record_error.assert_called_once()
 
     @pytest.mark.asyncio
-    async def test_unhandled_exception_handler_body_capture_error(self):
+    async def test_unhandled_exception_handler_body_capture_error(self) -> None:
         """Test handling errors during body capture."""
         mock_request = MagicMock(spec=Request)
         mock_request.state.request_id = "req_test123"
@@ -529,7 +529,7 @@ class TestUnhandledExceptionHandler:
         assert response.status_code == 500
 
     @pytest.mark.asyncio
-    async def test_unhandled_exception_handler_unparseable_json(self):
+    async def test_unhandled_exception_handler_unparseable_json(self) -> None:
         """Test handling unparseable JSON body."""
         mock_request = MagicMock(spec=Request)
         mock_request.state.request_id = "req_test123"
@@ -552,7 +552,7 @@ class TestUnhandledExceptionHandler:
 class TestRegisterExceptionHandlers:
     """Test exception handler registration."""
 
-    def test_register_exception_handlers(self):
+    def test_register_exception_handlers(self) -> None:
         """Test that all handlers are registered."""
         mock_app = MagicMock()
 
@@ -589,7 +589,7 @@ class TestRegisterExceptionHandlers:
         exception_call = [call for call in handler_calls if call[0][0] == Exception]
         assert len(exception_call) == 1
 
-    def test_register_exception_handlers_logging(self):
+    def test_register_exception_handlers_logging(self) -> None:
         """Test that registration is logged."""
         mock_app = MagicMock()
 

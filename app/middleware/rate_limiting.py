@@ -13,7 +13,7 @@ from fastapi import Request
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.responses import JSONResponse
 
-from typing import Optional
+from typing import Any, Optional
 
 from app.middleware.logging import StructuredLogger
 from app.services.rate_limiter import RateLimiter
@@ -32,7 +32,9 @@ class RateLimitingMiddleware(BaseHTTPMiddleware):
     _instance: Optional["RateLimitingMiddleware"] = None
     _instance_lock = threading.Lock()
 
-    def __init__(self, app, redis_client=None, enabled: bool = True):
+    def __init__(
+        self, app: Any, redis_client: Optional[redis.Redis] = None, enabled: bool = True
+    ) -> None:
         """
         Initialize rate limiting middleware.
 
@@ -67,7 +69,7 @@ class RateLimitingMiddleware(BaseHTTPMiddleware):
             RateLimitingMiddleware._instance = self
 
     @classmethod
-    def set_redis_client(cls, redis_client: redis.Redis):
+    def set_redis_client(cls, redis_client: redis.Redis) -> None:
         """
         Set Redis client on the global middleware instance.
 
@@ -185,7 +187,7 @@ class RateLimitingMiddleware(BaseHTTPMiddleware):
 
         return False
 
-    async def dispatch(self, request: Request, call_next):
+    async def dispatch(self, request: Request, call_next: Any) -> Any:
         """
         Process request with rate limiting.
 

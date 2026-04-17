@@ -15,11 +15,12 @@ Returns HTTP 422 for validation failures with proper error messages.
 
 import re
 import logging
-from typing import Any, Dict, List, Set
+from typing import Any, cast, Dict, List, Set
 from datetime import datetime, timedelta, timezone
 from collections import defaultdict
 from fastapi import Request, status
 from starlette.middleware.base import BaseHTTPMiddleware
+from starlette.responses import Response as StarletteResponse
 from starlette.types import ASGIApp
 
 logger = logging.getLogger(__name__)
@@ -143,7 +144,7 @@ class SecurityValidationMiddleware(BaseHTTPMiddleware):
         "\x1f",
     ]
 
-    async def dispatch(self, request: Request, call_next):
+    async def dispatch(self, request: Request, call_next: Any) -> StarletteResponse:
         """
         Validate request for security threats before passing to handler.
 
@@ -156,7 +157,8 @@ class SecurityValidationMiddleware(BaseHTTPMiddleware):
         """
         # Skip validation if disabled
         if not self.enabled:
-            return await call_next(request)
+            response = await call_next(request)
+            return cast(StarletteResponse, response)
 
         # Get client IP for WAF tracking
         client_ip = self._get_client_ip(request)
@@ -188,7 +190,8 @@ class SecurityValidationMiddleware(BaseHTTPMiddleware):
             if validation_result["is_valid"]:
                 # Update request score (lower is better)
                 self._update_request_score(client_ip, validation_result.get("score", 0))
-                return await call_next(request)
+                response = await call_next(request)
+                return cast(StarletteResponse, response)
             else:
                 # High-risk request - potentially block IP
                 if validation_result.get("score", 0) > 80:
@@ -203,7 +206,8 @@ class SecurityValidationMiddleware(BaseHTTPMiddleware):
                 )
         else:
             # Skip validation for HEAD and OPTIONS requests
-            return await call_next(request)
+            response = await call_next(request)
+            return cast(StarletteResponse, response)
 
     def _get_client_ip(self, request: Request) -> str:
         """Extract client IP from request headers."""
@@ -235,7 +239,7 @@ class SecurityValidationMiddleware(BaseHTTPMiddleware):
         # Check if under limit
         return len(self.request_timestamps[client_ip]) < 100
 
-    def _update_request_score(self, client_ip: str, score: float):
+    def _update_request_score(self, client_ip: str, score: float) -> None:
         """Update request score for IP and clean old scores."""
         now = datetime.now(timezone.utc)
         hour_ago = now - timedelta(hours=1)

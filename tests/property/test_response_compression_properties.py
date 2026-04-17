@@ -8,6 +8,7 @@ Tests universal properties of GZip response compression for large responses.
 from hypothesis import given, strategies as st, assume, settings
 import sys
 from pathlib import Path
+from typing import Any, Dict, List
 
 # Add app directory to path for imports
 sys.path.insert(0, str(Path(__file__).parent.parent.parent / "app"))
@@ -21,7 +22,7 @@ from fastapi.testclient import TestClient
 # ============================================================================
 
 
-def create_test_app_with_compression(minimum_size: int = 1000):
+def create_test_app_with_compression(minimum_size: int = 1000) -> FastAPI:
     """Create a test FastAPI app with GZip compression middleware."""
     app = FastAPI()
 
@@ -30,26 +31,26 @@ def create_test_app_with_compression(minimum_size: int = 1000):
 
     # Add test endpoints that return various sized responses
     @app.get("/test/small")
-    async def small_response():
+    async def small_response() -> Dict[str, str]:
         return {"message": "small"}
 
     @app.get("/test/large")
-    async def large_response():
+    async def large_response() -> Dict[str, str]:
         # Return a response larger than 1KB
         return {"data": "x" * 2000, "message": "large response"}
 
     @app.get("/test/custom")
-    async def custom_response(size: int = 1000):
+    async def custom_response(size: int = 1000) -> Dict[str, str]:
         # Return a response of custom size
         return {"data": "x" * size}
 
     @app.post("/test/echo")
-    async def echo_response(data: dict):
+    async def echo_response(data: Dict[str, Any]) -> Dict[str, Any]:
         # Echo back the data
         return data
 
     @app.get("/v1/sessions")
-    async def sessions_endpoint():
+    async def sessions_endpoint() -> Dict[str, List[Dict[str, Any]]]:
         # Return a large list of sessions
         sessions = [
             {
@@ -74,7 +75,7 @@ def create_test_app_with_compression(minimum_size: int = 1000):
 @given(
     response_size_kb=st.floats(min_value=1.1, max_value=100.0),
 )
-def test_property_29_response_compression_for_large_responses(response_size_kb):
+def test_property_29_response_compression_for_large_responses(response_size_kb: float) -> None:
     """
     **Validates: Requirements 20.1**
 
@@ -127,7 +128,7 @@ def test_property_29_response_compression_for_large_responses(response_size_kb):
 @given(
     response_size_bytes=st.integers(min_value=100, max_value=900),
 )
-def test_property_29_no_compression_for_small_responses(response_size_bytes):
+def test_property_29_no_compression_for_small_responses(response_size_bytes: int) -> None:
     """
     **Validates: Requirements 20.1**
 
@@ -170,7 +171,7 @@ def test_property_29_no_compression_for_small_responses(response_size_bytes):
 @given(
     response_size_kb=st.floats(min_value=1.1, max_value=50.0),
 )
-def test_property_29_no_compression_without_accept_encoding(response_size_kb):
+def test_property_29_no_compression_without_accept_encoding(response_size_kb: float) -> None:
     """
     **Validates: Requirements 20.1**
 
@@ -217,7 +218,9 @@ def test_property_29_no_compression_without_accept_encoding(response_size_kb):
     minimum_size_kb=st.floats(min_value=0.5, max_value=10.0),
     response_size_multiplier=st.floats(min_value=1.1, max_value=3.0),
 )
-def test_property_29_configurable_compression_threshold(minimum_size_kb, response_size_multiplier):
+def test_property_29_configurable_compression_threshold(
+    minimum_size_kb: float, response_size_multiplier: float
+) -> None:
     """
     **Validates: Requirements 20.1**
 
@@ -264,7 +267,7 @@ def test_property_29_configurable_compression_threshold(minimum_size_kb, respons
     path=st.sampled_from(["/test/large", "/v1/sessions"]),
     method=st.sampled_from(["GET", "POST"]),
 )
-def test_property_29_compression_applies_to_all_endpoints(path, method):
+def test_property_29_compression_applies_to_all_endpoints(path: str, method: str) -> None:
     """
     **Validates: Requirements 20.1**
 
@@ -316,7 +319,7 @@ def test_property_29_compression_applies_to_all_endpoints(path, method):
 @given(
     response_size_kb=st.floats(min_value=2.0, max_value=50.0),
 )
-def test_property_29_compressed_response_is_smaller(response_size_kb):
+def test_property_29_compressed_response_is_smaller(response_size_kb: float) -> None:
     """
     **Validates: Requirements 20.1**
 
@@ -390,7 +393,9 @@ def test_property_29_compressed_response_is_smaller(response_size_kb):
         ]
     ),
 )
-def test_property_29_compression_with_multiple_encodings(response_size_kb, accept_encoding):
+def test_property_29_compression_with_multiple_encodings(
+    response_size_kb: float, accept_encoding: str
+) -> None:
     """
     **Validates: Requirements 20.1**
 

@@ -296,7 +296,7 @@ class WebhookManager:
                                 list[int], delivery.retry_delays or [5, 30, 300, 1800, 3600]
                             )
                             attempts_value = (
-                                int(delivery.attempts) if delivery.attempts is not None else 0  # type: ignore[arg-type]
+                                int(delivery.attempts) if delivery.attempts is not None else 0
                             )
                             delay_index = min(attempts_value, len(retry_delays) - 1)
                             delay_value = (
@@ -337,7 +337,7 @@ class WebhookManager:
             if delivery.attempts < delivery.retry_count:
                 delivery.status = "retry"  # type: ignore[assignment]
                 retry_delays = cast(list[int], delivery.retry_delays or [5, 30, 300, 1800, 3600])
-                delay_index = min(int(delivery.attempts), len(retry_delays) - 1)  # type: ignore[arg-type]
+                delay_index = min(int(delivery.attempts), len(retry_delays) - 1)
                 delivery.next_retry_at = datetime.now(timezone.utc) + timedelta(  # type: ignore[assignment]
                     seconds=float(cast(float, retry_delays[delay_index]))
                 )

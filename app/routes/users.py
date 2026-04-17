@@ -22,29 +22,29 @@ from app.models.schemas import (
     UserCreateResponse,
     UserResponse,
     UserUpdateRequest,
+    UsersListResponse,
+    PaginationInfo,
+    TokenPayload,
+    UserStatsResponse,
     PasswordResetRequest,
     PasswordResetResponse,
     PasswordResetEmailRequest,
     PasswordResetEmailResponse,
     PasswordResetConfirmRequest,
     PasswordResetConfirmResponse,
-    UserStatsResponse,
     MFAEnrollResponse,
-    MFADisableRequest,
-    MFADisableResponse,
     MFAEnableRequest,
     MFAEnableResponse,
+    MFADisableRequest,
+    MFADisableResponse,
     MFABackupCodeVerifyRequest,
     MFABackupCodeVerifyResponse,
     MFABackupCodeRegenerateResponse,
-    UsersListResponse,
-    PaginationInfo,
 )
 from app.services.authorization import (
     Permission,
     require_permission,
     get_current_user,
-    TokenPayload,
     has_permission,
 )
 from app.services.auth_manager import AuthManager
@@ -74,7 +74,7 @@ router = APIRouter(
 async def register_user(
     request: UserCreateRequest,
     db: Session = Depends(get_db),
-):
+) -> UserCreateResponse:
     """
     Register a new user.
 
@@ -124,7 +124,7 @@ async def register_user(
 async def verify_email(
     token: str,
     db: Session = Depends(get_db),
-):
+) -> dict[str, str]:
     """
     Verify user email address.
 
@@ -186,7 +186,7 @@ async def verify_email(
 )
 async def create_default_user(
     db: Session = Depends(get_db),
-):
+) -> UserCreateResponse:
     """
     Create a default system user.
 
@@ -233,7 +233,7 @@ async def list_users(
     per_page: int = 10,
     active_only: bool = True,
     db: Session = Depends(get_db),
-):
+) -> UsersListResponse:
     """
     List users with pagination.
 
@@ -299,7 +299,7 @@ async def list_users(
 async def get_current_user_profile(
     current_user: TokenPayload = Depends(get_current_user),
     db: Session = Depends(get_db),
-):
+) -> UserResponse:
     """
     Get current user profile.
 
@@ -337,7 +337,7 @@ async def get_current_user_profile(
 )
 async def get_user_stats(
     db: Session = Depends(get_db),
-):
+) -> UserStatsResponse:
     """
     Get user statistics.
 
@@ -371,7 +371,7 @@ async def get_user_stats(
 async def get_user(
     user_id: str,
     db: Session = Depends(get_db),
-):
+) -> UserResponse:
     """
     Get user by ID.
 
@@ -414,7 +414,7 @@ async def partial_update_user(
     request: UserUpdateRequest,
     db: Session = Depends(get_db),
     current_user: TokenPayload = Depends(get_current_user),
-):
+) -> UserResponse:
     """
     Partially update user information.
 
@@ -473,7 +473,7 @@ async def update_user(
     request: UserUpdateRequest,
     db: Session = Depends(get_db),
     current_user: TokenPayload = Depends(get_current_user),
-):
+) -> UserResponse:
     """
     Update user information.
 
@@ -544,7 +544,7 @@ async def update_user(
 async def request_password_reset(
     request: PasswordResetEmailRequest,
     db: Session = Depends(get_db),
-):
+) -> PasswordResetEmailResponse:
     """
     Request password reset by email.
 
@@ -589,7 +589,7 @@ async def request_password_reset(
 async def confirm_password_reset(
     request: PasswordResetConfirmRequest,
     db: Session = Depends(get_db),
-):
+) -> PasswordResetConfirmResponse:
     """
     Confirm password reset with token.
 
@@ -636,7 +636,7 @@ async def reset_user_password(
     request: PasswordResetRequest,
     db: Session = Depends(get_db),
     current_user: TokenPayload = Depends(get_current_user),
-):
+) -> PasswordResetResponse:
     """
     Reset user password.
 
@@ -690,7 +690,7 @@ async def reset_user_password(
 async def enroll_mfa(
     db: Session = Depends(get_db),
     current_user: TokenPayload = Depends(get_current_user),
-):
+) -> MFAEnrollResponse:
     """
     Enroll MFA for the current user.
 
@@ -754,7 +754,7 @@ async def enable_mfa(
     request: MFAEnableRequest,
     db: Session = Depends(get_db),
     current_user: TokenPayload = Depends(get_current_user),
-):
+) -> MFAEnableResponse:
     """
     Enable MFA for the current user after verifying the code.
 
@@ -814,7 +814,7 @@ async def disable_mfa(
     request: MFADisableRequest,
     db: Session = Depends(get_db),
     current_user: TokenPayload = Depends(get_current_user),
-):
+) -> MFADisableResponse:
     """
     Disable MFA for the current user.
 
@@ -876,7 +876,7 @@ async def verify_mfa_backup_code(
     request: MFABackupCodeVerifyRequest,
     db: Session = Depends(get_db),
     current_user: TokenPayload = Depends(get_current_user),
-):
+) -> MFABackupCodeVerifyResponse:
     """
     Verify MFA backup code for recovery.
 
@@ -955,7 +955,7 @@ async def verify_mfa_backup_code(
 async def regenerate_mfa_backup_codes(
     db: Session = Depends(get_db),
     current_user: TokenPayload = Depends(get_current_user),
-):
+) -> MFABackupCodeRegenerateResponse:
     """
     Regenerate MFA backup codes.
 
@@ -1024,7 +1024,7 @@ async def regenerate_mfa_backup_codes(
 async def delete_user(
     user_id: str,
     db: Session = Depends(get_db),
-):
+) -> None:
     """
     Delete user.
 

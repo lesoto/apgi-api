@@ -11,7 +11,9 @@ import traceback
 import uuid
 import contextvars
 from datetime import datetime, timezone
-from typing import Any, Callable, Optional
+from typing import Any, Awaitable, Callable, Optional
+
+from starlette.responses import Response
 
 from fastapi import Request
 from starlette.middleware.base import BaseHTTPMiddleware
@@ -28,10 +30,10 @@ class StructuredLogger:
     Structured logger that outputs JSON-formatted log entries.
     """
 
-    def __init__(self, name: str):
+    def __init__(self, name: str) -> None:
         self.logger = logging.getLogger(name)
 
-    def _format_log_entry(self, level: str, message: str, **kwargs) -> str:
+    def _format_log_entry(self, level: str, message: str, **kwargs: Any) -> str:
         """
         Format log entry as JSON.
 
@@ -58,25 +60,25 @@ class StructuredLogger:
 
         return json.dumps(log_entry)
 
-    def info(self, message: str, **kwargs):
+    def info(self, message: str, **kwargs: Any) -> None:
         """Log info message with structured data."""
         # Don't pass kwargs to underlying logger - they're embedded in JSON message
         json_message = self._format_log_entry("INFO", message, **kwargs)
         self.logger.info(json_message)
 
-    def warning(self, message: str, **kwargs):
+    def warning(self, message: str, **kwargs: Any) -> None:
         """Log warning message with structured data."""
         # Don't pass kwargs to underlying logger - they're embedded in JSON message
         json_message = self._format_log_entry("WARNING", message, **kwargs)
         self.logger.warning(json_message)
 
-    def error(self, message: str, **kwargs):
+    def error(self, message: str, **kwargs: Any) -> None:
         """Log error message with structured data."""
         # Don't pass kwargs to underlying logger - they're embedded in JSON message
         json_message = self._format_log_entry("ERROR", message, **kwargs)
         self.logger.error(json_message)
 
-    def debug(self, message: str, **kwargs):
+    def debug(self, message: str, **kwargs: Any) -> None:
         """Log debug message with structured data."""
         # Don't pass kwargs to underlying logger - they're embedded in JSON message
         json_message = self._format_log_entry("DEBUG", message, **kwargs)
@@ -98,7 +100,9 @@ class RequestLoggingMiddleware(BaseHTTPMiddleware):
         super().__init__(app)
         self.logger = StructuredLogger("app.requests")
 
-    async def dispatch(self, request: Request, call_next: Callable) -> Any:
+    async def dispatch(
+        self, request: Request, call_next: Callable[[Request], Awaitable[Response]]
+    ) -> Response:
         """
         Process request and log details.
 
@@ -176,7 +180,7 @@ class ErrorLoggingHandler:
     Handler for logging errors with full context and stack traces.
     """
 
-    def __init__(self):
+    def __init__(self) -> None:
         self.logger = StructuredLogger("app.errors")
 
     def log_error(
@@ -184,8 +188,8 @@ class ErrorLoggingHandler:
         error: Exception,
         request: Optional[Request] = None,
         error_code: Optional[str] = None,
-        **context,
-    ):
+        **context: Any,
+    ) -> None:
         """
         Log error with full context.
 
@@ -225,7 +229,7 @@ class ErrorLoggingHandler:
 error_logger = ErrorLoggingHandler()
 
 
-def configure_structured_logging(log_level: str = "INFO"):
+def configure_structured_logging(log_level: str = "INFO") -> None:
     """
     Configure Python logging to use structured format.
 

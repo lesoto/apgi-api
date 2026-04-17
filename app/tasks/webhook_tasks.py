@@ -28,7 +28,7 @@ async def _process_webhooks() -> int:
         db.close()
 
 
-@shared_task(name="process_pending_webhooks")
+@shared_task(name="process_pending_webhooks")  # type: ignore[untyped-decorator]
 def process_pending_webhooks() -> int:
     """Celery task to process pending webhook deliveries."""
     return asyncio.run(_process_webhooks())

@@ -1309,5 +1309,5 @@ class TestSessionRoutesActions:
 
         result = await delete_session(
             "session123", mock_session_manager, mock_current_user, mock_db
-        )
+        )  # type: ignore[func-returns-value]
         assert result is None

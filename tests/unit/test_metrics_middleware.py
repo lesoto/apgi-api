@@ -3,6 +3,8 @@ Unit tests for PrometheusMetricsMiddleware and MetricsCollector.
 Requirements: 4.10
 """
 
+from typing import Any
+
 import pytest
 from unittest.mock import MagicMock, patch, AsyncMock
 from fastapi import FastAPI
@@ -17,7 +19,7 @@ if "bcrypt" not in sys.modules:
 class TestPrometheusMetricsMiddlewareInit:
     """Test PrometheusMetricsMiddleware initialization."""
 
-    def test_init_creates_middleware(self):
+    def test_init_creates_middleware(self) -> None:
         """Middleware initializes with app."""
         from app.middleware.metrics import PrometheusMetricsMiddleware
 
@@ -31,7 +33,7 @@ class TestPrometheusMetricsMiddlewareDispatch:
     """Test PrometheusMetricsMiddleware dispatch method."""
 
     @pytest.mark.asyncio
-    async def test_dispatch_skips_metrics_endpoint(self):
+    async def test_dispatch_skips_metrics_endpoint(self) -> None:
         """Dispatch skips metrics collection for /metrics endpoint."""
         from app.middleware.metrics import PrometheusMetricsMiddleware
 
@@ -51,7 +53,7 @@ class TestPrometheusMetricsMiddlewareDispatch:
         assert result is mock_response
 
     @pytest.mark.asyncio
-    async def test_dispatch_successful_request(self):
+    async def test_dispatch_successful_request(self) -> None:
         """Dispatch records metrics for successful request."""
         from app.middleware.metrics import (
             PrometheusMetricsMiddleware,
@@ -80,7 +82,7 @@ class TestPrometheusMetricsMiddlewareDispatch:
         call_next.assert_awaited_once_with(mock_request)
 
     @pytest.mark.asyncio
-    async def test_dispatch_increments_active_requests(self):
+    async def test_dispatch_increments_active_requests(self) -> None:
         """Dispatch increments and decrements active_requests gauge."""
         from app.middleware.metrics import PrometheusMetricsMiddleware
 
@@ -104,7 +106,7 @@ class TestPrometheusMetricsMiddlewareDispatch:
         assert mock_active.dec.called
 
     @pytest.mark.asyncio
-    async def test_dispatch_records_error_4xx(self):
+    async def test_dispatch_records_error_4xx(self) -> None:
         """Dispatch records client error (4xx) metrics."""
         from app.middleware.metrics import PrometheusMetricsMiddleware
 
@@ -130,7 +132,7 @@ class TestPrometheusMetricsMiddlewareDispatch:
         assert mock_error.labels.called
 
     @pytest.mark.asyncio
-    async def test_dispatch_records_error_5xx(self):
+    async def test_dispatch_records_error_5xx(self) -> None:
         """Dispatch records server error (5xx) metrics."""
         from app.middleware.metrics import PrometheusMetricsMiddleware
 
@@ -156,7 +158,7 @@ class TestPrometheusMetricsMiddlewareDispatch:
         assert mock_error.labels.called
 
     @pytest.mark.asyncio
-    async def test_dispatch_exception_handling(self):
+    async def test_dispatch_exception_handling(self) -> None:
         """Dispatch handles exceptions and records error metrics."""
         from app.middleware.metrics import PrometheusMetricsMiddleware
 
@@ -179,7 +181,7 @@ class TestPrometheusMetricsMiddlewareDispatch:
         assert mock_error.labels.called
 
     @pytest.mark.asyncio
-    async def test_dispatch_exception_decrements_active_requests(self):
+    async def test_dispatch_exception_decrements_active_requests(self) -> None:
         """Dispatch decrements active_requests even on exception."""
         from app.middleware.metrics import PrometheusMetricsMiddleware
 
@@ -202,7 +204,7 @@ class TestPrometheusMetricsMiddlewareDispatch:
         assert mock_active.dec.called
 
     @pytest.mark.asyncio
-    async def test_dispatch_records_response_size(self):
+    async def test_dispatch_records_response_size(self) -> None:
         """Dispatch records response size when content-length header present."""
         from app.middleware.metrics import PrometheusMetricsMiddleware
 
@@ -228,7 +230,7 @@ class TestPrometheusMetricsMiddlewareDispatch:
         assert mock_size.labels.called
 
     @pytest.mark.asyncio
-    async def test_dispatch_no_response_size_without_header(self):
+    async def test_dispatch_no_response_size_without_header(self) -> None:
         """Dispatch skips response size recording without content-length header."""
         from app.middleware.metrics import PrometheusMetricsMiddleware
 
@@ -257,7 +259,7 @@ class TestPrometheusMetricsMiddlewareDispatch:
 class TestNormalizeEndpoint:
     """Test _normalize_endpoint method."""
 
-    def test_normalize_endpoint_with_uuid(self):
+    def test_normalize_endpoint_with_uuid(self) -> None:
         """Normalize endpoint replaces UUID with {id}."""
         from app.middleware.metrics import PrometheusMetricsMiddleware
 
@@ -270,7 +272,7 @@ class TestNormalizeEndpoint:
         assert "{id}" in result
         assert "550e8400-e29b-41d4-a716-446655440000" not in result
 
-    def test_normalize_endpoint_with_numeric_id(self):
+    def test_normalize_endpoint_with_numeric_id(self) -> None:
         """Normalize endpoint replaces numeric ID with {id}."""
         from app.middleware.metrics import PrometheusMetricsMiddleware
 
@@ -283,7 +285,7 @@ class TestNormalizeEndpoint:
         assert "{id}" in result
         assert "12345" not in result
 
-    def test_normalize_endpoint_with_task_id(self):
+    def test_normalize_endpoint_with_task_id(self) -> None:
         """Normalize endpoint replaces task_xxx pattern with {id}."""
         from app.middleware.metrics import PrometheusMetricsMiddleware
 
@@ -296,7 +298,7 @@ class TestNormalizeEndpoint:
         assert "{id}" in result
         assert "task_abc123def456" not in result
 
-    def test_normalize_endpoint_no_ids(self):
+    def test_normalize_endpoint_no_ids(self) -> None:
         """Normalize endpoint returns unchanged path without IDs."""
         from app.middleware.metrics import PrometheusMetricsMiddleware
 
@@ -308,7 +310,7 @@ class TestNormalizeEndpoint:
 
         assert result == path
 
-    def test_normalize_endpoint_multiple_ids(self):
+    def test_normalize_endpoint_multiple_ids(self) -> None:
         """Normalize endpoint replaces multiple IDs."""
         from app.middleware.metrics import PrometheusMetricsMiddleware
 
@@ -322,7 +324,7 @@ class TestNormalizeEndpoint:
         assert "123" not in result
         assert "456" not in result
 
-    def test_normalize_endpoint_preserves_structure(self):
+    def test_normalize_endpoint_preserves_structure(self) -> None:
         """Normalize endpoint preserves path structure."""
         from app.middleware.metrics import PrometheusMetricsMiddleware
 
@@ -344,7 +346,7 @@ class TestNormalizeEndpoint:
 class TestLooksLikeId:
     """Test _looks_like_id method."""
 
-    def test_looks_like_id_uuid(self):
+    def test_looks_like_id_uuid(self) -> None:
         """Identifies UUID pattern."""
         from app.middleware.metrics import PrometheusMetricsMiddleware
 
@@ -353,7 +355,7 @@ class TestLooksLikeId:
 
         assert middleware._looks_like_id("550e8400-e29b-41d4-a716-446655440000") is True
 
-    def test_looks_like_id_numeric(self):
+    def test_looks_like_id_numeric(self) -> None:
         """Identifies numeric ID."""
         from app.middleware.metrics import PrometheusMetricsMiddleware
 
@@ -362,7 +364,7 @@ class TestLooksLikeId:
 
         assert middleware._looks_like_id("12345") is True
 
-    def test_looks_like_id_task_pattern(self):
+    def test_looks_like_id_task_pattern(self) -> None:
         """Identifies task_xxx pattern."""
         from app.middleware.metrics import PrometheusMetricsMiddleware
 
@@ -371,7 +373,7 @@ class TestLooksLikeId:
 
         assert middleware._looks_like_id("task_abc123") is True
 
-    def test_looks_like_id_not_id_text(self):
+    def test_looks_like_id_not_id_text(self) -> None:
         """Does not identify regular text as ID."""
         from app.middleware.metrics import PrometheusMetricsMiddleware
 
@@ -380,7 +382,7 @@ class TestLooksLikeId:
 
         assert middleware._looks_like_id("users") is False
 
-    def test_looks_like_id_not_id_list(self):
+    def test_looks_like_id_not_id_list(self) -> None:
         """Does not identify 'list' as ID."""
         from app.middleware.metrics import PrometheusMetricsMiddleware
 
@@ -389,7 +391,7 @@ class TestLooksLikeId:
 
         assert middleware._looks_like_id("list") is False
 
-    def test_looks_like_id_not_id_empty(self):
+    def test_looks_like_id_not_id_empty(self) -> None:
         """Does not identify empty string as ID."""
         from app.middleware.metrics import PrometheusMetricsMiddleware
 
@@ -398,7 +400,7 @@ class TestLooksLikeId:
 
         assert middleware._looks_like_id("") is False
 
-    def test_looks_like_id_invalid_uuid(self):
+    def test_looks_like_id_invalid_uuid(self) -> None:
         """Does not identify invalid UUID as ID."""
         from app.middleware.metrics import PrometheusMetricsMiddleware
 
@@ -407,7 +409,7 @@ class TestLooksLikeId:
 
         assert middleware._looks_like_id("550e8400-e29b-41d4-a716") is False
 
-    def test_looks_like_id_zero(self):
+    def test_looks_like_id_zero(self) -> None:
         """Identifies '0' as numeric ID."""
         from app.middleware.metrics import PrometheusMetricsMiddleware
 
@@ -420,7 +422,7 @@ class TestLooksLikeId:
 class TestUpdateSystemMetrics:
     """Test _update_system_metrics method."""
 
-    def test_update_system_metrics_success(self):
+    def test_update_system_metrics_success(self) -> None:
         """Update system metrics records memory and CPU."""
         from app.middleware.metrics import PrometheusMetricsMiddleware
 
@@ -440,7 +442,7 @@ class TestUpdateSystemMetrics:
             mock_mem.set.assert_called_once_with(1000000)
             mock_cpu.set.assert_called_once_with(25.5)
 
-    def test_update_system_metrics_exception_handling(self):
+    def test_update_system_metrics_exception_handling(self) -> None:
         """Update system metrics silently handles exceptions."""
         from app.middleware.metrics import PrometheusMetricsMiddleware
 
@@ -453,7 +455,7 @@ class TestUpdateSystemMetrics:
             # Should not raise
             middleware._update_system_metrics()
 
-    def test_update_system_metrics_cpu_error_handling(self):
+    def test_update_system_metrics_cpu_error_handling(self) -> None:
         """Update system metrics handles CPU error."""
         from app.middleware.metrics import PrometheusMetricsMiddleware
 
@@ -473,7 +475,7 @@ class TestUpdateSystemMetrics:
 class TestMetricsCollectorSessionMetrics:
     """Test MetricsCollector session-related methods."""
 
-    def test_set_active_sessions(self):
+    def test_set_active_sessions(self) -> None:
         """Set active sessions updates gauge."""
         from app.middleware.metrics import MetricsCollector
 
@@ -481,7 +483,7 @@ class TestMetricsCollectorSessionMetrics:
             MetricsCollector.set_active_sessions(42)
             mock_gauge.set.assert_called_once_with(42)
 
-    def test_record_session_created_default(self):
+    def test_record_session_created_default(self) -> None:
         """Record session created with default type."""
         from app.middleware.metrics import MetricsCollector
 
@@ -489,7 +491,7 @@ class TestMetricsCollectorSessionMetrics:
             MetricsCollector.record_session_created()
             mock_counter.labels.assert_called_once_with(session_type="default")
 
-    def test_record_session_created_custom_type(self):
+    def test_record_session_created_custom_type(self) -> None:
         """Record session created with custom type."""
         from app.middleware.metrics import MetricsCollector
 
@@ -497,7 +499,7 @@ class TestMetricsCollectorSessionMetrics:
             MetricsCollector.record_session_created(session_type="simulation")
             mock_counter.labels.assert_called_once_with(session_type="simulation")
 
-    def test_record_session_completed_default(self):
+    def test_record_session_completed_default(self) -> None:
         """Record session completed with default type."""
         from app.middleware.metrics import MetricsCollector
 
@@ -505,7 +507,7 @@ class TestMetricsCollectorSessionMetrics:
             MetricsCollector.record_session_completed()
             mock_counter.labels.assert_called_once_with(session_type="default")
 
-    def test_record_session_completed_custom_type(self):
+    def test_record_session_completed_custom_type(self) -> None:
         """Record session completed with custom type."""
         from app.middleware.metrics import MetricsCollector
 
@@ -513,7 +515,7 @@ class TestMetricsCollectorSessionMetrics:
             MetricsCollector.record_session_completed(session_type="training")
             mock_counter.labels.assert_called_once_with(session_type="training")
 
-    def test_record_session_failed_default(self):
+    def test_record_session_failed_default(self) -> None:
         """Record session failed with defaults."""
         from app.middleware.metrics import MetricsCollector
 
@@ -523,7 +525,7 @@ class TestMetricsCollectorSessionMetrics:
                 session_type="default", failure_reason="unknown"
             )
 
-    def test_record_session_failed_custom(self):
+    def test_record_session_failed_custom(self) -> None:
         """Record session failed with custom values."""
         from app.middleware.metrics import MetricsCollector
 
@@ -535,7 +537,7 @@ class TestMetricsCollectorSessionMetrics:
                 session_type="simulation", failure_reason="timeout"
             )
 
-    def test_record_session_duration(self):
+    def test_record_session_duration(self) -> None:
         """Record session duration."""
         from app.middleware.metrics import MetricsCollector
 
@@ -547,7 +549,7 @@ class TestMetricsCollectorSessionMetrics:
 class TestMetricsCollectorTaskMetrics:
     """Test MetricsCollector task-related methods."""
 
-    def test_set_task_queue_length(self):
+    def test_set_task_queue_length(self) -> None:
         """Set task queue length updates gauge."""
         from app.middleware.metrics import MetricsCollector
 
@@ -555,7 +557,7 @@ class TestMetricsCollectorTaskMetrics:
             MetricsCollector.set_task_queue_length(15)
             mock_gauge.set.assert_called_once_with(15)
 
-    def test_record_task_created(self):
+    def test_record_task_created(self) -> None:
         """Record task created."""
         from app.middleware.metrics import MetricsCollector
 
@@ -563,7 +565,7 @@ class TestMetricsCollectorTaskMetrics:
             MetricsCollector.record_task_created("export")
             mock_counter.labels.assert_called_once_with(task_type="export")
 
-    def test_record_task_completed(self):
+    def test_record_task_completed(self) -> None:
         """Record task completed."""
         from app.middleware.metrics import MetricsCollector
 
@@ -571,7 +573,7 @@ class TestMetricsCollectorTaskMetrics:
             MetricsCollector.record_task_completed("export")
             mock_counter.labels.assert_called_once_with(task_type="export")
 
-    def test_record_task_failed_default(self):
+    def test_record_task_failed_default(self) -> None:
         """Record task failed with default reason."""
         from app.middleware.metrics import MetricsCollector
 
@@ -581,7 +583,7 @@ class TestMetricsCollectorTaskMetrics:
                 task_type="export", failure_reason="unknown"
             )
 
-    def test_record_task_failed_custom_reason(self):
+    def test_record_task_failed_custom_reason(self) -> None:
         """Record task failed with custom reason."""
         from app.middleware.metrics import MetricsCollector
 
@@ -591,7 +593,7 @@ class TestMetricsCollectorTaskMetrics:
                 task_type="export", failure_reason="disk_full"
             )
 
-    def test_record_task_duration(self):
+    def test_record_task_duration(self) -> None:
         """Record task duration."""
         from app.middleware.metrics import MetricsCollector
 
@@ -599,7 +601,7 @@ class TestMetricsCollectorTaskMetrics:
             MetricsCollector.record_task_duration("export", 45.67)
             mock_histogram.labels.assert_called_once_with(task_type="export")
 
-    def test_record_task_queue_wait_time(self):
+    def test_record_task_queue_wait_time(self) -> None:
         """Record task queue wait time."""
         from app.middleware.metrics import MetricsCollector
 
@@ -611,7 +613,7 @@ class TestMetricsCollectorTaskMetrics:
 class TestMetricsCollectorUserMetrics:
     """Test MetricsCollector user-related methods."""
 
-    def test_record_user_registration(self):
+    def test_record_user_registration(self) -> None:
         """Record user registration."""
         from app.middleware.metrics import MetricsCollector
 
@@ -619,7 +621,7 @@ class TestMetricsCollectorUserMetrics:
             MetricsCollector.record_user_registration()
             mock_counter.inc.assert_called_once()
 
-    def test_record_user_login_default(self):
+    def test_record_user_login_default(self) -> None:
         """Record user login with default method."""
         from app.middleware.metrics import MetricsCollector
 
@@ -627,7 +629,7 @@ class TestMetricsCollectorUserMetrics:
             MetricsCollector.record_user_login()
             mock_counter.labels.assert_called_once_with(login_method="password")
 
-    def test_record_user_login_custom_method(self):
+    def test_record_user_login_custom_method(self) -> None:
         """Record user login with custom method."""
         from app.middleware.metrics import MetricsCollector
 
@@ -635,7 +637,7 @@ class TestMetricsCollectorUserMetrics:
             MetricsCollector.record_user_login(login_method="oauth")
             mock_counter.labels.assert_called_once_with(login_method="oauth")
 
-    def test_record_user_logout(self):
+    def test_record_user_logout(self) -> None:
         """Record user logout."""
         from app.middleware.metrics import MetricsCollector
 
@@ -643,7 +645,7 @@ class TestMetricsCollectorUserMetrics:
             MetricsCollector.record_user_logout()
             mock_counter.inc.assert_called_once()
 
-    def test_set_active_users(self):
+    def test_set_active_users(self) -> None:
         """Set active users gauge."""
         from app.middleware.metrics import MetricsCollector
 
@@ -655,7 +657,7 @@ class TestMetricsCollectorUserMetrics:
 class TestMetricsCollectorExportMetrics:
     """Test MetricsCollector export-related methods."""
 
-    def test_record_export_requested(self):
+    def test_record_export_requested(self) -> None:
         """Record export requested."""
         from app.middleware.metrics import MetricsCollector
 
@@ -663,7 +665,7 @@ class TestMetricsCollectorExportMetrics:
             MetricsCollector.record_export_requested("json")
             mock_counter.labels.assert_called_once_with(export_format="json")
 
-    def test_record_export_completed(self):
+    def test_record_export_completed(self) -> None:
         """Record export completed."""
         from app.middleware.metrics import MetricsCollector
 
@@ -675,7 +677,7 @@ class TestMetricsCollectorExportMetrics:
 class TestMetricsCollectorDatabaseMetrics:
     """Test MetricsCollector database-related methods."""
 
-    def test_update_database_metrics(self):
+    def test_update_database_metrics(self) -> None:
         """Update database connection pool metrics."""
         from app.middleware.metrics import MetricsCollector
 
@@ -698,7 +700,7 @@ class TestMetricsCollectorDatabaseMetrics:
 class TestMetricsCollectorRedisMetrics:
     """Test MetricsCollector Redis-related methods."""
 
-    def test_update_redis_metrics(self):
+    def test_update_redis_metrics(self) -> None:
         """Update Redis metrics."""
         from app.middleware.metrics import MetricsCollector
 
@@ -719,7 +721,7 @@ class TestMetricsCollectorRedisMetrics:
 class TestMetricsCollectorCeleryMetrics:
     """Test MetricsCollector Celery-related methods."""
 
-    def test_update_celery_metrics(self):
+    def test_update_celery_metrics(self) -> None:
         """Update Celery metrics."""
         from app.middleware.metrics import MetricsCollector
 
@@ -740,7 +742,7 @@ class TestMetricsCollectorCeleryMetrics:
 class TestMetricsCollectorCacheMetrics:
     """Test MetricsCollector cache-related methods."""
 
-    def test_record_cache_hit(self):
+    def test_record_cache_hit(self) -> None:
         """Record cache hit."""
         from app.middleware.metrics import MetricsCollector
 
@@ -748,7 +750,7 @@ class TestMetricsCollectorCacheMetrics:
             MetricsCollector.record_cache_hit()
             mock_counter.inc.assert_called_once()
 
-    def test_record_cache_miss(self):
+    def test_record_cache_miss(self) -> None:
         """Record cache miss."""
         from app.middleware.metrics import MetricsCollector
 
@@ -756,7 +758,7 @@ class TestMetricsCollectorCacheMetrics:
             MetricsCollector.record_cache_miss()
             mock_counter.inc.assert_called_once()
 
-    def test_record_cache_set(self):
+    def test_record_cache_set(self) -> None:
         """Record cache set."""
         from app.middleware.metrics import MetricsCollector
 
@@ -768,7 +770,7 @@ class TestMetricsCollectorCacheMetrics:
 class TestMetricsCollectorAuthMetrics:
     """Test MetricsCollector authentication-related methods."""
 
-    def test_record_auth_attempt_success(self):
+    def test_record_auth_attempt_success(self) -> None:
         """Record successful auth attempt."""
         from app.middleware.metrics import MetricsCollector
 
@@ -776,7 +778,7 @@ class TestMetricsCollectorAuthMetrics:
             MetricsCollector.record_auth_attempt("success")
             mock_counter.labels.assert_called_once_with(result="success")
 
-    def test_record_auth_attempt_failure(self):
+    def test_record_auth_attempt_failure(self) -> None:
         """Record failed auth attempt."""
         from app.middleware.metrics import MetricsCollector
 
@@ -784,7 +786,7 @@ class TestMetricsCollectorAuthMetrics:
             MetricsCollector.record_auth_attempt("failure")
             mock_counter.labels.assert_called_once_with(result="failure")
 
-    def test_record_token_issued(self):
+    def test_record_token_issued(self) -> None:
         """Record token issued."""
         from app.middleware.metrics import MetricsCollector
 
@@ -792,7 +794,7 @@ class TestMetricsCollectorAuthMetrics:
             MetricsCollector.record_token_issued()
             mock_counter.inc.assert_called_once()
 
-    def test_record_token_revoked(self):
+    def test_record_token_revoked(self) -> None:
         """Record token revoked."""
         from app.middleware.metrics import MetricsCollector
 
@@ -804,7 +806,7 @@ class TestMetricsCollectorAuthMetrics:
 class TestMetricsCollectorRateLimitMetrics:
     """Test MetricsCollector rate limit-related methods."""
 
-    def test_record_rate_limit_exceeded(self):
+    def test_record_rate_limit_exceeded(self) -> None:
         """Record rate limit exceeded."""
         from app.middleware.metrics import MetricsCollector
 
@@ -812,7 +814,7 @@ class TestMetricsCollectorRateLimitMetrics:
             MetricsCollector.record_rate_limit_exceeded("/api/users")
             mock_counter.labels.assert_called_once_with(endpoint="/api/users")
 
-    def test_record_rate_limit_allowed(self):
+    def test_record_rate_limit_allowed(self) -> None:
         """Record rate limit allowed."""
         from app.middleware.metrics import MetricsCollector
 
@@ -824,7 +826,7 @@ class TestMetricsCollectorRateLimitMetrics:
 class TestMetricsCollectorErrorMetrics:
     """Test MetricsCollector error-related methods."""
 
-    def test_increment_error(self):
+    def test_increment_error(self) -> None:
         """Increment error counter."""
         from app.middleware.metrics import MetricsCollector
 
@@ -838,7 +840,7 @@ class TestMetricsCollectorErrorMetrics:
 class TestGetMetricsResponse:
     """Test get_metrics_response function."""
 
-    def test_get_metrics_response(self):
+    def test_get_metrics_response(self) -> None:
         """Get metrics response returns Prometheus format."""
         from app.middleware.metrics import get_metrics_response
 
@@ -850,7 +852,7 @@ class TestGetMetricsResponse:
             assert response.status_code == 200
             mock_generate.assert_called_once()
 
-    def test_get_metrics_response_content_type(self):
+    def test_get_metrics_response_content_type(self) -> None:
         """Get metrics response has correct content type."""
         from app.middleware.metrics import get_metrics_response
 
@@ -869,12 +871,12 @@ class TestGetMetricsResponse:
 class TestPrometheusMetricsMiddlewareIntegration:
     """Integration tests using TestClient."""
 
-    def test_middleware_with_test_client_successful_request(self):
+    def test_middleware_with_test_client_successful_request(self) -> None:
         """Middleware records metrics for successful request via TestClient."""
         app = FastAPI()
 
         @app.get("/test")
-        async def test_route():
+        async def test_route() -> dict[str, str]:
             return {"status": "ok"}
 
         from app.middleware.metrics import PrometheusMetricsMiddleware
@@ -887,12 +889,12 @@ class TestPrometheusMetricsMiddlewareIntegration:
         assert response.status_code == 200
         assert response.json() == {"status": "ok"}
 
-    def test_middleware_with_test_client_404_error(self):
+    def test_middleware_with_test_client_404_error(self) -> None:
         """Middleware records 404 error metrics."""
         app = FastAPI()
 
         @app.get("/test")
-        async def test_route():
+        async def test_route() -> dict[str, str]:
             return {"status": "ok"}
 
         from app.middleware.metrics import PrometheusMetricsMiddleware
@@ -904,12 +906,12 @@ class TestPrometheusMetricsMiddlewareIntegration:
 
         assert response.status_code == 404
 
-    def test_middleware_with_test_client_post_request(self):
+    def test_middleware_with_test_client_post_request(self) -> None:
         """Middleware records POST request metrics."""
         app = FastAPI()
 
         @app.post("/data")
-        async def create_data(data: dict):
+        async def create_data(data: dict[str, Any]) -> dict[str, Any]:
             return {"created": True, "data": data}
 
         from app.middleware.metrics import PrometheusMetricsMiddleware
@@ -921,7 +923,7 @@ class TestPrometheusMetricsMiddlewareIntegration:
 
         assert response.status_code == 200
 
-    def test_middleware_skips_metrics_endpoint(self):
+    def test_middleware_skips_metrics_endpoint(self) -> None:
         """Middleware skips metrics endpoint."""
         app = FastAPI()
 
@@ -930,7 +932,7 @@ class TestPrometheusMetricsMiddlewareIntegration:
         app.add_middleware(PrometheusMetricsMiddleware)
 
         @app.get("/metrics")
-        async def metrics():
+        async def metrics() -> Any:
             return get_metrics_response()
 
         client = TestClient(app)
@@ -938,12 +940,12 @@ class TestPrometheusMetricsMiddlewareIntegration:
 
         assert response.status_code == 200
 
-    def test_middleware_with_test_client_multiple_requests(self):
+    def test_middleware_with_test_client_multiple_requests(self) -> None:
         """Middleware handles multiple requests."""
         app = FastAPI()
 
         @app.get("/test")
-        async def test_route():
+        async def test_route() -> dict[str, str]:
             return {"status": "ok"}
 
         from app.middleware.metrics import PrometheusMetricsMiddleware
@@ -957,12 +959,12 @@ class TestPrometheusMetricsMiddlewareIntegration:
             response = client.get("/test")
             assert response.status_code == 200
 
-    def test_middleware_with_test_client_different_paths(self):
+    def test_middleware_with_test_client_different_paths(self) -> None:
         """Middleware normalizes different paths with IDs."""
         app = FastAPI()
 
         @app.get("/users/{user_id}")
-        async def get_user(user_id: str):
+        async def get_user(user_id: str) -> dict[str, str]:
             return {"user_id": user_id}
 
         from app.middleware.metrics import PrometheusMetricsMiddleware
@@ -979,12 +981,12 @@ class TestPrometheusMetricsMiddlewareIntegration:
         response2 = client.get("/users/456")
         assert response2.status_code == 200
 
-    def test_middleware_with_test_client_exception_in_route(self):
+    def test_middleware_with_test_client_exception_in_route(self) -> None:
         """Middleware handles exceptions in route."""
         app = FastAPI()
 
         @app.get("/error")
-        async def error_route():
+        async def error_route() -> None:
             raise ValueError("Test error")
 
         from app.middleware.metrics import PrometheusMetricsMiddleware
@@ -997,12 +999,12 @@ class TestPrometheusMetricsMiddlewareIntegration:
         # Should get 500 error
         assert response.status_code == 500
 
-    def test_middleware_with_test_client_response_with_content_length(self):
+    def test_middleware_with_test_client_response_with_content_length(self) -> None:
         """Middleware records response size when content-length present."""
         app = FastAPI()
 
         @app.get("/data")
-        async def get_data():
+        async def get_data() -> dict[str, str]:
             return {"data": "x" * 1000}
 
         from app.middleware.metrics import PrometheusMetricsMiddleware
@@ -1016,12 +1018,12 @@ class TestPrometheusMetricsMiddlewareIntegration:
         # Response should have content-length header
         assert "content-length" in response.headers or len(response.content) > 0
 
-    def test_middleware_with_test_client_put_request(self):
+    def test_middleware_with_test_client_put_request(self) -> None:
         """Middleware records PUT request metrics."""
         app = FastAPI()
 
         @app.put("/data/{item_id}")
-        async def update_data(item_id: str, data: dict):
+        async def update_data(item_id: str, data: dict[str, str]) -> dict[str, str | bool]:
             return {"updated": True, "item_id": item_id}
 
         from app.middleware.metrics import PrometheusMetricsMiddleware
@@ -1033,12 +1035,12 @@ class TestPrometheusMetricsMiddlewareIntegration:
 
         assert response.status_code == 200
 
-    def test_middleware_with_test_client_delete_request(self):
+    def test_middleware_with_test_client_delete_request(self) -> None:
         """Middleware records DELETE request metrics."""
         app = FastAPI()
 
         @app.delete("/data/{item_id}")
-        async def delete_data(item_id: str):
+        async def delete_data(item_id: str) -> dict[str, str | bool]:
             return {"deleted": True, "item_id": item_id}
 
         from app.middleware.metrics import PrometheusMetricsMiddleware
@@ -1050,12 +1052,12 @@ class TestPrometheusMetricsMiddlewareIntegration:
 
         assert response.status_code == 200
 
-    def test_middleware_with_test_client_head_request(self):
+    def test_middleware_with_test_client_head_request(self) -> None:
         """Middleware records HEAD request metrics."""
         app = FastAPI()
 
         @app.head("/test")
-        async def head_test():
+        async def head_test() -> None:
             return None
 
         from app.middleware.metrics import PrometheusMetricsMiddleware
@@ -1067,12 +1069,12 @@ class TestPrometheusMetricsMiddlewareIntegration:
 
         assert response.status_code == 200
 
-    def test_middleware_with_test_client_options_request(self):
+    def test_middleware_with_test_client_options_request(self) -> None:
         """Middleware records OPTIONS request metrics."""
         app = FastAPI()
 
         @app.options("/test")
-        async def options_test():
+        async def options_test() -> None:
             return None
 
         from app.middleware.metrics import PrometheusMetricsMiddleware

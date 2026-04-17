@@ -11,7 +11,7 @@ from app.config import settings
 # Validate broker and backend URLs
 
 
-def _validate_celery_urls():
+def _validate_celery_urls() -> None:
     """Validate Celery broker and backend URLs."""
     from urllib.parse import urlparse
 

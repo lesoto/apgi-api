@@ -7,7 +7,7 @@ from unittest.mock import MagicMock
 class TestCreateDatabase:
     """Test create_db.py functionality."""
 
-    def test_create_database_success(self, mock_psycopg2):
+    def test_create_database_success(self, mock_psycopg2: MagicMock) -> None:
         """Test successful database creation."""
         import app.create_db as create_db_mod
 
@@ -31,7 +31,7 @@ class TestCreateDatabase:
         mock_cursor.close.assert_called_once()
         mock_conn.close.assert_called_once()
 
-    def test_create_database_duplicate_database(self, mock_psycopg2):
+    def test_create_database_duplicate_database(self, mock_psycopg2: MagicMock) -> None:
         """Test handling when database already exists."""
         import app.create_db as create_db_mod
 
@@ -51,7 +51,7 @@ class TestCreateDatabase:
         mock_cursor.close.assert_not_called()
         mock_conn.close.assert_not_called()
 
-    def test_create_database_duplicate_user(self, mock_psycopg2):
+    def test_create_database_duplicate_user(self, mock_psycopg2: MagicMock) -> None:
         """Test handling when user already exists."""
         import app.create_db as create_db_mod
 
@@ -74,7 +74,7 @@ class TestCreateDatabase:
         mock_cursor.close.assert_called_once()
         mock_conn.close.assert_called_once()
 
-    def test_create_database_connection_error(self, mock_psycopg2):
+    def test_create_database_connection_error(self, mock_psycopg2: MagicMock) -> None:
         """Test handling when connection fails."""
         import app.create_db as create_db_mod
 

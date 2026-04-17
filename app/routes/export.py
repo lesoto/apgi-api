@@ -9,16 +9,18 @@ import logging
 import hashlib
 from datetime import timezone
 from datetime import datetime
-from typing import Optional, Union, Generator
+from typing import Any, Optional, Union, Generator
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from fastapi.responses import StreamingResponse
+from sqlalchemy.orm import Session
 
 from app.models.schemas import ErrorResponse, SummaryStatistics
 from app.services.authorization import (
     Permission,
     require_permission,
     get_current_user,
+    TokenPayload,
 )
 from app.services.data_export import DataExportService
 from app.services.session_manager import SessionManager
@@ -58,7 +60,7 @@ def get_data_export_service() -> DataExportService:
     return _data_export_service
 
 
-def init_export_routes(session_manager: SessionManager):
+def init_export_routes(session_manager: SessionManager) -> None:
     """
     Initialize export routes with session manager.
 
@@ -84,10 +86,10 @@ async def export_session_data(
     ),
     start_time: Optional[float] = Query(None, description="Start time for export (ms)"),
     end_time: Optional[float] = Query(None, description="End time for export (ms)"),
-    db=Depends(get_db),
+    db: Session = Depends(get_db),
     service: DataExportService = Depends(get_data_export_service),
-    current_user=Depends(get_current_user),
-):
+    current_user: TokenPayload = Depends(get_current_user),
+) -> StreamingResponse:
     """
     Export simulation data.
 
@@ -212,8 +214,8 @@ async def export_session_data(
 async def get_summary_statistics(
     session_id: str,
     service: DataExportService = Depends(get_data_export_service),
-    current_user=Depends(get_current_user),
-):
+    current_user: TokenPayload = Depends(get_current_user),
+) -> dict[str, Any]:
     """
     Get summary statistics.
 
@@ -270,8 +272,8 @@ async def get_time_series_data(
     ),
     cursor: Optional[str] = Query(None, description="Pagination cursor"),
     service: DataExportService = Depends(get_data_export_service),
-    current_user=Depends(get_current_user),
-):
+    current_user: TokenPayload = Depends(get_current_user),
+) -> dict[str, Any]:
     """
     Get time series data.
 
@@ -350,8 +352,8 @@ async def get_event_analysis(
     session_id: str,
     event_type: str = Query("ignition", description="Type of event to analyze"),
     service: DataExportService = Depends(get_data_export_service),
-    current_user=Depends(get_current_user),
-):
+    current_user: TokenPayload = Depends(get_current_user),
+) -> dict[str, Any]:
     """
     Get event analysis.
 

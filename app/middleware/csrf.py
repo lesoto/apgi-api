@@ -9,7 +9,7 @@ import hashlib
 import hmac
 import secrets
 from datetime import datetime, timezone
-from typing import Optional
+from typing import Any, Optional
 
 from fastapi import Request
 from starlette.middleware.base import BaseHTTPMiddleware
@@ -31,12 +31,12 @@ class CSRFMiddleware(BaseHTTPMiddleware):
 
     def __init__(
         self,
-        app,
+        app: Any,
         enabled: bool = True,
         cookie_name: str = "csrf_token",
         header_name: str = "X-CSRF-Token",
         token_expiry_minutes: int = 60,
-    ):
+    ) -> None:
         """
         Initialize CSRF middleware.
 
@@ -136,7 +136,7 @@ class CSRFMiddleware(BaseHTTPMiddleware):
 
         return None
 
-    async def dispatch(self, request: Request, call_next):
+    async def dispatch(self, request: Request, call_next: Any) -> Any:
         """
         Process request with CSRF protection.
 

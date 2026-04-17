@@ -42,12 +42,12 @@ class TimeSeriesPoint:
 class BusinessMetricsService:
     """Service for collecting business metrics for dashboard display."""
 
-    def __init__(self):
+    def __init__(self) -> None:
         """Initialize the metrics service."""
         self.cache_service = get_cache_service()
         self.cache_ttl = 900  # 15 minutes for metrics cache
 
-    def _generate_cache_key(self, method_name: str, *args, **kwargs) -> str:
+    def _generate_cache_key(self, method_name: str, *args: Any, **kwargs: Any) -> str:
         """Generate a cache key for a method call."""
         key_data = f"{method_name}:{args}:{sorted(kwargs.items())}"
         return hashlib.md5(key_data.encode()).hexdigest()
@@ -81,7 +81,7 @@ class BusinessMetricsService:
         """
         cache_key = self._generate_cache_key("overview_metrics")
 
-        def _compute_overview_metrics():
+        def _compute_overview_metrics() -> Dict[str, Any]:
             with get_db_context() as db:
                 # Total users
                 total_users = db.query(func.count(User.user_id)).scalar()

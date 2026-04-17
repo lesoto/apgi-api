@@ -8,23 +8,24 @@ Requirements: 2.10
 import pytest
 from unittest.mock import AsyncMock, MagicMock, patch
 from datetime import datetime
+from typing import Any
 
 from app.services.health_check import HealthCheckService
 
 
 @pytest.fixture
-def mock_redis():
+def mock_redis() -> Any:
     redis = AsyncMock()
     redis.ping = AsyncMock(return_value=True)
     return redis
 
 
 @pytest.fixture
-def service(mock_redis):
+def service(mock_redis: Any) -> Any:
     return HealthCheckService(mock_redis)
 
 
-def _make_mock_engine(slow=False, fail=False):
+def _make_mock_engine(slow: bool = False, fail: bool = False) -> Any:
     """Build a mock SQLAlchemy engine."""
     engine = MagicMock()
     if fail:
@@ -40,7 +41,7 @@ def _make_mock_engine(slow=False, fail=False):
     return engine
 
 
-def _make_mock_celery_control(workers_up=True):
+def _make_mock_celery_control(workers_up: bool = True) -> Any:
     control = MagicMock()
     if workers_up:
         control.ping.return_value = [{"worker1": {"ok": "pong"}}]
@@ -60,7 +61,7 @@ def _make_mock_celery_control(workers_up=True):
 
 class TestPerformHealthCheck:
     @pytest.mark.asyncio
-    async def test_all_healthy(self, service, mock_redis):
+    async def test_all_healthy(self, service: Any, mock_redis: Any) -> None:
         mock_engine = _make_mock_engine()
         mock_control = _make_mock_celery_control(workers_up=True)
 
@@ -79,7 +80,9 @@ class TestPerformHealthCheck:
         assert deps["database"]["status"] == "healthy"
 
     @pytest.mark.asyncio
-    async def test_redis_unhealthy_makes_overall_unhealthy(self, service, mock_redis):
+    async def test_redis_unhealthy_makes_overall_unhealthy(
+        self, service: Any, mock_redis: Any
+    ) -> None:
         mock_redis.ping.side_effect = Exception("Redis down")
         mock_engine = _make_mock_engine()
 
@@ -95,7 +98,9 @@ class TestPerformHealthCheck:
         assert "CRITICAL" in result["dependencies"]["redis"]["message"]
 
     @pytest.mark.asyncio
-    async def test_database_unhealthy_makes_overall_unhealthy(self, service, mock_redis):
+    async def test_database_unhealthy_makes_overall_unhealthy(
+        self, service: Any, mock_redis: Any
+    ) -> None:
         mock_engine = _make_mock_engine(fail=True)
 
         with (
@@ -110,7 +115,7 @@ class TestPerformHealthCheck:
         assert "CRITICAL" in result["dependencies"]["database"]["message"]
 
     @pytest.mark.asyncio
-    async def test_both_redis_and_db_unhealthy(self, service, mock_redis):
+    async def test_both_redis_and_db_unhealthy(self, service: Any, mock_redis: Any) -> None:
         mock_redis.ping.side_effect = Exception("Redis down")
         mock_engine = _make_mock_engine(fail=True)
 
@@ -126,7 +131,9 @@ class TestPerformHealthCheck:
         assert result["dependencies"]["database"]["status"] == "unhealthy"
 
     @pytest.mark.asyncio
-    async def test_celery_no_workers_does_not_fail_overall(self, service, mock_redis):
+    async def test_celery_no_workers_does_not_fail_overall(
+        self, service: Any, mock_redis: Any
+    ) -> None:
         """Celery is optional — no workers should not make overall status unhealthy."""
         mock_engine = _make_mock_engine()
         mock_control = _make_mock_celery_control(workers_up=False)
@@ -143,7 +150,9 @@ class TestPerformHealthCheck:
         assert result["dependencies"]["celery"]["status"] == "unhealthy"
 
     @pytest.mark.asyncio
-    async def test_celery_exception_does_not_fail_overall(self, service, mock_redis):
+    async def test_celery_exception_does_not_fail_overall(
+        self, service: Any, mock_redis: Any
+    ) -> None:
         """Celery exception should be caught and not affect overall health."""
         mock_engine = _make_mock_engine()
 
@@ -158,7 +167,7 @@ class TestPerformHealthCheck:
         assert result["dependencies"]["celery"]["status"] == "unknown"
 
     @pytest.mark.asyncio
-    async def test_timestamp_format(self, service, mock_redis):
+    async def test_timestamp_format(self, service: Any, mock_redis: Any) -> None:
         mock_engine = _make_mock_engine()
 
         with (
@@ -174,10 +183,10 @@ class TestPerformHealthCheck:
         datetime.fromisoformat(ts.rstrip("Z"))
 
     @pytest.mark.asyncio
-    async def test_redis_degraded_when_slow(self, service, mock_redis):
+    async def test_redis_degraded_when_slow(self, service: Any, mock_redis: Any) -> None:
         """When Redis responds but slowly, status should be degraded."""
 
-        async def slow_ping():
+        async def slow_ping() -> bool:
             return True
 
         mock_redis.ping = slow_ping
@@ -199,7 +208,7 @@ class TestPerformHealthCheck:
         assert result["dependencies"]["redis"]["status"] in ("degraded", "healthy")
 
     @pytest.mark.asyncio
-    async def test_celery_workers_healthy_message(self, service, mock_redis):
+    async def test_celery_workers_healthy_message(self, service: Any, mock_redis: Any) -> None:
         mock_engine = _make_mock_engine()
         mock_control = _make_mock_celery_control(workers_up=True)
 
@@ -222,7 +231,7 @@ class TestPerformHealthCheck:
 
 class TestPerformReadinessCheck:
     @pytest.mark.asyncio
-    async def test_all_ready(self, service, mock_redis):
+    async def test_all_ready(self, service: Any, mock_redis: Any) -> None:
         mock_engine = _make_mock_engine()
 
         with patch("app.database.connection.engine", mock_engine):
@@ -235,7 +244,7 @@ class TestPerformReadinessCheck:
         assert deps["database"]["status"] == "ready"
 
     @pytest.mark.asyncio
-    async def test_redis_not_ready(self, service, mock_redis):
+    async def test_redis_not_ready(self, service: Any, mock_redis: Any) -> None:
         mock_redis.ping.side_effect = Exception("Redis unavailable")
         mock_engine = _make_mock_engine()
 
@@ -246,7 +255,7 @@ class TestPerformReadinessCheck:
         assert result["dependencies"]["redis"]["status"] == "not_ready"
 
     @pytest.mark.asyncio
-    async def test_database_not_ready(self, service, mock_redis):
+    async def test_database_not_ready(self, service: Any, mock_redis: Any) -> None:
         mock_engine = _make_mock_engine(fail=True)
 
         with patch("app.database.connection.engine", mock_engine):
@@ -256,7 +265,7 @@ class TestPerformReadinessCheck:
         assert result["dependencies"]["database"]["status"] == "not_ready"
 
     @pytest.mark.asyncio
-    async def test_readiness_timestamp_format(self, service, mock_redis):
+    async def test_readiness_timestamp_format(self, service: Any, mock_redis: Any) -> None:
         mock_engine = _make_mock_engine()
 
         with patch("app.database.connection.engine", mock_engine):
@@ -267,7 +276,7 @@ class TestPerformReadinessCheck:
         datetime.fromisoformat(ts.rstrip("Z"))
 
     @pytest.mark.asyncio
-    async def test_readiness_does_not_check_celery(self, service, mock_redis):
+    async def test_readiness_does_not_check_celery(self, service: Any, mock_redis: Any) -> None:
         """Readiness check should not include Celery."""
         mock_engine = _make_mock_engine()
 
@@ -286,14 +295,14 @@ class TestPerformReadinessCheckDegraded:
     """Tests for degraded paths in perform_readiness_check."""
 
     @pytest.mark.asyncio
-    async def test_redis_degraded_when_slow(self, service, mock_redis):
+    async def test_redis_degraded_when_slow(self, service: Any, mock_redis: Any) -> None:
         """When Redis responds slowly, readiness status should be not_ready."""
         import time as time_module
 
         call_count = [0]
         original_time = time_module.time
 
-        def mock_time():
+        def mock_time() -> float:
             call_count[0] += 1
             # Return increasing values to simulate slow response
             return call_count[0] * 0.5
@@ -313,7 +322,7 @@ class TestPerformReadinessCheckDegraded:
         assert result["status"] in ("not_ready", "ready")
 
     @pytest.mark.asyncio
-    async def test_database_degraded_when_slow(self, service, mock_redis):
+    async def test_database_degraded_when_slow(self, service: Any, mock_redis: Any) -> None:
         """When database responds slowly, readiness status should be not_ready."""
         mock_engine = _make_mock_engine()
 
@@ -334,7 +343,7 @@ class TestPerformHealthCheckDegraded:
     """Tests for degraded paths in perform_health_check."""
 
     @pytest.mark.asyncio
-    async def test_redis_degraded_in_health_check(self, service, mock_redis):
+    async def test_redis_degraded_in_health_check(self, service: Any, mock_redis: Any) -> None:
         """When Redis responds slowly in health check, status should be degraded."""
         mock_engine = _make_mock_engine()
 
@@ -355,7 +364,7 @@ class TestPerformHealthCheckDegraded:
         assert result["dependencies"]["redis"]["status"] in ("degraded", "healthy", "unhealthy")
 
     @pytest.mark.asyncio
-    async def test_database_degraded_in_health_check(self, service, mock_redis):
+    async def test_database_degraded_in_health_check(self, service: Any, mock_redis: Any) -> None:
         """When database responds slowly in health check, status should be degraded."""
         mock_engine = _make_mock_engine()
 

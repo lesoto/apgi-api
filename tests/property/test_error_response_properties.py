@@ -39,7 +39,7 @@ from app.exception_handlers import (
 # ============================================================================
 
 
-def create_test_app_with_error_handlers():
+def create_test_app_with_error_handlers() -> FastAPI:
     """Create a test FastAPI app with error handlers."""
     app = FastAPI()
 
@@ -55,34 +55,34 @@ def create_test_app_with_error_handlers():
         email: str
 
     @app.post("/validate")
-    async def validate_endpoint(request: TestRequest):
+    async def validate_endpoint(request: TestRequest) -> dict[str, str]:
         return {"message": "valid"}
 
     @app.get("/protected")
-    async def protected_endpoint():
+    async def protected_endpoint() -> None:
         raise AuthenticationError("Invalid credentials")
 
     @app.get("/forbidden")
-    async def forbidden_endpoint():
+    async def forbidden_endpoint() -> None:
         raise AuthorizationError(resource="session", action="delete", required_role="admin")
 
     @app.get("/not-found/{resource_id}")
-    async def not_found_endpoint(resource_id: str):
+    async def not_found_endpoint(resource_id: str) -> None:
         raise SessionNotFoundError(resource_id)
 
     @app.get("/server-error")
-    async def server_error_endpoint():
+    async def server_error_endpoint() -> None:
         raise Exception("Unexpected error occurred")
 
     @app.get("/database-error")
-    async def database_error_endpoint():
+    async def database_error_endpoint() -> None:
         # Simulate database error with sensitive information
         raise Exception("Database connection failed: postgresql://user:password@localhost:5432/db")
 
     return app
 
 
-def create_mock_request(path="/test", method="GET"):
+def create_mock_request(path: str = "/test", method: str = "GET") -> Mock:
     """Create a mock FastAPI request."""
     request = Mock(spec=Request)
     request.url.path = path
@@ -109,7 +109,9 @@ def create_mock_request(path="/test", method="GET"):
         st.text(min_size=0, max_size=5).filter(lambda x: "@" not in x),  # Invalid email
     ),
 )
-def test_property_23_validation_error_response(invalid_field, invalid_value):
+def test_property_23_validation_error_response(
+    invalid_field: str, invalid_value: Union[str, None]
+) -> None:
     """
     **Validates: Requirements 19.1, 19.2**
 
@@ -181,7 +183,7 @@ def test_property_23_validation_error_response(invalid_field, invalid_value):
         st.sampled_from(["name", "age", "email"]), min_size=1, max_size=3, unique=True
     )
 )
-def test_property_23_validation_error_multiple_fields(missing_fields):
+def test_property_23_validation_error_multiple_fields(missing_fields: list[str]) -> None:
     """
     **Validates: Requirements 19.1, 19.2**
 
@@ -222,7 +224,7 @@ def test_property_23_validation_error_multiple_fields(missing_fields):
 @given(
     path=st.sampled_from(["/protected", "/v1/sessions", "/v1/tasks"]),
 )
-def test_property_24_authentication_failure_response(path):
+def test_property_24_authentication_failure_response(path: str) -> None:
     """
     **Validates: Requirements 19.3**
 
@@ -271,7 +273,7 @@ def test_property_24_authentication_failure_response(path):
 @given(
     error_message=st.text(min_size=1, max_size=100),
 )
-def test_property_24_authentication_error_structure(error_message):
+def test_property_24_authentication_error_structure(error_message: str) -> None:
     """
     **Validates: Requirements 19.3**
 
@@ -314,7 +316,9 @@ def test_property_24_authentication_error_structure(error_message):
     action=st.sampled_from(["create", "read", "update", "delete", "export"]),
     required_role=st.sampled_from(["admin", "researcher", "viewer"]),
 )
-def test_property_25_authorization_failure_response(resource, action, required_role):
+def test_property_25_authorization_failure_response(
+    resource: str, action: str, required_role: str
+) -> None:
     """
     **Validates: Requirements 19.4**
 
@@ -354,7 +358,7 @@ def test_property_25_authorization_failure_response(resource, action, required_r
     assert "details" in error_dict["error"]
 
 
-def test_property_25_authorization_error_via_endpoint():
+def test_property_25_authorization_error_via_endpoint() -> None:
     """
     **Validates: Requirements 19.4**
 
@@ -400,7 +404,7 @@ def test_property_25_authorization_error_via_endpoint():
         alphabet=st.characters(whitelist_categories=("Lu", "Ll", "Nd"), blacklist_characters="-"),
     ),
 )
-def test_property_26_not_found_response(resource_id):
+def test_property_26_not_found_response(resource_id: str) -> None:
     """
     **Validates: Requirements 19.5**
 
@@ -443,7 +447,7 @@ def test_property_26_not_found_response(resource_id):
     resource_type=st.sampled_from(["session", "task", "user"]),
     resource_id=st.text(min_size=1, max_size=50),
 )
-def test_property_26_not_found_error_types(resource_type, resource_id):
+def test_property_26_not_found_error_types(resource_type: str, resource_id: str) -> None:
     """
     **Validates: Requirements 19.5**
 
@@ -485,7 +489,7 @@ def test_property_26_not_found_error_types(resource_type, resource_id):
 @given(
     error_message=st.text(min_size=1, max_size=100),
 )
-def test_property_27_server_error_response(error_message):
+def test_property_27_server_error_response(error_message: str) -> None:
     """
     **Validates: Requirements 19.6**
 
@@ -534,7 +538,7 @@ def test_property_27_server_error_response(error_message):
         assert "error_id" in error["details"]
 
 
-def test_property_27_server_error_via_endpoint():
+def test_property_27_server_error_via_endpoint() -> None:
     """
     **Validates: Requirements 19.6**
 
@@ -585,7 +589,7 @@ def test_property_27_server_error_via_endpoint():
         ]
     ),
 )
-def test_property_28_sensitive_information_exclusion(sensitive_pattern):
+def test_property_28_sensitive_information_exclusion(sensitive_pattern: str) -> None:
     """
     **Validates: Requirements 19.7**
 
@@ -640,7 +644,7 @@ def test_property_28_sensitive_information_exclusion(sensitive_pattern):
         ]
     ),
 )
-def test_property_28_database_credentials_not_exposed(database_url):
+def test_property_28_database_credentials_not_exposed(database_url: str) -> None:
     """
     **Validates: Requirements 19.7**
 
@@ -692,7 +696,7 @@ def test_property_28_database_credentials_not_exposed(database_url):
         ]
     ),
 )
-def test_property_28_file_paths_not_exposed(file_path):
+def test_property_28_file_paths_not_exposed(file_path: str) -> None:
     """
     **Validates: Requirements 19.7**
 
@@ -733,7 +737,7 @@ def test_property_28_file_paths_not_exposed(file_path):
         ), "Error message should be generic, not expose internal details"
 
 
-def test_property_28_stack_trace_not_in_response():
+def test_property_28_stack_trace_not_in_response() -> None:
     """
     **Validates: Requirements 19.7**
 

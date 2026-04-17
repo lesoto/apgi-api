@@ -20,14 +20,14 @@ logger = logging.getLogger(__name__)
 class ShardedDatabaseManager:
     """Database manager that supports sharding across multiple database instances."""
 
-    def __init__(self):
+    def __init__(self) -> None:
         self.engines: Dict[str, Any] = {}
         self.session_factories: Dict[str, sessionmaker[Session]] = {}
 
         # Initialize engines for all configured shards
         self._initialize_shard_engines()
 
-    def _initialize_shard_engines(self):
+    def _initialize_shard_engines(self) -> None:
         """Initialize database engines for all shards."""
         shard_configs = sharding_service.get_all_shards()
 
@@ -150,7 +150,7 @@ class ShardedDatabaseManager:
         finally:
             session.close()
 
-    def execute_cross_shard_query(self, query_func, *args, **kwargs) -> list:
+    def execute_cross_shard_query(self, query_func: Any, *args: Any, **kwargs: Any) -> list[Any]:
         """
         Execute a query that needs to run across all shards.
 
@@ -201,7 +201,7 @@ class ShardedDatabaseManager:
 
         return stats
 
-    def close_all_connections(self):
+    def close_all_connections(self) -> None:
         """Close all database connections across all shards."""
         for shard_id, engine in self.engines.items():
             try:

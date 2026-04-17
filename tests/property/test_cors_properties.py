@@ -8,6 +8,7 @@ Tests universal properties of CORS header inclusion in responses.
 from hypothesis import given, strategies as st, assume, settings
 import sys
 from pathlib import Path
+from typing import Any, Dict, List, Optional
 
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
@@ -22,11 +23,11 @@ sys.path.insert(0, str(Path(__file__).parent.parent.parent / "app"))
 
 
 def create_test_app_with_cors(
-    allow_origins=None,
-    allow_credentials=True,
-    allow_methods=None,
-    allow_headers=None,
-):
+    allow_origins: Optional[List[str]] = None,
+    allow_credentials: bool = True,
+    allow_methods: Optional[List[str]] = None,
+    allow_headers: Optional[List[str]] = None,
+) -> FastAPI:
     """Create a test FastAPI app with CORS middleware configured."""
     app = FastAPI()
 
@@ -41,19 +42,19 @@ def create_test_app_with_cors(
 
     # Add a test endpoint
     @app.get("/test")
-    async def test_endpoint():
+    async def test_endpoint() -> Dict[str, str]:
         return {"message": "test"}
 
     @app.post("/test")
-    async def test_post_endpoint():
+    async def test_post_endpoint() -> Dict[str, str]:
         return {"message": "test post"}
 
     @app.get("/v1/sessions")
-    async def sessions_endpoint():
+    async def sessions_endpoint() -> Dict[str, List[Any]]:
         return {"sessions": []}
 
     @app.post("/v1/sessions")
-    async def create_session_endpoint():
+    async def create_session_endpoint() -> Dict[str, str]:
         return {"session_id": "test-123"}
 
     return app
@@ -85,7 +86,7 @@ def create_test_app_with_cors(
         ]
     ),
 )
-def test_property_4_cors_headers_on_responses(path, method, origin):
+def test_property_4_cors_headers_on_responses(path: str, method: str, origin: str) -> None:
     """
     **Validates: Requirements 7.3, 7.4**
 
@@ -170,7 +171,7 @@ def test_property_4_cors_headers_on_responses(path, method, origin):
         ]
     ),
 )
-def test_property_4_cors_preflight_requests(path, origin):
+def test_property_4_cors_preflight_requests(path: str, origin: str) -> None:
     """
     **Validates: Requirements 7.3, 7.4**
 
@@ -244,7 +245,9 @@ def test_property_4_cors_preflight_requests(path, origin):
         ]
     ),
 )
-def test_property_4_cors_headers_disallowed_origin(path, method, disallowed_origin):
+def test_property_4_cors_headers_disallowed_origin(
+    path: str, method: str, disallowed_origin: str
+) -> None:
     """
     **Validates: Requirements 7.3, 7.4**
 
@@ -301,7 +304,7 @@ def test_property_4_cors_headers_disallowed_origin(path, method, disallowed_orig
     ),
     method=st.sampled_from(["GET", "POST"]),
 )
-def test_property_4_cors_wildcard_origin(path, method):
+def test_property_4_cors_wildcard_origin(path: str, method: str) -> None:
     """
     **Validates: Requirements 7.3, 7.4**
 
@@ -362,7 +365,7 @@ def test_property_4_cors_wildcard_origin(path, method):
         ]
     ),
 )
-def test_property_4_cors_headers_with_credentials(path, method, origin):
+def test_property_4_cors_headers_with_credentials(path: str, method: str, origin: str) -> None:
     """
     **Validates: Requirements 7.3, 7.4, 7.6**
 

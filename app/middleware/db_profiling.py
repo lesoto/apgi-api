@@ -7,7 +7,7 @@ cache hit ratio metrics by endpoint for performance dashboards.
 
 import time
 import logging
-from typing import Any, Callable, Dict, List, Optional
+from typing import Any, Awaitable, Callable, Dict, List, Optional
 from contextvars import ContextVar
 from dataclasses import dataclass, field
 
@@ -103,7 +103,9 @@ class DBProfilingMiddleware(BaseHTTPMiddleware):
         if enabled:
             logger.info("DB profiling middleware enabled")
 
-    async def dispatch(self, request: Request, call_next: Callable) -> Any:
+    async def dispatch(
+        self, request: Request, call_next: Callable[[Request], Awaitable[Any]]
+    ) -> Any:
         """Process request with profiling metrics collection."""
         if not self.enabled:
             return await call_next(request)

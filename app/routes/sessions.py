@@ -34,6 +34,7 @@ from app.services.authorization import (
     get_current_user,
     Role,
     has_any_role,
+    TokenPayload,
 )
 from app.services.session_manager import SessionLifecycleState, SessionManager
 
@@ -43,7 +44,7 @@ logger = logging.getLogger(__name__)
 class SessionRoutesState:
     """Encapsulate session routes state to avoid global mutable state."""
 
-    def __init__(self):
+    def __init__(self) -> None:
         self.redis_client: Optional[redis.Redis] = None
         self.session_manager: Optional[SessionManager] = None
 
@@ -189,7 +190,7 @@ async def cache_idempotency_response(
     response_data: Dict[str, Any],
     redis_client: redis.Redis,
     ttl_seconds: int = 86400,  # 24 hours
-):
+) -> None:
     """
     Cache response for idempotency key.
 
@@ -206,7 +207,7 @@ async def cache_idempotency_response(
     await redis_client.setex(cache_key, ttl_seconds, json.dumps(response_data))
 
 
-def init_session_routes(redis_client: redis.Redis):
+def init_session_routes(redis_client: redis.Redis) -> None:
     """
     Initialize session routes with Redis client.
 
@@ -230,8 +231,8 @@ async def list_sessions(
     per_page: int = 10,
     state: Optional[str] = None,
     manager: SessionManager = Depends(get_session_manager),
-    current_user=Depends(get_current_user),
-):
+    current_user: TokenPayload = Depends(get_current_user),
+) -> SessionListResponse:
     """
     List sessions with pagination.
 
@@ -307,8 +308,8 @@ async def create_session(
     req: Request,
     manager: SessionManager = Depends(get_session_manager),
     redis_client: redis.Redis = Depends(get_redis_client),
-    current_user=Depends(get_current_user),
-):
+    current_user: TokenPayload = Depends(get_current_user),
+) -> SessionCreateResponse:
     """
     Create new simulation session.
 
@@ -373,9 +374,9 @@ async def create_session(
 async def get_session(
     session_id: str,
     manager: SessionManager = Depends(get_session_manager),
-    current_user=Depends(get_current_user),
-    db=Depends(get_db),
-):
+    current_user: TokenPayload = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> SessionResponse:
     """
     Get session details.
 
@@ -423,9 +424,9 @@ async def get_session(
 async def get_session_metrics(
     session_id: str,
     manager: SessionManager = Depends(get_session_manager),
-    current_user=Depends(get_current_user),
-    db=Depends(get_db),
-):
+    current_user: TokenPayload = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> SessionMetricsResponse:
     """
     Get session metrics.
 
@@ -488,9 +489,9 @@ async def get_session_metrics(
 )
 async def get_session_tasks(
     session_id: str,
-    db=Depends(get_db),
-    current_user=Depends(get_current_user),
-):
+    db: Session = Depends(get_db),
+    current_user: TokenPayload = Depends(get_current_user),
+) -> SessionTaskListResponse:
     """
     Get tasks for a session.
 
@@ -506,7 +507,7 @@ async def get_session_tasks(
     """
 
     # Blocking function for DB queries
-    def _blocking_get_tasks():
+    def _blocking_get_tasks() -> Optional[object]:
         # Verify session exists
         session = db.query(SessionModel).filter(SessionModel.session_id == session_id).first()
         if not session:
@@ -541,7 +542,7 @@ async def get_session_tasks(
             task_id=str(task.task_id),
             status=str(task.status),
             state=str(task.status),  # Use status as state since Celery state not stored in DB
-            result=dict(task.result_data) if task.result_data else None,  # type: ignore[assignment]
+            result=dict(task.result_data) if task.result_data else None,
             error=str(task.error_message) if task.error_message else None,
             info=None,
         )
@@ -563,9 +564,9 @@ async def get_session_tasks(
 async def start_session(
     session_id: str,
     manager: SessionManager = Depends(get_session_manager),
-    current_user=Depends(get_current_user),
-    db=Depends(get_db),
-):
+    current_user: TokenPayload = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> SessionActionResponse:
     """
     Start simulation.
 
@@ -619,9 +620,9 @@ async def start_session(
 async def pause_session(
     session_id: str,
     manager: SessionManager = Depends(get_session_manager),
-    current_user=Depends(get_current_user),
-    db=Depends(get_db),
-):
+    current_user: TokenPayload = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> SessionActionResponse:
     """
     Pause simulation.
 
@@ -675,9 +676,9 @@ async def pause_session(
 async def stop_session(
     session_id: str,
     manager: SessionManager = Depends(get_session_manager),
-    current_user=Depends(get_current_user),
-    db=Depends(get_db),
-):
+    current_user: TokenPayload = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> SessionActionResponse:
     """
     Stop simulation.
 
@@ -731,9 +732,9 @@ async def stop_session(
 async def reset_session(
     session_id: str,
     manager: SessionManager = Depends(get_session_manager),
-    current_user=Depends(get_current_user),
-    db=Depends(get_db),
-):
+    current_user: TokenPayload = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> SessionActionResponse:
     """
     Reset simulation to initial state.
 
@@ -787,9 +788,9 @@ async def reset_session(
 async def delete_session(
     session_id: str,
     manager: SessionManager = Depends(get_session_manager),
-    current_user=Depends(get_current_user),
-    db=Depends(get_db),
-):
+    current_user: TokenPayload = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> None:
     """
     Delete session and clean up resources.
 
@@ -837,9 +838,9 @@ async def step_session(
     session_id: str,
     extero_input: Optional[Dict[str, Any]] = None,
     manager: SessionManager = Depends(get_session_manager),
-    current_user=Depends(get_current_user),
-    db=Depends(get_db),
-):
+    current_user: TokenPayload = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> SessionActionResponse:
     """
     Execute single simulation step.
 

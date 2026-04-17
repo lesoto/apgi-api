@@ -9,10 +9,12 @@ import io
 import pstats
 import time
 import logging
-from typing import Optional
+from typing import Any, cast, Optional
 
 from fastapi import Request
 from starlette.middleware.base import BaseHTTPMiddleware
+from starlette.responses import Response as StarletteResponse
+from starlette.types import ASGIApp
 
 from app.services.profiling_service import ProfilingService
 
@@ -24,11 +26,11 @@ class ProfilingMiddleware(BaseHTTPMiddleware):
 
     def __init__(
         self,
-        app,
+        app: ASGIApp,
         enabled: bool = False,
         memory_tracing: bool = False,
         profile_functions: bool = False,
-    ):
+    ) -> None:
         """
         Initialize profiling middleware.
 
@@ -50,10 +52,11 @@ class ProfilingMiddleware(BaseHTTPMiddleware):
                 self.profiling_service.start_memory_tracing()
             logger.info("Performance profiling middleware enabled")
 
-    async def dispatch(self, request: Request, call_next):
+    async def dispatch(self, request: Request, call_next: Any) -> StarletteResponse:
         """Process the request with profiling if enabled."""
         if not self.enabled or not self.profiling_service:
-            return await call_next(request)
+            response = await call_next(request)
+            return cast(StarletteResponse, response)
 
         # Start profiling
         start_time = time.time()
@@ -64,7 +67,7 @@ class ProfilingMiddleware(BaseHTTPMiddleware):
             profiler.enable()
 
         # Process request
-        response = await call_next(request)
+        response = cast(StarletteResponse, await call_next(request))
 
         # End profiling
         end_time = time.time()

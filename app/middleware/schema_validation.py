@@ -7,7 +7,7 @@ Logs validation failures for monitoring and debugging.
 
 import json
 from datetime import datetime, timezone
-from typing import Any, Awaitable, Callable, Dict, Optional, cast
+from typing import Any, Awaitable, Callable, Dict, List, Optional, cast
 
 from fastapi import Request, Response
 from starlette.middleware.base import BaseHTTPMiddleware
@@ -291,15 +291,15 @@ class ResponseSchemaValidationMiddleware(BaseHTTPMiddleware):
             # It's a StreamingResponse (e.g., from another BaseHTTPMiddleware)
             # We need to consume the body and replace the iterator to keep it available
             chunks = []
-            async for chunk in response.body_iterator:  # type: ignore[attr-defined]
+            async for chunk in response.body_iterator:
                 chunks.append(chunk)
 
             # Re-create the iterator so it can still be sent to the client
-            async def new_iterator():
+            async def new_iterator() -> Any:
                 for chunk in chunks:
                     yield chunk
 
-            response.body_iterator = new_iterator()  # type: ignore[attr-defined]
+            response.body_iterator = new_iterator()
             body = b"".join(chunks)
         else:
             return None
@@ -316,7 +316,7 @@ class ResponseSchemaValidationMiddleware(BaseHTTPMiddleware):
 
         return str(body)
 
-    def _validate_schema(self, data: Any, schema: Dict[str, Any]) -> list:
+    def _validate_schema(self, data: Any, schema: Dict[str, Any]) -> List[Any]:
         """
         Validate data against schema.
 
@@ -330,7 +330,7 @@ class ResponseSchemaValidationMiddleware(BaseHTTPMiddleware):
         Returns:
             List of validation errors (empty if valid)
         """
-        errors: list[Dict[str, Any]] = []
+        validation_errors: List[Dict[str, Any]] = []
 
         # Get content schema
         content = schema.get("content", {})
@@ -339,7 +339,7 @@ class ResponseSchemaValidationMiddleware(BaseHTTPMiddleware):
         json_content = content.get("application/json", {})
         if not json_content:
             # No JSON schema defined
-            return errors
+            return validation_errors
 
         # Get schema definition
         schema_def = json_content.get("schema", {})
@@ -347,27 +347,27 @@ class ResponseSchemaValidationMiddleware(BaseHTTPMiddleware):
         # Basic validation: check if data is dict when schema expects object
         if schema_def.get("type") == "object":
             if not isinstance(data, dict):
-                errors.append(
+                validation_errors.append(
                     {"field": "$", "error": f"Expected object, got {type(data).__name__}"}
                 )
-                return errors
+                return validation_errors
 
             # Check required fields
             required = schema_def.get("required", [])
             for field in required:
                 if field not in data:
-                    errors.append({"field": field, "error": "Required field is missing"})
+                    validation_errors.append({"field": field, "error": "Required field is missing"})
 
             # Check properties
             properties = schema_def.get("properties", {})
             for field, field_schema in properties.items():
                 if field in data:
                     field_errors = self._validate_field(data[field], field_schema, field)
-                    errors.extend(field_errors)
+                    validation_errors.extend(field_errors)
 
-        return errors
+        return validation_errors
 
-    def _validate_field(self, value: Any, schema: Dict[str, Any], field_path: str) -> list:
+    def _validate_field(self, value: Any, schema: Dict[str, Any], field_path: str) -> list[Any]:
         """
         Validate a single field against its schema.
 
@@ -441,7 +441,7 @@ class ResponseSchemaValidationMiddleware(BaseHTTPMiddleware):
         response: Response,
         error: str,
         schema: Dict[str, Any],
-        validation_errors: Optional[list] = None,
+        validation_errors: Optional[list[Any]] = None,
     ) -> None:
         """
         Log response validation failure.

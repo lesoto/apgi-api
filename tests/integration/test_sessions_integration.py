@@ -428,7 +428,7 @@ class TestSessionDeletion:
             manager=mock_manager,
             current_user=mock_current_user,
             db=mock_db,
-        )
+        )  # type: ignore[func-returns-value]
 
         assert result is None
         mock_manager.delete_session.assert_called_once_with("session123")

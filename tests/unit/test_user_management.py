@@ -8,12 +8,13 @@ import pytest
 from datetime import datetime, timedelta, timezone
 from unittest.mock import patch, MagicMock
 from sqlalchemy.exc import IntegrityError
+from typing import Generator
 from app.services.user_management import UserManagementService
 from app.exceptions import UserNotFoundError, ValidationError
 
 
 @pytest.fixture
-def mock_db():
+def mock_db() -> MagicMock:
     """Mock database session."""
     db = MagicMock()
     db.commit = MagicMock()
@@ -26,7 +27,7 @@ def mock_db():
 
 
 @pytest.fixture
-def mock_auth_manager():
+def mock_auth_manager() -> Generator[MagicMock, None, None]:
     """Mock auth manager."""
     with patch("app.services.user_management.AuthManager") as mock:
         manager = mock.return_value
@@ -36,7 +37,7 @@ def mock_auth_manager():
 
 
 @pytest.fixture
-def mock_user_model():
+def mock_user_model() -> MagicMock:
     """Mock user model."""
     user = MagicMock()
     user.user_id = "user123"
@@ -62,14 +63,18 @@ def mock_user_model():
 class TestPasswordValidation:
     """Tests for password validation."""
 
-    def test_validate_password_complexity_success(self, mock_db, mock_auth_manager):
+    def test_validate_password_complexity_success(
+        self, mock_db: MagicMock, mock_auth_manager: MagicMock
+    ) -> None:
         """Test successful password validation."""
         service = UserManagementService(mock_db)
 
         # Should not raise
         service._validate_password_complexity("SecurePass123!")
 
-    def test_validate_password_complexity_too_short(self, mock_db, mock_auth_manager):
+    def test_validate_password_complexity_too_short(
+        self, mock_db: MagicMock, mock_auth_manager: MagicMock
+    ) -> None:
         """Test password validation with too short password."""
         service = UserManagementService(mock_db)
 
@@ -78,7 +83,9 @@ class TestPasswordValidation:
 
         assert "at least 12 characters" in str(exc_info.value)
 
-    def test_validate_password_complexity_no_uppercase(self, mock_db, mock_auth_manager):
+    def test_validate_password_complexity_no_uppercase(
+        self, mock_db: MagicMock, mock_auth_manager: MagicMock
+    ) -> None:
         """Test password validation without uppercase."""
         service = UserManagementService(mock_db)
 
@@ -87,7 +94,9 @@ class TestPasswordValidation:
 
         assert "uppercase" in str(exc_info.value)
 
-    def test_validate_password_complexity_no_lowercase(self, mock_db, mock_auth_manager):
+    def test_validate_password_complexity_no_lowercase(
+        self, mock_db: MagicMock, mock_auth_manager: MagicMock
+    ) -> None:
         """Test password validation without lowercase."""
         service = UserManagementService(mock_db)
 
@@ -96,7 +105,9 @@ class TestPasswordValidation:
 
         assert "lowercase" in str(exc_info.value)
 
-    def test_validate_password_complexity_no_digit(self, mock_db, mock_auth_manager):
+    def test_validate_password_complexity_no_digit(
+        self, mock_db: MagicMock, mock_auth_manager: MagicMock
+    ) -> None:
         """Test password validation without digit."""
         service = UserManagementService(mock_db)
 
@@ -105,7 +116,9 @@ class TestPasswordValidation:
 
         assert "digit" in str(exc_info.value)
 
-    def test_validate_password_complexity_no_special(self, mock_db, mock_auth_manager):
+    def test_validate_password_complexity_no_special(
+        self, mock_db: MagicMock, mock_auth_manager: MagicMock
+    ) -> None:
         """Test password validation without special character."""
         service = UserManagementService(mock_db)
 
@@ -119,7 +132,13 @@ class TestCreateUser:
     """Tests for create_user method."""
 
     @patch("app.services.user_management.settings")
-    def test_create_user_success(self, mock_settings, mock_db, mock_auth_manager, mock_user_model):
+    def test_create_user_success(
+        self,
+        mock_settings: MagicMock,
+        mock_db: MagicMock,
+        mock_auth_manager: MagicMock,
+        mock_user_model: MagicMock,
+    ) -> None:
         """Test successful user creation."""
         mock_settings.smtp_server = None  # No SMTP - skip email sending
         mock_settings.require_email_verification = False  # Auto-activate
@@ -141,8 +160,12 @@ class TestCreateUser:
 
     @patch("app.services.user_management.settings")
     def test_create_user_default_roles(
-        self, mock_settings, mock_db, mock_auth_manager, mock_user_model
-    ):
+        self,
+        mock_settings: MagicMock,
+        mock_db: MagicMock,
+        mock_auth_manager: MagicMock,
+        mock_user_model: MagicMock,
+    ) -> None:
         """Test user creation with default roles."""
         mock_settings.smtp_server = "smtp.example.com"
         mock_settings.require_email_verification = False
@@ -162,8 +185,12 @@ class TestCreateUser:
 
     @patch("app.services.user_management.settings")
     def test_create_user_with_roles(
-        self, mock_settings, mock_db, mock_auth_manager, mock_user_model
-    ):
+        self,
+        mock_settings: MagicMock,
+        mock_db: MagicMock,
+        mock_auth_manager: MagicMock,
+        mock_user_model: MagicMock,
+    ) -> None:
         """Test user creation with custom roles."""
         mock_settings.smtp_server = "smtp.example.com"
         mock_settings.require_email_verification = False
@@ -184,7 +211,9 @@ class TestCreateUser:
             assert user.roles == ["admin"]
 
     @patch("app.services.user_management.settings")
-    def test_create_user_duplicate(self, mock_settings, mock_db, mock_auth_manager):
+    def test_create_user_duplicate(
+        self, mock_settings: MagicMock, mock_db: MagicMock, mock_auth_manager: MagicMock
+    ) -> None:
         """Test user creation with duplicate username/email."""
         mock_settings.smtp_server = "smtp.example.com"
         mock_settings.require_email_verification = False
@@ -201,7 +230,9 @@ class TestCreateUser:
         mock_db.rollback.assert_called_once()
 
     @patch("app.services.user_management.settings")
-    def test_create_user_db_error(self, mock_settings, mock_db, mock_auth_manager):
+    def test_create_user_db_error(
+        self, mock_settings: MagicMock, mock_db: MagicMock, mock_auth_manager: MagicMock
+    ) -> None:
         """Test user creation with database error."""
         mock_settings.smtp_server = "smtp.example.com"
         mock_settings.require_email_verification = False
@@ -218,7 +249,13 @@ class TestCreateUser:
         mock_db.rollback.assert_called_once()
 
     @patch("app.services.user_management.settings")
-    def test_create_user_no_smtp(self, mock_settings, mock_db, mock_auth_manager, mock_user_model):
+    def test_create_user_no_smtp(
+        self,
+        mock_settings: MagicMock,
+        mock_db: MagicMock,
+        mock_auth_manager: MagicMock,
+        mock_user_model: MagicMock,
+    ) -> None:
         """Test user creation without SMTP."""
         mock_settings.smtp_server = None
         mock_settings.require_email_verification = True
@@ -240,7 +277,9 @@ class TestCreateUser:
 class TestCreateDefaultUser:
     """Tests for create_default_user method."""
 
-    def test_create_default_user_success(self, mock_db, mock_auth_manager, mock_user_model):
+    def test_create_default_user_success(
+        self, mock_db: MagicMock, mock_auth_manager: MagicMock, mock_user_model: MagicMock
+    ) -> None:
         """Test successful default user creation."""
         mock_db.add.return_value = None
         mock_user_model.user_id = "user123"
@@ -261,7 +300,9 @@ class TestCreateDefaultUser:
             assert user.is_active is True  # type: ignore[comparison-overlap]  # Pre-activated
             assert user.email_verification_token is None
 
-    def test_create_default_user_duplicate(self, mock_db, mock_auth_manager):
+    def test_create_default_user_duplicate(
+        self, mock_db: MagicMock, mock_auth_manager: MagicMock
+    ) -> None:
         """Test default user creation with duplicate."""
         mock_db.add.side_effect = IntegrityError("INSERT", {}, Exception("Duplicate"))
 
@@ -273,7 +314,9 @@ class TestCreateDefaultUser:
         assert "already exists" in str(exc_info.value)
         mock_db.rollback.assert_called_once()
 
-    def test_create_default_user_error(self, mock_db, mock_auth_manager):
+    def test_create_default_user_error(
+        self, mock_db: MagicMock, mock_auth_manager: MagicMock
+    ) -> None:
         """Test default user creation with error."""
         mock_db.add.side_effect = Exception("Database error")
 
@@ -289,7 +332,9 @@ class TestCreateDefaultUser:
 class TestListUsers:
     """Tests for list_users method."""
 
-    def test_list_users_all(self, mock_db, mock_auth_manager, mock_user_model):
+    def test_list_users_all(
+        self, mock_db: MagicMock, mock_auth_manager: MagicMock, mock_user_model: MagicMock
+    ) -> None:
         """Test listing all users."""
         mock_query = MagicMock()
         mock_query.filter.return_value = mock_query
@@ -305,7 +350,9 @@ class TestListUsers:
         assert len(users) == 1
         assert users[0].user_id == "user123"
 
-    def test_list_users_active_only(self, mock_db, mock_auth_manager, mock_user_model):
+    def test_list_users_active_only(
+        self, mock_db: MagicMock, mock_auth_manager: MagicMock, mock_user_model: MagicMock
+    ) -> None:
         """Test listing active users only."""
         mock_query = MagicMock()
         mock_query.filter.return_value = mock_query
@@ -320,7 +367,9 @@ class TestListUsers:
 
         assert len(users) == 1
 
-    def test_list_users_pagination(self, mock_db, mock_auth_manager, mock_user_model):
+    def test_list_users_pagination(
+        self, mock_db: MagicMock, mock_auth_manager: MagicMock, mock_user_model: MagicMock
+    ) -> None:
         """Test user listing with pagination."""
         mock_query = MagicMock()
         mock_query.filter.return_value = mock_query
@@ -336,7 +385,9 @@ class TestListUsers:
         mock_query.offset.assert_called_once_with(10)
         mock_query.limit.assert_called_once_with(10)
 
-    def test_list_users_result_length_le_limit(self, mock_db, mock_auth_manager, mock_user_model):
+    def test_list_users_result_length_le_limit(
+        self, mock_db: MagicMock, mock_auth_manager: MagicMock, mock_user_model: MagicMock
+    ) -> None:
         """Test that list_users returns at most `limit` users (pagination invariant)."""
         limit = 3
         users_returned = [mock_user_model] * 2  # fewer than limit
@@ -354,7 +405,7 @@ class TestListUsers:
 
         assert len(users) <= limit
 
-    def test_list_users_empty(self, mock_db, mock_auth_manager):
+    def test_list_users_empty(self, mock_db: MagicMock, mock_auth_manager: MagicMock) -> None:
         """Test list_users returns empty list when no users match."""
         mock_query = MagicMock()
         mock_query.filter.return_value = mock_query
@@ -374,7 +425,9 @@ class TestListUsers:
 class TestGetUser:
     """Tests for get_user method."""
 
-    def test_get_user_success(self, mock_db, mock_auth_manager, mock_user_model):
+    def test_get_user_success(
+        self, mock_db: MagicMock, mock_auth_manager: MagicMock, mock_user_model: MagicMock
+    ) -> None:
         """Test successful user retrieval."""
         mock_db.query.return_value.filter.return_value.filter.return_value.first.return_value = (
             mock_user_model
@@ -386,7 +439,7 @@ class TestGetUser:
 
         assert user.user_id == "user123"
 
-    def test_get_user_not_found(self, mock_db, mock_auth_manager):
+    def test_get_user_not_found(self, mock_db: MagicMock, mock_auth_manager: MagicMock) -> None:
         """Test get_user when user not found."""
         mock_db.query.return_value.filter.return_value.filter.return_value.first.return_value = None
 
@@ -397,7 +450,9 @@ class TestGetUser:
 
         assert "not found" in str(exc_info.value).lower()
 
-    def test_get_user_deleted(self, mock_db, mock_auth_manager, mock_user_model):
+    def test_get_user_deleted(
+        self, mock_db: MagicMock, mock_auth_manager: MagicMock, mock_user_model: MagicMock
+    ) -> None:
         """Test get_user when user is deleted."""
         # When a user is deleted, the query should return None because of the filter
         mock_query = MagicMock()
@@ -416,7 +471,9 @@ class TestGetUser:
 class TestUpdateUser:
     """Tests for update_user method."""
 
-    def test_update_user_email(self, mock_db, mock_auth_manager, mock_user_model):
+    def test_update_user_email(
+        self, mock_db: MagicMock, mock_auth_manager: MagicMock, mock_user_model: MagicMock
+    ) -> None:
         """Test updating user email."""
         mock_db.query.return_value.filter.return_value.filter.return_value.first.return_value = (
             mock_user_model
@@ -432,7 +489,9 @@ class TestUpdateUser:
         assert user.email == "newemail@example.com"
         mock_db.commit.assert_called_once()
 
-    def test_update_user_password(self, mock_db, mock_auth_manager, mock_user_model):
+    def test_update_user_password(
+        self, mock_db: MagicMock, mock_auth_manager: MagicMock, mock_user_model: MagicMock
+    ) -> None:
         """Test updating user password."""
         mock_db.query.return_value.filter.return_value.filter.return_value.first.return_value = (
             mock_user_model
@@ -448,7 +507,9 @@ class TestUpdateUser:
         assert user.password_hash == "hashed_password"
         mock_db.commit.assert_called_once()
 
-    def test_update_user_roles(self, mock_db, mock_auth_manager, mock_user_model):
+    def test_update_user_roles(
+        self, mock_db: MagicMock, mock_auth_manager: MagicMock, mock_user_model: MagicMock
+    ) -> None:
         """Test updating user roles."""
         mock_db.query.return_value.filter.return_value.filter.return_value.first.return_value = (
             mock_user_model
@@ -464,7 +525,9 @@ class TestUpdateUser:
         assert user.roles == ["admin"]
         mock_db.commit.assert_called_once()
 
-    def test_update_user_is_active(self, mock_db, mock_auth_manager, mock_user_model):
+    def test_update_user_is_active(
+        self, mock_db: MagicMock, mock_auth_manager: MagicMock, mock_user_model: MagicMock
+    ) -> None:
         """Test updating user active status."""
         mock_db.query.return_value.filter.return_value.filter.return_value.first.return_value = (
             mock_user_model
@@ -480,7 +543,7 @@ class TestUpdateUser:
         assert user.is_active is False  # type: ignore[comparison-overlap]
         mock_db.commit.assert_called_once()
 
-    def test_update_user_not_found(self, mock_db, mock_auth_manager):
+    def test_update_user_not_found(self, mock_db: MagicMock, mock_auth_manager: MagicMock) -> None:
         """Test update_user when user not found."""
         mock_db.query.return_value.filter.return_value.filter.return_value.first.return_value = None
 
@@ -491,7 +554,9 @@ class TestUpdateUser:
 
         assert "not found" in str(exc_info.value).lower()
 
-    def test_update_user_duplicate_email(self, mock_db, mock_auth_manager, mock_user_model):
+    def test_update_user_duplicate_email(
+        self, mock_db: MagicMock, mock_auth_manager: MagicMock, mock_user_model: MagicMock
+    ) -> None:
         """Test update_user with duplicate email."""
         mock_db.query.return_value.filter.return_value.filter.return_value.first.return_value = (
             mock_user_model
@@ -509,7 +574,9 @@ class TestUpdateUser:
         assert "already exists" in str(exc_info.value)
         mock_db.rollback.assert_called_once()
 
-    def test_update_user_db_error(self, mock_db, mock_auth_manager, mock_user_model):
+    def test_update_user_db_error(
+        self, mock_db: MagicMock, mock_auth_manager: MagicMock, mock_user_model: MagicMock
+    ) -> None:
         """Test update_user with database error."""
         mock_db.query.return_value.filter.return_value.filter.return_value.first.return_value = (
             mock_user_model
@@ -528,7 +595,9 @@ class TestUpdateUser:
 class TestRequestPasswordReset:
     """Tests for request_password_reset method."""
 
-    def test_request_password_reset_success(self, mock_db, mock_auth_manager, mock_user_model):
+    def test_request_password_reset_success(
+        self, mock_db: MagicMock, mock_auth_manager: MagicMock, mock_user_model: MagicMock
+    ) -> None:
         """Test successful password reset request."""
         mock_db.query.return_value.filter.return_value.filter.return_value.first.return_value = (
             mock_user_model
@@ -543,7 +612,9 @@ class TestRequestPasswordReset:
         assert mock_user_model.password_reset_expires_at is not None
         mock_db.commit.assert_called_once()
 
-    def test_request_password_reset_not_found(self, mock_db, mock_auth_manager):
+    def test_request_password_reset_not_found(
+        self, mock_db: MagicMock, mock_auth_manager: MagicMock
+    ) -> None:
         """Test password reset request when user not found."""
         mock_db.query.return_value.filter.return_value.filter.return_value.first.return_value = None
 
@@ -556,8 +627,12 @@ class TestRequestPasswordReset:
 
     @patch("app.services.user_management.settings")
     def test_request_password_reset_send_email(
-        self, mock_settings, mock_db, mock_auth_manager, mock_user_model
-    ):
+        self,
+        mock_settings: MagicMock,
+        mock_db: MagicMock,
+        mock_auth_manager: MagicMock,
+        mock_user_model: MagicMock,
+    ) -> None:
         """Test password reset request sends email."""
         mock_settings.smtp_server = "smtp.example.com"
         mock_settings.smtp_from_email = "noreply@example.com"
@@ -572,7 +647,9 @@ class TestRequestPasswordReset:
             service.request_password_reset("test@example.com")
             mock_send.assert_called_once()
 
-    def test_request_password_reset_error(self, mock_db, mock_auth_manager, mock_user_model):
+    def test_request_password_reset_error(
+        self, mock_db: MagicMock, mock_auth_manager: MagicMock, mock_user_model: MagicMock
+    ) -> None:
         """Test password reset request with error."""
         mock_db.query.return_value.filter.return_value.filter.return_value.first.return_value = (
             mock_user_model
@@ -591,7 +668,9 @@ class TestRequestPasswordReset:
 class TestConfirmPasswordReset:
     """Tests for confirm_password_reset method."""
 
-    def test_confirm_password_reset_success(self, mock_db, mock_auth_manager, mock_user_model):
+    def test_confirm_password_reset_success(
+        self, mock_db: MagicMock, mock_auth_manager: MagicMock, mock_user_model: MagicMock
+    ) -> None:
         """Test successful password reset confirmation."""
         mock_user_model.password_reset_token = "hashed_token"
         mock_user_model.password_reset_expires_at = datetime.now(timezone.utc) + timedelta(hours=1)
@@ -607,7 +686,9 @@ class TestConfirmPasswordReset:
         assert mock_user_model.password_reset_token is None
         mock_db.commit.assert_called_once()
 
-    def test_confirm_password_reset_invalid_token(self, mock_db, mock_auth_manager):
+    def test_confirm_password_reset_invalid_token(
+        self, mock_db: MagicMock, mock_auth_manager: MagicMock
+    ) -> None:
         """Test password reset confirmation with invalid token."""
         mock_db.query.return_value.filter.return_value.filter.return_value.filter.return_value.first.return_value = (
             None
@@ -621,8 +702,8 @@ class TestConfirmPasswordReset:
         assert "Invalid or expired" in str(exc_info.value)
 
     def test_confirm_password_reset_expired_token(
-        self, mock_db, mock_auth_manager, mock_user_model
-    ):
+        self, mock_db: MagicMock, mock_auth_manager: MagicMock, mock_user_model: MagicMock
+    ) -> None:
         """Test password reset confirmation with expired token."""
         mock_user_model.password_reset_token = "hashed_token"
         mock_user_model.password_reset_expires_at = datetime.now(timezone.utc) - timedelta(hours=1)
@@ -638,8 +719,8 @@ class TestConfirmPasswordReset:
         assert "Invalid or expired" in str(exc_info.value)
 
     def test_confirm_password_reset_invalid_password(
-        self, mock_db, mock_auth_manager, mock_user_model
-    ):
+        self, mock_db: MagicMock, mock_auth_manager: MagicMock, mock_user_model: MagicMock
+    ) -> None:
         """Test password reset confirmation with invalid password."""
         mock_db.query.return_value.filter.return_value.filter.return_value.filter.return_value.first.return_value = (
             mock_user_model
@@ -652,7 +733,9 @@ class TestConfirmPasswordReset:
 
         assert "Password must be" in str(exc_info.value)
 
-    def test_confirm_password_reset_error(self, mock_db, mock_auth_manager, mock_user_model):
+    def test_confirm_password_reset_error(
+        self, mock_db: MagicMock, mock_auth_manager: MagicMock, mock_user_model: MagicMock
+    ) -> None:
         """Test password reset confirmation with error."""
         mock_user_model.password_reset_token = "hashed_token"
         mock_user_model.password_reset_expires_at = datetime.now(timezone.utc) + timedelta(hours=1)
@@ -670,8 +753,8 @@ class TestConfirmPasswordReset:
         mock_db.rollback.assert_called_once()
 
     def test_confirm_password_reset_token_revocation_failure(
-        self, mock_db, mock_auth_manager, mock_user_model
-    ):
+        self, mock_db: MagicMock, mock_auth_manager: MagicMock, mock_user_model: MagicMock
+    ) -> None:
         """Test password reset confirmation when token revocation fails (lines 351-352)."""
         mock_user_model.password_reset_token = "hashed_token"
         mock_user_model.password_reset_expires_at = datetime.now(timezone.utc) + timedelta(hours=1)
@@ -692,7 +775,9 @@ class TestConfirmPasswordReset:
 class TestResetPassword:
     """Tests for reset_password method."""
 
-    def test_reset_password_with_new_password(self, mock_db, mock_auth_manager, mock_user_model):
+    def test_reset_password_with_new_password(
+        self, mock_db: MagicMock, mock_auth_manager: MagicMock, mock_user_model: MagicMock
+    ) -> None:
         """Test reset password with new password."""
         mock_db.query.return_value.filter.return_value.filter.return_value.first.return_value = (
             mock_user_model
@@ -708,8 +793,12 @@ class TestResetPassword:
 
     @patch("app.services.user_management.settings")
     def test_reset_password_send_token(
-        self, mock_settings, mock_db, mock_auth_manager, mock_user_model
-    ):
+        self,
+        mock_settings: MagicMock,
+        mock_db: MagicMock,
+        mock_auth_manager: MagicMock,
+        mock_user_model: MagicMock,
+    ) -> None:
         """Test reset password sends token when no password provided."""
         mock_settings.smtp_server = "smtp.example.com"
         mock_settings.smtp_from_email = "noreply@example.com"
@@ -725,7 +814,9 @@ class TestResetPassword:
             assert "reset initiated" in result.lower()
             mock_send.assert_called_once()
 
-    def test_reset_password_not_found(self, mock_db, mock_auth_manager):
+    def test_reset_password_not_found(
+        self, mock_db: MagicMock, mock_auth_manager: MagicMock
+    ) -> None:
         """Test reset password when user not found."""
         mock_db.query.return_value.filter.return_value.filter.return_value.first.return_value = None
 
@@ -736,7 +827,9 @@ class TestResetPassword:
 
         assert "not found" in str(exc_info.value).lower()
 
-    def test_reset_password_error(self, mock_db, mock_auth_manager, mock_user_model):
+    def test_reset_password_error(
+        self, mock_db: MagicMock, mock_auth_manager: MagicMock, mock_user_model: MagicMock
+    ) -> None:
         """Test reset password with error."""
         mock_db.query.return_value.filter.return_value.filter.return_value.first.return_value = (
             mock_user_model
@@ -751,7 +844,9 @@ class TestResetPassword:
         assert "Database error" in str(exc_info)
         mock_db.rollback.assert_called_once()
 
-    def test_reset_password_revocation_failure(self, mock_db, mock_auth_manager, mock_user_model):
+    def test_reset_password_revocation_failure(
+        self, mock_db: MagicMock, mock_auth_manager: MagicMock, mock_user_model: MagicMock
+    ) -> None:
         """Test reset password when token revocation fails (lines 447-448)."""
         mock_db.query.return_value.filter.return_value.filter.return_value.first.return_value = (
             mock_user_model
@@ -768,8 +863,12 @@ class TestResetPassword:
 
     @patch("app.services.user_management.settings")
     def test_reset_password_no_password_commit_error(
-        self, mock_settings, mock_db, mock_auth_manager, mock_user_model
-    ):
+        self,
+        mock_settings: MagicMock,
+        mock_db: MagicMock,
+        mock_auth_manager: MagicMock,
+        mock_user_model: MagicMock,
+    ) -> None:
         """Test reset password without new_password when commit fails (lines 475-478)."""
         mock_settings.smtp_server = None
         mock_db.query.return_value.filter.return_value.filter.return_value.first.return_value = (
@@ -790,7 +889,9 @@ class TestSendPasswordResetEmail:
     """Tests for _send_password_reset_email method."""
 
     @patch("app.services.user_management.settings")
-    def test_send_password_reset_email_no_smtp(self, mock_settings, mock_db, mock_auth_manager):
+    def test_send_password_reset_email_no_smtp(
+        self, mock_settings: MagicMock, mock_db: MagicMock, mock_auth_manager: MagicMock
+    ) -> None:
         """Test send password reset email when SMTP not configured raises ServiceUnavailableError."""
         from app.exceptions import ServiceUnavailableError
 
@@ -805,8 +906,13 @@ class TestSendPasswordResetEmail:
     @patch("smtplib.SMTP")
     @patch("ssl.create_default_context")
     def test_send_password_reset_email_success(
-        self, mock_ssl, mock_smtp, mock_settings, mock_db, mock_auth_manager
-    ):
+        self,
+        mock_ssl: MagicMock,
+        mock_smtp: MagicMock,
+        mock_settings: MagicMock,
+        mock_db: MagicMock,
+        mock_auth_manager: MagicMock,
+    ) -> None:
         """Test successful password reset email sending."""
         mock_settings.smtp_server = "smtp.example.com"
         mock_settings.smtp_port = 587
@@ -831,8 +937,13 @@ class TestSendPasswordResetEmail:
     @patch("smtplib.SMTP")
     @patch("ssl.create_default_context")
     def test_send_password_reset_email_error(
-        self, mock_ssl, mock_smtp, mock_settings, mock_db, mock_auth_manager
-    ):
+        self,
+        mock_ssl: MagicMock,
+        mock_smtp: MagicMock,
+        mock_settings: MagicMock,
+        mock_db: MagicMock,
+        mock_auth_manager: MagicMock,
+    ) -> None:
         """Test password reset email sending with SMTP error raises ServiceUnavailableError."""
         from app.exceptions import ServiceUnavailableError
 
@@ -857,7 +968,9 @@ class TestSendVerificationEmail:
     """Tests for _send_verification_email method."""
 
     @patch("app.services.user_management.settings")
-    def test_send_verification_email_no_smtp(self, mock_settings, mock_db, mock_auth_manager):
+    def test_send_verification_email_no_smtp(
+        self, mock_settings: MagicMock, mock_db: MagicMock, mock_auth_manager: MagicMock
+    ) -> None:
         """Test send verification email when SMTP not configured raises ServiceUnavailableError."""
         from app.exceptions import ServiceUnavailableError
 
@@ -872,8 +985,13 @@ class TestSendVerificationEmail:
     @patch("smtplib.SMTP")
     @patch("ssl.create_default_context")
     def test_send_verification_email_success(
-        self, mock_ssl, mock_smtp, mock_settings, mock_db, mock_auth_manager
-    ):
+        self,
+        mock_ssl: MagicMock,
+        mock_smtp: MagicMock,
+        mock_settings: MagicMock,
+        mock_db: MagicMock,
+        mock_auth_manager: MagicMock,
+    ) -> None:
         """Test successful verification email sending."""
         mock_settings.smtp_server = "smtp.example.com"
         mock_settings.smtp_port = 587
@@ -897,8 +1015,13 @@ class TestSendVerificationEmail:
     @patch("smtplib.SMTP")
     @patch("ssl.create_default_context")
     def test_send_verification_email_error(
-        self, mock_ssl, mock_smtp, mock_settings, mock_db, mock_auth_manager
-    ):
+        self,
+        mock_ssl: MagicMock,
+        mock_smtp: MagicMock,
+        mock_settings: MagicMock,
+        mock_db: MagicMock,
+        mock_auth_manager: MagicMock,
+    ) -> None:
         """Test verification email sending with SMTP error raises ServiceUnavailableError."""
         from app.exceptions import ServiceUnavailableError
 
@@ -922,7 +1045,9 @@ class TestSendVerificationEmail:
 class TestDeleteUser:
     """Tests for delete_user method."""
 
-    def test_delete_user_success(self, mock_db, mock_auth_manager, mock_user_model):
+    def test_delete_user_success(
+        self, mock_db: MagicMock, mock_auth_manager: MagicMock, mock_user_model: MagicMock
+    ) -> None:
         """Test successful user deletion."""
         mock_db.query.return_value.filter.return_value.filter.return_value.first.return_value = (
             mock_user_model
@@ -936,7 +1061,7 @@ class TestDeleteUser:
         assert mock_user_model.is_deleted is True
         mock_db.commit.assert_called_once()
 
-    def test_delete_user_not_found(self, mock_db, mock_auth_manager):
+    def test_delete_user_not_found(self, mock_db: MagicMock, mock_auth_manager: MagicMock) -> None:
         """Test delete user when user not found."""
         mock_db.query.return_value.filter.return_value.filter.return_value.first.return_value = None
 
@@ -947,7 +1072,9 @@ class TestDeleteUser:
 
         assert "not found" in str(exc_info.value).lower()
 
-    def test_delete_user_error(self, mock_db, mock_auth_manager, mock_user_model):
+    def test_delete_user_error(
+        self, mock_db: MagicMock, mock_auth_manager: MagicMock, mock_user_model: MagicMock
+    ) -> None:
         """Test delete user with error."""
         mock_db.query.return_value.filter.return_value.filter.return_value.first.return_value = (
             mock_user_model
@@ -966,7 +1093,7 @@ class TestDeleteUser:
 class TestGetUserStats:
     """Tests for get_user_stats method."""
 
-    def test_get_user_stats(self, mock_db, mock_user_model):
+    def test_get_user_stats(self, mock_db: MagicMock, mock_user_model: MagicMock) -> None:
         """Test getting user statistics."""
         # Setup mocks for multiple queries
         mock_queries = []
@@ -998,7 +1125,7 @@ class TestGetUserStats:
         assert stats["total_sessions"] == 10
         assert stats["active_sessions"] == 5
 
-    def test_get_user_stats_empty(self, mock_db):
+    def test_get_user_stats_empty(self, mock_db: MagicMock) -> None:
         """Test getting user stats when no users."""
         mock_query = MagicMock()
         mock_query.filter.return_value = mock_query
@@ -1018,7 +1145,7 @@ class TestGetUserStats:
 class TestGetUserManagementService:
     """Tests for get_user_management_service function."""
 
-    def test_get_user_management_service(self, mock_db):
+    def test_get_user_management_service(self, mock_db: MagicMock) -> None:
         """Test getting user management service instance."""
         from app.services.user_management import get_user_management_service
 

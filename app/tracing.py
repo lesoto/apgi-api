@@ -6,7 +6,7 @@ Provides distributed tracing capabilities for the APGI API.
 
 import os
 import warnings
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, Optional
 
 if TYPE_CHECKING:
     pass
@@ -27,7 +27,7 @@ try:
     from opentelemetry import trace as _trace
     from opentelemetry.sdk.trace import TracerProvider as _TracerProvider
     from opentelemetry.sdk.trace.export import BatchSpanProcessor as _BatchSpanProcessor
-    from opentelemetry.exporter.jaeger.thrift import JaegerExporter as _JaegerExporterInstance  # type: ignore
+    from opentelemetry.exporter.jaeger.thrift import JaegerExporter as _JaegerExporterInstance
     from opentelemetry.exporter.otlp.proto.grpc.trace_exporter import (
         OTLPSpanExporter as _OTLPSpanExporter,
     )
@@ -55,7 +55,7 @@ except (ImportError, TypeError) as e:
     )
 
 
-def configure_distributed_tracing():
+def configure_distributed_tracing() -> None:
     """
     Configure OpenTelemetry distributed tracing for the application.
 
@@ -111,7 +111,7 @@ def configure_distributed_tracing():
     tracer_provider.add_span_processor(span_processor_otlp)
 
 
-def instrument_application():
+def instrument_application() -> None:
     """
     Instrument the application with OpenTelemetry auto-instrumentation.
 
@@ -164,7 +164,7 @@ def instrument_application():
         print(f"Failed to instrument HTTPX: {e}")
 
 
-def get_tracer(name: str):
+def get_tracer(name: str) -> Optional[Any]:
     """
     Get a tracer instance for manual instrumentation.
 

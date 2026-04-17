@@ -16,18 +16,18 @@ from hypothesis import given, settings, strategies as st, HealthCheck
 from unittest.mock import MagicMock
 
 
-def create_sqlite_compatible_migration():
+def create_sqlite_compatible_migration() -> Any:
     """Create a SQLite-compatible version of the migration for testing."""
     import sqlalchemy as sa
 
     # Mock the postgresql module to use SQLite-compatible types
     mock_postgresql = MagicMock()
 
-    def mock_array(element_type=None):
+    def mock_array(element_type: Any = None) -> Any:
         # Convert ARRAY to TEXT for SQLite
         return sa.Text()
 
-    def mock_jsonb(astext_type=None):
+    def mock_jsonb(astext_type: Any = None) -> Any:
         # Convert JSONB to JSON for SQLite
         return sa.JSON()
 
@@ -51,11 +51,11 @@ def create_sqlite_compatible_migration():
     return mock_postgresql
 
 
-def create_sqlite_initial_schema():
+def create_sqlite_initial_schema() -> Any:
     """Create a SQLite-compatible version of the initial schema directly."""
     import sqlalchemy as sa
 
-    def apply_schema(engine):
+    def apply_schema(engine: Any) -> None:
         """Apply the initial schema directly to SQLite engine."""
         with engine.connect() as conn:
             # Create users table
@@ -180,7 +180,7 @@ def get_alembic_config(database_url: str) -> Config:
     return alembic_cfg
 
 
-def get_database_schema_snapshot(engine) -> Dict[str, Any]:
+def get_database_schema_snapshot(engine: Any) -> Dict[str, Any]:
     """
     Capture a snapshot of the database schema.
 
@@ -243,7 +243,7 @@ def get_database_schema_snapshot(engine) -> Dict[str, Any]:
     return snapshot
 
 
-def compare_schema_snapshots(before, after):
+def compare_schema_snapshots(before: Dict[str, Any], after: Dict[str, Any]) -> list[str]:
     """
     Compare two schema snapshots and return differences.
 
@@ -310,7 +310,7 @@ def compare_schema_snapshots(before, after):
 
 
 @pytest.fixture
-def test_database_url():
+def test_database_url() -> str:
     """
     Provide a test database URL.
 
@@ -329,13 +329,13 @@ def test_database_url():
 
 
 @pytest.fixture
-def clean_test_database(test_database_url):
+def clean_test_database(test_database_url: str) -> str:
     """Provide a clean test database URL."""
     # For migration tests, always use SQLite
     return "sqlite:///:memory:"
 
 
-def test_property_3_migration_roundtrip_initial_schema(clean_test_database):
+def test_property_3_migration_roundtrip_initial_schema(clean_test_database: str) -> None:
     """
     **Validates: Requirements 3.6**
 
@@ -434,7 +434,7 @@ def test_property_3_migration_roundtrip_initial_schema(clean_test_database):
     engine.dispose()
 
 
-def test_property_3_migration_roundtrip_idempotency(clean_test_database):
+def test_property_3_migration_roundtrip_idempotency(clean_test_database: str) -> None:
     """
     **Validates: Requirements 3.6**
 
@@ -501,7 +501,7 @@ def test_property_3_migration_roundtrip_idempotency(clean_test_database):
     engine.dispose()
 
 
-def test_property_3_migration_roundtrip_preserves_alembic_version(clean_test_database):
+def test_property_3_migration_roundtrip_preserves_alembic_version(clean_test_database: str) -> None:
     """
     **Validates: Requirements 3.6**
 
@@ -571,7 +571,9 @@ def test_property_3_migration_roundtrip_preserves_alembic_version(clean_test_dat
     max_examples=1, suppress_health_check=[HealthCheck.function_scoped_fixture]
 )  # Reduced for faster testing
 @given(upgrade_count=st.integers(min_value=1, max_value=2))
-def test_property_3_migration_roundtrip_multiple_cycles(clean_test_database, upgrade_count):
+def test_property_3_migration_roundtrip_multiple_cycles(
+    clean_test_database: str, upgrade_count: int
+) -> None:
     """
     **Validates: Requirements 3.6**
 

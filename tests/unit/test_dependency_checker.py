@@ -6,7 +6,7 @@ Tests for validating required packages on startup.
 
 import sys
 from pathlib import Path
-from unittest.mock import patch
+from unittest.mock import MagicMock, patch
 
 # Add app directory to path for imports
 sys.path.insert(0, str(Path(__file__).parent.parent.parent / "app"))
@@ -15,42 +15,42 @@ sys.path.insert(0, str(Path(__file__).parent.parent.parent / "app"))
 class TestParseVersion:
     """Tests for parse_version function."""
 
-    def test_parse_version_standard(self):
+    def test_parse_version_standard(self) -> None:
         """Test parsing standard version string."""
         from app.dependency_checker import parse_version
 
         result = parse_version("1.2.3")
         assert result == (1, 2, 3)
 
-    def test_parse_version_two_parts(self):
+    def test_parse_version_two_parts(self) -> None:
         """Test parsing version with two parts."""
         from app.dependency_checker import parse_version
 
         result = parse_version("1.2")
         assert result == (1, 2)  # Function returns variable length tuple
 
-    def test_parse_version_one_part(self):
+    def test_parse_version_one_part(self) -> None:
         """Test parsing version with one part."""
         from app.dependency_checker import parse_version
 
         result = parse_version("1")
         assert result == (1,)  # Function returns variable length tuple
 
-    def test_parse_version_with_extra_parts(self):
+    def test_parse_version_with_extra_parts(self) -> None:
         """Test parsing version with extra parts (only first 3 used)."""
         from app.dependency_checker import parse_version
 
         result = parse_version("1.2.3.4.5")
         assert result == (1, 2, 3)  # First 3 parts used
 
-    def test_parse_version_invalid(self):
+    def test_parse_version_invalid(self) -> None:
         """Test parsing invalid version string."""
         from app.dependency_checker import parse_version
 
         result = parse_version("invalid")
         assert result == (0, 0, 0)  # Returns default for invalid
 
-    def test_parse_version_none(self):
+    def test_parse_version_none(self) -> None:
         """Test parsing None version string."""
         from app.dependency_checker import parse_version
         from typing import cast, Optional
@@ -63,7 +63,7 @@ class TestCheckPackageVersion:
     """Tests for check_package_version function."""
 
     @patch("app.dependency_checker.importlib.metadata.version")
-    def test_check_package_version_satisfied(self, mock_version):
+    def test_check_package_version_satisfied(self, mock_version: MagicMock) -> None:
         """Test check when package version satisfies requirement."""
         from app.dependency_checker import check_package_version
 
@@ -75,7 +75,7 @@ class TestCheckPackageVersion:
         assert error_msg is None
 
     @patch("app.dependency_checker.importlib.metadata.version")
-    def test_check_package_version_not_satisfied(self, mock_version):
+    def test_check_package_version_not_satisfied(self, mock_version: MagicMock) -> None:
         """Test check when package version does not satisfy requirement."""
         from app.dependency_checker import check_package_version
 
@@ -88,7 +88,7 @@ class TestCheckPackageVersion:
         assert "version 1.0.0 or higher is required" in error_msg
 
     @patch("app.dependency_checker.importlib.metadata.version")
-    def test_check_package_version_not_found(self, mock_version) -> None:
+    def test_check_package_version_not_found(self, mock_version: MagicMock) -> None:
         """Test check when package is not installed."""
         from app.dependency_checker import check_package_version
         import importlib.metadata
@@ -102,7 +102,7 @@ class TestCheckPackageVersion:
         assert "is not installed" in error_msg
 
     @patch("app.dependency_checker.importlib.metadata.version")
-    def test_check_package_version_exception(self, mock_version) -> None:
+    def test_check_package_version_exception(self, mock_version: MagicMock) -> None:
         """Test check when exception occurs during version check."""
         from app.dependency_checker import check_package_version
 
@@ -120,7 +120,9 @@ class TestCheckDependencies:
 
     @patch("app.dependency_checker.check_package_version")
     @patch("app.dependency_checker.logger")
-    def test_check_dependencies_all_satisfied(self, mock_logger, mock_check) -> None:
+    def test_check_dependencies_all_satisfied(
+        self, mock_logger: MagicMock, mock_check: MagicMock
+    ) -> None:
         """Test check when all dependencies are satisfied."""
         from app.dependency_checker import check_dependencies
 
@@ -135,7 +137,9 @@ class TestCheckDependencies:
     @patch("app.dependency_checker.check_package_version")
     @patch("app.dependency_checker.logger")
     @patch("app.dependency_checker.sys.exit")
-    def test_check_dependencies_missing_fail_fast(self, mock_exit, mock_logger, mock_check) -> None:
+    def test_check_dependencies_missing_fail_fast(
+        self, mock_exit: MagicMock, mock_logger: MagicMock, mock_check: MagicMock
+    ) -> None:
         """Test check with missing dependency and fail_fast=True."""
         from app.dependency_checker import check_dependencies
 
@@ -152,7 +156,7 @@ class TestCheckDependencies:
     @patch("app.dependency_checker.logger")
     @patch("app.dependency_checker.sys.exit")
     def test_check_dependencies_version_mismatch_fail_fast(
-        self, mock_exit, mock_logger, mock_check
+        self, mock_exit: MagicMock, mock_logger: MagicMock, mock_check: MagicMock
     ) -> None:
         """Test check with version mismatch and fail_fast=True."""
         from app.dependency_checker import check_dependencies
@@ -168,7 +172,9 @@ class TestCheckDependencies:
 
     @patch("app.dependency_checker.check_package_version")
     @patch("app.dependency_checker.logger")
-    def test_check_dependencies_missing_no_fail_fast(self, mock_logger, mock_check) -> None:
+    def test_check_dependencies_missing_no_fail_fast(
+        self, mock_logger: MagicMock, mock_check: MagicMock
+    ) -> None:
         """Test check with missing dependency and fail_fast=False."""
         from app.dependency_checker import check_dependencies
 
@@ -182,11 +188,13 @@ class TestCheckDependencies:
 
     @patch("app.dependency_checker.check_package_version")
     @patch("app.dependency_checker.logger")
-    def test_check_dependencies_mixed_results(self, mock_logger, mock_check) -> None:
+    def test_check_dependencies_mixed_results(
+        self, mock_logger: MagicMock, mock_check: MagicMock
+    ) -> None:
         """Test check with mixed satisfied and unsatisfied dependencies."""
         from app.dependency_checker import check_dependencies
 
-        def check_side_effect(package, version):
+        def check_side_effect(package: str, version: str) -> tuple[bool, str | None, str | None]:
             if package == "package1":
                 return (True, "1.0.0", None)
             else:
@@ -201,7 +209,9 @@ class TestCheckDependencies:
 
     @patch("app.dependency_checker.check_package_version")
     @patch("app.dependency_checker.logger")
-    def test_check_dependencies_uses_default_deps(self, mock_logger, mock_check):
+    def test_check_dependencies_uses_default_deps(
+        self, mock_logger: MagicMock, mock_check: MagicMock
+    ) -> None:
         """Test check uses REQUIRED_DEPENDENCIES when None provided."""
         from app.dependency_checker import check_dependencies, REQUIRED_DEPENDENCIES
 
@@ -214,7 +224,9 @@ class TestCheckDependencies:
     @patch("app.dependency_checker.check_package_version")
     @patch("app.dependency_checker.logger")
     @patch("app.dependency_checker.sys.exit")
-    def test_check_dependencies_logs_missing_packages(self, mock_exit, mock_logger, mock_check):
+    def test_check_dependencies_logs_missing_packages(
+        self, mock_exit: MagicMock, mock_logger: MagicMock, mock_check: MagicMock
+    ) -> None:
         """Test check logs missing packages."""
         from app.dependency_checker import check_dependencies
 
@@ -231,7 +243,7 @@ class TestCheckDependencies:
     @patch("app.dependency_checker.logger")
     @patch("app.dependency_checker.sys.exit")
     def test_check_dependencies_logs_version_mismatches(
-        self, mock_exit, mock_logger, mock_check
+        self, mock_exit: MagicMock, mock_logger: MagicMock, mock_check: MagicMock
     ) -> None:
         """Test check logs version mismatches."""
         from app.dependency_checker import check_dependencies
@@ -251,7 +263,9 @@ class TestCheckOptionalDependencies:
 
     @patch("app.dependency_checker.check_package_version")
     @patch("app.dependency_checker.logger")
-    def test_check_optional_dependencies_all_satisfied(self, mock_logger, mock_check) -> None:
+    def test_check_optional_dependencies_all_satisfied(
+        self, mock_logger: MagicMock, mock_check: MagicMock
+    ) -> None:
         """Test optional dependencies check when all are satisfied."""
         from app.dependency_checker import check_optional_dependencies
 
@@ -264,11 +278,13 @@ class TestCheckOptionalDependencies:
 
     @patch("app.dependency_checker.check_package_version")
     @patch("app.dependency_checker.logger")
-    def test_check_optional_dependencies_mixed(self, mock_logger, mock_check) -> None:
+    def test_check_optional_dependencies_mixed(
+        self, mock_logger: MagicMock, mock_check: MagicMock
+    ) -> None:
         """Test optional dependencies check with mixed results."""
         from app.dependency_checker import check_optional_dependencies
 
-        def check_side_effect(package, version) -> tuple[bool, str | None, str | None]:
+        def check_side_effect(package: str, version: str) -> tuple[bool, str | None, str | None]:
             if package == "package1":
                 return (True, "1.0.0", None)
             else:
@@ -283,7 +299,9 @@ class TestCheckOptionalDependencies:
 
     @patch("app.dependency_checker.check_package_version")
     @patch("app.dependency_checker.logger")
-    def test_check_optional_dependencies_logs_debug(self, mock_logger, mock_check) -> None:
+    def test_check_optional_dependencies_logs_debug(
+        self, mock_logger: MagicMock, mock_check: MagicMock
+    ) -> None:
         """Test optional dependencies check logs debug messages."""
         from app.dependency_checker import check_optional_dependencies
 
@@ -341,7 +359,9 @@ class TestStandaloneExecution:
     @patch("app.dependency_checker.check_dependencies")
     @patch("app.dependency_checker.logging.basicConfig")
     @patch("app.dependency_checker.sys.exit")
-    def test_main_success(self, mock_exit, mock_basicConfig, mock_check) -> None:
+    def test_main_success(
+        self, mock_exit: MagicMock, mock_basicConfig: MagicMock, mock_check: MagicMock
+    ) -> None:
         """Test main execution with successful check."""
         mock_check.return_value = True
 
@@ -360,7 +380,9 @@ class TestStandaloneExecution:
     @patch("app.dependency_checker.check_dependencies")
     @patch("app.dependency_checker.logging.basicConfig")
     @patch("app.dependency_checker.sys.exit")
-    def test_main_failure(self, mock_exit, mock_basicConfig, mock_check) -> None:
+    def test_main_failure(
+        self, mock_exit: MagicMock, mock_basicConfig: MagicMock, mock_check: MagicMock
+    ) -> None:
         """Test main execution with failed check."""
         mock_check.return_value = False
 

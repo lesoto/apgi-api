@@ -16,6 +16,7 @@ Tests cover:
 """
 
 import pytest
+from typing import Iterator, Any
 from unittest.mock import MagicMock, AsyncMock, patch
 from fastapi import FastAPI, Request
 from fastapi.testclient import TestClient
@@ -28,7 +29,7 @@ from app.middleware.csrf import CSRFMiddleware
 
 
 @pytest.fixture
-def mock_settings():
+def mock_settings() -> Iterator[MagicMock]:
     """Mock settings with JWT secret key."""
     with patch("app.middleware.csrf.settings") as mock:
         mock.jwt_secret_key = "test-secret-key-for-csrf-hashing"
@@ -36,44 +37,44 @@ def mock_settings():
 
 
 @pytest.fixture
-def app_with_csrf_enabled(mock_settings):
+def app_with_csrf_enabled(mock_settings: MagicMock) -> FastAPI:
     """Create FastAPI app with CSRF middleware enabled."""
     app = FastAPI()
 
     @app.get("/test")
-    async def get_test():
+    async def get_test() -> dict[str, Any]:
         return {"message": "GET success"}
 
     @app.post("/test")
-    async def post_test():
+    async def post_test() -> dict[str, Any]:
         return {"message": "POST success"}
 
     @app.put("/test")
-    async def put_test():
+    async def put_test() -> dict[str, Any]:
         return {"message": "PUT success"}
 
     @app.delete("/test")
-    async def delete_test():
+    async def delete_test() -> dict[str, Any]:
         return {"message": "DELETE success"}
 
     @app.patch("/test")
-    async def patch_test():
+    async def patch_test() -> dict[str, Any]:
         return {"message": "PATCH success"}
 
     @app.head("/test")
-    async def head_test():
+    async def head_test() -> dict[str, Any]:
         return {"message": "HEAD success"}
 
     @app.options("/test")
-    async def options_test():
+    async def options_test() -> dict[str, Any]:
         return {"message": "OPTIONS success"}
 
     @app.post("/form-test")
-    async def form_test():
+    async def form_test() -> dict[str, Any]:
         return {"message": "Form POST success"}
 
     @app.post("/json-test")
-    async def json_test():
+    async def json_test() -> dict[str, Any]:
         return {"message": "JSON POST success"}
 
     app.add_middleware(
@@ -88,12 +89,12 @@ def app_with_csrf_enabled(mock_settings):
 
 
 @pytest.fixture
-def app_with_csrf_disabled(mock_settings):
+def app_with_csrf_disabled(mock_settings: MagicMock) -> FastAPI:
     """Create FastAPI app with CSRF middleware disabled."""
     app = FastAPI()
 
     @app.post("/test")
-    async def post_test():
+    async def post_test() -> dict[str, Any]:
         return {"message": "POST success"}
 
     app.add_middleware(
@@ -108,19 +109,19 @@ def app_with_csrf_disabled(mock_settings):
 
 
 @pytest.fixture
-def client_csrf_enabled(app_with_csrf_enabled):
+def client_csrf_enabled(app_with_csrf_enabled: FastAPI) -> TestClient:
     """TestClient for app with CSRF enabled."""
     return TestClient(app_with_csrf_enabled, raise_server_exceptions=False)
 
 
 @pytest.fixture
-def client_csrf_disabled(app_with_csrf_disabled):
+def client_csrf_disabled(app_with_csrf_disabled: FastAPI) -> TestClient:
     """TestClient for app with CSRF disabled."""
     return TestClient(app_with_csrf_disabled, raise_server_exceptions=False)
 
 
 @pytest.fixture
-def csrf_middleware(mock_settings):
+def csrf_middleware(mock_settings: MagicMock) -> CSRFMiddleware:
     """Create CSRF middleware instance."""
     app = MagicMock()
     return CSRFMiddleware(
@@ -140,38 +141,38 @@ def csrf_middleware(mock_settings):
 class TestTokenGeneration:
     """Tests for CSRF token generation."""
 
-    def test_generate_csrf_token_returns_string(self, csrf_middleware):
+    def test_generate_csrf_token_returns_string(self, csrf_middleware: CSRFMiddleware) -> None:
         """Test that token generation returns a string."""
         token = csrf_middleware._generate_csrf_token()
         assert isinstance(token, str)
         assert len(token) > 0
 
-    def test_generate_csrf_token_is_unique(self, csrf_middleware):
+    def test_generate_csrf_token_is_unique(self, csrf_middleware: CSRFMiddleware) -> None:
         """Test that each generated token is unique."""
         token1 = csrf_middleware._generate_csrf_token()
         token2 = csrf_middleware._generate_csrf_token()
         assert token1 != token2
 
-    def test_generate_csrf_token_is_url_safe(self, csrf_middleware):
+    def test_generate_csrf_token_is_url_safe(self, csrf_middleware: CSRFMiddleware) -> None:
         """Test that generated tokens are URL-safe."""
         token = csrf_middleware._generate_csrf_token()
         # URL-safe tokens should only contain alphanumeric, -, and _
         assert all(c.isalnum() or c in "-_" for c in token)
 
-    def test_token_generation_on_get_request(self, client_csrf_enabled):
+    def test_token_generation_on_get_request(self, client_csrf_enabled: TestClient) -> None:
         """Test that GET request generates and sets CSRF token in cookie."""
         response = client_csrf_enabled.get("/test")
         assert response.status_code == 200
         assert "csrf_token" in response.cookies
         assert len(response.cookies["csrf_token"]) > 0
 
-    def test_token_generation_on_head_request(self, client_csrf_enabled):
+    def test_token_generation_on_head_request(self, client_csrf_enabled: TestClient) -> None:
         """Test that HEAD request generates and sets CSRF token in cookie."""
         response = client_csrf_enabled.head("/test")
         assert response.status_code == 200
         assert "csrf_token" in response.cookies
 
-    def test_token_generation_on_options_request(self, client_csrf_enabled):
+    def test_token_generation_on_options_request(self, client_csrf_enabled: TestClient) -> None:
         """Test that OPTIONS request generates and sets CSRF token in cookie."""
         response = client_csrf_enabled.options("/test")
         assert response.status_code == 200
@@ -186,21 +187,21 @@ class TestTokenGeneration:
 class TestTokenHashing:
     """Tests for CSRF token hashing."""
 
-    def test_hash_token_returns_string(self, csrf_middleware):
+    def test_hash_token_returns_string(self, csrf_middleware: CSRFMiddleware) -> None:
         """Test that token hashing returns a string."""
         token = "test-token"
         hashed = csrf_middleware._hash_token(token)
         assert isinstance(hashed, str)
         assert len(hashed) > 0
 
-    def test_hash_token_is_deterministic(self, csrf_middleware):
+    def test_hash_token_is_deterministic(self, csrf_middleware: CSRFMiddleware) -> None:
         """Test that hashing the same token produces the same hash."""
         token = "test-token"
         hash1 = csrf_middleware._hash_token(token)
         hash2 = csrf_middleware._hash_token(token)
         assert hash1 == hash2
 
-    def test_hash_token_uses_hmac_sha256(self, csrf_middleware):
+    def test_hash_token_uses_hmac_sha256(self, csrf_middleware: CSRFMiddleware) -> None:
         """Test that token hashing uses HMAC-SHA256."""
         token = "test-token"
         hashed = csrf_middleware._hash_token(token)
@@ -208,7 +209,9 @@ class TestTokenHashing:
         assert len(hashed) == 64
         assert all(c in "0123456789abcdef" for c in hashed)
 
-    def test_hash_token_different_tokens_different_hashes(self, csrf_middleware):
+    def test_hash_token_different_tokens_different_hashes(
+        self, csrf_middleware: CSRFMiddleware
+    ) -> None:
         """Test that different tokens produce different hashes."""
         token1 = "token1"
         token2 = "token2"
@@ -216,7 +219,7 @@ class TestTokenHashing:
         hash2 = csrf_middleware._hash_token(token2)
         assert hash1 != hash2
 
-    def test_hash_token_requires_secret_key(self, csrf_middleware):
+    def test_hash_token_requires_secret_key(self, csrf_middleware: CSRFMiddleware) -> None:
         """Test that hashing requires JWT secret key to be configured."""
         with patch("app.middleware.csrf.settings") as mock_settings:
             mock_settings.jwt_secret_key = None
@@ -232,56 +235,56 @@ class TestTokenHashing:
 class TestShouldProtect:
     """Tests for CSRF protection decision logic."""
 
-    def test_should_not_protect_get_request(self, csrf_middleware):
+    def test_should_not_protect_get_request(self, csrf_middleware: CSRFMiddleware) -> None:
         """Test that GET requests are not protected."""
         request = MagicMock(spec=Request)
         request.method = "GET"
         request.headers = {}
         assert csrf_middleware._should_protect(request) is False
 
-    def test_should_not_protect_head_request(self, csrf_middleware):
+    def test_should_not_protect_head_request(self, csrf_middleware: CSRFMiddleware) -> None:
         """Test that HEAD requests are not protected."""
         request = MagicMock(spec=Request)
         request.method = "HEAD"
         request.headers = {}
         assert csrf_middleware._should_protect(request) is False
 
-    def test_should_not_protect_options_request(self, csrf_middleware):
+    def test_should_not_protect_options_request(self, csrf_middleware: CSRFMiddleware) -> None:
         """Test that OPTIONS requests are not protected."""
         request = MagicMock(spec=Request)
         request.method = "OPTIONS"
         request.headers = {}
         assert csrf_middleware._should_protect(request) is False
 
-    def test_should_protect_post_request(self, csrf_middleware):
+    def test_should_protect_post_request(self, csrf_middleware: CSRFMiddleware) -> None:
         """Test that POST requests with form data are protected."""
         request = MagicMock(spec=Request)
         request.method = "POST"
         request.headers = {"content-type": "application/x-www-form-urlencoded"}
         assert csrf_middleware._should_protect(request) is True
 
-    def test_should_protect_put_request(self, csrf_middleware):
+    def test_should_protect_put_request(self, csrf_middleware: CSRFMiddleware) -> None:
         """Test that PUT requests with form data are protected."""
         request = MagicMock(spec=Request)
         request.method = "PUT"
         request.headers = {"content-type": "application/x-www-form-urlencoded"}
         assert csrf_middleware._should_protect(request) is True
 
-    def test_should_protect_delete_request(self, csrf_middleware):
+    def test_should_protect_delete_request(self, csrf_middleware: CSRFMiddleware) -> None:
         """Test that DELETE requests with form data are protected."""
         request = MagicMock(spec=Request)
         request.method = "DELETE"
         request.headers = {"content-type": "application/x-www-form-urlencoded"}
         assert csrf_middleware._should_protect(request) is True
 
-    def test_should_protect_patch_request(self, csrf_middleware):
+    def test_should_protect_patch_request(self, csrf_middleware: CSRFMiddleware) -> None:
         """Test that PATCH requests with form data are protected."""
         request = MagicMock(spec=Request)
         request.method = "PATCH"
         request.headers = {"content-type": "application/x-www-form-urlencoded"}
         assert csrf_middleware._should_protect(request) is True
 
-    def test_should_not_protect_bearer_token_request(self, csrf_middleware):
+    def test_should_not_protect_bearer_token_request(self, csrf_middleware: CSRFMiddleware) -> None:
         """Test that Bearer token requests bypass CSRF."""
         request = MagicMock(spec=Request)
         request.method = "POST"
@@ -291,28 +294,28 @@ class TestShouldProtect:
         }
         assert csrf_middleware._should_protect(request) is False
 
-    def test_should_not_protect_json_content_type(self, csrf_middleware):
+    def test_should_not_protect_json_content_type(self, csrf_middleware: CSRFMiddleware) -> None:
         """Test that JSON content-type requests bypass CSRF."""
         request = MagicMock(spec=Request)
         request.method = "POST"
         request.headers = {"content-type": "application/json"}
         assert csrf_middleware._should_protect(request) is False
 
-    def test_should_not_protect_multipart_form_data(self, csrf_middleware):
+    def test_should_not_protect_multipart_form_data(self, csrf_middleware: CSRFMiddleware) -> None:
         """Test that multipart/form-data is protected (form-based)."""
         request = MagicMock(spec=Request)
         request.method = "POST"
         request.headers = {"content-type": "multipart/form-data; boundary=----"}
         assert csrf_middleware._should_protect(request) is True
 
-    def test_should_not_protect_xml_content_type(self, csrf_middleware):
+    def test_should_not_protect_xml_content_type(self, csrf_middleware: CSRFMiddleware) -> None:
         """Test that XML content-type requests bypass CSRF."""
         request = MagicMock(spec=Request)
         request.method = "POST"
         request.headers = {"content-type": "application/xml"}
         assert csrf_middleware._should_protect(request) is False
 
-    def test_should_protect_missing_content_type(self, csrf_middleware):
+    def test_should_protect_missing_content_type(self, csrf_middleware: CSRFMiddleware) -> None:
         """Test that requests without content-type are protected (default to form-based)."""
         request = MagicMock(spec=Request)
         request.method = "POST"
@@ -329,7 +332,7 @@ class TestTokenExtraction:
     """Tests for CSRF token extraction from requests."""
 
     @pytest.mark.asyncio
-    async def test_extract_token_from_header(self, csrf_middleware):
+    async def test_extract_token_from_header(self, csrf_middleware: CSRFMiddleware) -> None:
         """Test extracting token from X-CSRF-Token header."""
         request = MagicMock(spec=Request)
         request.headers = {"X-CSRF-Token": "test-token-123"}
@@ -339,7 +342,7 @@ class TestTokenExtraction:
         assert token == "test-token-123"
 
     @pytest.mark.asyncio
-    async def test_extract_token_from_form_data(self, csrf_middleware):
+    async def test_extract_token_from_form_data(self, csrf_middleware: CSRFMiddleware) -> None:
         """Test extracting token from form data."""
         request = MagicMock(spec=Request)
         request.headers = {}
@@ -349,7 +352,9 @@ class TestTokenExtraction:
         assert token == "form-token-456"
 
     @pytest.mark.asyncio
-    async def test_extract_token_header_takes_precedence(self, csrf_middleware):
+    async def test_extract_token_header_takes_precedence(
+        self, csrf_middleware: CSRFMiddleware
+    ) -> None:
         """Test that header token takes precedence over form token."""
         request = MagicMock(spec=Request)
         request.headers = {"X-CSRF-Token": "header-token"}
@@ -359,7 +364,9 @@ class TestTokenExtraction:
         assert token == "header-token"
 
     @pytest.mark.asyncio
-    async def test_extract_token_returns_none_if_missing(self, csrf_middleware):
+    async def test_extract_token_returns_none_if_missing(
+        self, csrf_middleware: CSRFMiddleware
+    ) -> None:
         """Test that None is returned if token is missing."""
         request = MagicMock(spec=Request)
         request.headers = {}
@@ -369,7 +376,9 @@ class TestTokenExtraction:
         assert token is None
 
     @pytest.mark.asyncio
-    async def test_extract_token_handles_form_exception(self, csrf_middleware):
+    async def test_extract_token_handles_form_exception(
+        self, csrf_middleware: CSRFMiddleware
+    ) -> None:
         """Test that form parsing exceptions are handled gracefully."""
         request = MagicMock(spec=Request)
         request.headers = {}
@@ -379,7 +388,9 @@ class TestTokenExtraction:
         assert token is None
 
     @pytest.mark.asyncio
-    async def test_extract_token_ignores_non_string_form_values(self, csrf_middleware):
+    async def test_extract_token_ignores_non_string_form_values(
+        self, csrf_middleware: CSRFMiddleware
+    ) -> None:
         """Test that non-string form values are ignored."""
         request = MagicMock(spec=Request)
         request.headers = {}
@@ -397,7 +408,7 @@ class TestTokenExtraction:
 class TestValidTokenValidation:
     """Tests for valid token validation on unsafe methods."""
 
-    def test_valid_token_on_post_request(self, client_csrf_enabled):
+    def test_valid_token_on_post_request(self, client_csrf_enabled: TestClient) -> None:
         """Test that POST request with valid token succeeds."""
         # First, get a token from a GET request
         get_response = client_csrf_enabled.get("/test")
@@ -420,7 +431,7 @@ class TestValidTokenValidation:
         assert response.status_code == 200
         assert response.json()["message"] == "POST success"
 
-    def test_valid_token_on_put_request(self, client_csrf_enabled):
+    def test_valid_token_on_put_request(self, client_csrf_enabled: TestClient) -> None:
         """Test that PUT request with valid token succeeds."""
         test_token = "valid-test-token"
         with patch("app.middleware.csrf.settings") as mock_settings:
@@ -436,7 +447,7 @@ class TestValidTokenValidation:
         assert response.status_code == 200
         assert response.json()["message"] == "PUT success"
 
-    def test_valid_token_on_delete_request(self, client_csrf_enabled):
+    def test_valid_token_on_delete_request(self, client_csrf_enabled: TestClient) -> None:
         """Test that DELETE request with valid token succeeds."""
         test_token = "valid-test-token"
         with patch("app.middleware.csrf.settings") as mock_settings:
@@ -452,7 +463,7 @@ class TestValidTokenValidation:
         assert response.status_code == 200
         assert response.json()["message"] == "DELETE success"
 
-    def test_valid_token_on_patch_request(self, client_csrf_enabled):
+    def test_valid_token_on_patch_request(self, client_csrf_enabled: TestClient) -> None:
         """Test that PATCH request with valid token succeeds."""
         test_token = "valid-test-token"
         with patch("app.middleware.csrf.settings") as mock_settings:
@@ -477,7 +488,7 @@ class TestValidTokenValidation:
 class TestMissingTokenRejection:
     """Tests for missing token rejection on unsafe methods."""
 
-    def test_missing_token_on_post_request(self, client_csrf_enabled):
+    def test_missing_token_on_post_request(self, client_csrf_enabled: TestClient) -> None:
         """Test that POST request without token is rejected."""
         response = client_csrf_enabled.post("/test")
         assert response.status_code == 403
@@ -485,32 +496,32 @@ class TestMissingTokenRejection:
         assert data["error"]["code"] == "CSRF_TOKEN_MISSING"
         assert "required" in data["error"]["message"].lower()
 
-    def test_missing_token_on_put_request(self, client_csrf_enabled):
+    def test_missing_token_on_put_request(self, client_csrf_enabled: TestClient) -> None:
         """Test that PUT request without token is rejected."""
         response = client_csrf_enabled.put("/test")
         assert response.status_code == 403
         assert response.json()["error"]["code"] == "CSRF_TOKEN_MISSING"
 
-    def test_missing_token_on_delete_request(self, client_csrf_enabled):
+    def test_missing_token_on_delete_request(self, client_csrf_enabled: TestClient) -> None:
         """Test that DELETE request without token is rejected."""
         response = client_csrf_enabled.delete("/test")
         assert response.status_code == 403
         assert response.json()["error"]["code"] == "CSRF_TOKEN_MISSING"
 
-    def test_missing_token_on_patch_request(self, client_csrf_enabled):
+    def test_missing_token_on_patch_request(self, client_csrf_enabled: TestClient) -> None:
         """Test that PATCH request without token is rejected."""
         response = client_csrf_enabled.patch("/test")
         assert response.status_code == 403
         assert response.json()["error"]["code"] == "CSRF_TOKEN_MISSING"
 
-    def test_missing_header_token_with_cookie(self, client_csrf_enabled):
+    def test_missing_header_token_with_cookie(self, client_csrf_enabled: TestClient) -> None:
         """Test that missing header token is rejected even with cookie."""
         client_csrf_enabled.cookies.set("csrf_token", "some-cookie-value")
         response = client_csrf_enabled.post("/test")
         assert response.status_code == 403
         assert response.json()["error"]["code"] == "CSRF_TOKEN_MISSING"
 
-    def test_missing_cookie_token_with_header(self, client_csrf_enabled):
+    def test_missing_cookie_token_with_header(self, client_csrf_enabled: TestClient) -> None:
         """Test that missing cookie token is rejected even with header."""
         response = client_csrf_enabled.post(
             "/test",
@@ -519,7 +530,7 @@ class TestMissingTokenRejection:
         assert response.status_code == 403
         assert response.json()["error"]["code"] == "CSRF_TOKEN_MISSING"
 
-    def test_error_response_includes_timestamp(self, client_csrf_enabled):
+    def test_error_response_includes_timestamp(self, client_csrf_enabled: TestClient) -> None:
         """Test that error response includes timestamp."""
         response = client_csrf_enabled.post("/test")
         assert response.status_code == 403
@@ -538,7 +549,7 @@ class TestMissingTokenRejection:
 class TestInvalidTokenRejection:
     """Tests for invalid token rejection on unsafe methods."""
 
-    def test_invalid_token_on_post_request(self, client_csrf_enabled):
+    def test_invalid_token_on_post_request(self, client_csrf_enabled: TestClient) -> None:
         """Test that POST request with invalid token is rejected."""
         client_csrf_enabled.cookies.set("csrf_token", "invalid-cookie")
         response = client_csrf_enabled.post(
@@ -550,7 +561,7 @@ class TestInvalidTokenRejection:
         assert data["error"]["code"] == "CSRF_TOKEN_INVALID"
         assert "invalid" in data["error"]["message"].lower()
 
-    def test_invalid_token_on_put_request(self, client_csrf_enabled):
+    def test_invalid_token_on_put_request(self, client_csrf_enabled: TestClient) -> None:
         """Test that PUT request with invalid token is rejected."""
         client_csrf_enabled.cookies.set("csrf_token", "invalid-cookie")
         response = client_csrf_enabled.put(
@@ -560,7 +571,7 @@ class TestInvalidTokenRejection:
         assert response.status_code == 403
         assert response.json()["error"]["code"] == "CSRF_TOKEN_INVALID"
 
-    def test_invalid_token_on_delete_request(self, client_csrf_enabled):
+    def test_invalid_token_on_delete_request(self, client_csrf_enabled: TestClient) -> None:
         """Test that DELETE request with invalid token is rejected."""
         client_csrf_enabled.cookies.set("csrf_token", "invalid-cookie")
         response = client_csrf_enabled.delete(
@@ -570,7 +581,7 @@ class TestInvalidTokenRejection:
         assert response.status_code == 403
         assert response.json()["error"]["code"] == "CSRF_TOKEN_INVALID"
 
-    def test_invalid_token_on_patch_request(self, client_csrf_enabled):
+    def test_invalid_token_on_patch_request(self, client_csrf_enabled: TestClient) -> None:
         """Test that PATCH request with invalid token is rejected."""
         client_csrf_enabled.cookies.set("csrf_token", "invalid-cookie")
         response = client_csrf_enabled.patch(
@@ -580,7 +591,7 @@ class TestInvalidTokenRejection:
         assert response.status_code == 403
         assert response.json()["error"]["code"] == "CSRF_TOKEN_INVALID"
 
-    def test_mismatched_token_and_cookie(self, client_csrf_enabled):
+    def test_mismatched_token_and_cookie(self, client_csrf_enabled: TestClient) -> None:
         """Test that mismatched token and cookie are rejected."""
         # Create two different tokens
         with patch("app.middleware.csrf.settings") as mock_settings:
@@ -609,7 +620,7 @@ class TestInvalidTokenRejection:
 class TestExemptPaths:
     """Tests for CSRF exempt paths."""
 
-    def test_bearer_token_bypass_post(self, client_csrf_enabled):
+    def test_bearer_token_bypass_post(self, client_csrf_enabled: TestClient) -> None:
         """Test that Bearer token requests bypass CSRF on POST."""
         response = client_csrf_enabled.post(
             "/test",
@@ -618,7 +629,7 @@ class TestExemptPaths:
         assert response.status_code == 200
         assert response.json()["message"] == "POST success"
 
-    def test_bearer_token_bypass_put(self, client_csrf_enabled):
+    def test_bearer_token_bypass_put(self, client_csrf_enabled: TestClient) -> None:
         """Test that Bearer token requests bypass CSRF on PUT."""
         response = client_csrf_enabled.put(
             "/test",
@@ -627,7 +638,7 @@ class TestExemptPaths:
         assert response.status_code == 200
         assert response.json()["message"] == "PUT success"
 
-    def test_bearer_token_bypass_delete(self, client_csrf_enabled):
+    def test_bearer_token_bypass_delete(self, client_csrf_enabled: TestClient) -> None:
         """Test that Bearer token requests bypass CSRF on DELETE."""
         response = client_csrf_enabled.delete(
             "/test",
@@ -636,7 +647,7 @@ class TestExemptPaths:
         assert response.status_code == 200
         assert response.json()["message"] == "DELETE success"
 
-    def test_bearer_token_bypass_patch(self, client_csrf_enabled):
+    def test_bearer_token_bypass_patch(self, client_csrf_enabled: TestClient) -> None:
         """Test that Bearer token requests bypass CSRF on PATCH."""
         response = client_csrf_enabled.patch(
             "/test",
@@ -645,7 +656,7 @@ class TestExemptPaths:
         assert response.status_code == 200
         assert response.json()["message"] == "PATCH success"
 
-    def test_json_content_type_bypass(self, client_csrf_enabled):
+    def test_json_content_type_bypass(self, client_csrf_enabled: TestClient) -> None:
         """Test that JSON content-type requests bypass CSRF."""
         response = client_csrf_enabled.post(
             "/json-test",
@@ -654,7 +665,7 @@ class TestExemptPaths:
         assert response.status_code == 200
         assert response.json()["message"] == "JSON POST success"
 
-    def test_xml_content_type_bypass(self, client_csrf_enabled):
+    def test_xml_content_type_bypass(self, client_csrf_enabled: TestClient) -> None:
         """Test that XML content-type requests bypass CSRF."""
         response = client_csrf_enabled.post(
             "/test",
@@ -663,18 +674,18 @@ class TestExemptPaths:
         )
         assert response.status_code == 200
 
-    def test_safe_method_get_no_token_required(self, client_csrf_enabled):
+    def test_safe_method_get_no_token_required(self, client_csrf_enabled: TestClient) -> None:
         """Test that GET requests don't require CSRF token."""
         response = client_csrf_enabled.get("/test")
         assert response.status_code == 200
         assert response.json()["message"] == "GET success"
 
-    def test_safe_method_head_no_token_required(self, client_csrf_enabled):
+    def test_safe_method_head_no_token_required(self, client_csrf_enabled: TestClient) -> None:
         """Test that HEAD requests don't require CSRF token."""
         response = client_csrf_enabled.head("/test")
         assert response.status_code == 200
 
-    def test_safe_method_options_no_token_required(self, client_csrf_enabled):
+    def test_safe_method_options_no_token_required(self, client_csrf_enabled: TestClient) -> None:
         """Test that OPTIONS requests don't require CSRF token."""
         response = client_csrf_enabled.options("/test")
         assert response.status_code == 200
@@ -688,13 +699,17 @@ class TestExemptPaths:
 class TestDisabledMiddleware:
     """Tests for disabled CSRF middleware."""
 
-    def test_disabled_middleware_allows_post_without_token(self, client_csrf_disabled):
+    def test_disabled_middleware_allows_post_without_token(
+        self, client_csrf_disabled: TestClient
+    ) -> None:
         """Test that disabled middleware allows POST without token."""
         response = client_csrf_disabled.post("/test")
         assert response.status_code == 200
         assert response.json()["message"] == "POST success"
 
-    def test_disabled_middleware_no_token_in_response(self, client_csrf_disabled):
+    def test_disabled_middleware_no_token_in_response(
+        self, client_csrf_disabled: TestClient
+    ) -> None:
         """Test that disabled middleware doesn't set token in response."""
         response = client_csrf_disabled.post("/test")
         assert "csrf_token" not in response.cookies
@@ -708,7 +723,7 @@ class TestDisabledMiddleware:
 class TestFormDataTokenExtraction:
     """Tests for CSRF token extraction from form data."""
 
-    def test_form_data_token_extraction(self, client_csrf_enabled):
+    def test_form_data_token_extraction(self, client_csrf_enabled: TestClient) -> None:
         """Test that token can be extracted from form data."""
         test_token = "form-token-123"
         with patch("app.middleware.csrf.settings") as mock_settings:
@@ -724,7 +739,7 @@ class TestFormDataTokenExtraction:
         assert response.status_code == 200
         assert response.json()["message"] == "Form POST success"
 
-    def test_multipart_form_data_token_extraction(self, client_csrf_enabled):
+    def test_multipart_form_data_token_extraction(self, client_csrf_enabled: TestClient) -> None:
         """Test that token can be extracted from multipart form data."""
         test_token = "multipart-token-456"
         with patch("app.middleware.csrf.settings") as mock_settings:
@@ -748,7 +763,7 @@ class TestFormDataTokenExtraction:
 class TestHeaderTokenExtraction:
     """Tests for CSRF token extraction from headers."""
 
-    def test_header_token_extraction(self, client_csrf_enabled):
+    def test_header_token_extraction(self, client_csrf_enabled: TestClient) -> None:
         """Test that token can be extracted from X-CSRF-Token header."""
         test_token = "header-token-789"
         with patch("app.middleware.csrf.settings") as mock_settings:
@@ -764,12 +779,12 @@ class TestHeaderTokenExtraction:
         assert response.status_code == 200
         assert response.json()["message"] == "POST success"
 
-    def test_custom_header_name(self, mock_settings):
+    def test_custom_header_name(self, mock_settings: MagicMock) -> None:
         """Test that custom header name is respected."""
         app = FastAPI()
 
         @app.post("/test")
-        async def post_test():
+        async def post_test() -> dict[str, Any]:
             return {"message": "POST success"}
 
         app.add_middleware(
@@ -801,12 +816,12 @@ class TestHeaderTokenExtraction:
 class TestTokenExpiryConfiguration:
     """Tests for token expiry configuration."""
 
-    def test_token_expiry_minutes_in_cookie(self, mock_settings):
+    def test_token_expiry_in_cookie(self, mock_settings: MagicMock) -> None:
         """Test that token expiry is set in cookie."""
         app = FastAPI()
 
         @app.get("/test")
-        async def get_test():
+        async def get_test() -> dict[str, Any]:
             return {"message": "GET success"}
 
         app.add_middleware(
@@ -826,12 +841,12 @@ class TestTokenExpiryConfiguration:
         # The cookie should have max_age set to 120 * 60 = 7200 seconds
         assert cookie is not None
 
-    def test_custom_cookie_name(self, mock_settings):
+    def test_custom_cookie_name(self, mock_settings: MagicMock) -> None:
         """Test that custom cookie name is respected."""
         app = FastAPI()
 
         @app.get("/test")
-        async def get_test():
+        async def get_test() -> dict[str, Any]:
             return {"message": "GET success"}
 
         app.add_middleware(
@@ -857,12 +872,12 @@ class TestTokenExpiryConfiguration:
 class TestCookieAttributes:
     """Tests for CSRF token cookie attributes."""
 
-    def test_cookie_httponly_false(self, mock_settings):
+    def test_cookie_httponly_false(self, mock_settings: MagicMock) -> None:
         """Test that cookie httponly is False (JavaScript needs to read it)."""
         app = FastAPI()
 
         @app.get("/test")
-        async def get_test():
+        async def get_test() -> dict[str, Any]:
             return {"message": "GET success"}
 
         app.add_middleware(
@@ -880,12 +895,12 @@ class TestCookieAttributes:
         # the cookie is set and accessible
         assert "csrf_token" in response.cookies
 
-    def test_cookie_samesite_strict(self, mock_settings):
+    def test_cookie_samesite_strict(self, mock_settings: MagicMock) -> None:
         """Test that cookie samesite is strict."""
         app = FastAPI()
 
         @app.get("/test")
-        async def get_test():
+        async def get_test() -> dict[str, Any]:
             return {"message": "GET success"}
 
         app.add_middleware(
@@ -902,12 +917,12 @@ class TestCookieAttributes:
         # Verify cookie is set
         assert "csrf_token" in response.cookies
 
-    def test_cookie_secure_true(self, mock_settings):
+    def test_cookie_secure_true(self, mock_settings: MagicMock) -> None:
         """Test that cookie secure flag is True."""
         app = FastAPI()
 
         @app.get("/test")
-        async def get_test():
+        async def get_test() -> dict[str, Any]:
             return {"message": "GET success"}
 
         app.add_middleware(
@@ -933,7 +948,7 @@ class TestCookieAttributes:
 class TestEdgeCases:
     """Tests for edge cases and error handling."""
 
-    def test_empty_authorization_header(self, client_csrf_enabled):
+    def test_empty_authorization_header(self, client_csrf_enabled: TestClient) -> None:
         """Test that empty authorization header doesn't bypass CSRF."""
         response = client_csrf_enabled.post(
             "/test",
@@ -942,7 +957,7 @@ class TestEdgeCases:
         assert response.status_code == 403
         assert response.json()["error"]["code"] == "CSRF_TOKEN_MISSING"
 
-    def test_authorization_header_without_bearer(self, client_csrf_enabled):
+    def test_authorization_header_without_bearer(self, client_csrf_enabled: TestClient) -> None:
         """Test that non-Bearer authorization doesn't bypass CSRF."""
         response = client_csrf_enabled.post(
             "/test",
@@ -951,7 +966,7 @@ class TestEdgeCases:
         assert response.status_code == 403
         assert response.json()["error"]["code"] == "CSRF_TOKEN_MISSING"
 
-    def test_case_insensitive_content_type(self, client_csrf_enabled):
+    def test_case_insensitive_content_type(self, client_csrf_enabled: TestClient) -> None:
         """Test that content-type matching is case-insensitive."""
         response = client_csrf_enabled.post(
             "/test",
@@ -961,7 +976,7 @@ class TestEdgeCases:
         assert response.status_code == 403
         assert response.json()["error"]["code"] == "CSRF_TOKEN_MISSING"
 
-    def test_content_type_with_charset(self, client_csrf_enabled):
+    def test_content_type_with_charset(self, client_csrf_enabled: TestClient) -> None:
         """Test that content-type with charset is handled correctly."""
         response = client_csrf_enabled.post(
             "/test",
@@ -971,7 +986,7 @@ class TestEdgeCases:
         assert response.status_code == 403
         assert response.json()["error"]["code"] == "CSRF_TOKEN_MISSING"
 
-    def test_multiple_authorization_headers(self, client_csrf_enabled):
+    def test_multiple_authorization_headers(self, client_csrf_enabled: TestClient) -> None:
         """Test handling of multiple authorization headers."""
         # Most HTTP clients only send one, but test robustness
         response = client_csrf_enabled.post(
@@ -980,7 +995,7 @@ class TestEdgeCases:
         )
         assert response.status_code == 200
 
-    def test_whitespace_in_bearer_token(self, client_csrf_enabled):
+    def test_whitespace_in_bearer_token(self, client_csrf_enabled: TestClient) -> None:
         """Test that Bearer token with whitespace is recognized."""
         response = client_csrf_enabled.post(
             "/test",
@@ -989,7 +1004,7 @@ class TestEdgeCases:
         # Should bypass CSRF (Bearer token present)
         assert response.status_code == 200
 
-    def test_constant_time_comparison(self, csrf_middleware):
+    def test_constant_time_comparison(self, csrf_middleware: CSRFMiddleware) -> None:
         """Test that token comparison uses constant-time comparison."""
         # This is a security test to ensure timing attacks are prevented
         test_token = "test-token"

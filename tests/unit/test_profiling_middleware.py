@@ -12,12 +12,12 @@ from fastapi.testclient import TestClient
 class TestProfilingMiddlewareDisabled:
     """Test ProfilingMiddleware when profiling is disabled."""
 
-    def test_dispatch_disabled_passes_through(self):
+    def test_dispatch_disabled_passes_through(self) -> None:
         """When disabled, middleware passes request through without profiling."""
         app = FastAPI()
 
         @app.get("/test")
-        async def test_route():
+        async def test_route() -> dict[str, bool]:
             return {"ok": True}
 
         from app.middleware.profiling import ProfilingMiddleware
@@ -31,7 +31,7 @@ class TestProfilingMiddlewareDisabled:
         # No profiling headers added when disabled
         assert "X-Request-Duration" not in response.headers
 
-    def test_init_disabled_no_profiling_service(self):
+    def test_init_disabled_no_profiling_service(self) -> None:
         """When disabled, ProfilingService is not instantiated."""
         from app.middleware.profiling import ProfilingMiddleware
 
@@ -45,12 +45,12 @@ class TestProfilingMiddlewareDisabled:
 class TestProfilingMiddlewareEnabled:
     """Test ProfilingMiddleware when profiling is enabled."""
 
-    def test_dispatch_enabled_adds_duration_header(self):
+    def test_dispatch_enabled_adds_duration_header(self) -> None:
         """When enabled, dispatch adds X-Request-Duration header."""
         app = FastAPI()
 
         @app.get("/test")
-        async def test_route():
+        async def test_route() -> dict[str, bool]:
             return {"ok": True}
 
         from app.middleware.profiling import ProfilingMiddleware
@@ -63,12 +63,12 @@ class TestProfilingMiddlewareEnabled:
         assert response.status_code == 200
         assert "X-Request-Duration" in response.headers
 
-    def test_dispatch_enabled_with_function_profiling(self):
+    def test_dispatch_enabled_with_function_profiling(self) -> None:
         """When enabled with profile_functions=True, adds X-Profiled header."""
         app = FastAPI()
 
         @app.get("/test")
-        async def test_route():
+        async def test_route() -> dict[str, bool]:
             return {"ok": True}
 
         from app.middleware.profiling import ProfilingMiddleware
@@ -82,7 +82,7 @@ class TestProfilingMiddlewareEnabled:
         assert "X-Request-Duration" in response.headers
         assert response.headers.get("X-Profiled") == "true"
 
-    def test_init_enabled_creates_profiling_service(self):
+    def test_init_enabled_creates_profiling_service(self) -> None:
         """When enabled, ProfilingService is instantiated."""
         from app.middleware.profiling import ProfilingMiddleware
 
@@ -94,7 +94,7 @@ class TestProfilingMiddlewareEnabled:
         assert middleware.profiling_service is not None
         mock_svc_cls.assert_called_once()
 
-    def test_init_enabled_with_memory_tracing(self):
+    def test_init_enabled_with_memory_tracing(self) -> None:
         """When enabled with memory_tracing=True, starts memory tracing."""
         from app.middleware.profiling import ProfilingMiddleware
 
@@ -105,12 +105,12 @@ class TestProfilingMiddlewareEnabled:
 
         mock_svc.start_memory_tracing.assert_called_once()
 
-    def test_dispatch_enabled_no_function_profiling(self):
+    def test_dispatch_enabled_no_function_profiling(self) -> None:
         """When enabled without function profiling, no cProfile is used."""
         app = FastAPI()
 
         @app.get("/test")
-        async def test_route():
+        async def test_route() -> dict[str, bool]:
             return {"ok": True}
 
         from app.middleware.profiling import ProfilingMiddleware
@@ -130,7 +130,7 @@ class TestProfilingMiddlewareDispatchDirect:
     """Test dispatch method directly using AsyncMock for call_next."""
 
     @pytest.mark.asyncio
-    async def test_dispatch_disabled_calls_call_next(self):
+    async def test_dispatch_disabled_calls_call_next(self) -> None:
         """Disabled middleware calls call_next and returns its response."""
         from app.middleware.profiling import ProfilingMiddleware
 
@@ -148,7 +148,7 @@ class TestProfilingMiddlewareDispatchDirect:
         assert result is mock_response
 
     @pytest.mark.asyncio
-    async def test_dispatch_enabled_records_duration(self):
+    async def test_dispatch_enabled_records_duration(self) -> None:
         """Enabled middleware records duration and adds header."""
         from app.middleware.profiling import ProfilingMiddleware
 
@@ -169,7 +169,7 @@ class TestProfilingMiddlewareDispatchDirect:
         assert "X-Request-Duration" in mock_response.headers
 
     @pytest.mark.asyncio
-    async def test_dispatch_enabled_with_cprofile(self):
+    async def test_dispatch_enabled_with_cprofile(self) -> None:
         """Enabled middleware with profile_functions uses cProfile."""
         from app.middleware.profiling import ProfilingMiddleware
 

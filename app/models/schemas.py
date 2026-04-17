@@ -83,10 +83,11 @@ class CustomConfig(BaseModel):
 
     @field_validator("config")
     @classmethod
-    def validate_config_structure(cls, v):
+    def validate_config_structure(cls, v: Any) -> Any:
         """Validate that config values are reasonable types and not too deeply nested."""
 
-        def validate_value(value, depth=0, max_depth=5):
+        def validate_value(value: Any, depth: int = 0, max_depth: int = 5) -> None:
+            """Recursively validate configuration values."""
             if depth > max_depth:
                 raise ValueError(f"Configuration nesting too deep (max {max_depth} levels)")
 
@@ -110,7 +111,7 @@ class CustomConfig(BaseModel):
         validate_value(v)
         return v
 
-    def model_dump(self, **kwargs):
+    def model_dump(self, **kwargs: Any) -> Any:
         """Override model_dump to return just the config dict for backward compatibility."""
         return self.config
 
@@ -130,7 +131,7 @@ class SessionTemplateCreateRequest(BaseModel):
 
     @field_validator("name")
     @classmethod
-    def validate_name(cls, v):
+    def validate_name(cls, v: Any) -> Any:
         """Validate template name."""
         if not v or not v.strip():
             raise ValueError("Template name cannot be empty")
@@ -142,7 +143,7 @@ class SessionTemplateCreateRequest(BaseModel):
 
     @field_validator("config_path")
     @classmethod
-    def validate_config_path(cls, v):
+    def validate_config_path(cls, v: Any) -> Any:
         """Validate configuration file path."""
         if v is None:
             return v
@@ -169,7 +170,7 @@ class SessionTemplateCreateRequest(BaseModel):
 
     @field_validator("custom_config")
     @classmethod
-    def validate_custom_config(cls, v):
+    def validate_custom_config(cls, v: Any) -> Any:
         """Validate custom configuration."""
         if v is None:
             return v
@@ -191,7 +192,7 @@ class SessionTemplateCreateRequest(BaseModel):
 
     @field_validator("tags")
     @classmethod
-    def validate_tags(cls, v):
+    def validate_tags(cls, v: Any) -> Any:
         """Validate template tags."""
         if v is None:
             return []
@@ -213,7 +214,7 @@ class SessionTemplateCreateRequest(BaseModel):
         return [tag.strip() for tag in v]
 
     @model_validator(mode="after")
-    def validate_config_consistency(self):
+    def validate_config_consistency(self) -> "SessionTemplateCreateRequest":
         """Validate consistency between config_path and custom_config."""
         if self.config_path and self.custom_config:
             # Having both is allowed but warn about potential conflicts
@@ -253,7 +254,7 @@ class SessionTemplateUpdateRequest(BaseModel):
 
     @field_validator("name")
     @classmethod
-    def validate_name(cls, v):
+    def validate_name(cls, v: Any) -> Any:
         """Validate template name."""
         if v is None:
             return v
@@ -268,7 +269,7 @@ class SessionTemplateUpdateRequest(BaseModel):
 
     @field_validator("config_path")
     @classmethod
-    def validate_config_path(cls, v):
+    def validate_config_path(cls, v: Any) -> Any:
         """Validate configuration file path."""
         if v is None:
             return v
@@ -298,7 +299,7 @@ class SessionTemplateUpdateRequest(BaseModel):
 
     @field_validator("custom_config")
     @classmethod
-    def validate_custom_config(cls, v):
+    def validate_custom_config(cls, v: Any) -> Any:
         """Validate custom configuration."""
         if v is None:
             return v
@@ -320,7 +321,7 @@ class SessionTemplateUpdateRequest(BaseModel):
 
     @field_validator("tags")
     @classmethod
-    def validate_tags(cls, v):
+    def validate_tags(cls, v: Any) -> Any:
         """Validate template tags."""
         if v is None:
             return v
@@ -437,7 +438,7 @@ class SessionCreateRequest(BaseModel):
 
     @field_validator("template_id")
     @classmethod
-    def validate_template_id(cls, v):
+    def validate_template_id(cls, v: Any) -> Any:
         """Validate template ID format."""
         if v is None:
             return v
@@ -456,7 +457,7 @@ class SessionCreateRequest(BaseModel):
 
     @field_validator("config_path")
     @classmethod
-    def validate_config_path(cls, v):
+    def validate_config_path(cls, v: Any) -> Any:
         """Validate configuration file path."""
         if v is None:
             return v
@@ -486,7 +487,7 @@ class SessionCreateRequest(BaseModel):
 
     @field_validator("custom_config")
     @classmethod
-    def validate_custom_config(cls, v):
+    def validate_custom_config(cls, v: Any) -> Any:
         """Validate custom configuration."""
         if v is None:
             return v
@@ -508,7 +509,7 @@ class SessionCreateRequest(BaseModel):
 
     @field_validator("description")
     @classmethod
-    def validate_description(cls, v):
+    def validate_description(cls, v: Any) -> Any:
         """Validate session description."""
         if v is None:
             return v
@@ -523,7 +524,7 @@ class SessionCreateRequest(BaseModel):
         return v.strip()
 
     @model_validator(mode="after")
-    def validate_config_consistency(self):
+    def validate_config_consistency(self) -> "SessionCreateRequest":
         """Validate consistency between template_id, config_path and custom_config."""
         if self.template_id:
             # If using template, config_path and custom_config are optional overrides
@@ -557,7 +558,7 @@ class LoginRequest(BaseModel):
 
     @field_validator("username")
     @classmethod
-    def validate_username(cls, v):
+    def validate_username(cls, v: Any) -> Any:
         """Validate username format."""
         if not v or not v.strip():
             raise ValueError("Username cannot be empty")
@@ -578,7 +579,7 @@ class LoginRequest(BaseModel):
 
     @field_validator("password")
     @classmethod
-    def validate_password(cls, v):
+    def validate_password(cls, v: Any) -> Any:
         """Validate password strength."""
         if not v or len(v) < 8:
             raise ValueError("Password must be at least 8 characters long")
@@ -807,7 +808,7 @@ class TaskDependencyCreateRequest(BaseModel):
 
     @field_validator("prerequisite_task_id")
     @classmethod
-    def validate_prerequisite_task_id(cls, v):
+    def validate_prerequisite_task_id(cls, v: Any) -> Any:
         """Validate prerequisite task ID format."""
         if not isinstance(v, str) or not v.strip():
             raise ValueError("Prerequisite task ID must be a non-empty string")
@@ -820,7 +821,7 @@ class TaskDependencyCreateRequest(BaseModel):
 
     @field_validator("dependency_type")
     @classmethod
-    def validate_dependency_type(cls, v):
+    def validate_dependency_type(cls, v: Any) -> Any:
         """Validate dependency type."""
         if v is None:
             return "completion"
@@ -877,7 +878,7 @@ class TaskSubmitRequest(BaseModel):
 
     @field_validator("task_type")
     @classmethod
-    def validate_task_type(cls, v):
+    def validate_task_type(cls, v: Any) -> Any:
         """Validate task type."""
         if not v or not v.strip():
             raise ValueError("Task type cannot be empty")
@@ -886,7 +887,7 @@ class TaskSubmitRequest(BaseModel):
 
     @field_validator("parameters")
     @classmethod
-    def validate_parameters(cls, v):
+    def validate_parameters(cls, v: Any) -> Any:
         """Validate task parameters."""
         if not isinstance(v, dict):
             raise ValueError("Parameters must be a dictionary")
@@ -908,7 +909,7 @@ class TaskSubmitRequest(BaseModel):
 
     @field_validator("webhook_url")
     @classmethod
-    def validate_webhook_url(cls, v):
+    def validate_webhook_url(cls, v: Any) -> Any:
         """Validate webhook URL format."""
         if v is None:
             return v
@@ -930,7 +931,7 @@ class TaskSubmitRequest(BaseModel):
         return v.strip()
 
     @model_validator(mode="after")
-    def validate_task_specific_parameters(self):
+    def validate_task_specific_parameters(self) -> "TaskSubmitRequest":
         """Validate task-specific parameter ranges."""
         if self.task_type == "attentional_blink":
             params = self.parameters
@@ -1289,7 +1290,7 @@ class UserCreateRequest(BaseModel):
 
     @field_validator("username")
     @classmethod
-    def validate_username(cls, v):
+    def validate_username(cls, v: Any) -> Any:
         """Validate username format."""
         if not v or not v.strip():
             raise ValueError("Username cannot be empty")
@@ -1304,7 +1305,7 @@ class UserCreateRequest(BaseModel):
 
     @field_validator("email")
     @classmethod
-    def validate_email(cls, v):
+    def validate_email(cls, v: Any) -> Any:
         """Validate email format."""
         if not v or not v.strip():
             raise ValueError("Email cannot be empty")
@@ -1317,7 +1318,7 @@ class UserCreateRequest(BaseModel):
 
     @field_validator("password")
     @classmethod
-    def validate_password(cls, v):
+    def validate_password(cls, v: Any) -> Any:
         """Validate password strength."""
         if not v or len(v) < 8:
             raise ValueError("Password must be at least 8 characters long")
@@ -1417,7 +1418,7 @@ class PasswordResetEmailRequest(BaseModel):
 
     @field_validator("email")
     @classmethod
-    def validate_email(cls, v):
+    def validate_email(cls, v: Any) -> Any:
         """Validate email format."""
         if not v or not v.strip():
             raise ValueError("Email cannot be empty")
@@ -1437,7 +1438,7 @@ class PasswordResetConfirmRequest(BaseModel):
 
     @field_validator("token")
     @classmethod
-    def validate_token(cls, v):
+    def validate_token(cls, v: Any) -> Any:
         """Validate token format."""
         if not v or not v.strip():
             raise ValueError("Token cannot be empty")
@@ -1511,7 +1512,7 @@ class MFABackupCodeVerifyRequest(BaseModel):
 
     @field_validator("code")
     @classmethod
-    def validate_code(cls, v):
+    def validate_code(cls, v: Any) -> Any:
         """Validate backup code format."""
         if not v or not v.strip():
             raise ValueError("Backup code cannot be empty")
@@ -1726,7 +1727,7 @@ class APIKeyCreateRequest(BaseModel):
 
     @field_validator("name")
     @classmethod
-    def validate_name(cls, v):
+    def validate_name(cls, v: Any) -> Any:
         """Validate API key name."""
         if not v or not v.strip():
             raise ValueError("API key name cannot be empty")
@@ -1738,7 +1739,7 @@ class APIKeyCreateRequest(BaseModel):
 
     @field_validator("expires_at")
     @classmethod
-    def validate_expires_at(cls, v):
+    def validate_expires_at(cls, v: Any) -> Any:
         """Validate expiration date."""
         if v is not None:
             now = datetime.now(timezone.utc)
@@ -1754,7 +1755,7 @@ class APIKeyCreateRequest(BaseModel):
 
     @model_validator(mode="before")
     @classmethod
-    def validate_request(cls, data):
+    def validate_request(cls, data: Any) -> Any:
         """Ensure API key has reasonable expiry if provided."""
         if data.get("expires_at") is None:
             # Set default expiry to 1 year if not provided
@@ -1764,7 +1765,7 @@ class APIKeyCreateRequest(BaseModel):
 
     @field_validator("permissions")
     @classmethod
-    def validate_permissions(cls, v):
+    def validate_permissions(cls, v: Any) -> Any:
         """Validate permissions list."""
         if v is None:
             return []
@@ -1885,7 +1886,7 @@ class APIKeyUpdateRequest(BaseModel):
 
     @field_validator("name")
     @classmethod
-    def validate_name(cls, v):
+    def validate_name(cls, v: Any) -> Any:
         """Validate API key name."""
         if v is None:
             return v
@@ -1900,7 +1901,7 @@ class APIKeyUpdateRequest(BaseModel):
 
     @field_validator("permissions")
     @classmethod
-    def validate_permissions(cls, v):
+    def validate_permissions(cls, v: Any) -> Any:
         """Validate permissions list."""
         if v is None:
             return v

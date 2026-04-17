@@ -152,7 +152,7 @@ class InvalidTaskTypeError(APIError):
     HTTP Status: 400 Bad Request
     """
 
-    def __init__(self, task_type: str, valid_types: list):
+    def __init__(self, task_type: str, valid_types: list[str]):
         """
         Initialize invalid task type error.
 
@@ -180,7 +180,7 @@ class ValidationError(APIError):
     HTTP Status: 422 Unprocessable Entity
     """
 
-    def __init__(self, message: str, validation_errors: Optional[list] = None):
+    def __init__(self, message: str, validation_errors: Optional[list[dict[str, Any]]] = None):
         """
         Initialize validation error.
 
@@ -432,7 +432,7 @@ class ExportFormatError(APIError):
     HTTP Status: 400 Bad Request
     """
 
-    def __init__(self, format: str, supported_formats: list):
+    def __init__(self, format: str, supported_formats: list[str]):
         """
         Initialize export format error.
 

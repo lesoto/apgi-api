@@ -2,7 +2,7 @@
 
 import json
 import pytest
-from typing import Dict, Any
+from typing import Dict, Any, List, Optional
 from unittest.mock import patch, MagicMock, AsyncMock
 
 from app.services.data_export import DataExportService
@@ -12,15 +12,15 @@ class TestDataExportService:
     """Test DataExportService initialization and basic functionality."""
 
     @pytest.fixture
-    def export_service(self):
+    def export_service(self) -> DataExportService:
         mock_session_manager = MagicMock()
         return DataExportService(session_manager=mock_session_manager)
 
-    def test_initialization(self, export_service):
+    def test_initialization(self, export_service: DataExportService) -> None:
         """Test DataExportService initializes correctly."""
         assert export_service.session_manager is not None
 
-    def test_export_json_basic(self, export_service):
+    def test_export_json_basic(self, export_service: DataExportService) -> None:
         """Test _export_json returns bytes and correct content type."""
         data = {"session_id": "s1", "data": []}
         result, ct = export_service._export_json(data)
@@ -29,7 +29,7 @@ class TestDataExportService:
         parsed = json.loads(result)
         assert parsed["session_id"] == "s1"
 
-    def test_export_csv_basic(self, export_service):
+    def test_export_csv_basic(self, export_service: DataExportService) -> None:
         """Test _export_csv returns bytes."""
         data = {
             "session_id": "s1",
@@ -44,32 +44,32 @@ class TestDataExportService:
         text = result.decode("utf-8")
         assert "time" in text
 
-    def test_redact_config_basic(self, export_service):
+    def test_redact_config_basic(self, export_service: DataExportService) -> None:
         """Test _redact_config removes sensitive keys."""
         config = {"password": "secret", "name": "test"}
         redacted = export_service._redact_config(config)
         assert redacted["password"] == "[REDACTED]"
         assert redacted["name"] == "test"
 
-    def test_extract_time_series_empty(self, export_service):
+    def test_extract_time_series_empty(self, export_service: DataExportService) -> None:
         """Test _extract_time_series with empty state."""
         result = export_service._extract_time_series({}, None, None, None)
         assert result == []
 
 
 @pytest.fixture
-def mock_session_manager():
+def mock_session_manager() -> MagicMock:
     mgr = MagicMock()
     mgr.get_session = AsyncMock()
     return mgr
 
 
 @pytest.fixture
-def service(mock_session_manager):
+def service(mock_session_manager: MagicMock) -> DataExportService:
     return DataExportService(mock_session_manager)
 
 
-def _make_mock_session(history=None):
+def _make_mock_session(history: Optional[Dict[str, Any]] = None) -> MagicMock:
     """Helper to build a mock session object."""
     if history is None:
         history = {"time": [0, 1, 2], "var1": [10, 20, 30]}
@@ -92,7 +92,9 @@ def _make_mock_session(history=None):
 
 class TestExportSessionData:
     @pytest.mark.asyncio
-    async def test_json_export_returns_bytes_and_content_type(self, service, mock_session_manager):
+    async def test_json_export_returns_bytes_and_content_type(
+        self, service: DataExportService, mock_session_manager: MagicMock
+    ) -> None:
         mock_session_manager.get_session.return_value = _make_mock_session()
         data, ct = await service.export_session_data("sess1", format="json")
         assert ct == "application/json"
@@ -102,7 +104,9 @@ class TestExportSessionData:
         assert "data" in parsed
 
     @pytest.mark.asyncio
-    async def test_csv_export_returns_bytes_and_content_type(self, service, mock_session_manager):
+    async def test_csv_export_returns_bytes_and_content_type(
+        self, service: DataExportService, mock_session_manager: MagicMock
+    ) -> None:
         mock_session_manager.get_session.return_value = _make_mock_session()
         data, ct = await service.export_session_data("sess1", format="csv")
         assert ct == "text/csv"
@@ -111,65 +115,81 @@ class TestExportSessionData:
         assert "time" in text
 
     @pytest.mark.asyncio
-    async def test_invalid_format_raises_value_error(self, service, mock_session_manager):
+    async def test_invalid_format_raises_value_error(
+        self, service: DataExportService, mock_session_manager: MagicMock
+    ) -> None:
         mock_session_manager.get_session.return_value = _make_mock_session()
         with pytest.raises(ValueError, match="Unsupported export format"):
             await service.export_session_data("sess1", format="xml")
 
     @pytest.mark.asyncio
-    async def test_session_not_found_raises_value_error(self, service, mock_session_manager):
+    async def test_session_not_found_raises_value_error(
+        self, service: DataExportService, mock_session_manager: MagicMock
+    ) -> None:
         mock_session_manager.get_session.side_effect = ValueError("not found")
         with pytest.raises(ValueError, match="Session sess1 not found"):
             await service.export_session_data("sess1")
 
     @pytest.mark.asyncio
-    async def test_json_export_with_time_filter(self, service, mock_session_manager):
+    async def test_json_export_with_time_filter(
+        self, service: DataExportService, mock_session_manager: MagicMock
+    ) -> None:
         history = {"time": [0, 1, 2, 3, 4], "val": [10, 20, 30, 40, 50]}
         mock_session_manager.get_session.return_value = _make_mock_session(history)
         data, ct = await service.export_session_data(
             "sess1", format="json", start_time=1, end_time=3
         )
-        parsed = json.loads(data)
+        parsed = json.loads(data)  # type: ignore[arg-type]
         times = [p["time"] for p in parsed["data"]]
         assert all(1 <= t <= 3 for t in times)
 
     @pytest.mark.asyncio
-    async def test_json_export_with_variable_filter(self, service, mock_session_manager):
+    async def test_json_export_with_variable_filter(
+        self, service: DataExportService, mock_session_manager: MagicMock
+    ) -> None:
         history = {"time": [0, 1], "var1": [1, 2], "var2": [3, 4]}
         mock_session_manager.get_session.return_value = _make_mock_session(history)
         data, ct = await service.export_session_data("sess1", format="json", variables=["var1"])
-        parsed = json.loads(data)
+        parsed = json.loads(data)  # type: ignore[arg-type]
         for point in parsed["data"]:
             assert "var1" in point
             assert "var2" not in point
 
     @pytest.mark.asyncio
-    async def test_json_export_with_user_id(self, service, mock_session_manager):
+    async def test_json_export_with_user_id(
+        self, service: DataExportService, mock_session_manager: MagicMock
+    ) -> None:
         mock_session_manager.get_session.return_value = _make_mock_session()
         data, ct = await service.export_session_data("sess1", format="json", user_id="user_1")
         mock_session_manager.get_session.assert_called_once_with("sess1", "user_1")
 
     @pytest.mark.asyncio
-    async def test_csv_export_empty_history(self, service, mock_session_manager):
+    async def test_csv_export_empty_history(
+        self, service: DataExportService, mock_session_manager: MagicMock
+    ) -> None:
         mock_session_manager.get_session.return_value = _make_mock_session({"time": []})
         data, ct = await service.export_session_data("sess1", format="csv")
         assert ct == "text/csv"
-        text = data.decode("utf-8")
+        text = data.decode("utf-8")  # type: ignore[union-attr]
         assert "time" in text
 
     @pytest.mark.asyncio
-    async def test_csv_export_includes_metadata_comments(self, service, mock_session_manager):
+    async def test_csv_export_includes_metadata_comments(
+        self, service: DataExportService, mock_session_manager: MagicMock
+    ) -> None:
         mock_session_manager.get_session.return_value = _make_mock_session()
         data, ct = await service.export_session_data("sess1", format="csv")
-        text = data.decode("utf-8")
+        text = data.decode("utf-8")  # type: ignore[union-attr]
         assert "# session_id: sess1" in text
         assert "# state:" in text
 
     @pytest.mark.asyncio
-    async def test_json_export_metadata_fields(self, service, mock_session_manager):
+    async def test_json_export_metadata_fields(
+        self, service: DataExportService, mock_session_manager: MagicMock
+    ) -> None:
         mock_session_manager.get_session.return_value = _make_mock_session()
         data, _ = await service.export_session_data("sess1", format="json")
-        parsed = json.loads(data)
+        parsed = json.loads(data)  # type: ignore[arg-type]
         assert "session_id" in parsed
         assert "created_at" in parsed
         assert "updated_at" in parsed
@@ -177,19 +197,25 @@ class TestExportSessionData:
         assert "state" in parsed
 
     @pytest.mark.asyncio
-    async def test_format_is_case_insensitive_json(self, service, mock_session_manager):
+    async def test_format_is_case_insensitive_json(
+        self, service: DataExportService, mock_session_manager: MagicMock
+    ) -> None:
         mock_session_manager.get_session.return_value = _make_mock_session()
         data, ct = await service.export_session_data("sess1", format="JSON")
         assert ct == "application/json"
 
     @pytest.mark.asyncio
-    async def test_format_is_case_insensitive_csv(self, service, mock_session_manager):
+    async def test_format_is_case_insensitive_csv(
+        self, service: DataExportService, mock_session_manager: MagicMock
+    ) -> None:
         mock_session_manager.get_session.return_value = _make_mock_session()
         data, ct = await service.export_session_data("sess1", format="CSV")
         assert ct == "text/csv"
 
     @pytest.mark.asyncio
-    async def test_default_format_is_json(self, service, mock_session_manager):
+    async def test_default_format_is_json(
+        self, service: DataExportService, mock_session_manager: MagicMock
+    ) -> None:
         mock_session_manager.get_session.return_value = _make_mock_session()
         data, ct = await service.export_session_data("sess1")
         assert ct == "application/json"
@@ -201,44 +227,44 @@ class TestExportSessionData:
 
 
 class TestExtractTimeSeries:
-    def test_no_history_returns_empty(self, service):
+    def test_no_history_returns_empty(self, service: DataExportService) -> None:
         result = service._extract_time_series({}, None, None, None)
         assert result == []
 
-    def test_basic_extraction(self, service):
+    def test_basic_extraction(self, service: DataExportService) -> None:
         state = {"history": {"time": [0, 1, 2], "x": [10, 20, 30]}}
         result = service._extract_time_series(state, None, None, None)
         assert len(result) == 3
         assert result[0] == {"time": 0, "x": 10}
 
-    def test_start_time_filter(self, service):
+    def test_start_time_filter(self, service: DataExportService) -> None:
         state = {"history": {"time": [0, 1, 2, 3], "x": [1, 2, 3, 4]}}
         result = service._extract_time_series(state, None, 2, None)
         assert all(p["time"] >= 2 for p in result)
 
-    def test_end_time_filter(self, service):
+    def test_end_time_filter(self, service: DataExportService) -> None:
         state = {"history": {"time": [0, 1, 2, 3], "x": [1, 2, 3, 4]}}
         result = service._extract_time_series(state, None, None, 1)
         assert all(p["time"] <= 1 for p in result)
 
-    def test_variable_filter(self, service):
+    def test_variable_filter(self, service: DataExportService) -> None:
         state = {"history": {"time": [0, 1], "x": [1, 2], "y": [3, 4]}}
         result = service._extract_time_series(state, ["x"], None, None)
         for point in result:
             assert "x" in point
             assert "y" not in point
 
-    def test_size_limit_truncates(self, service):
+    def test_size_limit_truncates(self, service: DataExportService) -> None:
         state = {"history": {"time": list(range(1000)), "x": list(range(1000))}}
         result = service._extract_time_series(state, None, None, None, max_size_bytes=100)
         assert len(result) < 1000
 
-    def test_missing_value_uses_none(self, service):
+    def test_missing_value_uses_none(self, service: DataExportService) -> None:
         state = {"history": {"time": [0, 1, 2], "x": [10, 20]}}  # x shorter than time
         result = service._extract_time_series(state, None, None, None)
         assert result[2]["x"] is None
 
-    def test_max_export_points_truncation(self, service):
+    def test_max_export_points_truncation(self, service: DataExportService) -> None:
         """Covers the settings.max_export_points truncation warning path."""
         n = 200
         state = {"history": {"time": list(range(n)), "x": list(range(n))}}
@@ -248,17 +274,17 @@ class TestExtractTimeSeries:
             result = service._extract_time_series(state, None, None, None)
         assert len(result) == 5
 
-    def test_both_time_filters_applied(self, service):
+    def test_both_time_filters_applied(self, service: DataExportService) -> None:
         state = {"history": {"time": [0, 1, 2, 3, 4], "x": [0, 1, 2, 3, 4]}}
         result = service._extract_time_series(state, None, 1, 3)
         assert [p["time"] for p in result] == [1, 2, 3]
 
-    def test_empty_time_points(self, service):
+    def test_empty_time_points(self, service: DataExportService) -> None:
         state: Dict[str, Any] = {"history": {"time": [], "x": []}}
         result = service._extract_time_series(state, None, None, None)
         assert result == []
 
-    def test_no_variables_in_history_except_time(self, service):
+    def test_no_variables_in_history_except_time(self, service: DataExportService) -> None:
         state = {"history": {"time": [0, 1, 2]}}
         result = service._extract_time_series(state, None, None, None)
         assert len(result) == 3
@@ -271,14 +297,14 @@ class TestExtractTimeSeries:
 
 
 class TestExportHelpers:
-    def test_export_json_returns_bytes(self, service):
+    def test_export_json_returns_bytes(self, service: DataExportService) -> None:
         data = {"session_id": "s1", "data": []}
         result, ct = service._export_json(data)
         assert ct == "application/json"
         assert isinstance(result, bytes)
         assert json.loads(result)["session_id"] == "s1"
 
-    def test_export_csv_with_data(self, service):
+    def test_export_csv_with_data(self, service: DataExportService) -> None:
         data = {
             "session_id": "s1",
             "created_at": "2024-01-01T00:00:00Z",
@@ -293,7 +319,7 @@ class TestExportHelpers:
         assert "time,x" in text
         assert "0,1" in text
 
-    def test_export_csv_empty_data(self, service):
+    def test_export_csv_empty_data(self, service: DataExportService) -> None:
         data = {
             "session_id": "s1",
             "created_at": "2024-01-01T00:00:00Z",
@@ -306,14 +332,14 @@ class TestExportHelpers:
         text = result.decode("utf-8")
         assert "time" in text
 
-    def test_redact_config_removes_sensitive_keys(self, service):
+    def test_redact_config_removes_sensitive_keys(self, service: DataExportService) -> None:
         config = {"password": "secret", "api_key": "key123", "name": "test"}
         redacted = service._redact_config(config)
         assert redacted["password"] == "[REDACTED]"
         assert redacted["api_key"] == "[REDACTED]"
         assert redacted["name"] == "test"
 
-    def test_redact_config_all_sensitive_keys(self, service):
+    def test_redact_config_all_sensitive_keys(self, service: DataExportService) -> None:
         """Covers all sensitive key names: password, secret, key, token, api_key."""
         config = {
             "password": "p",
@@ -328,12 +354,12 @@ class TestExportHelpers:
             assert redacted[sensitive] == "[REDACTED]"
         assert redacted["safe"] == "value"
 
-    def test_redact_config_does_not_mutate_original(self, service):
+    def test_redact_config_does_not_mutate_original(self, service: DataExportService) -> None:
         config = {"password": "secret"}
         service._redact_config(config)
         assert config["password"] == "secret"
 
-    def test_export_csv_config_is_redacted(self, service):
+    def test_export_csv_config_is_redacted(self, service: DataExportService) -> None:
         """Ensures _redact_config is called during CSV export."""
         data = {
             "session_id": "s1",
@@ -348,7 +374,7 @@ class TestExportHelpers:
         assert "supersecret" not in text
         assert "[REDACTED]" in text
 
-    def test_export_csv_metadata_comment_lines(self, service):
+    def test_export_csv_metadata_comment_lines(self, service: DataExportService) -> None:
         data = {
             "session_id": "my-session",
             "created_at": "2024-01-01T00:00:00Z",
@@ -374,7 +400,7 @@ class TestExportHelpers:
 class TestCsvEscaping:
     """Tests for the escape_csv_value inner function via _export_csv."""
 
-    def _make_csv_data(self, values):
+    def _make_csv_data(self, values: List[Any]) -> Dict[str, Any]:
         """Build export_data with a single variable 'v' having the given values."""
         return {
             "session_id": "s1",
@@ -385,74 +411,74 @@ class TestCsvEscaping:
             "data": [{"time": i, "v": val} for i, val in enumerate(values)],
         }
 
-    def test_plain_value_unchanged(self, service):
+    def test_plain_value_unchanged(self, service: DataExportService) -> None:
         data = self._make_csv_data(["hello"])
         text = service._export_csv(data).decode("utf-8")
         assert "hello" in text
 
-    def test_empty_string_value(self, service):
+    def test_empty_string_value(self, service: DataExportService) -> None:
         data = self._make_csv_data([""])
         result = service._export_csv(data)
         assert isinstance(result, bytes)
 
-    def test_value_starting_with_equals_is_escaped(self, service):
+    def test_value_starting_with_equals_is_escaped(self, service: DataExportService) -> None:
         data = self._make_csv_data(["=SUM(A1)"])
         text = service._export_csv(data).decode("utf-8")
         assert "=SUM(A1)" not in text or "\\=" in text or text.count("'") >= 1
 
-    def test_value_starting_with_plus_is_escaped(self, service):
+    def test_value_starting_with_plus_is_escaped(self, service: DataExportService) -> None:
         data = self._make_csv_data(["+cmd"])
         text = service._export_csv(data).decode("utf-8")
         # Should be sanitized — original unescaped form should not appear
         assert "+cmd" not in text or "\\+" in text or "'" in text
 
-    def test_value_starting_with_minus_is_escaped(self, service):
+    def test_value_starting_with_minus_is_escaped(self, service: DataExportService) -> None:
         data = self._make_csv_data(["-1+2"])
         text = service._export_csv(data).decode("utf-8")
         assert isinstance(text, str)
 
-    def test_value_starting_with_at_is_escaped(self, service):
+    def test_value_starting_with_at_is_escaped(self, service: DataExportService) -> None:
         data = self._make_csv_data(["@user"])
         text = service._export_csv(data).decode("utf-8")
         assert "@user" not in text or "\\@" in text or "'" in text
 
-    def test_value_starting_with_tab_is_escaped(self, service):
+    def test_value_starting_with_tab_is_escaped(self, service: DataExportService) -> None:
         data = self._make_csv_data(["\tcmd"])
         text = service._export_csv(data).decode("utf-8")
         assert isinstance(text, str)
 
-    def test_value_with_comma_is_quoted(self, service):
+    def test_value_with_comma_is_quoted(self, service: DataExportService) -> None:
         data = self._make_csv_data(["hello,world"])
         text = service._export_csv(data).decode("utf-8")
         # comma in value should be handled (quoted or escaped)
         assert isinstance(text, str)
 
-    def test_value_with_newline_is_handled(self, service):
+    def test_value_with_newline_is_handled(self, service: DataExportService) -> None:
         data = self._make_csv_data(["line1\nline2"])
         text = service._export_csv(data).decode("utf-8")
         assert isinstance(text, str)
 
-    def test_value_with_double_quote_is_escaped(self, service):
+    def test_value_with_double_quote_is_escaped(self, service: DataExportService) -> None:
         data = self._make_csv_data(['say "hello"'])
         text = service._export_csv(data).decode("utf-8")
         assert isinstance(text, str)
 
-    def test_hex_pattern_is_escaped(self, service):
+    def test_hex_pattern_is_escaped(self, service: DataExportService) -> None:
         data = self._make_csv_data(["0xFF"])
         text = service._export_csv(data).decode("utf-8")
         assert isinstance(text, str)
 
-    def test_formula_cmd_pattern(self, service):
+    def test_formula_cmd_pattern(self, service: DataExportService) -> None:
         data = self._make_csv_data(["=cmd|' /C calc'!A0"])
         text = service._export_csv(data).decode("utf-8")
         assert "=cmd|' /C calc'!A0" not in text or "\\=" in text
 
-    def test_value_with_carriage_return(self, service):
+    def test_value_with_carriage_return(self, service: DataExportService) -> None:
         data = self._make_csv_data(["val\rend"])
         text = service._export_csv(data).decode("utf-8")
         assert isinstance(text, str)
 
-    def test_multiple_variables_sorted_in_header(self, service):
+    def test_multiple_variables_sorted_in_header(self, service: DataExportService) -> None:
         """Verifies variable names are sorted in CSV header."""
         export_data = {
             "session_id": "s1",
@@ -475,7 +501,9 @@ class TestCsvEscaping:
 
 class TestGenerateSummaryStats:
     @pytest.mark.asyncio
-    async def test_returns_correct_stats(self, service, mock_session_manager):
+    async def test_returns_correct_stats(
+        self, service: DataExportService, mock_session_manager: MagicMock
+    ) -> None:
         history = {"time": [0, 1, 2], "var1": [1, 2, 3], "var2": [4, 5, 6]}
         mock_session_manager.get_session.return_value = _make_mock_session(history)
         stats = await service.generate_summary_stats("sess1")
@@ -484,25 +512,33 @@ class TestGenerateSummaryStats:
         assert "time" in stats["variables"]
 
     @pytest.mark.asyncio
-    async def test_session_not_found_raises(self, service, mock_session_manager):
+    async def test_session_not_found_raises(
+        self, service: DataExportService, mock_session_manager: MagicMock
+    ) -> None:
         mock_session_manager.get_session.side_effect = ValueError("not found")
         with pytest.raises(ValueError, match="Session sess1 not found"):
             await service.generate_summary_stats("sess1")
 
     @pytest.mark.asyncio
-    async def test_empty_history(self, service, mock_session_manager):
+    async def test_empty_history(
+        self, service: DataExportService, mock_session_manager: MagicMock
+    ) -> None:
         mock_session_manager.get_session.return_value = _make_mock_session({})
         stats = await service.generate_summary_stats("sess1")
         assert stats["num_time_points"] == 0
 
     @pytest.mark.asyncio
-    async def test_with_user_id(self, service, mock_session_manager):
+    async def test_with_user_id(
+        self, service: DataExportService, mock_session_manager: MagicMock
+    ) -> None:
         mock_session_manager.get_session.return_value = _make_mock_session()
         await service.generate_summary_stats("sess1", user_id="u1")
         mock_session_manager.get_session.assert_called_once_with("sess1", "u1")
 
     @pytest.mark.asyncio
-    async def test_variables_list_in_stats(self, service, mock_session_manager):
+    async def test_variables_list_in_stats(
+        self, service: DataExportService, mock_session_manager: MagicMock
+    ) -> None:
         history = {"time": [0], "alpha": [1], "beta": [2]}
         mock_session_manager.get_session.return_value = _make_mock_session(history)
         stats = await service.generate_summary_stats("sess1")
@@ -516,7 +552,9 @@ class TestGenerateSummaryStats:
 
 class TestExportTimeSeries:
     @pytest.mark.asyncio
-    async def test_basic_export(self, service, mock_session_manager):
+    async def test_basic_export(
+        self, service: DataExportService, mock_session_manager: MagicMock
+    ) -> None:
         history = {"time": [0, 1, 2], "var1": [1, 2, 3]}
         mock_session_manager.get_session.return_value = _make_mock_session(history)
         result = await service.export_time_series("sess1", variables=["var1"])
@@ -525,33 +563,43 @@ class TestExportTimeSeries:
         assert result["num_points"] == 3
 
     @pytest.mark.asyncio
-    async def test_with_downsample(self, service, mock_session_manager):
+    async def test_with_downsample(
+        self, service: DataExportService, mock_session_manager: MagicMock
+    ) -> None:
         history = {"time": list(range(10)), "var1": list(range(10))}
         mock_session_manager.get_session.return_value = _make_mock_session(history)
         result = await service.export_time_series("sess1", variables=["var1"], downsample=2)
         assert result["num_points"] == 5
 
     @pytest.mark.asyncio
-    async def test_with_limit(self, service, mock_session_manager):
+    async def test_with_limit(
+        self, service: DataExportService, mock_session_manager: MagicMock
+    ) -> None:
         history = {"time": list(range(100)), "var1": list(range(100))}
         mock_session_manager.get_session.return_value = _make_mock_session(history)
         result = await service.export_time_series("sess1", variables=["var1"], limit=10)
         assert result["num_points"] == 10
 
     @pytest.mark.asyncio
-    async def test_session_not_found_raises(self, service, mock_session_manager):
+    async def test_session_not_found_raises(
+        self, service: DataExportService, mock_session_manager: MagicMock
+    ) -> None:
         mock_session_manager.get_session.side_effect = ValueError("not found")
         with pytest.raises(ValueError, match="Session sess1 not found"):
             await service.export_time_series("sess1", variables=["var1"])
 
     @pytest.mark.asyncio
-    async def test_next_cursor_is_none(self, service, mock_session_manager):
+    async def test_next_cursor_is_none(
+        self, service: DataExportService, mock_session_manager: MagicMock
+    ) -> None:
         mock_session_manager.get_session.return_value = _make_mock_session()
         result = await service.export_time_series("sess1", variables=["var1"])
         assert result["next_cursor"] is None
 
     @pytest.mark.asyncio
-    async def test_with_time_filters(self, service, mock_session_manager):
+    async def test_with_time_filters(
+        self, service: DataExportService, mock_session_manager: MagicMock
+    ) -> None:
         history = {"time": [0, 1, 2, 3, 4], "var1": [0, 1, 2, 3, 4]}
         mock_session_manager.get_session.return_value = _make_mock_session(history)
         result = await service.export_time_series(
@@ -560,13 +608,17 @@ class TestExportTimeSeries:
         assert all(1 <= p["time"] <= 3 for p in result["data"])
 
     @pytest.mark.asyncio
-    async def test_with_user_id(self, service, mock_session_manager):
+    async def test_with_user_id(
+        self, service: DataExportService, mock_session_manager: MagicMock
+    ) -> None:
         mock_session_manager.get_session.return_value = _make_mock_session()
         await service.export_time_series("sess1", variables=["var1"], user_id="u1")
         mock_session_manager.get_session.assert_called_once_with("sess1", "u1")
 
     @pytest.mark.asyncio
-    async def test_downsample_of_one_no_change(self, service, mock_session_manager):
+    async def test_downsample_of_one_no_change(
+        self, service: DataExportService, mock_session_manager: MagicMock
+    ) -> None:
         """downsample=1 should not reduce points (slice [::1] is identity)."""
         history = {"time": [0, 1, 2], "var1": [1, 2, 3]}
         mock_session_manager.get_session.return_value = _make_mock_session(history)
@@ -575,7 +627,9 @@ class TestExportTimeSeries:
         assert result["num_points"] == 3
 
     @pytest.mark.asyncio
-    async def test_data_structure(self, service, mock_session_manager):
+    async def test_data_structure(
+        self, service: DataExportService, mock_session_manager: MagicMock
+    ) -> None:
         history = {"time": [0, 1], "var1": [10, 20]}
         mock_session_manager.get_session.return_value = _make_mock_session(history)
         result = await service.export_time_series("sess1", variables=["var1"])
@@ -590,7 +644,9 @@ class TestExportTimeSeries:
 
 class TestGetEventAnalysis:
     @pytest.mark.asyncio
-    async def test_returns_event_analysis(self, service, mock_session_manager):
+    async def test_returns_event_analysis(
+        self, service: DataExportService, mock_session_manager: MagicMock
+    ) -> None:
         mock_session_manager.get_session.return_value = _make_mock_session()
         result = await service.get_event_analysis("sess1", event_type="ignition")
         assert result["session_id"] == "sess1"
@@ -599,31 +655,41 @@ class TestGetEventAnalysis:
         assert "events" in result
 
     @pytest.mark.asyncio
-    async def test_session_not_found_raises(self, service, mock_session_manager):
+    async def test_session_not_found_raises(
+        self, service: DataExportService, mock_session_manager: MagicMock
+    ) -> None:
         mock_session_manager.get_session.side_effect = ValueError("not found")
         with pytest.raises(ValueError, match="Session sess1 not found"):
             await service.get_event_analysis("sess1")
 
     @pytest.mark.asyncio
-    async def test_default_event_type_is_ignition(self, service, mock_session_manager):
+    async def test_default_event_type_is_ignition(
+        self, service: DataExportService, mock_session_manager: MagicMock
+    ) -> None:
         mock_session_manager.get_session.return_value = _make_mock_session()
         result = await service.get_event_analysis("sess1")
         assert result["event_type"] == "ignition"
 
     @pytest.mark.asyncio
-    async def test_custom_event_type(self, service, mock_session_manager):
+    async def test_custom_event_type(
+        self, service: DataExportService, mock_session_manager: MagicMock
+    ) -> None:
         mock_session_manager.get_session.return_value = _make_mock_session()
         result = await service.get_event_analysis("sess1", event_type="shutdown")
         assert result["event_type"] == "shutdown"
 
     @pytest.mark.asyncio
-    async def test_with_user_id(self, service, mock_session_manager):
+    async def test_with_user_id(
+        self, service: DataExportService, mock_session_manager: MagicMock
+    ) -> None:
         mock_session_manager.get_session.return_value = _make_mock_session()
         await service.get_event_analysis("sess1", user_id="u1")
         mock_session_manager.get_session.assert_called_once_with("sess1", "u1")
 
     @pytest.mark.asyncio
-    async def test_total_events_is_zero(self, service, mock_session_manager):
+    async def test_total_events_is_zero(
+        self, service: DataExportService, mock_session_manager: MagicMock
+    ) -> None:
         mock_session_manager.get_session.return_value = _make_mock_session()
         result = await service.get_event_analysis("sess1")
         assert result["total_events"] == 0

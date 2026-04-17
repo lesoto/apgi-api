@@ -12,11 +12,12 @@ import uuid
 import time
 from datetime import datetime, timezone
 from enum import Enum
-from typing import Any, Dict, Optional, Tuple
+from typing import Any, Callable, Dict, Optional, Tuple
 from collections import OrderedDict
 
 import redis.asyncio as redis
 from sqlalchemy import select, func
+from sqlalchemy.orm import Session
 
 from app.database.models import Session as SessionModel
 from app.database.models import SessionTemplate
@@ -131,11 +132,11 @@ class SimulationSession:
         """Check if transition to new_state is allowed from current state."""
         return new_state in ALLOWED_TRANSITIONS.get(self.state, [])
 
-    def _apply_custom_config(self, custom_config: Dict[str, Any]):
+    def _apply_custom_config(self, custom_config: Dict[str, Any]) -> None:
         """Apply custom configuration overrides to APGI system."""
 
         # Deep merge custom config into system config
-        def deep_merge(base: dict, override: dict):
+        def deep_merge(base: dict[str, Any], override: dict[str, Any]) -> None:
             for key, value in override.items():
                 if key in base and isinstance(base[key], dict) and isinstance(value, dict):
                     deep_merge(base[key], value)
@@ -163,7 +164,7 @@ class SimulationSession:
         state["ignition"] = self.apgi_system.ignition.save_state()
         return state
 
-    def _restore_state(self, state: Dict[str, Any]):
+    def _restore_state(self, state: Dict[str, Any]) -> None:
         """Restore system state from snapshot."""
         # Restore complete system state from snapshot
         if not state:
@@ -386,7 +387,7 @@ class SessionManager:
     Handles session lifecycle, state caching, and resource cleanup.
     """
 
-    def __init__(self, redis_client: redis.Redis, db_session_factory):
+    def __init__(self, redis_client: redis.Redis, db_session_factory: Callable[[], Session]):
         """
         Initialize session manager.
 
@@ -422,7 +423,7 @@ class SessionManager:
             del self.sessions[key]
             logger.debug(f"Removed expired session {key} from cache")
 
-    async def _persist_session(self, session_id: str):
+    async def _persist_session(self, session_id: str) -> None:
         """Persist the full session state to database."""
         if session_id not in self.sessions:
             return
@@ -444,8 +445,8 @@ class SessionManager:
                 db_model = result.scalar_one_or_none()
 
                 if db_model:
-                    db_model.full_state = state
-                    db_model.updated_at = datetime.now(timezone.utc)
+                    db_model.full_state = state  # type: ignore[assignment]
+                    db_model.updated_at = datetime.now(timezone.utc)  # type: ignore[assignment]
                     db_session.commit()
                     logger.debug(f"Persisted full state for session {session_id}")
             except Exception as e:
@@ -494,7 +495,7 @@ class SessionManager:
                 .where(SessionModel.user_id == user_id)
                 .where(SessionModel.is_deleted.is_(False))
             )
-            if session_count >= settings.max_sessions_per_user:
+            if session_count >= settings.max_sessions_per_user:  # type: ignore[operator]
                 raise ValueError(
                     f"User {user_id} has reached the maximum number of sessions ({settings.max_sessions_per_user}). "
                     "Please delete some existing sessions before creating new ones."
@@ -503,7 +504,7 @@ class SessionManager:
             db_session.close()
 
         # Prepare configuration
-        config = {}
+        config: dict[str, Any] = {}
 
         # Handle template-based session creation
         template_id = None
@@ -542,7 +543,7 @@ class SessionManager:
             config["config_path"] = request.config_path
         if request.custom_config:
             # Merge custom config with existing (request overrides template)
-            existing_custom = config.get("custom_config", {})
+            existing_custom: Any = config.get("custom_config", {})
             existing_custom.update(request.custom_config)
             config["custom_config"] = existing_custom
         if request.description and not template_id:
@@ -678,21 +679,21 @@ class SessionManager:
                     raise ValueError(f"Session {session_id} not found")
 
             # Reconstruct session
-            sim_session = SimulationSession(session_id, db_model.config)
+            sim_session = SimulationSession(session_id, db_model.config)  # type: ignore[arg-type]
             sim_session.state = SessionLifecycleState(db_model.state)
-            sim_session.created_at = db_model.created_at
-            sim_session.updated_at = db_model.updated_at
+            sim_session.created_at = db_model.created_at  # type: ignore[assignment]
+            sim_session.updated_at = db_model.updated_at  # type: ignore[assignment]
 
             # Restore full state if persisted
             if db_model.full_state:
-                sim_session._restore_state(db_model.full_state)
+                sim_session._restore_state(db_model.full_state)  # type: ignore[arg-type]
                 logger.debug(f"Restored full state for session {session_id}")
 
             # Add to caches
             async with self.cache_lock:
                 self.sessions[session_id] = (sim_session, time.time())  # Store with timestamp
 
-            await self._cache_session_metadata(session_id, sim_session, db_model.user_id)
+            await self._cache_session_metadata(session_id, sim_session, db_model.user_id)  # type: ignore[arg-type]
 
             logger.info(f"Session {session_id} loaded from database")
 
@@ -700,7 +701,7 @@ class SessionManager:
         finally:
             db_session.close()
 
-    async def delete_session(self, session_id: str):
+    async def delete_session(self, session_id: str) -> None:
         """
         Clean up session resources.
 
@@ -728,8 +729,8 @@ class SessionManager:
             db_model = result.scalar_one_or_none()
 
             if db_model:
-                db_model.is_deleted = True
-                db_model.updated_at = datetime.now(timezone.utc)
+                db_model.is_deleted = True  # type: ignore[assignment]
+                db_model.updated_at = datetime.now(timezone.utc)  # type: ignore[assignment]
                 db_session.commit()
                 logger.info(f"Session {session_id} soft deleted from database")
         except Exception as e:
@@ -743,7 +744,7 @@ class SessionManager:
 
     async def update_session_state(
         self, session_id: str, new_state: SessionLifecycleState, user_id: Optional[str] = None
-    ):
+    ) -> None:
         """
         Update session state in database and cache atomically.
 
@@ -772,8 +773,8 @@ class SessionManager:
             db_model = result.scalar_one_or_none()
 
             if db_model:
-                db_model.state = new_state.value
-                db_model.updated_at = datetime.now(timezone.utc)
+                db_model.state = new_state.value  # type: ignore[assignment]
+                db_model.updated_at = datetime.now(timezone.utc)  # type: ignore[assignment]
                 db_session.commit()
                 logger.info(f"Session {session_id} state updated to {new_state.value} atomically")
         except Exception as e:
@@ -790,7 +791,7 @@ class SessionManager:
 
     async def _cache_session_metadata(
         self, session_id: str, sim_session: SimulationSession, user_id: str
-    ):
+    ) -> None:
         """Cache session metadata in Redis."""
         metadata = {
             "session_id": session_id,

@@ -156,7 +156,7 @@ class TestValidateCeleryUrls:
 class TestModuleLevel:
     """Test module-level code behavior."""
 
-    def test_validate_function_exists(self, clear_celery_mock) -> None:
+    def test_validate_function_exists(self, clear_celery_mock: Any) -> None:
         """Test that _validate_celery_urls function exists."""
         from app.celery_app import _validate_celery_urls
 

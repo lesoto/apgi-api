@@ -47,7 +47,9 @@ class CircuitBreaker:
     service_name: str
     failure_threshold: int = 5  # Open after this many consecutive failures
     recovery_timeout: float = 60.0  # Seconds to wait before trying again
-    expected_exception: tuple = (Exception,)  # Exceptions that count as failures
+    expected_exception: tuple[type[Exception], ...] = (
+        Exception,
+    )  # Exceptions that count as failures
     success_threshold: int = 3  # Successes needed to close circuit in half-open state
 
     # Internal state
@@ -55,11 +57,11 @@ class CircuitBreaker:
     stats: CircuitBreakerStats = field(default_factory=CircuitBreakerStats)
     logger: StructuredLogger = field(default_factory=lambda: StructuredLogger("circuit_breaker"))
 
-    def __post_init__(self):
+    def __post_init__(self) -> None:
         if self.logger is None:
             self.logger = StructuredLogger(f"circuit_breaker.{self.service_name}")
 
-    async def call(self, func: Callable, *args, **kwargs) -> Any:
+    async def call(self, func: Callable[..., Any], *args: Any, **kwargs: Any) -> Any:
         """
         Execute a function with circuit breaker protection.
 
@@ -105,7 +107,7 @@ class CircuitBreaker:
             return True
         return time.time() - self.stats.last_failure_time >= self.recovery_timeout
 
-    def _record_success(self):
+    def _record_success(self) -> None:
         """Record a successful call."""
         self.stats.successful_requests += 1
         self.stats.consecutive_failures = 0
@@ -118,7 +120,7 @@ class CircuitBreaker:
                 "Circuit breaker CLOSED after successful call", service=self.service_name
             )
 
-    def _record_failure(self):
+    def _record_failure(self) -> None:
         """Record a failed call."""
         self.stats.failed_requests += 1
         self.stats.consecutive_failures += 1
@@ -178,7 +180,7 @@ class RetryConfig:
     max_delay: float = 60.0  # Maximum delay between retries
     backoff_factor: float = 2.0  # Exponential backoff multiplier
     jitter: bool = True  # Add random jitter to delay
-    retryable_exceptions: tuple = (Exception,)  # Exceptions to retry on
+    retryable_exceptions: tuple[type[Exception], ...] = (Exception,)  # Exceptions to retry on
 
 
 class RetryService:
@@ -189,7 +191,9 @@ class RetryService:
     def __init__(self, logger: Optional[StructuredLogger] = None):
         self.logger: StructuredLogger = logger or StructuredLogger("retry_service")
 
-    async def execute_with_retry(self, func: Callable, config: RetryConfig, *args, **kwargs) -> Any:
+    async def execute_with_retry(
+        self, func: Callable[..., Any], config: RetryConfig, *args: Any, **kwargs: Any
+    ) -> Any:
         """
         Execute a function with exponential backoff retry.
 
@@ -259,7 +263,7 @@ class ErrorRecoveryService:
     Comprehensive error recovery service combining retry logic and circuit breakers.
     """
 
-    def __init__(self):
+    def __init__(self) -> None:
         self.logger = StructuredLogger("error_recovery")
         self.services: Dict[str, ExternalServiceConfig] = {}
         self.retry_service = RetryService()
@@ -269,7 +273,7 @@ class ErrorRecoveryService:
         service_name: str,
         retry_config: Optional[RetryConfig] = None,
         circuit_breaker: Optional[CircuitBreaker] = None,
-    ):
+    ) -> None:
         """
         Register an external service for error recovery.
 
@@ -291,7 +295,7 @@ class ErrorRecoveryService:
         self.logger.info("Registered service for error recovery", service=service_name)
 
     async def call_external_service(
-        self, service_name: str, func: Callable, *args, **kwargs
+        self, service_name: str, func: Callable[..., Any], *args: Any, **kwargs: Any
     ) -> Any:
         """
         Call an external service with error recovery.
@@ -319,7 +323,7 @@ class ErrorRecoveryService:
         service_config = self.services[service_name]
 
         # Wrap the function call with circuit breaker and retry logic
-        async def protected_call():
+        async def protected_call() -> Any:
             return await self.retry_service.execute_with_retry(
                 func, service_config.retry_config, *args, **kwargs
             )
@@ -360,7 +364,7 @@ class ErrorRecoveryService:
         """Get statistics for all registered services."""
         return {name: self.get_service_stats(name) for name in self.services.keys()}
 
-    def reset_circuit_breaker(self, service_name: str):
+    def reset_circuit_breaker(self, service_name: str) -> None:
         """
         Manually reset a circuit breaker to closed state.
 

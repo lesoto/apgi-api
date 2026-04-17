@@ -27,6 +27,7 @@ Usage:
 
 import json
 import random
+from typing import Any
 from locust import HttpUser, task, between, events
 from locust.runners import MasterRunner
 
@@ -48,9 +49,9 @@ class APIUser(HttpUser):
     """
 
     # Wait between 1-3 seconds between tasks
-    wait_time = between(1, 3)
+    wait_time = between(1, 3)  # type: ignore[no-untyped-call]
 
-    def on_start(self):
+    def on_start(self) -> None:
         """
         Called when a simulated user starts.
         Performs login to get authentication token.
@@ -61,7 +62,7 @@ class APIUser(HttpUser):
         self.session_id = None
 
     @task(10)
-    def health_check(self):
+    def health_check(self) -> None:
         """
         Test basic health check endpoint.
 
@@ -79,7 +80,7 @@ class APIUser(HttpUser):
                 response.failure(f"Got status code {response.status_code}")
 
     @task(8)
-    def readiness_check(self):
+    def readiness_check(self) -> None:
         """
         Test readiness check endpoint with dependency verification.
 
@@ -95,7 +96,7 @@ class APIUser(HttpUser):
                 response.failure(f"Unexpected status code {response.status_code}")
 
     @task(5)
-    def liveness_check(self):
+    def liveness_check(self) -> None:
         """
         Test liveness check endpoint.
 
@@ -111,7 +112,7 @@ class APIUser(HttpUser):
                 response.failure(f"Got status code {response.status_code}")
 
     @task(3)
-    def get_api_info(self):
+    def get_api_info(self) -> None:
         """
         Test root endpoint for API information.
 
@@ -129,7 +130,7 @@ class APIUser(HttpUser):
                 response.failure(f"Got status code {response.status_code}")
 
     @task(2)
-    def get_version(self):
+    def get_version(self) -> None:
         """
         Test version endpoint.
 
@@ -143,7 +144,7 @@ class APIUser(HttpUser):
                 response.failure(f"Got status code {response.status_code}")
 
     @task(2)
-    def list_tasks(self):
+    def list_tasks(self) -> None:
         """
         Test task listing endpoint.
 
@@ -158,7 +159,7 @@ class APIUser(HttpUser):
                 response.failure(f"Got status code {response.status_code}")
 
     @task(1)
-    def get_openapi_schema(self):
+    def get_openapi_schema(self) -> None:
         """
         Test OpenAPI schema endpoint.
 
@@ -191,16 +192,16 @@ class AuthenticatedAPIUser(HttpUser):
     - Task submission
     """
 
-    wait_time = between(2, 5)
+    wait_time = between(2, 5)  # type: ignore[no-untyped-call]
 
-    def on_start(self):
+    def on_start(self) -> None:
         """Setup authentication for this user."""
         # In test mode, authentication might be bypassed
         self.token = None
-        self.session_ids = []
+        self.session_ids: list[str] = []
 
     @task(5)
-    def create_session(self):
+    def create_session(self) -> None:
         """
         Test session creation under load.
 
@@ -230,7 +231,7 @@ class AuthenticatedAPIUser(HttpUser):
                 response.failure(f"Got status code {response.status_code}")
 
     @task(3)
-    def get_session(self):
+    def get_session(self) -> None:
         """
         Test session retrieval under load.
 
@@ -254,7 +255,7 @@ class AuthenticatedAPIUser(HttpUser):
                 response.failure(f"Got status code {response.status_code}")
 
     @task(2)
-    def start_session(self):
+    def start_session(self) -> None:
         """
         Test session start operation under load.
 
@@ -278,7 +279,7 @@ class AuthenticatedAPIUser(HttpUser):
                 response.failure(f"Got status code {response.status_code}")
 
     @task(1)
-    def submit_task(self):
+    def submit_task(self) -> None:
         """
         Test task submission under load.
 
@@ -314,10 +315,10 @@ class OverloadTestUser(HttpUser):
     """
 
     # No wait time - send requests continuously
-    wait_time = between(0, 0.1)
+    wait_time = between(0, 0.1)  # type: ignore[no-untyped-call]
 
     @task
-    def rapid_health_checks(self):
+    def rapid_health_checks(self) -> None:
         """
         Rapid health check requests to test overload handling.
 
@@ -340,8 +341,8 @@ class OverloadTestUser(HttpUser):
 # Event handlers for performance validation
 
 
-@events.test_start.add_listener
-def on_test_start(environment, **kwargs):
+@events.test_start.add_listener  # type: ignore[untyped-decorator]
+def on_test_start(environment: Any, **kwargs: Any) -> None:
     """
     Called when load test starts.
     Initialize performance tracking.
@@ -358,8 +359,8 @@ def on_test_start(environment, **kwargs):
     print("=" * 80 + "\n")
 
 
-@events.test_stop.add_listener
-def on_test_stop(environment, **kwargs):
+@events.test_stop.add_listener  # type: ignore[untyped-decorator]
+def on_test_stop(environment: Any, **kwargs: Any) -> None:
     """
     Called when load test stops.
     Validate performance metrics against thresholds.
@@ -456,11 +457,11 @@ class StepLoadShape(LoadTestShape):
         (150, 150, 25),  # Step 4: 150 users for 30s (overload test)
     ]
 
-    def tick(self):
+    def tick(self) -> tuple[int, int] | None:
         """
         Returns the current user count and spawn rate based on elapsed time.
         """
-        run_time = self.get_run_time()
+        run_time: float = self.get_run_time()  # type: ignore[no-untyped-call]
 
         for step_duration, users, spawn_rate in self.steps:
             if run_time < step_duration:
@@ -479,11 +480,11 @@ class SpikeLoadShape(LoadTestShape):
     Validates: Requirement 20.6 - Graceful degradation under overload
     """
 
-    def tick(self):
+    def tick(self) -> tuple[int, int] | None:
         """
         Creates a spike pattern: low -> high -> low -> high
         """
-        run_time = self.get_run_time()
+        run_time: float = self.get_run_time()  # type: ignore[no-untyped-call]
 
         if run_time < 30:
             return (10, 5)  # Baseline

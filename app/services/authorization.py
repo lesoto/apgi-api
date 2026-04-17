@@ -6,7 +6,7 @@ Role-Based Access Control (RBAC) for API endpoints.
 
 import logging
 from enum import Enum
-from typing import Any, Dict, List, Optional, Set, cast
+from typing import Any, Awaitable, Callable, Dict, List, Optional, Set, cast
 
 from fastapi import Depends, Request
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
@@ -16,7 +16,7 @@ from app.database.connection import get_db
 from app.database.models import AuditLog
 from app.exceptions import AuthorizationError, InvalidTokenError
 from app.services.auth_manager import AuthManager
-from app.models.schemas import TokenPayload
+from app.models.schemas import TokenPayload as TokenPayload
 
 logger = logging.getLogger(__name__)
 
@@ -396,7 +396,7 @@ async def get_current_user(
             )
 
 
-def require_permission(permission: Permission):
+def require_permission(permission: Permission) -> Callable[..., Awaitable[TokenPayload]]:
     """
     Create a FastAPI dependency that requires a specific permission.
 
@@ -439,7 +439,7 @@ def require_permission(permission: Permission):
     return permission_checker
 
 
-def require_role(role: Role):
+def require_role(role: Role) -> Callable[..., Awaitable[TokenPayload]]:
     """
     Create a FastAPI dependency that requires a specific role.
 
@@ -464,7 +464,7 @@ def require_role(role: Role):
     return role_checker
 
 
-def require_any_role(roles: List[Role]):
+def require_any_role(roles: List[Role]) -> Callable[..., Awaitable[TokenPayload]]:
     """
     Create a FastAPI dependency that requires any of the specified roles.
 

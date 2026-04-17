@@ -11,8 +11,11 @@ import asyncio
 import socket
 import pytest
 from datetime import datetime, timezone
-from typing import Any, Dict, List, Optional
+from typing import TYPE_CHECKING, Any, Dict, List, Optional
 from unittest.mock import AsyncMock, MagicMock, patch
+
+if TYPE_CHECKING:
+    from app.services.webhook_manager import WebhookManager
 
 # ---------------------------------------------------------------------------
 # Helpers / fixtures
@@ -20,13 +23,13 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 
 @pytest.fixture
-def db():
+def db() -> MagicMock:
     """MagicMock SQLAlchemy session."""
     return MagicMock()
 
 
 @pytest.fixture
-def manager():
+def manager() -> "WebhookManager":
     from app.services.webhook_manager import WebhookManager
 
     return WebhookManager()
@@ -71,37 +74,37 @@ def _make_delivery(
 class TestValidateWebhookUrl:
     """Tests for the static SSRF-prevention URL validator."""
 
-    def test_valid_https_url_resolves(self):
+    def test_valid_https_url_resolves(self) -> None:
         from app.services.webhook_manager import WebhookManager
 
         # example.com resolves to a public IP — should not raise
         WebhookManager._validate_webhook_url("https://example.com/webhook")
 
-    def test_valid_http_url_resolves(self):
+    def test_valid_http_url_resolves(self) -> None:
         from app.services.webhook_manager import WebhookManager
 
         WebhookManager._validate_webhook_url("http://example.com/webhook")
 
-    def test_ftp_scheme_rejected(self):
+    def test_ftp_scheme_rejected(self) -> None:
         from app.services.webhook_manager import WebhookManager
 
         with pytest.raises(ValueError, match="Only HTTP and HTTPS URLs are allowed"):
             WebhookManager._validate_webhook_url("ftp://example.com/webhook")
 
-    def test_missing_scheme_rejected(self):
+    def test_missing_scheme_rejected(self) -> None:
         from app.services.webhook_manager import WebhookManager
 
         with pytest.raises(ValueError):
             WebhookManager._validate_webhook_url("example.com/webhook")
 
-    def test_missing_hostname_rejected(self):
+    def test_missing_hostname_rejected(self) -> None:
         from app.services.webhook_manager import WebhookManager
 
         with pytest.raises(ValueError):
             WebhookManager._validate_webhook_url("https:///path")
 
     @patch("socket.getaddrinfo")
-    def test_private_192_168_blocked(self, mock_gai):
+    def test_private_192_168_blocked(self, mock_gai: MagicMock) -> None:
         from app.services.webhook_manager import WebhookManager
 
         mock_gai.return_value = [(None, None, None, None, ("192.168.1.100", 0))]
@@ -109,7 +112,7 @@ class TestValidateWebhookUrl:
             WebhookManager._validate_webhook_url("http://internal.corp/hook")
 
     @patch("socket.getaddrinfo")
-    def test_private_10_x_blocked(self, mock_gai):
+    def test_private_10_x_blocked(self, mock_gai: MagicMock) -> None:
         from app.services.webhook_manager import WebhookManager
 
         mock_gai.return_value = [(None, None, None, None, ("10.0.0.5", 0))]
@@ -117,7 +120,7 @@ class TestValidateWebhookUrl:
             WebhookManager._validate_webhook_url("http://internal.corp/hook")
 
     @patch("socket.getaddrinfo")
-    def test_private_172_16_blocked(self, mock_gai):
+    def test_private_172_16_blocked(self, mock_gai: MagicMock) -> None:
         from app.services.webhook_manager import WebhookManager
 
         mock_gai.return_value = [(None, None, None, None, ("172.16.0.1", 0))]
@@ -125,7 +128,7 @@ class TestValidateWebhookUrl:
             WebhookManager._validate_webhook_url("http://internal.corp/hook")
 
     @patch("socket.getaddrinfo")
-    def test_loopback_127_blocked(self, mock_gai):
+    def test_loopback_127_blocked(self, mock_gai: MagicMock) -> None:
         from app.services.webhook_manager import WebhookManager
 
         mock_gai.return_value = [(None, None, None, None, ("127.0.0.1", 0))]
@@ -133,7 +136,7 @@ class TestValidateWebhookUrl:
             WebhookManager._validate_webhook_url("http://localhost/hook")
 
     @patch("socket.getaddrinfo")
-    def test_cloud_metadata_169_254_169_254_blocked(self, mock_gai):
+    def test_cloud_metadata_169_254_169_254_blocked(self, mock_gai: MagicMock) -> None:
         from app.services.webhook_manager import WebhookManager
 
         mock_gai.return_value = [(None, None, None, None, ("169.254.169.254", 0))]
@@ -141,7 +144,7 @@ class TestValidateWebhookUrl:
             WebhookManager._validate_webhook_url("http://metadata/hook")
 
     @patch("socket.getaddrinfo")
-    def test_cloud_metadata_169_254_169_253_blocked(self, mock_gai):
+    def test_cloud_metadata_169_254_169_253_blocked(self, mock_gai: MagicMock) -> None:
         from app.services.webhook_manager import WebhookManager
 
         mock_gai.return_value = [(None, None, None, None, ("169.254.169.253", 0))]
@@ -149,7 +152,7 @@ class TestValidateWebhookUrl:
             WebhookManager._validate_webhook_url("http://metadata/hook")
 
     @patch("socket.getaddrinfo")
-    def test_dns_resolution_failure_raises(self, mock_gai):
+    def test_dns_resolution_failure_raises(self, mock_gai: MagicMock) -> None:
         from app.services.webhook_manager import WebhookManager
 
         mock_gai.side_effect = socket.gaierror("Name or service not known")
@@ -157,7 +160,7 @@ class TestValidateWebhookUrl:
             WebhookManager._validate_webhook_url("http://nonexistent.invalid/hook")
 
     @patch("socket.getaddrinfo")
-    def test_no_valid_ip_raises(self, mock_gai):
+    def test_no_valid_ip_raises(self, mock_gai: MagicMock) -> None:
         from app.services.webhook_manager import WebhookManager
 
         # Return an entry with an invalid IP string so all IPs are skipped
@@ -166,7 +169,7 @@ class TestValidateWebhookUrl:
             WebhookManager._validate_webhook_url("http://weird.host/hook")
 
     @patch("socket.getaddrinfo")
-    def test_returns_resolved_ip_string(self, mock_gai):
+    def test_returns_resolved_ip_string(self, mock_gai: MagicMock) -> None:
         from app.services.webhook_manager import WebhookManager
 
         mock_gai.return_value = [(None, None, None, None, ("93.184.216.34", 0))]
@@ -183,7 +186,7 @@ class TestCreateWebhookDelivery:
     """Tests for WebhookManager.create_webhook_delivery."""
 
     @pytest.mark.asyncio
-    async def test_success_returns_uuid_string(self, manager, db):
+    async def test_success_returns_uuid_string(self, manager: Any, db: MagicMock) -> None:
         with (
             patch(
                 "app.services.webhook_manager.WebhookManager._validate_webhook_url",
@@ -205,13 +208,13 @@ class TestCreateWebhookDelivery:
         db.refresh.assert_called_once_with(mock_obj)
 
     @pytest.mark.asyncio
-    async def test_invalid_url_raises_before_db(self, manager, db):
+    async def test_invalid_url_raises_before_db(self, manager: Any, db: MagicMock) -> None:
         with pytest.raises(ValueError):
             await manager.create_webhook_delivery(db, "task-1", "ftp://bad.url/hook", {})
         db.add.assert_not_called()
 
     @pytest.mark.asyncio
-    async def test_db_commit_error_rolls_back(self, manager, db):
+    async def test_db_commit_error_rolls_back(self, manager: Any, db: MagicMock) -> None:
         db.commit.side_effect = Exception("DB unavailable")
         with (
             patch(
@@ -225,11 +228,13 @@ class TestCreateWebhookDelivery:
         db.rollback.assert_called_once()
 
     @pytest.mark.asyncio
-    async def test_retry_schedule_uses_exponential_delays(self, manager, db):
+    async def test_retry_schedule_uses_exponential_delays(
+        self, manager: Any, db: MagicMock
+    ) -> None:
         """Delivery record is created with next_retry_at set from retry_delays[0]."""
         captured = {}
 
-        def capture_delivery(**kwargs):
+        def capture_delivery(**kwargs: Any) -> MagicMock:
             captured.update(kwargs)
             return MagicMock()
 
@@ -261,7 +266,7 @@ class TestDeliverWebhookGuards:
     """Tests for early-exit conditions in deliver_webhook."""
 
     @pytest.mark.asyncio
-    async def test_delivery_not_found_returns_false(self, manager, db):
+    async def test_delivery_not_found_returns_false(self, manager: Any, db: MagicMock) -> None:
         db.query.return_value.filter.return_value.first.return_value = None
         result = await manager.deliver_webhook(db, "missing-id")
         assert result is False

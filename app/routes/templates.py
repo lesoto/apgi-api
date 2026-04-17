@@ -18,7 +18,12 @@ from app.models.schemas import (
     SessionTemplateListResponse,
     PaginationInfo,
 )
-from app.services.authorization import get_current_user, require_permission, Permission
+from app.services.authorization import (
+    get_current_user,
+    require_permission,
+    Permission,
+    TokenPayload,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -50,8 +55,8 @@ async def list_templates(
     page: int = 1,
     per_page: int = 10,
     public_only: bool = False,
-    current_user=Depends(get_current_user),
-):
+    current_user: TokenPayload = Depends(get_current_user),
+) -> SessionTemplateListResponse:
     """
     List templates with pagination.
 
@@ -116,7 +121,7 @@ async def list_templates(
                 config_path=template.config_path,  # type: ignore[arg-type]
                 custom_config=template.custom_config,  # type: ignore[arg-type]
                 default_description=template.default_description,  # type: ignore[arg-type]
-                tags=list(template.tags or []),  # type: ignore[arg-type]
+                tags=list(template.tags or []),
                 is_public=bool(template.is_public),
                 created_at=template.created_at,  # type: ignore[arg-type]
                 updated_at=template.updated_at,  # type: ignore[arg-type]
@@ -152,8 +157,8 @@ async def list_templates(
 )
 async def create_template(
     request: SessionTemplateCreateRequest,
-    current_user=Depends(get_current_user),
-):
+    current_user: TokenPayload = Depends(get_current_user),
+) -> SessionTemplateResponse:
     """
     Create new session template.
 
@@ -244,7 +249,7 @@ async def create_template(
             config_path=template.config_path,  # type: ignore[arg-type]
             custom_config=template.custom_config,  # type: ignore[arg-type]
             default_description=template.default_description,  # type: ignore[arg-type]
-            tags=list(template.tags or []),  # type: ignore[arg-type]
+            tags=list(template.tags or []),
             is_public=bool(template.is_public),
             created_at=template.created_at,  # type: ignore[arg-type]
             updated_at=template.updated_at,  # type: ignore[arg-type]
@@ -263,8 +268,8 @@ async def create_template(
 )
 async def get_template(
     template_id: str,
-    current_user=Depends(get_current_user),
-):
+    current_user: TokenPayload = Depends(get_current_user),
+) -> SessionTemplateResponse:
     """
     Get template details.
 
@@ -306,7 +311,7 @@ async def get_template(
             config_path=template.config_path,  # type: ignore[arg-type]
             custom_config=template.custom_config,  # type: ignore[arg-type]
             default_description=template.default_description,  # type: ignore[arg-type]
-            tags=list(template.tags or []),  # type: ignore[arg-type]
+            tags=list(template.tags or []),
             is_public=bool(template.is_public),
             created_at=template.created_at,  # type: ignore[arg-type]
             updated_at=template.updated_at,  # type: ignore[arg-type]
@@ -332,8 +337,8 @@ async def get_template(
 async def update_template(
     template_id: str,
     request: SessionTemplateUpdateRequest,
-    current_user=Depends(get_current_user),
-):
+    current_user: TokenPayload = Depends(get_current_user),
+) -> SessionTemplateResponse:
     """
     Update template details.
 
@@ -414,7 +419,7 @@ async def update_template(
             config_path=template.config_path,  # type: ignore[arg-type]
             custom_config=template.custom_config,  # type: ignore[arg-type]
             default_description=template.default_description,  # type: ignore[arg-type]
-            tags=list(template.tags or []),  # type: ignore[arg-type]
+            tags=list(template.tags or []),
             is_public=bool(template.is_public),
             created_at=template.created_at,  # type: ignore[arg-type]
             updated_at=template.updated_at,  # type: ignore[arg-type]
@@ -433,8 +438,8 @@ async def update_template(
 )
 async def delete_template(
     template_id: str,
-    current_user=Depends(get_current_user),
-):
+    current_user: TokenPayload = Depends(get_current_user),
+) -> None:
     """
     Delete template.
 

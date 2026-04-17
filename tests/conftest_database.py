@@ -27,7 +27,7 @@ def test_db_engine() -> Generator[Any, Any, None]:
 
 
 @pytest.fixture
-def test_db_session(test_db_engine) -> Generator[Any, Any, None]:
+def test_db_session(test_db_engine: Any) -> Generator[Any, Any, None]:
     """Create a test database session."""
     TestSessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=test_db_engine)
     session = TestSessionLocal()

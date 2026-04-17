@@ -6,6 +6,7 @@ Requirements: 2.8
 """
 
 import json
+from typing import AsyncGenerator, AsyncIterator
 
 import pytest
 from unittest.mock import AsyncMock, patch
@@ -22,7 +23,7 @@ def mock_redis() -> AsyncMock:
     client = AsyncMock()
 
     # scan_iter is an async generator — default to empty
-    async def _empty_scan(pattern):
+    async def _empty_scan(pattern: str) -> AsyncGenerator[None, None]:
         return
         yield  # make it an async generator
 
@@ -380,7 +381,7 @@ class TestCacheInvalidation:
     ) -> None:
         keys = [b"session:s1:state", b"session:s1:metadata"]
 
-        async def _scan(pattern):
+        async def _scan(pattern: str) -> AsyncIterator[bytes]:
             for k in keys:
                 yield k
 
@@ -396,7 +397,7 @@ class TestCacheInvalidation:
     async def test_invalidate_session_cache_returns_0_when_no_keys(
         self, service: CacheService, mock_redis: AsyncMock
     ) -> None:
-        async def _empty(pattern):
+        async def _empty(pattern: str) -> AsyncGenerator[None, None]:
             return
             yield
 
@@ -414,7 +415,7 @@ class TestCacheInvalidation:
     ) -> None:
         keys = [b"user:u1:data"]
 
-        async def _scan(pattern):
+        async def _scan(pattern: str) -> AsyncIterator[bytes]:
             for k in keys:
                 yield k
 
@@ -430,7 +431,7 @@ class TestCacheInvalidation:
     async def test_invalidate_user_cache_returns_0_when_no_keys(
         self, service: CacheService, mock_redis: AsyncMock
     ) -> None:
-        async def _empty(pattern):
+        async def _empty(pattern: str) -> AsyncIterator[str]:
             return
             yield
 
@@ -458,7 +459,7 @@ class TestCacheStats:
     async def test_get_cache_stats_returns_key_counts(
         self, service: CacheService, mock_redis: AsyncMock
     ) -> None:
-        async def _scan(pattern):
+        async def _scan(pattern: str) -> AsyncGenerator[bytes, None]:
             # yield 2 keys for every prefix
             yield b"key1"
             yield b"key2"

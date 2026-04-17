@@ -7,8 +7,9 @@ Tests database initialization, connection pooling, and health checks.
 import pytest
 import asyncio
 import logging
+from typing import Generator
 from unittest.mock import patch, MagicMock
-from sqlalchemy import create_engine, inspect, text
+from sqlalchemy import create_engine, inspect, text, Engine
 from sqlalchemy.orm import Session, sessionmaker
 
 from app.config import settings
@@ -28,22 +29,22 @@ from app.database.connection import (
 
 
 @pytest.fixture
-def test_db_url():
+def test_db_url() -> str:
     """Provide test database URL using SQLite in-memory database."""
     return "sqlite:///:memory:"
 
 
 @pytest.fixture
-def test_engine(test_db_url):
+def test_engine(test_db_url: str) -> Generator[Engine, None, None]:
     """Create a test database engine using SQLite in-memory database."""
     from sqlalchemy import Column, String, DateTime, Integer, Text, Float, Boolean, ForeignKey
-    from sqlalchemy.orm import declarative_base
+    from sqlalchemy.orm import DeclarativeBase, declarative_base
     from sqlalchemy.sql import func
 
     # Create a test-specific Base with SQLite-compatible models
-    TestBase = declarative_base()
+    TestBase: type[DeclarativeBase] = declarative_base()
 
-    class TestUser(TestBase):  # type: ignore
+    class TestUser(TestBase):  # type: ignore[valid-type, misc]
         """Test user model compatible with SQLite."""
 
         __tablename__ = "users"
@@ -55,7 +56,7 @@ def test_engine(test_db_url):
         created_at = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
         last_login = Column(DateTime(timezone=True), nullable=True)
 
-    class TestSession(TestBase):  # type: ignore
+    class TestSession(TestBase):  # type: ignore[valid-type, misc]
         """Test session model compatible with SQLite."""
 
         __tablename__ = "sessions"
@@ -68,7 +69,7 @@ def test_engine(test_db_url):
         description = Column(Text, nullable=True)
         tags = Column(Text, nullable=True, default="[]")  # JSON string instead of ARRAY
 
-    class TestTask(TestBase):  # type: ignore
+    class TestTask(TestBase):  # type: ignore[valid-type, misc]
         """Test task model compatible with SQLite."""
 
         __tablename__ = "tasks"
@@ -85,7 +86,7 @@ def test_engine(test_db_url):
         error_message = Column(Text, nullable=True)
         webhook_url = Column(String(500), nullable=True)
 
-    class TestSessionData(TestBase):  # type: ignore
+    class TestSessionData(TestBase):  # type: ignore[valid-type, misc]
         """Test session data model compatible with SQLite."""
 
         __tablename__ = "session_data"
@@ -95,7 +96,7 @@ def test_engine(test_db_url):
         data = Column(Text, nullable=False)  # JSON string
         created_at = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
 
-    class TestRefreshToken(TestBase):  # type: ignore
+    class TestRefreshToken(TestBase):  # type: ignore[valid-type, misc]
         """Test refresh token model compatible with SQLite."""
 
         __tablename__ = "refresh_tokens"
@@ -106,7 +107,7 @@ def test_engine(test_db_url):
         created_at = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
         revoked = Column(Boolean, nullable=False, default=False)
 
-    class TestWebhookDelivery(TestBase):  # type: ignore
+    class TestWebhookDelivery(TestBase):  # type: ignore[valid-type, misc]
         """Test webhook delivery model compatible with SQLite."""
 
         __tablename__ = "webhook_deliveries"
@@ -138,7 +139,7 @@ def test_engine(test_db_url):
 class TestDatabaseInitialization:
     """Test database initialization creates all tables."""
 
-    def test_init_db_creates_all_tables(self, test_engine):
+    def test_init_db_creates_all_tables(self, test_engine: Engine) -> None:
         """Test that init_db creates all required tables."""
         # Tables are already created by the fixture
         # Verify all tables exist
@@ -157,7 +158,7 @@ class TestDatabaseInitialization:
         for table in expected_tables:
             assert table in table_names, f"Table '{table}' was not created"
 
-    def test_init_db_creates_users_table_with_correct_schema(self, test_engine):
+    def test_init_db_creates_users_table_with_correct_schema(self, test_engine: Engine) -> None:
         """Test that users table has correct columns."""
         inspector = inspect(test_engine)
         columns = {col["name"]: col for col in inspector.get_columns("users")}
@@ -174,7 +175,7 @@ class TestDatabaseInitialization:
         pk_constraint = inspector.get_pk_constraint("users")
         assert "user_id" in pk_constraint["constrained_columns"]
 
-    def test_init_db_creates_sessions_table_with_foreign_key(self, test_engine):
+    def test_init_db_creates_sessions_table_with_foreign_key(self, test_engine: Engine) -> None:
         """Test that sessions table has foreign key to users."""
         inspector = inspect(test_engine)
         foreign_keys = inspector.get_foreign_keys("sessions")
@@ -184,7 +185,7 @@ class TestDatabaseInitialization:
         assert user_fk is not None, "Foreign key to users table not found"
         assert "user_id" in user_fk["constrained_columns"]
 
-    def test_init_db_creates_indexes(self, test_engine):
+    def test_init_db_creates_indexes(self, test_engine: Engine) -> None:
         """Test that required indexes are created."""
         inspector = inspect(test_engine)
 
@@ -203,13 +204,13 @@ class TestDatabaseInitialization:
 class TestConnectionPooling:
     """Test database connection pooling configuration."""
 
-    def test_engine_has_connection_pool(self):
+    def test_engine_has_connection_pool(self) -> None:
         """Test that engine is configured with connection pooling."""
         # Verify engine has a pool
         assert hasattr(engine, "pool")
         assert engine.pool is not None
 
-    def test_connection_pool_size_configuration(self):
+    def test_connection_pool_size_configuration(self) -> None:
         """Test that connection pool has correct size settings."""
         pool = engine.pool
 
@@ -230,7 +231,7 @@ class TestConnectionPooling:
         # Note: overflow is the number of connections that can be created beyond pool_size
         assert hasattr(pool, "_max_overflow")
 
-    def test_connection_pool_pre_ping_enabled(self):
+    def test_connection_pool_pre_ping_enabled(self) -> None:
         """Test that pre_ping is enabled for connection verification."""
         # Pre-ping is configured at engine level
         # SQLite uses StaticPool which doesn't have _pre_ping attribute
@@ -243,7 +244,7 @@ class TestConnectionPooling:
         # We can verify it's set by checking the engine's dialect settings
         assert engine.pool._pre_ping is True, "Pre-ping should be enabled"
 
-    def test_connection_pool_can_acquire_connection(self, test_engine):
+    def test_connection_pool_can_acquire_connection(self, test_engine: Engine) -> None:
         """Test that connections can be acquired from the pool."""
         # Acquire a connection from the pool
         with test_engine.connect() as conn:
@@ -255,7 +256,7 @@ class TestConnectionPooling:
 class TestDatabaseHealthCheck:
     """Test database health check on startup."""
 
-    def test_database_connectivity_check(self, test_engine):
+    def test_database_connectivity_check(self, test_engine: Engine) -> None:
         """Test that database connectivity can be verified."""
         # Try to connect and execute a simple query
         try:
@@ -268,7 +269,7 @@ class TestDatabaseHealthCheck:
 
         assert connectivity_ok, "Database should be connectable"
 
-    def test_database_schema_version_check(self, test_engine):
+    def test_database_schema_version_check(self, test_engine: Engine) -> None:
         """Test that database schema can be inspected."""
         # Tables are already created by the fixture
         # Verify we can inspect the schema
@@ -278,7 +279,7 @@ class TestDatabaseHealthCheck:
         assert len(tables) > 0, "Should be able to inspect database schema"
         assert "users" in tables, "Users table should exist in schema"
 
-    def test_health_check_detects_missing_tables(self):
+    def test_health_check_detects_missing_tables(self) -> None:
         """Test that health check can detect missing tables."""
         # Create a fresh engine without tables
         empty_engine = create_engine("sqlite:///:memory:", echo=False)
@@ -292,7 +293,7 @@ class TestDatabaseHealthCheck:
 
         empty_engine.dispose()
 
-    def test_health_check_with_valid_schema(self, test_engine):
+    def test_health_check_with_valid_schema(self, test_engine: Engine) -> None:
         """Test health check passes with valid schema."""
         # Tables are already created by the fixture
         inspector = inspect(test_engine)
@@ -307,7 +308,7 @@ class TestDatabaseHealthCheck:
 class TestSessionManagement:
     """Test database session management."""
 
-    def test_get_db_yields_session(self, test_engine):
+    def test_get_db_yields_session(self, test_engine: Engine) -> None:
         """Test that get_db yields a valid session."""
         # Use get_db generator with test engine
         with patch(
@@ -326,7 +327,7 @@ class TestSessionManagement:
             except StopIteration:
                 pass
 
-    def test_get_db_closes_session_after_use(self, test_engine):
+    def test_get_db_closes_session_after_use(self, test_engine: Engine) -> None:
         """Test that get_db closes session after use."""
         # Use get_db in a context with test engine
         with patch(
@@ -349,7 +350,7 @@ class TestSessionManagement:
             # Verify by checking that session is no longer in a transaction
             assert not session.in_transaction(), "Session should be closed and not in transaction"
 
-    def test_get_db_context_commits_on_success(self, test_engine):
+    def test_get_db_context_commits_on_success(self, test_engine: Engine) -> None:
         """Test that get_db_context commits on successful completion."""
         # Use context manager with test engine
         with patch(
@@ -363,7 +364,7 @@ class TestSessionManagement:
             # Session should be committed and closed
             assert not session.in_transaction(), "Session should be closed and not in transaction"
 
-    def test_get_db_context_rolls_back_on_error(self, test_engine):
+    def test_get_db_context_rolls_back_on_error(self, test_engine: Engine) -> None:
         """Test that get_db_context rolls back on exception."""
         # Use context manager with test engine
         with patch(
@@ -380,7 +381,7 @@ class TestSessionManagement:
             # Session should be rolled back and closed despite exception
             assert not session.in_transaction(), "Session should be closed and not in transaction"
 
-    def test_get_db_context_exception_during_commit(self, test_engine):
+    def test_get_db_context_exception_during_commit(self, test_engine: Engine) -> None:
         """Test that get_db_context handles exception during commit."""
         mock_session = MagicMock()
         mock_session.commit.side_effect = Exception("Commit error")
@@ -399,7 +400,7 @@ class TestSessionManagement:
 class TestDatabaseCleanup:
     """Test database connection cleanup."""
 
-    def test_close_db_disposes_engine(self):
+    def test_close_db_disposes_engine(self) -> None:
         """Test that close_db disposes the engine."""
         # Create a test engine using SQLite in-memory database
         test_url = "sqlite:///:memory:"
@@ -415,7 +416,7 @@ class TestDatabaseCleanup:
             # We can't directly check this, but we can verify no error was raised
             assert True  # If we got here, close_db executed successfully
 
-    def test_close_db_handles_errors_gracefully(self):
+    def test_close_db_handles_errors_gracefully(self) -> None:
         """Test that close_db handles errors without raising."""
         with patch("app.database.connection.engine") as mock_engine:
             # Make dispose raise an exception
@@ -434,13 +435,13 @@ class TestDatabaseCleanup:
 class TestSecurePasswordGeneration:
     """Test secure password generation."""
 
-    def test_generate_secure_password_default_length(self):
+    def test_generate_secure_password_default_length(self) -> None:
         """Test that generate_secure_password creates a 32-character password by default."""
         password = generate_secure_password()
         assert len(password) == 32
         assert isinstance(password, str)
 
-    def test_generate_secure_password_custom_length(self):
+    def test_generate_secure_password_custom_length(self) -> None:
         """Test that generate_secure_password respects custom length."""
         password = generate_secure_password(length=16)
         assert len(password) == 16
@@ -448,7 +449,7 @@ class TestSecurePasswordGeneration:
         password = generate_secure_password(length=64)
         assert len(password) == 64
 
-    def test_generate_secure_password_contains_valid_characters(self):
+    def test_generate_secure_password_contains_valid_characters(self) -> None:
         """Test that generated password contains only valid characters."""
         password = generate_secure_password()
         valid_chars = set(
@@ -456,29 +457,29 @@ class TestSecurePasswordGeneration:
         )
         assert all(c in valid_chars for c in password)
 
-    def test_generate_secure_password_randomness(self):
+    def test_generate_secure_password_randomness(self) -> None:
         """Test that generated passwords are different (random)."""
         password1 = generate_secure_password()
         password2 = generate_secure_password()
         assert password1 != password2
 
-    def test_generate_secure_password_minimum_length(self):
+    def test_generate_secure_password_minimum_length(self) -> None:
         """Test that generate_secure_password requires minimum length of 3."""
         # Should work with minimum length 3
         password = generate_secure_password(length=3)
         assert len(password) == 3
 
-    def test_generate_secure_password_zero_length_raises(self):
+    def test_generate_secure_password_zero_length_raises(self) -> None:
         """Test that generate_secure_password raises ValueError for length < 3."""
         with pytest.raises(ValueError, match="Password length must be at least 3"):
             generate_secure_password(length=0)
 
-    def test_generate_secure_password_one_character_raises(self):
+    def test_generate_secure_password_one_character_raises(self) -> None:
         """Test that generate_secure_password raises ValueError for length < 3."""
         with pytest.raises(ValueError, match="Password length must be at least 3"):
             generate_secure_password(length=1)
 
-    def test_generate_secure_password_two_characters_raises(self):
+    def test_generate_secure_password_two_characters_raises(self) -> None:
         """Test that generate_secure_password raises ValueError for length < 3."""
         with pytest.raises(ValueError, match="Password length must be at least 3"):
             generate_secure_password(length=2)
@@ -487,13 +488,13 @@ class TestSecurePasswordGeneration:
 class TestSecureUsernameGeneration:
     """Test secure username generation."""
 
-    def test_generate_secure_username_default_prefix(self):
+    def test_generate_secure_username_default_prefix(self) -> None:
         """Test that generate_secure_username creates username with default prefix."""
         username = generate_secure_username()
         assert username.startswith("user_")
         assert len(username) > len("user_")
 
-    def test_generate_secure_username_custom_prefix(self):
+    def test_generate_secure_username_custom_prefix(self) -> None:
         """Test that generate_secure_username respects custom prefix."""
         username = generate_secure_username(prefix="admin")
         assert username.startswith("admin_")
@@ -501,13 +502,13 @@ class TestSecureUsernameGeneration:
         username = generate_secure_username(prefix="test")
         assert username.startswith("test_")
 
-    def test_generate_secure_username_randomness(self):
+    def test_generate_secure_username_randomness(self) -> None:
         """Test that generated usernames are different (random)."""
         username1 = generate_secure_username()
         username2 = generate_secure_username()
         assert username1 != username2
 
-    def test_generate_secure_username_format(self):
+    def test_generate_secure_username_format(self) -> None:
         """Test that generated username has correct format."""
         username = generate_secure_username(prefix="user")
         parts = username.split("_")
@@ -521,7 +522,7 @@ class TestSecureUsernameGeneration:
 class TestInitDatabase:
     """Test database initialization."""
 
-    def test_init_db_creates_tables(self, test_engine):
+    def test_init_db_creates_tables(self, test_engine: Engine) -> None:
         """Test that init_db creates all required tables."""
         with patch("app.database.connection.engine", test_engine):
             with patch("app.database.connection.SessionLocal", sessionmaker(bind=test_engine)):
@@ -533,7 +534,9 @@ class TestInitDatabase:
                     tables = inspector.get_table_names()
                     assert len(tables) > 0
 
-    def test_init_db_logs_success(self, test_engine, caplog):
+    def test_init_db_logs_success(
+        self, test_engine: Engine, caplog: pytest.LogCaptureFixture
+    ) -> None:
         """Test that init_db logs success message."""
         with patch("app.database.connection.engine", test_engine):
             with patch("app.database.connection.SessionLocal", sessionmaker(bind=test_engine)):
@@ -544,7 +547,7 @@ class TestInitDatabase:
                     # Verify success log message
                     assert "Database tables created successfully" in caplog.text
 
-    def test_init_db_calls_create_default_user(self, test_engine):
+    def test_init_db_calls_create_default_user(self, test_engine: Engine) -> None:
         """Test that init_db calls create_default_user."""
         with patch("app.database.connection.engine", test_engine):
             with patch("app.database.connection.SessionLocal", sessionmaker(bind=test_engine)):
@@ -553,7 +556,7 @@ class TestInitDatabase:
                     # Verify create_default_user was called
                     mock_create.assert_called_once()
 
-    def test_init_db_exception_handling(self, caplog):
+    def test_init_db_exception_handling(self, caplog: pytest.LogCaptureFixture) -> None:
         """Test that init_db handles exceptions from create_default_user."""
         mock_engine = MagicMock()
         mock_engine.metadata.create_all.return_value = None
@@ -575,7 +578,7 @@ class TestInitDatabase:
 class TestCreateDefaultUser:
     """Test default user creation."""
 
-    def test_create_default_user_generates_credentials(self):
+    def test_create_default_user_generates_credentials(self) -> None:
         """Test that create_default_user generates secure credentials."""
         mock_session = MagicMock()
         mock_session.execute.return_value.scalar_one_or_none.return_value = None
@@ -597,7 +600,7 @@ class TestCreateDefaultUser:
                         # Verify session was used
                         assert mock_session.add.called or mock_session.commit.called
 
-    def test_create_default_user_already_exists(self, caplog):
+    def test_create_default_user_already_exists(self, caplog: pytest.LogCaptureFixture) -> None:
         """Test that create_default_user skips if user already exists."""
         mock_session = MagicMock()
         mock_user = MagicMock()
@@ -610,7 +613,7 @@ class TestCreateDefaultUser:
                 # Verify it detected existing user
                 assert "Default user already exists" in caplog.text
 
-    def test_create_default_user_handles_errors(self, caplog):
+    def test_create_default_user_handles_errors(self, caplog: pytest.LogCaptureFixture) -> None:
         """Test that create_default_user handles errors gracefully."""
         mock_session = MagicMock()
         mock_session.execute.side_effect = Exception("DB error")
@@ -627,32 +630,32 @@ class TestCreateDefaultUser:
 class TestAsyncDatabaseContext:
     """Test async database context manager."""
 
-    def test_get_async_db_context_yields_session(self, test_engine):
+    def test_get_async_db_context_yields_session(self, test_engine: Engine) -> None:
         """Test that get_async_db_context yields a valid session."""
         with patch("app.database.connection.SessionLocal", sessionmaker(bind=test_engine)):
 
-            async def test_async():
+            async def test_async() -> None:
                 async with get_async_db_context() as session:
                     assert session is not None
                     assert isinstance(session, Session)
 
             asyncio.run(test_async())
 
-    def test_get_async_db_context_commits_on_success(self, test_engine):
+    def test_get_async_db_context_commits_on_success(self, test_engine: Engine) -> None:
         """Test that get_async_db_context commits on successful completion."""
         with patch("app.database.connection.SessionLocal", sessionmaker(bind=test_engine)):
 
-            async def test_async():
+            async def test_async() -> None:
                 async with get_async_db_context() as session:
                     assert session is not None
 
             asyncio.run(test_async())
 
-    def test_get_async_db_context_rolls_back_on_error(self, test_engine):
+    def test_get_async_db_context_rolls_back_on_error(self, test_engine: Engine) -> None:
         """Test that get_async_db_context rolls back on exception."""
         with patch("app.database.connection.SessionLocal", sessionmaker(bind=test_engine)):
 
-            async def test_async():
+            async def test_async() -> None:
                 try:
                     async with get_async_db_context() as session:
                         raise ValueError("Test error")
@@ -665,12 +668,12 @@ class TestAsyncDatabaseContext:
 class TestPoolStatus:
     """Test connection pool status monitoring."""
 
-    def test_get_pool_status_returns_dict(self):
+    def test_get_pool_status_returns_dict(self) -> None:
         """Test that get_pool_status returns a dictionary."""
         status = get_pool_status()
         assert isinstance(status, dict)
 
-    def test_get_pool_status_has_required_keys(self):
+    def test_get_pool_status_has_required_keys(self) -> None:
         """Test that get_pool_status includes all required keys."""
         status = get_pool_status()
         required_keys = [
@@ -686,7 +689,7 @@ class TestPoolStatus:
         for key in required_keys:
             assert key in status, f"Missing key: {key}"
 
-    def test_get_pool_status_values_are_numeric(self):
+    def test_get_pool_status_values_are_numeric(self) -> None:
         """Test that pool status values are numeric."""
         status = get_pool_status()
         numeric_keys = [
@@ -702,12 +705,14 @@ class TestPoolStatus:
         for key in numeric_keys:
             assert isinstance(status[key], (int, float)), f"{key} should be numeric"
 
-    def test_get_pool_status_utilization_range(self):
+    def test_get_pool_status_utilization_range(self) -> None:
         """Test that utilization is between 0 and 1."""
         status = get_pool_status()
         assert 0 <= status["utilization"] <= 1
 
-    def test_get_pool_status_logs_warning_on_high_load(self, caplog):
+    def test_get_pool_status_logs_warning_on_high_load(
+        self, caplog: pytest.LogCaptureFixture
+    ) -> None:
         """Test that get_pool_status logs warning when pool is under high load."""
         mock_pool = MagicMock()
         mock_pool.size = 10
@@ -726,7 +731,9 @@ class TestPoolStatus:
                 # Verify warning was logged
                 assert "Database connection pool under high load" in caplog.text
 
-    def test_get_pool_status_logs_error_on_exhaustion(self, caplog):
+    def test_get_pool_status_logs_error_on_exhaustion(
+        self, caplog: pytest.LogCaptureFixture
+    ) -> None:
         """Test that get_pool_status logs error when pool is exhausted."""
         mock_pool = MagicMock()
         mock_pool.size = 10
@@ -751,7 +758,9 @@ class TestPoolStatus:
                 # So we need to adjust to make utilization <= 0.8
                 pass
 
-    def test_get_pool_status_logs_error_on_exhaustion_low_utilization(self, caplog):
+    def test_get_pool_status_logs_error_on_exhaustion_low_utilization(
+        self, caplog: pytest.LogCaptureFixture
+    ) -> None:
         """Test that get_pool_status logs error when pool is exhausted with low utilization."""
         mock_pool = MagicMock()
         mock_pool.size = 100
@@ -776,7 +785,7 @@ class TestPoolStatus:
                 # Let's just verify the status is calculated correctly
                 assert status["checked_out"] == 101
 
-    def test_log_pool_status_logs_info(self, caplog):
+    def test_log_pool_status_logs_info(self, caplog: pytest.LogCaptureFixture) -> None:
         """Test that log_pool_status logs pool information."""
         with caplog.at_level(logging.INFO):
             log_pool_status()
@@ -784,7 +793,7 @@ class TestPoolStatus:
             # Verify info log message
             assert "DB Pool Status" in caplog.text
 
-    def test_get_pool_status_available_connections_calculation(self):
+    def test_get_pool_status_available_connections_calculation(self) -> None:
         """Test that available_connections is calculated correctly."""
         mock_pool = MagicMock()
         mock_pool.size = 20

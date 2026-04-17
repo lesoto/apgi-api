@@ -7,7 +7,7 @@ Tests to verify API contracts, including rate limiting headers, error responses,
 from fastapi.testclient import TestClient
 
 
-def test_rate_limit_headers_present(client: TestClient):
+def test_rate_limit_headers_present(client: TestClient) -> None:
     """
     Test that rate limit headers are present in API responses.
 
@@ -32,7 +32,7 @@ def test_rate_limit_headers_present(client: TestClient):
     assert reset > 0
 
 
-def test_rate_limit_headers_authenticated(client: TestClient, auth_headers):
+def test_rate_limit_headers_authenticated(client: TestClient, auth_headers: dict[str, str]) -> None:
     """
     Test that rate limit headers are present for authenticated requests.
 
@@ -56,7 +56,7 @@ def test_rate_limit_headers_authenticated(client: TestClient, auth_headers):
     assert reset > 0
 
 
-def test_error_response_format(client: TestClient):
+def test_error_response_format(client: TestClient) -> None:
     """
     Test that error responses follow the expected JSON format.
     """
@@ -71,7 +71,7 @@ def test_error_response_format(client: TestClient):
     assert "timestamp" in data["error"]
 
 
-def test_cors_headers_present(client: TestClient):
+def test_cors_headers_present(client: TestClient) -> None:
     """
     Test that CORS headers are present in responses.
     """
@@ -89,7 +89,7 @@ def test_cors_headers_present(client: TestClient):
         assert header in response.headers
 
 
-def test_csrf_token_provided(client: TestClient):
+def test_csrf_token_provided(client: TestClient) -> None:
     """
     Test that CSRF tokens are provided for safe methods.
     """

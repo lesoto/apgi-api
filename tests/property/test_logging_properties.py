@@ -32,7 +32,7 @@ from app.middleware.logging import (
 # ============================================================================
 
 
-def create_test_app_with_logging():
+def create_test_app_with_logging() -> FastAPI:
     """Create a test FastAPI app with logging middleware."""
     app = FastAPI()
 
@@ -41,23 +41,23 @@ def create_test_app_with_logging():
 
     # Add test endpoints
     @app.get("/test")
-    async def test_endpoint():
+    async def test_endpoint() -> dict[str, str]:
         return {"message": "test"}
 
     @app.post("/test")
-    async def test_post_endpoint():
+    async def test_post_endpoint() -> dict[str, str]:
         return {"message": "test post"}
 
     @app.get("/error")
-    async def error_endpoint():
+    async def error_endpoint() -> None:
         raise ValueError("Test error")
 
     @app.get("/http-error")
-    async def http_error_endpoint():
+    async def http_error_endpoint() -> None:
         raise HTTPException(status_code=400, detail="Bad request")
 
     @app.get("/v1/sessions")
-    async def sessions_endpoint(request: Request):
+    async def sessions_endpoint(request: Request) -> dict[str, Any]:
         # Access request_id to verify it's set
         request_id = getattr(request.state, "request_id", None)
         return {"sessions": [], "request_id": request_id}
@@ -66,7 +66,7 @@ def create_test_app_with_logging():
 
 
 @contextmanager
-def capture_logs(logger_name: str):
+def capture_logs(logger_name: str) -> Any:
     """Context manager to capture log output."""
     logger = logging.getLogger(logger_name)
     string_io = StringIO()
@@ -76,10 +76,10 @@ def capture_logs(logger_name: str):
     logger.setLevel(logging.DEBUG)
 
     class LogCapture:
-        def get_logs(self):
+        def get_logs(self) -> str:
             return string_io.getvalue()
 
-        def get_log_entries(self):
+        def get_log_entries(self) -> list[Dict[str, Any]]:
             """Parse JSON log entries."""
             logs = self.get_logs()
             entries = []
@@ -110,7 +110,7 @@ def capture_logs(logger_name: str):
     message=st.text(min_size=1, max_size=100),
     level=st.sampled_from(["INFO", "WARNING", "ERROR", "DEBUG"]),
 )
-def test_property_7_structured_json_logging_format(message, level):
+def test_property_7_structured_json_logging_format(message: str, level: str) -> None:
     """
     **Validates: Requirements 10.1**
 
@@ -180,8 +180,8 @@ def test_property_7_structured_json_logging_format(message, level):
     ),
 )
 def test_property_7_structured_logging_with_extra_fields(
-    message, extra_field_key, extra_field_value
-):
+    message: str, extra_field_key: str, extra_field_value: Any
+) -> None:
     """
     **Validates: Requirements 10.1**
 
@@ -232,7 +232,7 @@ def test_property_7_structured_logging_with_extra_fields(
     path=st.sampled_from(["/test", "/v1/sessions", "/health"]),
     method=st.sampled_from(["GET", "POST"]),
 )
-def test_property_8_request_logging_completeness(path, method):
+def test_property_8_request_logging_completeness(path: str, method: str) -> None:
     """
     **Validates: Requirements 10.2**
 
@@ -306,7 +306,7 @@ def test_property_8_request_logging_completeness(path, method):
 @given(
     path=st.sampled_from(["/v1/sessions", "/test"]),
 )
-def test_property_9_request_id_propagation_in_response(path):
+def test_property_9_request_id_propagation_in_response(path: str) -> None:
     """
     **Validates: Requirements 10.3**
 
@@ -344,7 +344,7 @@ def test_property_9_request_id_propagation_in_response(path):
 @given(
     path=st.sampled_from(["/v1/sessions"]),
 )
-def test_property_9_request_id_propagation_in_logs(path):
+def test_property_9_request_id_propagation_in_logs(path: str) -> None:
     """
     **Validates: Requirements 10.3**
 
@@ -384,7 +384,7 @@ def test_property_9_request_id_propagation_in_logs(path):
 @given(
     path=st.sampled_from(["/v1/sessions"]),
 )
-def test_property_9_request_id_in_request_state(path):
+def test_property_9_request_id_in_request_state(path: str) -> None:
     """
     **Validates: Requirements 10.3**
 
@@ -425,7 +425,7 @@ def test_property_9_request_id_in_request_state(path):
 @given(
     error_message=st.text(min_size=1, max_size=100),
 )
-def test_property_10_error_logging_with_context(error_message):
+def test_property_10_error_logging_with_context(error_message: str) -> None:
     """
     **Validates: Requirements 10.7**
 
@@ -484,7 +484,9 @@ def test_property_10_error_logging_with_context(error_message):
     path=st.sampled_from(["/test", "/v1/sessions"]),
     method=st.sampled_from(["GET", "POST"]),
 )
-def test_property_10_error_logging_with_request_context(error_message, path, method):
+def test_property_10_error_logging_with_request_context(
+    error_message: str, path: str, method: str
+) -> None:
     """
     **Validates: Requirements 10.7**
 
@@ -546,7 +548,7 @@ def test_property_10_error_logging_with_request_context(error_message, path, met
 @given(
     path=st.sampled_from(["/error"]),
 )
-def test_property_10_error_logging_in_middleware(path):
+def test_property_10_error_logging_in_middleware(path: str) -> None:
     """
     **Validates: Requirements 10.7**
 

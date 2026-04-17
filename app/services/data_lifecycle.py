@@ -251,7 +251,7 @@ class DataLifecycleManager:
                     .filter(
                         or_(
                             RefreshToken.expires_at < datetime.now(timezone.utc),
-                            RefreshToken.revoked is True,
+                            RefreshToken.revoked.is_(True),
                         )
                     )
                     .limit(batch_size)
@@ -263,7 +263,7 @@ class DataLifecycleManager:
                     .filter(
                         or_(
                             APIKey.expires_at < datetime.now(timezone.utc),
-                            not APIKey.is_active,
+                            APIKey.is_active.is_(False),
                         )
                     )
                     .limit(batch_size)
@@ -388,13 +388,13 @@ class DataLifecycleManager:
             # Soft delete user (keep record with anonymized data)
             user = db.query(User).filter(User.user_id == user_id).first()
             if user:
-                user.is_deleted = True
-                user.is_active = False
-                user.username = f"deleted_{user_id[:8]}"
-                user.email = f"deleted_{user_id[:8]}@deleted.local"
-                user.password_hash = "deleted"
-                user.mfa_secret = None
-                user.mfa_backup_codes = None
+                user.is_deleted = True  # type: ignore[assignment]
+                user.is_active = False  # type: ignore[assignment]
+                user.username = f"deleted_{user_id[:8]}"  # type: ignore[assignment]
+                user.email = f"deleted_{user_id[:8]}@deleted.local"  # type: ignore[assignment]
+                user.password_hash = "deleted"  # type: ignore[assignment]
+                user.mfa_secret = None  # type: ignore[assignment]
+                user.mfa_backup_codes = None  # type: ignore[assignment]
                 deletion_summary["user_soft_deleted"] = 1
 
             db.commit()

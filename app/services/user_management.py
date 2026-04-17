@@ -6,7 +6,7 @@ Handles user CRUD operations and user-related business logic.
 
 import logging
 from datetime import datetime, timedelta, timezone
-from typing import List, Optional
+from typing import Any, List, Optional
 
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
@@ -579,7 +579,7 @@ APGI API Team
             logger.error(f"Failed to soft delete user {user_id}: {e}")
             raise
 
-    def get_user_stats(self) -> dict:
+    def get_user_stats(self) -> dict[str, Any]:
         """
         Get user statistics.
 

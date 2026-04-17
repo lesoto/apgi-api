@@ -10,7 +10,7 @@ from app.database.models import User
 from app.services.auth_manager import AuthManager
 
 
-def create_demo_user():
+def create_demo_user() -> None:
     db = SessionLocal()
     try:
         # Check if user exists

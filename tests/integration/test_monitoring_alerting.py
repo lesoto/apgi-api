@@ -30,7 +30,7 @@ from app.middleware.alerting import (
 @pytest.fixture
 async def alert_manager() -> "AlertManager":
     """Create a test alert manager instance."""
-    manager = AlertManager()  # type: ignore[no-untyped-call]
+    manager = AlertManager()
 
     # Clear any existing channels
     manager.channels.clear()
@@ -273,7 +273,7 @@ class TestBusinessMetricsIntegration:
         """Test that business metrics service can be created."""
         from app.services.business_metrics import BusinessMetricsService
 
-        service = BusinessMetricsService()  # type: ignore[no-untyped-call]
+        service = BusinessMetricsService()
         assert service is not None
         assert hasattr(service, "cache_service")
         assert hasattr(service, "_generate_cache_key")
@@ -283,7 +283,7 @@ class TestBusinessMetricsIntegration:
         """Test that metrics service uses caching."""
         from app.services.business_metrics import BusinessMetricsService
 
-        service = BusinessMetricsService()  # type: ignore[no-untyped-call]
+        service = BusinessMetricsService()
 
         # Test cache key generation
         key1 = service._generate_cache_key("test_method", "arg1", "arg2", kwarg1="value1")
@@ -298,7 +298,7 @@ class TestBusinessMetricsIntegration:
         """Test that overview metrics returns expected structure."""
         from app.services.business_metrics import BusinessMetricsService
 
-        service = BusinessMetricsService()  # type: ignore[no-untyped-call]
+        service = BusinessMetricsService()
 
         # Mock the database context to return test data
         with patch("app.services.business_metrics.get_db_context") as mock_db_context:

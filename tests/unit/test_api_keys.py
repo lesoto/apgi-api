@@ -31,13 +31,13 @@ except ImportError:
 
 
 @pytest.fixture
-def mock_db_session():
+def mock_db_session() -> MagicMock:
     """Create a mock database session."""
     return MagicMock()
 
 
 @pytest.fixture
-def mock_current_user():
+def mock_current_user() -> TokenPayload:
     """Create a mock current user."""
     return TokenPayload(
         user_id="test_user_123",
@@ -48,7 +48,7 @@ def mock_current_user():
 
 
 @pytest.fixture
-def mock_api_key():
+def mock_api_key() -> MagicMock:
     """Create a mock API key database object."""
     api_key = MagicMock()
     api_key.key_id = "test_key_123"
@@ -68,7 +68,9 @@ class TestCreateAPIKey:
     """Test API key creation."""
 
     @pytest.mark.asyncio
-    async def test_create_api_key_success(self, mock_db_session, mock_current_user):
+    async def test_create_api_key_success(
+        self, mock_db_session: MagicMock, mock_current_user: TokenPayload
+    ) -> None:
         """Test successful API key creation."""
         request = APIKeyCreateRequest(
             name="Test Key",
@@ -126,7 +128,9 @@ class TestCreateAPIKey:
                         assert "apgi_test_token" in result.key
 
     @pytest.mark.asyncio
-    async def test_create_api_key_database_error(self, mock_db_session, mock_current_user):
+    async def test_create_api_key_database_error(
+        self, mock_db_session: MagicMock, mock_current_user: TokenPayload
+    ) -> None:
         """Test API key creation with database error."""
         request = APIKeyCreateRequest(
             name="Test Key",
@@ -146,7 +150,9 @@ class TestListAPIKeys:
     """Test API key listing."""
 
     @pytest.mark.asyncio
-    async def test_list_api_keys_success(self, mock_db_session, mock_current_user, mock_api_key):
+    async def test_list_api_keys_success(
+        self, mock_db_session: MagicMock, mock_current_user: TokenPayload, mock_api_key: MagicMock
+    ) -> None:
         """Test successful API key listing."""
         mock_db_session.query.return_value.filter.return_value.count.return_value = 1
         mock_db_session.query.return_value.filter.return_value.offset.return_value.limit.return_value.all.return_value = [
@@ -160,7 +166,9 @@ class TestListAPIKeys:
         assert result.pagination.total == 1
 
     @pytest.mark.asyncio
-    async def test_list_api_keys_invalid_per_page(self, mock_db_session, mock_current_user):
+    async def test_list_api_keys_invalid_per_page(
+        self, mock_db_session: MagicMock, mock_current_user: TokenPayload
+    ) -> None:
         """Test API key listing with invalid per_page."""
         with pytest.raises(HTTPException) as exc_info:
             await list_api_keys(1, 0, mock_db_session, mock_current_user)
@@ -168,7 +176,9 @@ class TestListAPIKeys:
         assert exc_info.value.status_code == 400
 
     @pytest.mark.asyncio
-    async def test_list_api_keys_database_error(self, mock_db_session, mock_current_user):
+    async def test_list_api_keys_database_error(
+        self, mock_db_session: MagicMock, mock_current_user: TokenPayload
+    ) -> None:
         """Test API key listing with database error."""
         mock_db_session.query.side_effect = Exception("Database error")
 
@@ -182,7 +192,9 @@ class TestGetAPIKey:
     """Test API key retrieval."""
 
     @pytest.mark.asyncio
-    async def test_get_api_key_success(self, mock_db_session, mock_current_user, mock_api_key):
+    async def test_get_api_key_success(
+        self, mock_db_session: MagicMock, mock_current_user: TokenPayload, mock_api_key: MagicMock
+    ) -> None:
         """Test successful API key retrieval."""
         mock_db_session.query.return_value.filter.return_value.first.return_value = mock_api_key
 
@@ -192,7 +204,9 @@ class TestGetAPIKey:
         assert result.name == "Test API Key"
 
     @pytest.mark.asyncio
-    async def test_get_api_key_not_found(self, mock_db_session, mock_current_user):
+    async def test_get_api_key_not_found(
+        self, mock_db_session: MagicMock, mock_current_user: TokenPayload
+    ) -> None:
         """Test API key retrieval when key not found."""
         mock_db_session.query.return_value.filter.return_value.first.return_value = None
 
@@ -206,7 +220,9 @@ class TestUpdateAPIKey:
     """Test API key updating."""
 
     @pytest.mark.asyncio
-    async def test_update_api_key_success(self, mock_db_session, mock_current_user, mock_api_key):
+    async def test_update_api_key_success(
+        self, mock_db_session: MagicMock, mock_current_user: TokenPayload, mock_api_key: MagicMock
+    ) -> None:
         """Test successful API key update."""
         mock_db_session.query.return_value.filter.return_value.first.return_value = mock_api_key
 
@@ -222,7 +238,9 @@ class TestUpdateAPIKey:
         mock_db_session.commit.assert_called_once()
 
     @pytest.mark.asyncio
-    async def test_update_api_key_not_found(self, mock_db_session, mock_current_user):
+    async def test_update_api_key_not_found(
+        self, mock_db_session: MagicMock, mock_current_user: TokenPayload
+    ) -> None:
         """Test API key update when key not found."""
         mock_db_session.query.return_value.filter.return_value.first.return_value = None
 
@@ -235,8 +253,8 @@ class TestUpdateAPIKey:
 
     @pytest.mark.asyncio
     async def test_update_api_key_database_error(
-        self, mock_db_session, mock_current_user, mock_api_key
-    ):
+        self, mock_db_session: MagicMock, mock_current_user: TokenPayload, mock_api_key: MagicMock
+    ) -> None:
         """Test API key update with database error."""
         mock_db_session.query.return_value.filter.return_value.first.return_value = mock_api_key
         mock_db_session.commit.side_effect = Exception("Database error")
@@ -253,7 +271,9 @@ class TestRotateAPIKey:
     """Test API key rotation."""
 
     @pytest.mark.asyncio
-    async def test_rotate_api_key_success(self, mock_db_session, mock_current_user, mock_api_key):
+    async def test_rotate_api_key_success(
+        self, mock_db_session: MagicMock, mock_current_user: TokenPayload, mock_api_key: MagicMock
+    ) -> None:
         """Test successful API key rotation."""
         mock_db_session.query.return_value.filter.return_value.first.return_value = mock_api_key
 
@@ -286,7 +306,9 @@ class TestRotateAPIKey:
                         assert not mock_api_key.is_active
 
     @pytest.mark.asyncio
-    async def test_rotate_api_key_not_found(self, mock_db_session, mock_current_user):
+    async def test_rotate_api_key_not_found(
+        self, mock_db_session: MagicMock, mock_current_user: TokenPayload
+    ) -> None:
         """Test API key rotation when key not found."""
         mock_db_session.query.return_value.filter.return_value.first.return_value = None
 
@@ -297,8 +319,8 @@ class TestRotateAPIKey:
 
     @pytest.mark.asyncio
     async def test_rotate_api_key_database_error(
-        self, mock_db_session, mock_current_user, mock_api_key
-    ):
+        self, mock_db_session: MagicMock, mock_current_user: TokenPayload, mock_api_key: MagicMock
+    ) -> None:
         """Test API key rotation with database error."""
         mock_db_session.query.return_value.filter.return_value.first.return_value = mock_api_key
         mock_db_session.commit.side_effect = Exception("Database error")
@@ -313,18 +335,22 @@ class TestDeleteAPIKey:
     """Test API key deletion."""
 
     @pytest.mark.asyncio
-    async def test_delete_api_key_success(self, mock_db_session, mock_current_user, mock_api_key):
+    async def test_delete_api_key_success(
+        self, mock_db_session: MagicMock, mock_current_user: TokenPayload, mock_api_key: MagicMock
+    ) -> None:
         """Test successful API key deletion."""
         mock_db_session.query.return_value.filter.return_value.first.return_value = mock_api_key
 
-        result = await delete_api_key("test_key_123", mock_db_session, mock_current_user)
+        result = await delete_api_key("test_key_123", mock_db_session, mock_current_user)  # type: ignore[func-returns-value]
 
         assert result is None  # 204 No Content
         mock_db_session.delete.assert_called_once_with(mock_api_key)
         mock_db_session.commit.assert_called_once()
 
     @pytest.mark.asyncio
-    async def test_delete_api_key_not_found(self, mock_db_session, mock_current_user):
+    async def test_delete_api_key_not_found(
+        self, mock_db_session: MagicMock, mock_current_user: TokenPayload
+    ) -> None:
         """Test API key deletion when key not found."""
         mock_db_session.query.return_value.filter.return_value.first.return_value = None
 
@@ -335,8 +361,8 @@ class TestDeleteAPIKey:
 
     @pytest.mark.asyncio
     async def test_delete_api_key_database_error(
-        self, mock_db_session, mock_current_user, mock_api_key
-    ):
+        self, mock_db_session: MagicMock, mock_current_user: TokenPayload, mock_api_key: MagicMock
+    ) -> None:
         """Test API key deletion with database error."""
         mock_db_session.query.return_value.filter.return_value.first.return_value = mock_api_key
         mock_db_session.commit.side_effect = Exception("Database error")

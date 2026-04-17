@@ -376,9 +376,9 @@ class TestDeleteWebhookDelivery:
             mock_webhook_delivery
         )
 
-        result = await delete_webhook_delivery("delivery_123", mock_db_session, mock_current_user)
+        _ = await delete_webhook_delivery("delivery_123", mock_db_session, mock_current_user)  # type: ignore[func-returns-value]
 
-        assert result is None  # 204 No Content
+        # 204 No Content
         mock_db_session.delete.assert_called_once_with(mock_webhook_delivery)
         mock_db_session.commit.assert_called_once()
 
@@ -587,11 +587,13 @@ class TestPurgeDeadLetterDelivery:
             mock_dead_letter_delivery
         )
 
-        result = await purge_dead_letter_delivery(
-            "dl_delivery_456", mock_db_session, mock_current_user
-        )
+        _ = await purge_dead_letter_delivery(
+            "dl_delivery_456",
+            mock_db_session,
+            mock_current_user,
+        )  # type: ignore[func-returns-value]
 
-        assert result is None  # 204 No Content
+        # 204 No Content
         mock_db_session.delete.assert_called_once_with(mock_dead_letter_delivery)
         mock_db_session.commit.assert_called_once()
 

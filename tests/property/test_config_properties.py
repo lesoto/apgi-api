@@ -161,12 +161,16 @@ def test_property_1_config_env_override(config_key: str, env_value: str, bool_va
             env_value
         ), f"{config_key} should be {int(env_value)}, got {actual_value}"
     elif config_key in ["RATE_LIMIT_ENABLED", "CORS_ALLOW_CREDENTIALS"]:
-        expected = env_value.lower() == "true"
-        assert actual_value == expected, f"{config_key} should be {expected}, got {actual_value}"
+        expected_bool = env_value.lower() == "true"
+        assert (
+            actual_value == expected_bool
+        ), f"{config_key} should be {expected_bool}, got {actual_value}"
     elif config_key == "CORS_ORIGINS":
         # CORS_ORIGINS is parsed as comma-separated list
-        expected = [origin.strip() for origin in env_value.split(",")]
-        assert actual_value == expected, f"CORS_ORIGINS should be {expected}, got {actual_value}"
+        expected_list: list[str] = [origin.strip() for origin in env_value.split(",")]
+        assert (
+            actual_value == expected_list
+        ), f"CORS_ORIGINS should be {expected_list}, got {actual_value}"
     else:
         # String values should match exactly
         assert (
@@ -325,7 +329,7 @@ def test_property_2_config_validation_error_logging(validation_scenario: str) ->
     }
 
     scenario_config = scenarios[validation_scenario]
-    env_vars = scenario_config["env"]
+    env_vars: dict[str, str] = scenario_config["env"]  # type: ignore[assignment]
     expected_key = str(scenario_config["expected_key"])
     expected_error_fragment = str(scenario_config["expected_error_fragment"])
 

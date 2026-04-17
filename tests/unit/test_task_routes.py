@@ -226,7 +226,7 @@ class TestTaskRoutes:
 
         # JSONResponse content is accessed via body_decode or similar
         # For testing, we can check the status code and that it returns a response
-        assert response.status_code == 200
+        assert response.status_code == 200  # type: ignore[union-attr]
 
     @pytest.mark.asyncio
     async def test_get_task_status_not_found(

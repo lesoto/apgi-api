@@ -135,7 +135,7 @@ class TestRecreateDatabaseGenericError:
             mod.recreate_database()
             mock_clear.assert_called_once()
 
-    def test_execute_error_falls_back(self, mock_psycopg2):
+    def test_execute_error_falls_back(self, mock_psycopg2: MagicMock) -> None:
         mod = _load_reset_db(mock_psycopg2)
 
         mock_conn = MagicMock()
@@ -148,7 +148,7 @@ class TestRecreateDatabaseGenericError:
             mod.recreate_database()
             mock_clear.assert_called_once()
 
-    def test_drop_error_falls_back(self, mock_psycopg2):
+    def test_drop_error_falls_back(self, mock_psycopg2: MagicMock) -> None:
         mod = _load_reset_db(mock_psycopg2)
 
         mock_conn = MagicMock()
@@ -168,7 +168,7 @@ class TestRecreateDatabaseGenericError:
 class TestClearAllTables:
     """Test _clear_all_tables directly."""
 
-    def test_clear_all_tables_success(self, mock_psycopg2):
+    def test_clear_all_tables_success(self, mock_psycopg2: MagicMock) -> None:
         mod = _load_reset_db(mock_psycopg2)
 
         mock_conn = MagicMock()
@@ -184,7 +184,7 @@ class TestClearAllTables:
         mock_cursor.close.assert_called()
         mock_conn.close.assert_called()
 
-    def test_clear_all_tables_no_tables(self, mock_psycopg2):
+    def test_clear_all_tables_no_tables(self, mock_psycopg2: MagicMock) -> None:
         mod = _load_reset_db(mock_psycopg2)
 
         mock_conn = MagicMock()
@@ -200,7 +200,7 @@ class TestClearAllTables:
         mock_cursor.close.assert_called()
         mock_conn.close.assert_called()
 
-    def test_clear_all_tables_drop_error_continues(self, mock_psycopg2):
+    def test_clear_all_tables_drop_error_continues(self, mock_psycopg2: MagicMock) -> None:
         """Error dropping one table should not stop the rest."""
         mod = _load_reset_db(mock_psycopg2)
 

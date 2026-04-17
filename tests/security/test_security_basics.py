@@ -10,13 +10,14 @@ Validates Requirements 9.1-9.8 for security-focused tests.
 import os
 import jwt
 from datetime import datetime, timedelta, timezone
+from typing import Any
 from unittest.mock import MagicMock
 
 
 class TestJWTWrongSecret:
     """Test JWT signed with wrong secret is rejected with 401 (Requirement 9.1)."""
 
-    def test_jwt_wrong_secret_rejected(self):
+    def test_jwt_wrong_secret_rejected(self) -> None:
         """Verify JWT signed with wrong secret is rejected with 401."""
         from app.middleware.authentication import AuthenticationMiddleware
 
@@ -35,7 +36,10 @@ class TestJWTWrongSecret:
         token = jwt.encode(payload, wrong_secret, algorithm="HS256")
 
         # Verify that the token verification would fail
-        auth_middleware = AuthenticationMiddleware(None)
+        async def mock_app(scope: Any, receive: Any, send: Any) -> None:
+            pass
+
+        auth_middleware = AuthenticationMiddleware(mock_app)
 
         # The token should fail verification because it's signed with wrong secret
         try:
@@ -55,7 +59,7 @@ class TestJWTWrongSecret:
 class TestJWTExpired:
     """Test expired JWT token is rejected with 401 (Requirement 9.2)."""
 
-    def test_expired_jwt_rejected(self):
+    def test_expired_jwt_rejected(self) -> None:
         """Verify expired JWT token is rejected with 401."""
         from app.middleware.authentication import AuthenticationMiddleware
 
@@ -74,7 +78,10 @@ class TestJWTExpired:
         token = jwt.encode(payload, secret, algorithm="HS256")
 
         # Verify that the token verification would fail
-        auth_middleware = AuthenticationMiddleware(None)
+        async def mock_app2(scope: Any, receive: Any, send: Any) -> None:
+            pass
+
+        auth_middleware = AuthenticationMiddleware(mock_app2)
 
         # The token should fail verification because it's expired
         try:
@@ -94,7 +101,7 @@ class TestJWTExpired:
 class TestSQLInjection:
     """Test SQL injection patterns are rejected with 400 (Requirement 9.3)."""
 
-    def test_sql_injection_in_request_body_rejected(self):
+    def test_sql_injection_in_request_body_rejected(self) -> None:
         """Verify SQL injection pattern in request body is rejected with 400."""
         from app.middleware.security_validation import SecurityValidationMiddleware
 
@@ -108,7 +115,7 @@ class TestSQLInjection:
         # Verify the middleware detects SQL injection
         assert middleware._contains_sql_injection(test_value) is True
 
-    def test_sql_injection_comment_syntax_rejected(self):
+    def test_sql_injection_comment_syntax_rejected(self) -> None:
         """Verify SQL injection with comment syntax is rejected."""
         from app.middleware.security_validation import SecurityValidationMiddleware
 
@@ -121,7 +128,7 @@ class TestSQLInjection:
         # Verify the middleware detects SQL injection
         assert middleware._contains_sql_injection(test_value) is True
 
-    def test_sql_injection_union_select_rejected(self):
+    def test_sql_injection_union_select_rejected(self) -> None:
         """Verify UNION SELECT injection pattern is rejected."""
         from app.middleware.security_validation import SecurityValidationMiddleware
 
@@ -138,7 +145,7 @@ class TestSQLInjection:
 class TestXSSPrevention:
     """Test XSS patterns are rejected with 400 (Requirement 9.7)."""
 
-    def test_xss_script_tag_rejected(self):
+    def test_xss_script_tag_rejected(self) -> None:
         """Verify XSS pattern with script tag is rejected with 400."""
         from app.middleware.security_validation import SecurityValidationMiddleware
 
@@ -151,7 +158,7 @@ class TestXSSPrevention:
         # Verify the middleware detects XSS
         assert middleware._contains_xss(test_value) is True
 
-    def test_xss_event_handler_rejected(self):
+    def test_xss_event_handler_rejected(self) -> None:
         """Verify XSS pattern with event handler is rejected."""
         from app.middleware.security_validation import SecurityValidationMiddleware
 
@@ -164,7 +171,7 @@ class TestXSSPrevention:
         # Verify the middleware detects XSS
         assert middleware._contains_xss(test_value) is True
 
-    def test_xss_javascript_protocol_rejected(self):
+    def test_xss_javascript_protocol_rejected(self) -> None:
         """Verify XSS pattern with javascript protocol is rejected."""
         from app.middleware.security_validation import SecurityValidationMiddleware
 
@@ -181,7 +188,7 @@ class TestXSSPrevention:
 class TestCSRFProtection:
     """Test CSRF protection (Requirement 9.4)."""
 
-    def test_csrf_token_generation(self):
+    def test_csrf_token_generation(self) -> None:
         """Verify CSRF token generation works."""
         from app.middleware.csrf import CSRFMiddleware
 
@@ -195,7 +202,7 @@ class TestCSRFProtection:
         assert len(token) > 0
         assert isinstance(token, str)
 
-    def test_csrf_token_hashing(self):
+    def test_csrf_token_hashing(self) -> None:
         """Verify CSRF token hashing works."""
         from app.middleware.csrf import CSRFMiddleware
 
@@ -220,14 +227,17 @@ class TestCSRFProtection:
 class TestJWTSecurity:
     """Test JWT token security."""
 
-    def test_jwt_algorithm_none_rejected(self):
+    def test_jwt_algorithm_none_rejected(self) -> None:
         """Test that 'none' algorithm is rejected."""
         from app.middleware.authentication import AuthenticationMiddleware
 
         # Create a malformed JWT with 'none' algorithm
         token = "eyJhbGciOiJub25lIiwidHlwIjoiSldUIn0.eyJ1c2VyX2lkIjoidGVzdCJ9.signature"
 
-        auth_middleware = AuthenticationMiddleware(None)
+        async def mock_app3(scope: Any, receive: Any, send: Any) -> None:
+            pass
+
+        auth_middleware = AuthenticationMiddleware(mock_app3)
 
         # The token should fail verification
         try:
@@ -242,14 +252,17 @@ class TestJWTSecurity:
                 or "not configured" in error_msg
             )
 
-    def test_jwt_expiration_enforced(self):
+    def test_jwt_expiration_enforced(self) -> None:
         """Test that expired tokens are rejected."""
         from app.middleware.authentication import AuthenticationMiddleware
 
         # Create an invalid token format
         token = "invalid.expired.token"
 
-        auth_middleware = AuthenticationMiddleware(None)
+        async def mock_app4(scope: Any, receive: Any, send: Any) -> None:
+            pass
+
+        auth_middleware = AuthenticationMiddleware(mock_app4)
 
         # The token should fail verification
         try:
@@ -268,7 +281,7 @@ class TestJWTSecurity:
 class TestLoginAttempts:
     """Test login attempt limiting (Requirement 9.8)."""
 
-    def test_login_attempt_tracking_structure(self):
+    def test_login_attempt_tracking_structure(self) -> None:
         """Verify login attempt tracking structure exists."""
         from app.database.models import User
 
@@ -280,7 +293,7 @@ class TestLoginAttempts:
 class TestRateLimiting:
     """Test rate limiting security (Requirement 9.5)."""
 
-    def test_rate_limit_middleware_exists(self):
+    def test_rate_limit_middleware_exists(self) -> None:
         """Verify rate limiting middleware is configured."""
         from app.middleware.rate_limiting import RateLimitingMiddleware
 
@@ -289,7 +302,7 @@ class TestRateLimiting:
         assert hasattr(RateLimitingMiddleware, "_get_client_id")
         assert hasattr(RateLimitingMiddleware, "_get_endpoint_identifier")
 
-    def test_rate_limit_headers_configured(self):
+    def test_rate_limit_headers_configured(self) -> None:
         """Verify rate limit headers are configured."""
         from app.middleware.rate_limiting import RateLimitingMiddleware
 
@@ -304,7 +317,7 @@ class TestRateLimiting:
 class TestSecurityHeaders:
     """Test security headers are present (Requirement 9.6)."""
 
-    def test_security_headers_middleware_exists(self):
+    def test_security_headers_middleware_exists(self) -> None:
         """Verify security headers middleware is configured."""
         from app.middleware.security_headers import SecurityHeadersMiddleware
 
@@ -321,7 +334,7 @@ class TestSecurityHeaders:
         assert middleware.security_headers["X-Content-Type-Options"] == "nosniff"
         assert middleware.security_headers["X-Frame-Options"] == "DENY"
 
-    def test_hsts_header_configured(self):
+    def test_hsts_header_configured(self) -> None:
         """Verify HSTS header is configured."""
         from app.middleware.security_headers import SecurityHeadersMiddleware
 

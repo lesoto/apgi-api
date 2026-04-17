@@ -12,11 +12,13 @@ class TestResponseSchemaValidationMiddleware:
     """Test ResponseSchemaValidationMiddleware functionality."""
 
     @pytest.fixture
-    def validation_middleware(self):
+    def validation_middleware(self) -> ResponseSchemaValidationMiddleware:
         mock_app = MagicMock()
         return ResponseSchemaValidationMiddleware(app=mock_app)
 
-    def test_valid_json_schema(self, validation_middleware):
+    def test_valid_json_schema(
+        self, validation_middleware: ResponseSchemaValidationMiddleware
+    ) -> None:
         """Test valid JSON schema validation."""
         # Test the middleware's internal validation methods
         schema = {
@@ -30,7 +32,9 @@ class TestResponseSchemaValidationMiddleware:
         errors = validation_middleware._validate_schema(data, schema)
         assert errors == []
 
-    def test_invalid_json_schema(self, validation_middleware):
+    def test_invalid_json_schema(
+        self, validation_middleware: ResponseSchemaValidationMiddleware
+    ) -> None:
         """Test invalid JSON schema validation."""
         # Test validation with wrong data type
         schema = {
@@ -45,7 +49,9 @@ class TestResponseSchemaValidationMiddleware:
         assert len(errors) == 1
         assert "Expected string" in errors[0]["error"]
 
-    def test_missing_content_type(self, validation_middleware):
+    def test_missing_content_type(
+        self, validation_middleware: ResponseSchemaValidationMiddleware
+    ) -> None:
         """Test missing content-type validation."""
         # Test validation of required fields
         schema = {
@@ -64,7 +70,9 @@ class TestResponseSchemaValidationMiddleware:
         assert len(errors) == 1
         assert "Required field is missing" in errors[0]["error"]
 
-    def test_large_payload_validation(self, validation_middleware):
+    def test_large_payload_validation(
+        self, validation_middleware: ResponseSchemaValidationMiddleware
+    ) -> None:
         """Test large payload size validation."""
         # Test field length validation
         schema = {
@@ -86,9 +94,9 @@ class TestResponseSchemaValidationMiddleware:
 class TestResponseSchemaValidationMiddlewareAdditional:
     """Test ResponseSchemaValidationMiddleware functionality."""
 
-    def setup_method(self):
+    def setup_method(self) -> None:
         """Set up test fixtures."""
-        self.openapi_schema = {
+        self.openapi_schema: dict[str, Any] = {
             "paths": {
                 "/api/test": {
                     "get": {
@@ -133,7 +141,7 @@ class TestResponseSchemaValidationMiddlewareAdditional:
             }
         }
 
-    def test_init_default(self):
+    def test_init_default(self) -> None:
         """Test middleware initialization with defaults."""
         app = Mock()
         middleware = ResponseSchemaValidationMiddleware(app)
@@ -143,7 +151,7 @@ class TestResponseSchemaValidationMiddlewareAdditional:
         assert middleware.fail_on_error is False
         assert middleware._schema_cache == {}
 
-    def test_init_with_params(self):
+    def test_init_with_params(self) -> None:
         """Test middleware initialization with parameters."""
         app = Mock()
         schema = {"test": "schema"}
@@ -156,7 +164,7 @@ class TestResponseSchemaValidationMiddlewareAdditional:
         assert middleware.fail_on_error is True
 
     @pytest.mark.asyncio
-    async def test_dispatch_disabled(self):
+    async def test_dispatch_disabled(self) -> None:
         """Test dispatch when validation is disabled."""
         app = Mock()
         middleware = ResponseSchemaValidationMiddleware(app, enabled=False)
@@ -168,7 +176,7 @@ class TestResponseSchemaValidationMiddlewareAdditional:
         assert response == call_next.return_value
 
     @pytest.mark.asyncio
-    async def test_dispatch_schema_load_failure(self):
+    async def test_dispatch_schema_load_failure(self) -> None:
         """Test dispatch when OpenAPI schema loading fails."""
         app = Mock()
         app.openapi.side_effect = Exception("Schema load error")
@@ -182,7 +190,7 @@ class TestResponseSchemaValidationMiddlewareAdditional:
         assert response == call_next.return_value
 
     @pytest.mark.asyncio
-    async def test_dispatch_successful_validation(self):
+    async def test_dispatch_successful_validation(self) -> None:
         """Test dispatch with successful response validation."""
         app = Mock()
         middleware = ResponseSchemaValidationMiddleware(app, openapi_schema=self.openapi_schema)
@@ -198,7 +206,7 @@ class TestResponseSchemaValidationMiddlewareAdditional:
         assert result == response
 
     @pytest.mark.asyncio
-    async def test_dispatch_non_validatable_status(self):
+    async def test_dispatch_non_validatable_status(self) -> None:
         """Test dispatch with 5xx status (not validated)."""
         app = Mock()
         middleware = ResponseSchemaValidationMiddleware(app, openapi_schema=self.openapi_schema)
@@ -210,27 +218,27 @@ class TestResponseSchemaValidationMiddlewareAdditional:
         result = await middleware.dispatch(request, call_next)
         assert result == response
 
-    def test_get_response_schema_exact_match(self):
+    def test_get_response_schema_exact_match(self) -> None:
         """Test getting response schema with exact path match."""
         middleware = ResponseSchemaValidationMiddleware(Mock(), openapi_schema=self.openapi_schema)
         schema = middleware._get_response_schema("/api/test", "get", 200)
         assert schema is not None
         assert "content" in schema
 
-    def test_get_response_schema_parametric_match(self):
+    def test_get_response_schema_parametric_match(self) -> None:
         """Test getting response schema with path parameter match."""
         middleware = ResponseSchemaValidationMiddleware(Mock(), openapi_schema=self.openapi_schema)
         schema = middleware._get_response_schema("/api/test/123", "get", 200)
         assert schema is not None
         assert "content" in schema
 
-    def test_get_response_schema_no_match(self):
+    def test_get_response_schema_no_match(self) -> None:
         """Test getting response schema with no match."""
         middleware = ResponseSchemaValidationMiddleware(Mock(), openapi_schema=self.openapi_schema)
         schema = middleware._get_response_schema("/nonexistent", "get", 200)
         assert schema is None
 
-    def test_get_response_schema_default_response(self):
+    def test_get_response_schema_default_response(self) -> None:
         """Test getting response schema with default response."""
         schema_with_default = {
             "paths": {
@@ -249,26 +257,26 @@ class TestResponseSchemaValidationMiddlewareAdditional:
         schema = middleware._get_response_schema("/api/test", "get", 404)
         assert schema is not None
 
-    def test_find_matching_path_exact(self):
+    def test_find_matching_path_exact(self) -> None:
         """Test finding matching path with exact match."""
         middleware = ResponseSchemaValidationMiddleware(Mock(), openapi_schema=self.openapi_schema)
         path_item = middleware._find_matching_path("/api/test")
         assert path_item is not None
 
-    def test_find_matching_path_parametric(self):
+    def test_find_matching_path_parametric(self) -> None:
         """Test finding matching path with parameters."""
         middleware = ResponseSchemaValidationMiddleware(Mock(), openapi_schema=self.openapi_schema)
         path_item = middleware._find_matching_path("/api/test/123")
         assert path_item is not None
 
-    def test_find_matching_path_no_match(self):
+    def test_find_matching_path_no_match(self) -> None:
         """Test finding matching path with no match."""
         middleware = ResponseSchemaValidationMiddleware(Mock(), openapi_schema=self.openapi_schema)
         path_item = middleware._find_matching_path("/nonexistent/path")
         assert path_item is None
 
     @pytest.mark.asyncio
-    async def test_get_response_body_regular_response(self):
+    async def test_get_response_body_regular_response(self) -> None:
         """Test getting response body from regular response."""
         middleware = ResponseSchemaValidationMiddleware(Mock())
         response = Mock()
@@ -278,7 +286,7 @@ class TestResponseSchemaValidationMiddlewareAdditional:
         assert body == '{"test": "data"}'
 
     @pytest.mark.asyncio
-    async def test_get_response_body_empty_body(self):
+    async def test_get_response_body_empty_body(self) -> None:
         """Test getting response body when empty."""
         middleware = ResponseSchemaValidationMiddleware(Mock())
         response = Mock()
@@ -291,7 +299,7 @@ class TestResponseSchemaValidationMiddlewareAdditional:
         assert body is None
 
     @pytest.mark.asyncio
-    async def test_get_response_body_streaming_response(self):
+    async def test_get_response_body_streaming_response(self) -> None:
         """Test getting response body from streaming response."""
         middleware = ResponseSchemaValidationMiddleware(Mock())
         response = Mock()
@@ -302,21 +310,21 @@ class TestResponseSchemaValidationMiddlewareAdditional:
 
         # Create proper async iterator mock that returns bytes
         class MockIterator:
-            def __init__(self):
+            def __init__(self) -> None:
                 self.chunks = [b"chunk1", b"chunk2"]
                 self.index = 0
 
-            def __aiter__(self):
+            def __aiter__(self) -> "MockIterator":
                 return self
 
-            async def __anext__(self):
+            async def __anext__(self) -> bytes:
                 if self.index >= len(self.chunks):
                     raise StopAsyncIteration
                 chunk = self.chunks[self.index]
                 self.index += 1
                 return chunk
 
-            def __len__(self):
+            def __len__(self) -> int:
                 return sum(len(chunk) for chunk in self.chunks)
 
         response.body_iterator = MockIterator()
@@ -325,7 +333,7 @@ class TestResponseSchemaValidationMiddlewareAdditional:
         assert body == "chunk1chunk2"
 
     @pytest.mark.asyncio
-    async def test_get_response_body_no_body_attr(self):
+    async def test_get_response_body_no_body_attr(self) -> None:
         """Test getting response body when no body attribute."""
         middleware = ResponseSchemaValidationMiddleware(Mock())
         response = Mock()
@@ -338,7 +346,7 @@ class TestResponseSchemaValidationMiddlewareAdditional:
         body = await middleware._get_response_body(response)
         assert body is None
 
-    def test_validate_schema_valid_object(self):
+    def test_validate_schema_valid_object(self) -> None:
         """Test validating valid object schema."""
         middleware = ResponseSchemaValidationMiddleware(Mock())
         schema = {
@@ -356,7 +364,7 @@ class TestResponseSchemaValidationMiddlewareAdditional:
         errors = middleware._validate_schema(data, schema)
         assert errors == []
 
-    def test_validate_schema_missing_required(self):
+    def test_validate_schema_missing_required(self) -> None:
         """Test validating object with missing required field."""
         middleware = ResponseSchemaValidationMiddleware(Mock())
         schema = {
@@ -375,7 +383,7 @@ class TestResponseSchemaValidationMiddlewareAdditional:
         assert len(errors) == 1
         assert "Required field is missing" in errors[0]["error"]
 
-    def test_validate_schema_wrong_type(self):
+    def test_validate_schema_wrong_type(self) -> None:
         """Test validating object with wrong field type."""
         middleware = ResponseSchemaValidationMiddleware(Mock())
         schema = {
@@ -390,7 +398,7 @@ class TestResponseSchemaValidationMiddlewareAdditional:
         assert len(errors) == 1
         assert "Expected integer" in errors[0]["error"]
 
-    def test_validate_schema_array_items(self):
+    def test_validate_schema_array_items(self) -> None:
         """Test validating array items."""
         middleware = ResponseSchemaValidationMiddleware(Mock())
         schema = {
@@ -408,7 +416,7 @@ class TestResponseSchemaValidationMiddlewareAdditional:
         assert len(errors) == 1
         assert "Expected string" in errors[0]["error"]
 
-    def test_validate_schema_string_pattern(self):
+    def test_validate_schema_string_pattern(self) -> None:
         """Test validating string with pattern."""
         middleware = ResponseSchemaValidationMiddleware(Mock())
         schema = {
@@ -426,20 +434,20 @@ class TestResponseSchemaValidationMiddlewareAdditional:
         assert len(errors) == 1
         assert "does not match pattern" in errors[0]["error"]
 
-    def test_validate_field_string_type(self):
+    def test_validate_field_string_type(self) -> None:
         """Test validating string field type."""
         middleware = ResponseSchemaValidationMiddleware(Mock())
         errors = middleware._validate_field("test", {"type": "string"}, "field")
         assert errors == []
 
-    def test_validate_field_wrong_type(self):
+    def test_validate_field_wrong_type(self) -> None:
         """Test validating field with wrong type."""
         middleware = ResponseSchemaValidationMiddleware(Mock())
         errors = middleware._validate_field(123, {"type": "string"}, "field")
         assert len(errors) == 1
         assert "Expected string" in errors[0]["error"]
 
-    def test_validate_field_array_items(self):
+    def test_validate_field_array_items(self) -> None:
         """Test validating array field items."""
         middleware = ResponseSchemaValidationMiddleware(Mock())
         errors = middleware._validate_field(
@@ -447,7 +455,7 @@ class TestResponseSchemaValidationMiddlewareAdditional:
         )
         assert len(errors) == 2  # Both items are wrong type
 
-    def test_validate_field_object_properties(self):
+    def test_validate_field_object_properties(self) -> None:
         """Test validating object field properties."""
         middleware = ResponseSchemaValidationMiddleware(Mock())
         errors = middleware._validate_field(
@@ -456,7 +464,7 @@ class TestResponseSchemaValidationMiddlewareAdditional:
         assert len(errors) == 1
         assert "Expected string" in errors[0]["error"]
 
-    def test_log_validation_failure(self):
+    def test_log_validation_failure(self) -> None:
         """Test logging validation failure."""
         middleware = ResponseSchemaValidationMiddleware(Mock())
         request = Mock()
@@ -472,7 +480,7 @@ class TestResponseSchemaValidationMiddlewareAdditional:
         )
 
     @pytest.mark.asyncio
-    async def test_validate_response_with_empty_body(self):
+    async def test_validate_response_with_empty_body(self) -> None:
         """Test validating response with empty body."""
         middleware = ResponseSchemaValidationMiddleware(Mock(), openapi_schema=self.openapi_schema)
         request = Mock()
@@ -486,7 +494,7 @@ class TestResponseSchemaValidationMiddlewareAdditional:
         await middleware._validate_response(request, response)
 
     @pytest.mark.asyncio
-    async def test_validate_response_invalid_json(self):
+    async def test_validate_response_invalid_json(self) -> None:
         """Test validating response with invalid JSON."""
         middleware = ResponseSchemaValidationMiddleware(Mock(), openapi_schema=self.openapi_schema)
         request = Mock()
@@ -500,7 +508,7 @@ class TestResponseSchemaValidationMiddlewareAdditional:
         await middleware._validate_response(request, response)
 
     @pytest.mark.asyncio
-    async def test_validate_response_validation_error(self):
+    async def test_validate_response_validation_error(self) -> None:
         """Test validating response with validation errors."""
         middleware = ResponseSchemaValidationMiddleware(Mock(), openapi_schema=self.openapi_schema)
         request = Mock()
@@ -515,7 +523,7 @@ class TestResponseSchemaValidationMiddlewareAdditional:
         await middleware._validate_response(request, response)
 
     @pytest.mark.asyncio
-    async def test_validate_response_no_schema(self):
+    async def test_validate_response_no_schema(self) -> None:
         """Test validating response with no matching schema."""
         middleware = ResponseSchemaValidationMiddleware(Mock(), openapi_schema=self.openapi_schema)
         request = Mock()
@@ -539,7 +547,7 @@ class TestSchemaValidationMiddlewareExtra:
     """Additional tests merged from test_schema_validation_middleware.py."""
 
     @pytest.mark.asyncio
-    async def test_dispatch_loads_openapi_schema_from_app(self):
+    async def test_dispatch_loads_openapi_schema_from_app(self) -> None:
         """Test dispatch loads OpenAPI schema from request.app if not already loaded."""
         mock_app = _MagicMock()
         mock_app.openapi = _MagicMock(return_value={"paths": {}})
@@ -558,7 +566,7 @@ class TestSchemaValidationMiddlewareExtra:
         mock_app.openapi.assert_called_once()
 
     @pytest.mark.asyncio
-    async def test_validate_response_with_status_range(self):
+    async def test_validate_response_with_status_range(self) -> None:
         """Test validation uses status range (2XX) when specific status not found."""
         schema_with_range = {
             "paths": {
@@ -596,7 +604,7 @@ class TestSchemaValidationMiddlewareExtra:
         assert result.status_code == 201
 
     @pytest.mark.asyncio
-    async def test_validate_response_with_nested_object(self):
+    async def test_validate_response_with_nested_object(self) -> None:
         """Test validation handles nested objects."""
         schema_with_nested = {
             "paths": {
@@ -641,25 +649,25 @@ class TestSchemaValidationMiddlewareExtra:
 
         assert result.status_code == 200
 
-    def test_validate_field_with_number_type(self):
+    def test_validate_field_with_number_type(self) -> None:
         """Test field validation with number type."""
         middleware = ResponseSchemaValidationMiddleware(_MagicMock())
         errors = middleware._validate_field(123.45, {"type": "number"}, "field")
         assert errors == []
 
-    def test_validate_field_with_boolean_type(self):
+    def test_validate_field_with_boolean_type(self) -> None:
         """Test field validation with boolean type."""
         middleware = ResponseSchemaValidationMiddleware(_MagicMock())
         errors = middleware._validate_field(True, {"type": "boolean"}, "field")
         assert errors == []
 
-    def test_validate_field_with_integer_type(self):
+    def test_validate_field_with_integer_type(self) -> None:
         """Test field validation with integer type."""
         middleware = ResponseSchemaValidationMiddleware(_MagicMock())
         errors = middleware._validate_field(42, {"type": "integer"}, "field")
         assert errors == []
 
-    def test_find_matching_path_multi_segment_params(self):
+    def test_find_matching_path_multi_segment_params(self) -> None:
         """Test path matching handles multi-segment path parameters."""
         schema: Dict[str, Any] = {
             "paths": {
@@ -688,7 +696,7 @@ class TestSchemaValidationComprehensive:
     """Comprehensive tests for schema validation middleware coverage."""
 
     @pytest.mark.asyncio
-    async def test_dispatch_with_5xx_status_skips_validation(self):
+    async def test_dispatch_with_5xx_status_skips_validation(self) -> None:
         """Test that 5xx responses are not validated."""
         mock_app = _MagicMock()
         middleware = ResponseSchemaValidationMiddleware(mock_app, enabled=True)
@@ -705,7 +713,7 @@ class TestSchemaValidationComprehensive:
         assert result.status_code == 500
 
     @pytest.mark.asyncio
-    async def test_dispatch_with_status_below_200_skips_validation(self):
+    async def test_dispatch_with_status_below_200_skips_validation(self) -> None:
         """Test that responses below 200 are not validated."""
         mock_app = _MagicMock()
         middleware = ResponseSchemaValidationMiddleware(mock_app, enabled=True)
@@ -722,7 +730,7 @@ class TestSchemaValidationComprehensive:
         assert result.status_code == 100
 
     @pytest.mark.asyncio
-    async def test_validate_response_with_no_openapi_schema(self):
+    async def test_validate_response_with_no_openapi_schema(self) -> None:
         """Test validation when OpenAPI schema is None."""
         mock_app = _MagicMock()
         mock_app.openapi.side_effect = Exception("No schema")
@@ -740,7 +748,7 @@ class TestSchemaValidationComprehensive:
 
         assert result == response
 
-    def test_get_response_schema_caching(self):
+    def test_get_response_schema_caching(self) -> None:
         """Test that response schemas are cached."""
         schema = {
             "paths": {
@@ -763,7 +771,7 @@ class TestSchemaValidationComprehensive:
         assert result1 == result2
         assert "get:/test:200" in middleware._schema_cache
 
-    def test_get_response_schema_with_no_paths(self):
+    def test_get_response_schema_with_no_paths(self) -> None:
         """Test getting schema when paths are not defined."""
         middleware = ResponseSchemaValidationMiddleware(_MagicMock(), openapi_schema={})
 
@@ -771,7 +779,7 @@ class TestSchemaValidationComprehensive:
 
         assert result is None
 
-    def test_get_response_schema_with_no_operation(self):
+    def test_get_response_schema_with_no_operation(self) -> None:
         """Test getting schema when operation is not defined."""
         schema: dict[str, Any] = {"paths": {"/test": {"post": {"responses": {}}}}}
         middleware = ResponseSchemaValidationMiddleware(_MagicMock(), openapi_schema=schema)
@@ -780,7 +788,7 @@ class TestSchemaValidationComprehensive:
 
         assert result is None
 
-    def test_get_response_schema_with_no_responses(self):
+    def test_get_response_schema_with_no_responses(self) -> None:
         """Test getting schema when responses are not defined."""
         schema: dict[str, Any] = {"paths": {"/test": {"get": {}}}}
         middleware = ResponseSchemaValidationMiddleware(_MagicMock(), openapi_schema=schema)
@@ -789,7 +797,7 @@ class TestSchemaValidationComprehensive:
 
         assert result is None
 
-    def test_find_matching_path_with_no_paths(self):
+    def test_find_matching_path_with_no_paths(self) -> None:
         """Test finding path when paths are not defined."""
         middleware = ResponseSchemaValidationMiddleware(_MagicMock(), openapi_schema={})
 
@@ -797,7 +805,7 @@ class TestSchemaValidationComprehensive:
 
         assert result is None
 
-    def test_find_matching_path_with_different_segment_count(self):
+    def test_find_matching_path_with_different_segment_count(self) -> None:
         """Test finding path with different segment count."""
         schema: dict[str, Any] = {"paths": {"/test": {"get": {}}, "/test/{id}": {"get": {}}}}
         middleware = ResponseSchemaValidationMiddleware(_MagicMock(), openapi_schema=schema)
@@ -806,7 +814,7 @@ class TestSchemaValidationComprehensive:
 
         assert result is None
 
-    def test_find_matching_path_with_multiple_parameters(self):
+    def test_find_matching_path_with_multiple_parameters(self) -> None:
         """Test finding path with multiple parameters."""
         schema: dict[str, Any] = {
             "paths": {"/users/{user_id}/posts/{post_id}/comments/{comment_id}": {"get": {}}}
@@ -818,7 +826,7 @@ class TestSchemaValidationComprehensive:
         assert result is not None
 
     @pytest.mark.asyncio
-    async def test_get_response_body_with_bytes(self):
+    async def test_get_response_body_with_bytes(self) -> None:
         """Test getting response body from bytes."""
         middleware = ResponseSchemaValidationMiddleware(_MagicMock())
         response = _MagicMock()
@@ -829,7 +837,7 @@ class TestSchemaValidationComprehensive:
         assert body == '{"test": "data"}'
 
     @pytest.mark.asyncio
-    async def test_get_response_body_with_invalid_utf8(self):
+    async def test_get_response_body_with_invalid_utf8(self) -> None:
         """Test getting response body with invalid UTF-8."""
         middleware = ResponseSchemaValidationMiddleware(_MagicMock())
         response = _MagicMock()
@@ -840,7 +848,7 @@ class TestSchemaValidationComprehensive:
         assert body is None
 
     @pytest.mark.asyncio
-    async def test_get_response_body_with_string_body(self):
+    async def test_get_response_body_with_string_body(self) -> None:
         """Test getting response body when body is already a string."""
         middleware = ResponseSchemaValidationMiddleware(_MagicMock())
         response = _MagicMock()
@@ -850,7 +858,7 @@ class TestSchemaValidationComprehensive:
 
         assert body == '{"test": "data"}'
 
-    def test_validate_schema_with_non_object_type(self):
+    def test_validate_schema_with_non_object_type(self) -> None:
         """Test validating non-object data."""
         middleware = ResponseSchemaValidationMiddleware(_MagicMock())
         schema = {"content": {"application/json": {"schema": {"type": "object"}}}}
@@ -860,7 +868,7 @@ class TestSchemaValidationComprehensive:
         assert len(errors) == 1
         assert "Expected object" in errors[0]["error"]
 
-    def test_validate_schema_with_no_content(self):
+    def test_validate_schema_with_no_content(self) -> None:
         """Test validating when schema has no content."""
         middleware = ResponseSchemaValidationMiddleware(_MagicMock())
         schema: dict[str, Any] = {}
@@ -869,7 +877,7 @@ class TestSchemaValidationComprehensive:
 
         assert errors == []
 
-    def test_validate_schema_with_no_json_content(self):
+    def test_validate_schema_with_no_json_content(self) -> None:
         """Test validating when schema has no JSON content."""
         middleware = ResponseSchemaValidationMiddleware(_MagicMock())
         schema: dict[str, Any] = {"content": {"text/plain": {}}}
@@ -878,7 +886,7 @@ class TestSchemaValidationComprehensive:
 
         assert errors == []
 
-    def test_validate_field_with_pattern_match(self):
+    def test_validate_field_with_pattern_match(self) -> None:
         """Test field validation with matching pattern."""
         middleware = ResponseSchemaValidationMiddleware(_MagicMock())
 
@@ -888,7 +896,7 @@ class TestSchemaValidationComprehensive:
 
         assert errors == []
 
-    def test_validate_field_with_pattern_mismatch(self):
+    def test_validate_field_with_pattern_mismatch(self) -> None:
         """Test field validation with non-matching pattern."""
         middleware = ResponseSchemaValidationMiddleware(_MagicMock())
 
@@ -899,7 +907,7 @@ class TestSchemaValidationComprehensive:
         assert len(errors) == 1
         assert "does not match pattern" in errors[0]["error"]
 
-    def test_validate_field_with_nested_array(self):
+    def test_validate_field_with_nested_array(self) -> None:
         """Test field validation with nested arrays."""
         middleware = ResponseSchemaValidationMiddleware(_MagicMock())
 
@@ -911,7 +919,7 @@ class TestSchemaValidationComprehensive:
 
         assert errors == []
 
-    def test_validate_field_with_nested_array_invalid(self):
+    def test_validate_field_with_nested_array_invalid(self) -> None:
         """Test field validation with invalid nested arrays."""
         middleware = ResponseSchemaValidationMiddleware(_MagicMock())
 
@@ -923,7 +931,7 @@ class TestSchemaValidationComprehensive:
 
         assert len(errors) == 1
 
-    def test_validate_field_with_number_type(self):
+    def test_validate_field_with_number_type(self) -> None:
         """Test field validation with number type."""
         middleware = ResponseSchemaValidationMiddleware(_MagicMock())
 
@@ -931,7 +939,7 @@ class TestSchemaValidationComprehensive:
 
         assert errors == []
 
-    def test_validate_field_with_boolean_type(self):
+    def test_validate_field_with_boolean_type(self) -> None:
         """Test field validation with boolean type."""
         middleware = ResponseSchemaValidationMiddleware(_MagicMock())
 
@@ -939,7 +947,7 @@ class TestSchemaValidationComprehensive:
 
         assert errors == []
 
-    def test_validate_field_with_integer_type(self):
+    def test_validate_field_with_integer_type(self) -> None:
         """Test field validation with integer type."""
         middleware = ResponseSchemaValidationMiddleware(_MagicMock())
 
@@ -947,7 +955,7 @@ class TestSchemaValidationComprehensive:
 
         assert errors == []
 
-    def test_validate_field_with_unknown_type(self):
+    def test_validate_field_with_unknown_type(self) -> None:
         """Test field validation with unknown type."""
         middleware = ResponseSchemaValidationMiddleware(_MagicMock())
 
@@ -955,7 +963,7 @@ class TestSchemaValidationComprehensive:
 
         assert errors == []
 
-    def test_validate_field_with_no_type(self):
+    def test_validate_field_with_no_type(self) -> None:
         """Test field validation with no type specified."""
         middleware = ResponseSchemaValidationMiddleware(_MagicMock())
 
@@ -964,7 +972,7 @@ class TestSchemaValidationComprehensive:
         assert errors == []
 
     @pytest.mark.asyncio
-    async def test_validate_response_with_empty_body_and_no_content_schema(self):
+    async def test_validate_response_with_empty_body_and_no_content_schema(self) -> None:
         """Test validating empty response when schema expects no content."""
         schema: dict[str, Any] = {"paths": {"/test": {"get": {"responses": {"204": {}}}}}}
         middleware = ResponseSchemaValidationMiddleware(_MagicMock(), openapi_schema=schema)
@@ -980,7 +988,7 @@ class TestSchemaValidationComprehensive:
         await middleware._validate_response(mock_request, response)
 
     @pytest.mark.asyncio
-    async def test_validate_response_with_exception_during_validation(self):
+    async def test_validate_response_with_exception_during_validation(self) -> None:
         """Test that exceptions during validation are caught."""
         middleware = ResponseSchemaValidationMiddleware(_MagicMock(), openapi_schema={"paths": {}})
 
@@ -995,7 +1003,7 @@ class TestSchemaValidationComprehensive:
         # This should not raise an exception
         await middleware._validate_response(mock_request, response)
 
-    def test_init_with_logging(self, caplog):
+    def test_init_with_logging(self, caplog: Any) -> None:
         """Test middleware initialization logs when enabled."""
         with caplog.at_level(logging.INFO):
             ResponseSchemaValidationMiddleware(_MagicMock(), enabled=True)
@@ -1005,7 +1013,7 @@ class TestSchemaValidationComprehensive:
             for record in caplog.records
         )
 
-    def test_init_without_logging_when_disabled(self, caplog):
+    def test_init_without_logging_when_disabled(self, caplog: Any) -> None:
         """Test middleware initialization does not log when disabled."""
         with caplog.at_level(logging.INFO):
             ResponseSchemaValidationMiddleware(_MagicMock(), enabled=False)
@@ -1017,7 +1025,7 @@ class TestSchemaValidationComprehensive:
         )
 
     @pytest.mark.asyncio
-    async def test_dispatch_with_fail_on_error_false(self):
+    async def test_dispatch_with_fail_on_error_false(self) -> None:
         """Test dispatch with fail_on_error=False (default)."""
         schema = {
             "paths": {
@@ -1057,7 +1065,7 @@ class TestSchemaValidationComprehensive:
         # Should still return the response even with validation errors
         assert result.status_code == 200
 
-    def test_validate_field_with_nested_object_properties(self):
+    def test_validate_field_with_nested_object_properties(self) -> None:
         """Test field validation with nested object properties."""
         middleware = ResponseSchemaValidationMiddleware(_MagicMock())
 
@@ -1077,7 +1085,7 @@ class TestSchemaValidationComprehensive:
 
         assert errors == []
 
-    def test_validate_field_with_nested_object_invalid_property(self):
+    def test_validate_field_with_nested_object_invalid_property(self) -> None:
         """Test field validation with invalid nested object property."""
         middleware = ResponseSchemaValidationMiddleware(_MagicMock())
 
@@ -1095,7 +1103,7 @@ class TestSchemaValidationComprehensive:
         assert len(errors) == 1
 
     @pytest.mark.asyncio
-    async def test_get_response_body_with_streaming_response_empty(self):
+    async def test_get_response_body_with_streaming_response_empty(self) -> None:
         """Test getting response body from empty streaming response."""
         middleware = ResponseSchemaValidationMiddleware(_MagicMock())
         response = _MagicMock()
@@ -1104,10 +1112,10 @@ class TestSchemaValidationComprehensive:
             delattr(response, "body")
 
         class EmptyIterator:
-            def __aiter__(self):
+            def __aiter__(self) -> "EmptyIterator":
                 return self
 
-            async def __anext__(self):
+            async def __anext__(self) -> bytes:
                 raise StopAsyncIteration
 
         response.body_iterator = EmptyIterator()
@@ -1116,7 +1124,7 @@ class TestSchemaValidationComprehensive:
 
         assert body is None
 
-    def test_get_response_schema_with_status_range_2xx(self):
+    def test_get_response_schema_with_status_range_2xx(self) -> None:
         """Test getting schema with 2XX status range."""
         schema = {
             "paths": {
@@ -1135,7 +1143,7 @@ class TestSchemaValidationComprehensive:
 
         assert result is not None
 
-    def test_get_response_schema_with_status_range_4xx(self):
+    def test_get_response_schema_with_status_range_4xx(self) -> None:
         """Test getting schema with 4XX status range."""
         schema = {
             "paths": {
@@ -1155,7 +1163,7 @@ class TestSchemaValidationComprehensive:
         assert result is not None
 
     @pytest.mark.asyncio
-    async def test_validate_response_with_multiple_validation_errors(self):
+    async def test_validate_response_with_multiple_validation_errors(self) -> None:
         """Test validating response with multiple validation errors."""
         schema = {
             "paths": {
@@ -1195,7 +1203,7 @@ class TestSchemaValidationComprehensive:
 
         await middleware._validate_response(mock_request, response)
 
-    def test_find_matching_path_with_trailing_slashes(self):
+    def test_find_matching_path_with_trailing_slashes(self) -> None:
         """Test finding path with trailing slashes."""
         schema: dict[str, Any] = {"paths": {"/test/": {"get": {}}, "/test": {"post": {}}}}
         middleware = ResponseSchemaValidationMiddleware(_MagicMock(), openapi_schema=schema)
@@ -1204,7 +1212,7 @@ class TestSchemaValidationComprehensive:
 
         assert result is not None
 
-    def test_validate_schema_with_multiple_required_fields(self):
+    def test_validate_schema_with_multiple_required_fields(self) -> None:
         """Test validating schema with multiple required fields."""
         middleware = ResponseSchemaValidationMiddleware(_MagicMock())
         schema = {
@@ -1228,7 +1236,7 @@ class TestSchemaValidationComprehensive:
 
         assert len(errors) == 3  # Missing name, email, age
 
-    def test_validate_field_with_array_of_objects(self):
+    def test_validate_field_with_array_of_objects(self) -> None:
         """Test field validation with array of objects."""
         middleware = ResponseSchemaValidationMiddleware(_MagicMock())
 
@@ -1246,7 +1254,7 @@ class TestSchemaValidationComprehensive:
 
         assert errors == []
 
-    def test_validate_field_with_array_of_objects_invalid(self):
+    def test_validate_field_with_array_of_objects_invalid(self) -> None:
         """Test field validation with invalid array of objects."""
         middleware = ResponseSchemaValidationMiddleware(_MagicMock())
 

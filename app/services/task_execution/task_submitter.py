@@ -13,7 +13,7 @@ from typing import Any, Callable, Dict, Optional
 try:
     from celery.result import AsyncResult
 except ImportError:  # pragma: no cover
-    import celery  # type: ignore
+    import celery
 
     AsyncResult = celery.result.AsyncResult
 
@@ -224,9 +224,9 @@ class TaskSubmitter:
         with get_db_context() as db:
             task_record = db.query(Task).filter(Task.task_id == task_id).first()
             if task_record:
-                task_record.status = TaskStatus.FAILED.value
-                task_record.error_message = error_message
-                task_record.completed_at = datetime.now(timezone.utc)
+                task_record.status = TaskStatus.FAILED.value  # type: ignore[assignment]
+                task_record.error_message = error_message  # type: ignore[assignment]
+                task_record.completed_at = datetime.now(timezone.utc)  # type: ignore[assignment]
                 db.commit()
 
     async def submit_task(
@@ -324,9 +324,9 @@ class TaskSubmitter:
         with get_db_context() as db:
             task = db.query(Task).filter(Task.task_id == task_id).first()
             if task:
-                task.status = TaskStatus.PENDING.value
-                task.error_message = None
-                task.completed_at = None
+                task.status = TaskStatus.PENDING.value  # type: ignore[assignment]
+                task.error_message = None  # type: ignore[assignment]
+                task.completed_at = None  # type: ignore[assignment]
                 db.commit()
 
         # Re-submit to Celery

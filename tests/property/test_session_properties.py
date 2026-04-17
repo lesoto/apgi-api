@@ -36,7 +36,7 @@ class OperationResult(TypedDict, total=False):
 # ============================================================================
 
 
-def create_mock_redis():
+def create_mock_redis() -> MagicMock:
     """Create a mock Redis client."""
     mock_redis = MagicMock()
     mock_redis.get = MagicMock(return_value=None)
@@ -45,7 +45,7 @@ def create_mock_redis():
     return mock_redis
 
 
-def create_mock_db_session_factory():
+def create_mock_db_session_factory() -> MagicMock:
     """Create a mock database session factory."""
     mock_session = MagicMock()
     mock_session.add = MagicMock()
@@ -56,13 +56,15 @@ def create_mock_db_session_factory():
         return_value=MagicMock(scalar_one_or_none=MagicMock(return_value=None))
     )
 
-    def factory():
+    def factory() -> MagicMock:
         return mock_session
 
-    return factory
+    return factory  # type: ignore[return-value]
 
 
-def create_test_session(session_id: Optional[str] = None, config: Optional[dict] = None):
+def create_test_session(
+    session_id: Optional[str] = None, config: Optional[dict[str, Any]] = None
+) -> SimulationSession:
     """Create a test simulation session."""
     if session_id is None:
         session_id = str(uuid.uuid4())
@@ -105,7 +107,9 @@ def create_test_session(session_id: Optional[str] = None, config: Optional[dict]
     operation1=st.sampled_from(["start", "pause", "stop", "reset"]),
     operation2=st.sampled_from(["start", "pause", "stop", "reset"]),
 )
-def test_property_22_concurrent_modification_prevention(initial_state, operation1, operation2):
+def test_property_22_concurrent_modification_prevention(
+    initial_state: SessionLifecycleState, operation1: str, operation2: str
+) -> None:
     """
     **Validates: Requirements 18.8**
 
@@ -149,7 +153,7 @@ def test_property_22_concurrent_modification_prevention(initial_state, operation
     # Track results from concurrent operations
     results: OperationResult = {"op1": None, "op2": None, "errors": []}
 
-    async def execute_operation(op_name: str, operation: str):
+    async def execute_operation(op_name: str, operation: str) -> None:
         """Execute an operation and capture result or error."""
         try:
             if operation == "start":
@@ -172,7 +176,7 @@ def test_property_22_concurrent_modification_prevention(initial_state, operation
             # Unexpected error
             results[op_name] = ("unexpected_error", str(e))  # type: ignore
 
-    async def run_concurrent_operations():
+    async def run_concurrent_operations() -> None:
         """Run two operations concurrently."""
         # Create tasks for concurrent execution
         task1 = asyncio.create_task(execute_operation("op1", operation1))
@@ -235,7 +239,7 @@ def test_property_22_concurrent_modification_prevention(initial_state, operation
 @given(
     num_concurrent_ops=st.integers(min_value=2, max_value=5),
 )
-def test_property_22_multiple_concurrent_modifications(num_concurrent_ops):
+def test_property_22_multiple_concurrent_modifications(num_concurrent_ops: int) -> None:
     """
     **Validates: Requirements 18.8**
 
@@ -254,7 +258,7 @@ def test_property_22_multiple_concurrent_modifications(num_concurrent_ops):
     # Track results
     results = []
 
-    async def execute_start():
+    async def execute_start() -> Tuple[str, Any]:
         """Execute start operation."""
         try:
             result = await session.start()
@@ -264,7 +268,7 @@ def test_property_22_multiple_concurrent_modifications(num_concurrent_ops):
         except Exception as e:
             return ("unexpected_error", str(e))
 
-    async def run_concurrent_starts():
+    async def run_concurrent_starts() -> List[Tuple[str, Any]]:
         """Run multiple start operations concurrently."""
         tasks = [asyncio.create_task(execute_start()) for _ in range(num_concurrent_ops)]
         return await asyncio.gather(*tasks)
@@ -302,7 +306,7 @@ def test_property_22_multiple_concurrent_modifications(num_concurrent_ops):
         ), f"Error message should indicate session is already running, got: {error_msg}"
 
 
-def test_property_22_concurrent_read_write_safety():
+def test_property_22_concurrent_read_write_safety() -> None:
     """
     **Validates: Requirements 18.8**
 
@@ -322,16 +326,16 @@ def test_property_22_concurrent_read_write_safety():
     write_result = None
     read_results = []
 
-    async def write_operation():
+    async def write_operation() -> None:
         """Execute a write operation (start)."""
         nonlocal write_result
         try:
             result = await session.start()
             write_result = ("success", result)
         except Exception as e:
-            write_result = ("error", str(e))
+            write_result = ("error", {"error": str(e)})
 
-    async def read_operation():
+    async def read_operation() -> Tuple[str, Any]:
         """Execute a read operation (get_state)."""
         try:
             state = await session.get_state()
@@ -339,7 +343,7 @@ def test_property_22_concurrent_read_write_safety():
         except Exception as e:
             return ("error", str(e))
 
-    async def run_concurrent_read_write():
+    async def run_concurrent_read_write() -> List[Tuple[str, Any]]:
         """Run one write and multiple reads concurrently."""
         write_task = asyncio.create_task(write_operation())
         read_tasks = [asyncio.create_task(read_operation()) for _ in range(3)]

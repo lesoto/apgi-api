@@ -4,7 +4,11 @@ Security Headers Middleware
 Adds security-related HTTP headers to all responses for defense in depth.
 """
 
+from typing import Any, cast
+
 from starlette.middleware.base import BaseHTTPMiddleware
+from starlette.requests import Request
+from starlette.responses import Response
 
 from app.config import settings
 from app.middleware.logging import StructuredLogger
@@ -28,7 +32,7 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
     - Cross-Origin-Resource-Policy
     """
 
-    def __init__(self, app):
+    def __init__(self, app: Any) -> None:
         """
         Initialize security headers middleware.
 
@@ -85,7 +89,7 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
 
         logger.info("Security headers middleware initialized")
 
-    async def dispatch(self, request, call_next):
+    async def dispatch(self, request: Request, call_next: Any) -> Response:
         """
         Process request and add security headers to response.
 
@@ -116,4 +120,4 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
             # In non-production, explicitly disable HSTS to avoid browser caching issues
             response.headers["Strict-Transport-Security"] = "max-age=0"
 
-        return response
+        return cast(Response, response)

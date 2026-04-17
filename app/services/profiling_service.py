@@ -45,13 +45,13 @@ class ProfilingResult:
 class ProfilingService:
     """Service for application performance profiling and monitoring."""
 
-    def __init__(self):
+    def __init__(self) -> None:
         self.snapshots: List[PerformanceSnapshot] = []
         self.max_snapshots = 1000
         self.is_tracing_memory = False
         self.memory_trace_started = False
 
-    def start_memory_tracing(self):
+    def start_memory_tracing(self) -> None:
         """Start memory tracing."""
         if not self.is_tracing_memory:
             tracemalloc.start()
@@ -59,7 +59,7 @@ class ProfilingService:
             self.is_tracing_memory = True
             logger.info("Memory tracing started")
 
-    def stop_memory_tracing(self):
+    def stop_memory_tracing(self) -> None:
         """Stop memory tracing."""
         if self.is_tracing_memory:
             tracemalloc.stop()
@@ -101,7 +101,7 @@ class ProfilingService:
         active_coroutines: int,
         request_count: int,
         response_time_avg: float,
-    ):
+    ) -> None:
         """Record a performance snapshot."""
         snapshot = PerformanceSnapshot(
             timestamp=datetime.now(timezone.utc),
@@ -236,7 +236,7 @@ class ProfilingService:
     def get_system_performance(self) -> Dict[str, Any]:
         """Get current system performance metrics."""
         try:
-            import psutil  # type: ignore
+            import psutil
             import threading
 
             # CPU usage

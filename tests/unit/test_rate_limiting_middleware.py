@@ -4,15 +4,19 @@ Unit tests for app/middleware/rate_limiting.py
 Tests the actual RateLimitingMiddleware ASGI interface, not a fictional API.
 """
 
+from typing import TYPE_CHECKING
 import pytest
 from unittest.mock import AsyncMock, MagicMock, patch
+
+if TYPE_CHECKING:
+    from app.middleware.rate_limiting import RateLimitingMiddleware
 
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
 
 
-def make_scope(path: str = "/v1/sessions", method: str = "GET") -> dict:
+def make_scope(path: str = "/v1/sessions", method: str = "GET") -> dict[str, object]:
     """Build a minimal ASGI HTTP scope dict."""
     return {
         "type": "http",
@@ -33,7 +37,7 @@ def make_scope(path: str = "/v1/sessions", method: str = "GET") -> dict:
 class TestRateLimitingMiddlewareInit:
     """Test middleware initialization."""
 
-    def test_init_enabled_default(self):
+    def test_init_enabled_default(self) -> None:
         """Middleware can be created with enabled=True."""
         from app.middleware.rate_limiting import RateLimitingMiddleware
 
@@ -44,7 +48,7 @@ class TestRateLimitingMiddlewareInit:
         assert mw.redis_client is None
         assert mw.rate_limiter is None
 
-    def test_init_disabled(self):
+    def test_init_disabled(self) -> None:
         """Middleware can be created with enabled=False."""
         from app.middleware.rate_limiting import RateLimitingMiddleware
 
@@ -53,7 +57,7 @@ class TestRateLimitingMiddlewareInit:
 
         assert mw.enabled is False
 
-    def test_init_with_redis_client(self):
+    def test_init_with_redis_client(self) -> None:
         """When a redis_client is provided, rate_limiter is initialised."""
         from app.middleware.rate_limiting import RateLimitingMiddleware
 
@@ -66,7 +70,7 @@ class TestRateLimitingMiddlewareInit:
         MockRL.assert_called_once_with(mock_redis)
         assert mw.redis_client is mock_redis
 
-    def test_set_redis_client(self):
+    def test_set_redis_client(self) -> None:
         """set_redis_client() updates the singleton instance."""
         from app.middleware.rate_limiting import RateLimitingMiddleware
 
@@ -79,7 +83,7 @@ class TestRateLimitingMiddlewareInit:
 
         MockRL.assert_called_once_with(mock_redis)
 
-    def test_endpoint_rates_configured(self):
+    def test_endpoint_rates_configured(self) -> None:
         """Default endpoint_rates dictionary is present."""
         from app.middleware.rate_limiting import RateLimitingMiddleware
 
@@ -98,12 +102,12 @@ class TestRateLimitingMiddlewareInit:
 class TestGetClientId:
     """Test the _get_client_id private method."""
 
-    def _make_mw(self):
+    def _make_mw(self) -> "RateLimitingMiddleware":
         from app.middleware.rate_limiting import RateLimitingMiddleware
 
         return RateLimitingMiddleware(AsyncMock(), enabled=True)
 
-    def test_returns_user_id_when_authenticated(self):
+    def test_returns_user_id_when_authenticated(self) -> None:
         """Returns 'user:<id>' when request.state.user is set."""
         mw = self._make_mw()
 
@@ -114,16 +118,19 @@ class TestGetClientId:
             user = _User()
 
         class _Request(MagicMock):
-            def __init__(self):
+            def __init__(self) -> None:
                 super().__init__()
                 self.state = _State()
                 self.client = MagicMock()
-                self.headers = {}
+                self.headers: dict[str, str] = {}
+
+            def __call__(self) -> None:
+                pass
 
         result = mw._get_client_id(_Request())
         assert result == "user:abc123"
 
-    def test_returns_ip_when_no_user(self):
+    def test_returns_ip_when_no_user(self) -> None:
         """Falls back to 'ip:<addr>' when no state.user."""
         mw = self._make_mw()
 
@@ -136,7 +143,7 @@ class TestGetClientId:
         result = mw._get_client_id(request)
         assert result.startswith("ip:")
 
-    def test_returns_ip_unknown_when_no_client(self):
+    def test_returns_ip_unknown_when_no_client(self) -> None:
         """Falls back to 'ip:unknown' when no client info."""
         mw = self._make_mw()
 
@@ -157,54 +164,54 @@ class TestGetClientId:
 class TestGetEndpointIdentifier:
     """Test endpoint identification for rate limit categories."""
 
-    def _make_mw(self):
+    def _make_mw(self) -> "RateLimitingMiddleware":
         from app.middleware.rate_limiting import RateLimitingMiddleware
 
         return RateLimitingMiddleware(AsyncMock(), enabled=True)
 
-    def _req(self, path, method="GET"):
+    def _req(self, path: str, method: str = "GET") -> MagicMock:
         request = MagicMock()
         request.url.path = path
         request.method = method
         return request
 
-    def test_auth_path(self):
+    def test_auth_path(self) -> None:
         mw = self._make_mw()
         assert mw._get_endpoint_identifier(self._req("/v1/auth/login")) == "auth:attempt"
 
-    def test_register_path(self):
+    def test_register_path(self) -> None:
         mw = self._make_mw()
         assert mw._get_endpoint_identifier(self._req("/v1/users/register")) == "auth:attempt"
 
-    def test_reset_password_path(self):
+    def test_reset_password_path(self) -> None:
         mw = self._make_mw()
         assert (
             mw._get_endpoint_identifier(self._req("/v1/users/reset-password"))
             == "users:reset-password"
         )
 
-    def test_session_create_post(self):
+    def test_session_create_post(self) -> None:
         mw = self._make_mw()
         assert mw._get_endpoint_identifier(self._req("/v1/sessions", "POST")) == "session:create"
 
-    def test_session_tasks_post(self):
+    def test_session_tasks_post(self) -> None:
         mw = self._make_mw()
         assert (
             mw._get_endpoint_identifier(self._req("/v1/sessions/123/tasks", "POST"))
             == "task:execute"
         )
 
-    def test_session_read_get(self):
+    def test_session_read_get(self) -> None:
         mw = self._make_mw()
         assert mw._get_endpoint_identifier(self._req("/v1/sessions", "GET")) == "session:read"
 
-    def test_session_delete(self):
+    def test_session_delete(self) -> None:
         mw = self._make_mw()
         assert (
             mw._get_endpoint_identifier(self._req("/v1/sessions/123", "DELETE")) == "session:delete"
         )
 
-    def test_session_export_other_method(self):
+    def test_session_export_other_method(self) -> None:
         """Non-GET/POST/DELETE to sessions path with 'export' returns 'data:export'."""
         mw = self._make_mw()
         # The export branch is only reachable after POST/GET/DELETE checks – use PUT
@@ -213,11 +220,11 @@ class TestGetEndpointIdentifier:
             == "data:export"
         )
 
-    def test_tasks_path(self):
+    def test_tasks_path(self) -> None:
         mw = self._make_mw()
         assert mw._get_endpoint_identifier(self._req("/v1/tasks")) == "task:execute"
 
-    def test_unknown_path_returns_global(self):
+    def test_unknown_path_returns_global(self) -> None:
         mw = self._make_mw()
         assert mw._get_endpoint_identifier(self._req("/v1/unknown/path")) == "global"
 
@@ -230,12 +237,12 @@ class TestGetEndpointIdentifier:
 class TestTrustedProxy:
     """Test trusted proxy detection for X-Forwarded-For headers (Lines 111-122)."""
 
-    def _make_mw(self):
+    def _make_mw(self) -> "RateLimitingMiddleware":
         from app.middleware.rate_limiting import RateLimitingMiddleware
 
         return RateLimitingMiddleware(AsyncMock(), enabled=True)
 
-    def test_x_forwarded_for_from_localhost(self):
+    def test_x_forwarded_for_from_localhost(self) -> None:
         """X-Forwarded-For trusted when from localhost (127.0.0.1)."""
         mw = self._make_mw()
 
@@ -247,7 +254,7 @@ class TestTrustedProxy:
         result = mw._get_client_id(request)
         assert result == "ip:203.0.113.1"
 
-    def test_x_forwarded_for_from_10_network(self):
+    def test_x_forwarded_for_from_10_network(self) -> None:
         """X-Forwarded-For trusted when from 10.0.0.0/8 network."""
         mw = self._make_mw()
 
@@ -259,7 +266,7 @@ class TestTrustedProxy:
         result = mw._get_client_id(request)
         assert result == "ip:203.0.113.1"
 
-    def test_x_forwarded_for_from_172_network(self):
+    def test_x_forwarded_for_from_172_network(self) -> None:
         """X-Forwarded-For trusted when from 172.16.0.0/12 network."""
         mw = self._make_mw()
 
@@ -271,7 +278,7 @@ class TestTrustedProxy:
         result = mw._get_client_id(request)
         assert result == "ip:203.0.113.1"
 
-    def test_x_forwarded_for_from_192_network(self):
+    def test_x_forwarded_for_from_192_network(self) -> None:
         """X-Forwarded-For trusted when from 192.168.0.0/16 network."""
         mw = self._make_mw()
 
@@ -283,7 +290,7 @@ class TestTrustedProxy:
         result = mw._get_client_id(request)
         assert result == "ip:203.0.113.1"
 
-    def test_x_forwarded_for_from_ipv6_localhost(self):
+    def test_x_forwarded_for_from_ipv6_localhost(self) -> None:
         """X-Forwarded-For trusted when from IPv6 localhost (::1)."""
         mw = self._make_mw()
 
@@ -295,7 +302,7 @@ class TestTrustedProxy:
         result = mw._get_client_id(request)
         assert result == "ip:2001:db8::1"
 
-    def test_x_forwarded_for_not_trusted_external_ip(self):
+    def test_x_forwarded_for_not_trusted_external_ip(self) -> None:
         """X-Forwarded-For NOT trusted when from external IP."""
         mw = self._make_mw()
 
@@ -308,7 +315,7 @@ class TestTrustedProxy:
         # Should use direct IP, not forwarded
         assert result == "ip:203.0.113.1"
 
-    def test_x_forwarded_for_multiple_ips_takes_first(self):
+    def test_x_forwarded_for_multiple_ips_takes_first(self) -> None:
         """X-Forwarded-For with multiple IPs takes the first one."""
         mw = self._make_mw()
 
@@ -320,7 +327,7 @@ class TestTrustedProxy:
         result = mw._get_client_id(request)
         assert result == "ip:203.0.113.1"
 
-    def test_x_real_ip_trusted_from_localhost(self):
+    def test_x_real_ip_trusted_from_localhost(self) -> None:
         """X-Real-IP trusted when from localhost."""
         mw = self._make_mw()
 
@@ -332,7 +339,7 @@ class TestTrustedProxy:
         result = mw._get_client_id(request)
         assert result == "ip:203.0.113.1"
 
-    def test_x_real_ip_not_trusted_external(self):
+    def test_x_real_ip_not_trusted_external(self) -> None:
         """X-Real-IP NOT trusted when from external IP."""
         mw = self._make_mw()
 
@@ -344,7 +351,7 @@ class TestTrustedProxy:
         result = mw._get_client_id(request)
         assert result == "ip:203.0.113.1"
 
-    def test_x_forwarded_for_takes_priority_over_x_real_ip(self):
+    def test_x_forwarded_for_takes_priority_over_x_real_ip(self) -> None:
         """X-Forwarded-For takes priority over X-Real-IP when both present."""
         mw = self._make_mw()
 
@@ -356,7 +363,7 @@ class TestTrustedProxy:
         result = mw._get_client_id(request)
         assert result == "ip:203.0.113.1"
 
-    def test_x_forwarded_for_with_whitespace(self):
+    def test_x_forwarded_for_with_whitespace(self) -> None:
         """X-Forwarded-For handles whitespace correctly."""
         mw = self._make_mw()
 
@@ -368,7 +375,7 @@ class TestTrustedProxy:
         result = mw._get_client_id(request)
         assert result == "ip:203.0.113.1"
 
-    def test_no_proxy_headers_uses_direct_ip(self):
+    def test_no_proxy_headers_uses_direct_ip(self) -> None:
         """No proxy headers, uses direct client IP."""
         mw = self._make_mw()
 
@@ -380,7 +387,7 @@ class TestTrustedProxy:
         result = mw._get_client_id(request)
         assert result == "ip:203.0.113.1"
 
-    def test_is_trusted_proxy_with_invalid_direct_ip_format(self):
+    def test_is_trusted_proxy_with_invalid_direct_ip_format(self) -> None:
         """When direct_ip is invalid format, is_trusted_proxy returns False and uses direct IP."""
         mw = self._make_mw()
 
@@ -397,33 +404,33 @@ class TestTrustedProxy:
 class TestShouldSkipRateLimiting:
     """Test skip-list logic."""
 
-    def _make_mw(self):
+    def _make_mw(self) -> "RateLimitingMiddleware":
         from app.middleware.rate_limiting import RateLimitingMiddleware
 
         return RateLimitingMiddleware(AsyncMock(), enabled=True)
 
-    def _req(self, path):
+    def _req(self, path: str) -> MagicMock:
         request = MagicMock()
         request.url.path = path
         return request
 
-    def test_health_path_skipped(self):
+    def test_health_path_skipped(self) -> None:
         mw = self._make_mw()
         assert mw._should_skip_rate_limiting(self._req("/health")) is True
 
-    def test_health_ready_skipped(self):
+    def test_health_ready_skipped(self) -> None:
         mw = self._make_mw()
         assert mw._should_skip_rate_limiting(self._req("/health/ready")) is True
 
-    def test_metrics_path_skipped(self):
+    def test_metrics_path_skipped(self) -> None:
         mw = self._make_mw()
         assert mw._should_skip_rate_limiting(self._req("/metrics")) is True
 
-    def test_docs_skipped(self):
+    def test_docs_skipped(self) -> None:
         mw = self._make_mw()
         assert mw._should_skip_rate_limiting(self._req("/docs")) is True
 
-    def test_api_path_not_skipped(self):
+    def test_api_path_not_skipped(self) -> None:
         mw = self._make_mw()
         assert mw._should_skip_rate_limiting(self._req("/v1/sessions")) is False
 
@@ -437,7 +444,7 @@ class TestDispatch:
     """Test the middleware dispatch method."""
 
     @pytest.mark.asyncio
-    async def test_disabled_middleware_passes_through(self):
+    async def test_disabled_middleware_passes_through(self) -> None:
         """When middleware is disabled, passes request to next handler."""
         from app.middleware.rate_limiting import RateLimitingMiddleware
 
@@ -455,7 +462,7 @@ class TestDispatch:
         assert result is response_mock
 
     @pytest.mark.asyncio
-    async def test_no_rate_limiter_passes_through(self):
+    async def test_no_rate_limiter_passes_through(self) -> None:
         """When rate_limiter is None, passes request through with default headers."""
         from app.middleware.rate_limiting import RateLimitingMiddleware
 
@@ -475,7 +482,7 @@ class TestDispatch:
         assert "X-RateLimit-Limit" in response_mock.headers
 
     @pytest.mark.asyncio
-    async def test_skipped_path_passes_through(self):
+    async def test_skipped_path_passes_through(self) -> None:
         """Health-check paths bypass rate limiting."""
         from app.middleware.rate_limiting import RateLimitingMiddleware
 
@@ -494,7 +501,7 @@ class TestDispatch:
         call_next.assert_called_once_with(request)
 
     @pytest.mark.asyncio
-    async def test_allowed_request_passes_through(self):
+    async def test_allowed_request_passes_through(self) -> None:
         """An allowed request is forwarded and gets rate-limit headers."""
         from app.middleware.rate_limiting import RateLimitingMiddleware
 
@@ -523,7 +530,7 @@ class TestDispatch:
         assert "X-RateLimit-Remaining" in response_mock.headers
 
     @pytest.mark.asyncio
-    async def test_rate_limited_request_returns_429(self):
+    async def test_rate_limited_request_returns_429(self) -> None:
         """A rate-limited request returns HTTP 429."""
         from app.middleware.rate_limiting import RateLimitingMiddleware
         from starlette.responses import JSONResponse
@@ -552,7 +559,7 @@ class TestDispatch:
         call_next.assert_not_called()
 
     @pytest.mark.asyncio
-    async def test_rate_limiter_exception_continues(self):
+    async def test_rate_limiter_exception_continues(self) -> None:
         """If rate limiter raises, request still passes through."""
         from app.middleware.rate_limiting import RateLimitingMiddleware
 
@@ -579,7 +586,7 @@ class TestDispatch:
         call_next.assert_called_once_with(request)
 
     @pytest.mark.asyncio
-    async def test_reset_time_negative_value_handled(self):
+    async def test_reset_time_negative_value_handled(self) -> None:
         """If reset_time is negative, uses default 60-second window."""
         from app.middleware.rate_limiting import RateLimitingMiddleware
 
@@ -608,7 +615,7 @@ class TestDispatch:
         assert "X-RateLimit-Limit" in response_mock.headers
 
     @pytest.mark.asyncio
-    async def test_reset_time_invalid_type_handled(self):
+    async def test_reset_time_invalid_type_handled(self) -> None:
         """If reset_time is invalid type, uses default 60-second window."""
         from app.middleware.rate_limiting import RateLimitingMiddleware
 

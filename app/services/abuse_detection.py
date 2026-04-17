@@ -61,7 +61,7 @@ class AbuseDetectionService:
     and anomaly detection.
     """
 
-    def __init__(self):
+    def __init__(self) -> None:
         """Initialize abuse detection service."""
         # Track login attempts per user for anomaly detection
         self.login_attempts: Dict[str, List[LoginAttempt]] = defaultdict(list)

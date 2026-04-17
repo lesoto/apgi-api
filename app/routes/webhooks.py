@@ -49,7 +49,7 @@ async def list_webhook_deliveries(
     per_page: int = 10,
     db: Session = Depends(get_db),
     current_user: TokenPayload = Depends(require_permission(Permission.DATA_READ)),
-):
+) -> WebhookDeliveryListResponse:
     """
     List webhook deliveries.
 
@@ -145,7 +145,7 @@ async def get_webhook_delivery(
     delivery_id: str,
     db: Session = Depends(get_db),
     current_user: TokenPayload = Depends(require_permission(Permission.DATA_READ)),
-):
+) -> WebhookDeliveryResponse:
     """
     Get details of a specific webhook delivery.
 
@@ -189,7 +189,7 @@ async def retry_webhook_delivery(
     delivery_id: str,
     db: Session = Depends(get_db),
     current_user: TokenPayload = Depends(require_permission(Permission.SYSTEM_ADMIN)),
-):
+) -> WebhookRetryResponse:
     """
     Retry a webhook delivery.
 
@@ -254,7 +254,7 @@ async def delete_webhook_delivery(
     delivery_id: str,
     db: Session = Depends(get_db),
     current_user: TokenPayload = Depends(require_permission(Permission.SYSTEM_ADMIN)),
-):
+) -> None:
     """
     Delete a webhook delivery record.
 
@@ -295,7 +295,7 @@ async def list_dead_letter_deliveries(
     per_page: int = 10,
     db: Session = Depends(get_db),
     current_user: TokenPayload = Depends(require_permission(Permission.SYSTEM_ADMIN)),
-):
+) -> WebhookDeliveryListResponse:
     """
     List dead-letter webhook deliveries.
 
@@ -379,7 +379,7 @@ async def retry_dead_letter_delivery(
     delivery_id: str,
     db: Session = Depends(get_db),
     current_user: TokenPayload = Depends(require_permission(Permission.SYSTEM_ADMIN)),
-):
+) -> WebhookRetryResponse:
     """
     Retry a dead-letter webhook delivery.
 
@@ -437,7 +437,7 @@ async def purge_dead_letter_delivery(
     delivery_id: str,
     db: Session = Depends(get_db),
     current_user: TokenPayload = Depends(require_permission(Permission.SYSTEM_ADMIN)),
-):
+) -> None:
     """
     Purge a dead-letter webhook delivery record.
 

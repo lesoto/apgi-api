@@ -78,7 +78,7 @@ class SLOMonitor:
     def __init__(self, slo_config: Dict[str, SLO] = API_SLOS):
         self.slos = slo_config
 
-    def check_compliance(self, slo_name: str, duration: float):
+    def check_compliance(self, slo_name: str, duration: float) -> None:
         """Track request duration against SLO targets."""
         slo = self.slos.get(slo_name, self.slos["global_default"])
 

@@ -17,7 +17,9 @@ class DeprecationMiddleware(BaseHTTPMiddleware):
     Requirements: 16.3, 16.4, 16.6
     """
 
-    def __init__(self, app, deprecated_endpoints: Optional[Dict[str, Dict[str, str]]] = None):
+    def __init__(
+        self, app: Any, deprecated_endpoints: Optional[Dict[str, Dict[str, str]]] = None
+    ) -> None:
         """
         Initialize deprecation middleware.
 
@@ -29,7 +31,7 @@ class DeprecationMiddleware(BaseHTTPMiddleware):
         super().__init__(app)
         self.deprecated_endpoints = deprecated_endpoints or {}
 
-    async def dispatch(self, request: Request, call_next: Callable) -> Any:
+    async def dispatch(self, request: Request, call_next: Callable[..., Any]) -> Any:
         """
         Process request and add deprecation headers if endpoint is deprecated.
 
@@ -151,7 +153,7 @@ class DeprecationMiddleware(BaseHTTPMiddleware):
 
         return msg
 
-    def update_deprecated_endpoints(self, deprecated_endpoints: Dict[str, Dict[str, str]]):
+    def update_deprecated_endpoints(self, deprecated_endpoints: Dict[str, Dict[str, str]]) -> None:
         """
         Update the deprecated endpoints configuration.
 

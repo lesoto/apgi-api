@@ -8,6 +8,7 @@ import pytest
 from unittest.mock import MagicMock, patch, AsyncMock
 from datetime import datetime, timezone, timedelta
 from starlette.responses import JSONResponse
+from typing import Any, TYPE_CHECKING
 
 from app.middleware.authentication import (
     AuthenticationMiddleware,
@@ -17,29 +18,36 @@ from app.middleware.authentication import (
 )
 from app.services.auth_manager import TokenPayload
 
+if TYPE_CHECKING:
+
+    class MockRequest:
+        url: Any
+        headers: dict[str, str]
+        state: Any
+
 
 @pytest.fixture
-def auth_middleware():
+def auth_middleware() -> AuthenticationMiddleware:
     """Create authentication middleware instance."""
     app = MagicMock()
     return AuthenticationMiddleware(app)
 
 
 @pytest.fixture
-def mock_request():
+def mock_request() -> Any:
     """Create a mock request."""
 
     class MockRequest:
-        def __init__(self):
+        def __init__(self) -> None:
             self.url = type("URL", (), {"path": "/api/test"})()
-            self.headers = {}
+            self.headers: dict[str, str] = {}
             self.state = type("State", (), {"authenticated": False})()
 
     return MockRequest()
 
 
 @pytest.fixture
-def mock_user_payload():
+def mock_user_payload() -> TokenPayload:
     """Create a mock user payload."""
     return TokenPayload(
         user_id="user_123",
@@ -50,7 +58,7 @@ def mock_user_payload():
 
 
 @pytest.fixture
-def mock_api_key_info():
+def mock_api_key_info() -> APIKeyInfo:
     """Create a mock API key info."""
     return APIKeyInfo(
         key_id="key_123",
@@ -65,30 +73,34 @@ def mock_api_key_info():
 class TestAuthenticationMiddleware:
     """Test authentication middleware."""
 
-    def test_is_public_path(self, auth_middleware):
+    def test_is_public_path(self, auth_middleware: AuthenticationMiddleware) -> None:
         """Test public path detection."""
         assert auth_middleware._is_public_path("/health") is True
         assert auth_middleware._is_public_path("/api/users") is False
         assert auth_middleware._is_public_path("/v1/auth/login") is True
 
     @pytest.mark.asyncio
-    async def test_dispatch_public_path(self, auth_middleware, mock_request):
+    async def test_dispatch_public_path(
+        self, auth_middleware: AuthenticationMiddleware, mock_request: "MockRequest"
+    ) -> None:
         """Test dispatch for public paths skips authentication."""
         mock_request.url.path = "/health"
         call_next = AsyncMock(return_value=MagicMock())
 
-        result = await auth_middleware.dispatch(mock_request, call_next)
+        result = await auth_middleware.dispatch(mock_request, call_next)  # type: ignore[arg-type]
 
         call_next.assert_called_once_with(mock_request)
         # Should not set user state
 
     @pytest.mark.asyncio
-    async def test_dispatch_no_auth_headers(self, auth_middleware, mock_request):
+    async def test_dispatch_no_auth_headers(
+        self, auth_middleware: AuthenticationMiddleware, mock_request: "MockRequest"
+    ) -> None:
         """Test dispatch with no auth headers returns 401 (deny-by-default)."""
         call_next = AsyncMock(return_value=MagicMock())
 
         with patch.object(auth_middleware, "_extract_and_verify_credentials", return_value=None):
-            result = await auth_middleware.dispatch(mock_request, call_next)
+            result = await auth_middleware.dispatch(mock_request, call_next)  # type: ignore[arg-type]
 
             assert isinstance(result, JSONResponse)
             assert result.status_code == 401
@@ -96,20 +108,27 @@ class TestAuthenticationMiddleware:
             assert not hasattr(mock_request.state, "user")
 
     @pytest.mark.asyncio
-    async def test_dispatch_invalid_auth_headers(self, auth_middleware, mock_request):
+    async def test_dispatch_invalid_auth_headers(
+        self, auth_middleware: AuthenticationMiddleware, mock_request: "MockRequest"
+    ) -> None:
         """Test dispatch with invalid auth headers returns 401."""
         mock_request.headers = {"Authorization": "Bearer invalid"}
         call_next = AsyncMock()
 
         with patch.object(auth_middleware, "_extract_and_verify_credentials", return_value=None):
-            result = await auth_middleware.dispatch(mock_request, call_next)
+            result = await auth_middleware.dispatch(mock_request, call_next)  # type: ignore[arg-type]
 
             assert isinstance(result, JSONResponse)
             assert result.status_code == 401
             call_next.assert_not_called()
 
     @pytest.mark.asyncio
-    async def test_dispatch_valid_auth(self, auth_middleware, mock_request, mock_user_payload):
+    async def test_dispatch_valid_auth(
+        self,
+        auth_middleware: AuthenticationMiddleware,
+        mock_request: "MockRequest",
+        mock_user_payload: TokenPayload,
+    ) -> None:
         """Test dispatch with valid authentication."""
         call_next = AsyncMock(return_value=MagicMock())
 
@@ -118,37 +137,45 @@ class TestAuthenticationMiddleware:
             "_extract_and_verify_credentials",
             return_value=("jwt", mock_user_payload),
         ):
-            result = await auth_middleware.dispatch(mock_request, call_next)
+            result = await auth_middleware.dispatch(mock_request, call_next)  # type: ignore[arg-type]
 
             assert mock_request.state.user == mock_user_payload
             assert mock_request.state.authenticated is True
             assert mock_request.state.auth_type == "jwt"
             call_next.assert_called_once_with(mock_request)
 
-    def test_extract_token_valid(self, auth_middleware, mock_request):
+    def test_extract_token_valid(
+        self, auth_middleware: AuthenticationMiddleware, mock_request: "MockRequest"
+    ) -> None:
         """Test token extraction from valid Authorization header."""
         mock_request.headers = {"Authorization": "Bearer test_token_123"}
 
-        token = auth_middleware._extract_token(mock_request)
+        token = auth_middleware._extract_token(mock_request)  # type: ignore[arg-type]
 
         assert token == "test_token_123"
 
-    def test_extract_token_invalid_format(self, auth_middleware, mock_request):
+    def test_extract_token_invalid_format(
+        self, auth_middleware: AuthenticationMiddleware, mock_request: "MockRequest"
+    ) -> None:
         """Test token extraction from invalid Authorization header."""
         mock_request.headers = {"Authorization": "InvalidFormat"}
 
-        token = auth_middleware._extract_token(mock_request)
+        token = auth_middleware._extract_token(mock_request)  # type: ignore[arg-type]
 
         assert token is None
 
-    def test_extract_token_no_header(self, auth_middleware, mock_request):
+    def test_extract_token_no_header(
+        self, auth_middleware: AuthenticationMiddleware, mock_request: "MockRequest"
+    ) -> None:
         """Test token extraction when no Authorization header."""
-        token = auth_middleware._extract_token(mock_request)
+        token = auth_middleware._extract_token(mock_request)  # type: ignore[arg-type]
 
         assert token is None
 
     @pytest.mark.asyncio
-    async def test_verify_token_valid(self, auth_middleware, mock_user_payload):
+    async def test_verify_token_valid(
+        self, auth_middleware: AuthenticationMiddleware, mock_user_payload: TokenPayload
+    ) -> None:
         """Test token verification."""
         with patch.object(
             auth_middleware, "_decode_and_validate_token", return_value=mock_user_payload
@@ -158,7 +185,7 @@ class TestAuthenticationMiddleware:
             assert result == mock_user_payload
 
     @pytest.mark.asyncio
-    async def test_verify_token_invalid(self, auth_middleware):
+    async def test_verify_token_invalid(self, auth_middleware: AuthenticationMiddleware) -> None:
         """Test invalid token verification."""
         from app.exceptions import InvalidTokenError
 
@@ -170,7 +197,9 @@ class TestAuthenticationMiddleware:
             with pytest.raises(InvalidTokenError):
                 await auth_middleware._verify_token("invalid_token")
 
-    def test_decode_and_validate_token(self, auth_middleware, mock_user_payload):
+    def test_decode_and_validate_token(
+        self, auth_middleware: AuthenticationMiddleware, mock_user_payload: TokenPayload
+    ) -> None:
         """Test blocking token verification."""
         from unittest.mock import patch
 
@@ -194,7 +223,9 @@ class TestAuthenticationMiddleware:
             assert result == mock_user_payload
 
     @pytest.mark.asyncio
-    async def test_verify_api_key_valid(self, auth_middleware, mock_api_key_info):
+    async def test_verify_api_key_valid(
+        self, auth_middleware: AuthenticationMiddleware, mock_api_key_info: APIKeyInfo
+    ) -> None:
         """Test API key verification."""
         with patch.object(
             auth_middleware, "_blocking_verify_api_key", return_value=mock_api_key_info
@@ -203,7 +234,9 @@ class TestAuthenticationMiddleware:
 
             assert result == mock_api_key_info
 
-    def test_blocking_verify_api_key_valid(self, auth_middleware, mock_api_key_info):
+    def test_blocking_verify_api_key_valid(
+        self, auth_middleware: AuthenticationMiddleware, mock_api_key_info: APIKeyInfo
+    ) -> None:
         """Test blocking API key verification."""
         mock_api_key = MagicMock()
         mock_api_key.key_id = "key_123"
@@ -240,7 +273,9 @@ class TestAuthenticationMiddleware:
 
                     assert result.key_id == "key_123"
 
-    def test_blocking_verify_api_key_invalid(self, auth_middleware):
+    def test_blocking_verify_api_key_invalid(
+        self, auth_middleware: AuthenticationMiddleware
+    ) -> None:
         """Test blocking API key verification with invalid key."""
         with patch("app.middleware.authentication.SessionLocal") as mock_session_class:
             mock_session = MagicMock()
@@ -250,7 +285,9 @@ class TestAuthenticationMiddleware:
             with pytest.raises(ValueError, match="Invalid API key"):
                 auth_middleware._blocking_verify_api_key("invalid_key")
 
-    def test_blocking_verify_api_key_expired(self, auth_middleware):
+    def test_blocking_verify_api_key_expired(
+        self, auth_middleware: AuthenticationMiddleware
+    ) -> None:
         """Test blocking API key verification with expired key."""
         mock_api_key = MagicMock()
         mock_api_key.expires_at = datetime.now(timezone.utc) - timedelta(days=1)  # Expired
@@ -281,37 +318,46 @@ class TestAuthenticationMiddleware:
 
     @pytest.mark.asyncio
     async def test_extract_and_verify_credentials_jwt(
-        self, auth_middleware, mock_request, mock_user_payload
-    ):
+        self,
+        auth_middleware: AuthenticationMiddleware,
+        mock_request: "MockRequest",
+        mock_user_payload: TokenPayload,
+    ) -> None:
         """Test credential extraction with JWT."""
         mock_request.headers = {"Authorization": "Bearer test_token"}
 
         with patch.object(auth_middleware, "_verify_token", return_value=mock_user_payload):
-            result = await auth_middleware._extract_and_verify_credentials(mock_request)
+            result = await auth_middleware._extract_and_verify_credentials(mock_request)  # type: ignore[arg-type]
 
             assert result == ("jwt", mock_user_payload)
 
     @pytest.mark.asyncio
     async def test_extract_and_verify_credentials_api_key(
-        self, auth_middleware, mock_request, mock_api_key_info
-    ):
+        self,
+        auth_middleware: AuthenticationMiddleware,
+        mock_request: "MockRequest",
+        mock_api_key_info: APIKeyInfo,
+    ) -> None:
         """Test credential extraction with API key."""
         mock_request.headers = {"X-API-Key": "test_key"}
 
         with patch.object(auth_middleware, "_verify_api_key", return_value=mock_api_key_info):
-            result = await auth_middleware._extract_and_verify_credentials(mock_request)
+            result = await auth_middleware._extract_and_verify_credentials(mock_request)  # type: ignore[arg-type]
 
+            assert result is not None
             assert result[0] == "api_key"
             assert result[1].user_id == "user_123"
 
     @pytest.mark.asyncio
-    async def test_extract_and_verify_credentials_none(self, auth_middleware, mock_request):
+    async def test_extract_and_verify_credentials_none(
+        self, auth_middleware: AuthenticationMiddleware, mock_request: "MockRequest"
+    ) -> None:
         """Test credential extraction with no valid credentials."""
-        result = await auth_middleware._extract_and_verify_credentials(mock_request)
+        result = await auth_middleware._extract_and_verify_credentials(mock_request)  # type: ignore[arg-type]
 
         assert result is None
 
-    def test_create_error_response(self, auth_middleware):
+    def test_create_error_response(self, auth_middleware: AuthenticationMiddleware) -> None:
         """Test error response creation."""
         response = auth_middleware._create_error_response(
             401, "invalid_credentials", "Invalid credentials"
@@ -323,32 +369,34 @@ class TestAuthenticationMiddleware:
         assert b"invalid_credentials" in content
 
 
-def test_get_current_user_from_request_authenticated(mock_request, mock_user_payload):
+def test_get_current_user_from_request_authenticated(
+    mock_request: "MockRequest", mock_user_payload: TokenPayload
+) -> None:
     """Test getting current user from authenticated request."""
     mock_request.state.user = mock_user_payload
 
-    user = get_current_user_from_request(mock_request)
+    user = get_current_user_from_request(mock_request)  # type: ignore[arg-type]
 
     assert user == mock_user_payload
 
 
-def test_get_current_user_from_request_unauthenticated(mock_request):
+def test_get_current_user_from_request_unauthenticated(mock_request: "MockRequest") -> None:
     """Test getting current user from unauthenticated request."""
-    user = get_current_user_from_request(mock_request)
+    user = get_current_user_from_request(mock_request)  # type: ignore[arg-type]
 
     assert user is None
 
 
-def test_is_authenticated_true(mock_request):
+def test_is_authenticated_true(mock_request: "MockRequest") -> None:
     """Test checking if request is authenticated."""
     mock_request.state.authenticated = True
 
-    assert is_authenticated(mock_request) is True
+    assert is_authenticated(mock_request) is True  # type: ignore[arg-type]
 
 
-def test_is_authenticated_false(mock_request):
+def test_is_authenticated_false(mock_request: "MockRequest") -> None:
     """Test checking if request is not authenticated."""
-    assert is_authenticated(mock_request) is False
+    assert is_authenticated(mock_request) is False  # type: ignore[arg-type]
 
 
 class TestAuthenticationMiddlewareCoverage:
@@ -356,7 +404,7 @@ class TestAuthenticationMiddlewareCoverage:
 
     # ── set_redis_client (line 93) ──────────────────────────────────────────
 
-    def test_set_redis_client(self, auth_middleware):
+    def test_set_redis_client(self, auth_middleware: AuthenticationMiddleware) -> None:
         """Test set_redis_client classmethod sets the class-level attribute."""
         mock_redis = MagicMock()
         AuthenticationMiddleware.set_redis_client(mock_redis)
@@ -367,7 +415,9 @@ class TestAuthenticationMiddlewareCoverage:
     # ── _verify_token: Redis revocation check (lines 178-180) ──────────────
 
     @pytest.mark.asyncio
-    async def test_verify_token_revoked_in_redis(self, auth_middleware, mock_user_payload):
+    async def test_verify_token_revoked_in_redis(
+        self, auth_middleware: AuthenticationMiddleware, mock_user_payload: TokenPayload
+    ) -> None:
         """Token with jti that is revoked in Redis raises InvalidTokenError."""
         from app.exceptions import InvalidTokenError
 
@@ -386,7 +436,9 @@ class TestAuthenticationMiddlewareCoverage:
             AuthenticationMiddleware._redis_client = None
 
     @pytest.mark.asyncio
-    async def test_verify_token_not_revoked_in_redis(self, auth_middleware, mock_user_payload):
+    async def test_verify_token_not_revoked_in_redis(
+        self, auth_middleware: AuthenticationMiddleware, mock_user_payload: TokenPayload
+    ) -> None:
         """Token with jti that is NOT revoked in Redis passes through."""
         mock_user_payload.jti = "some-jti-value"
         mock_redis = AsyncMock()
@@ -404,7 +456,9 @@ class TestAuthenticationMiddlewareCoverage:
 
     # ── _decode_and_validate_token: missing secret key (lines 198-200) ─────
 
-    def test_decode_and_validate_token_no_secret_key(self, auth_middleware):
+    def test_decode_and_validate_token_no_secret_key(
+        self, auth_middleware: AuthenticationMiddleware
+    ) -> None:
         """Raises InvalidTokenError when JWT secret key is not configured."""
         from app.exceptions import InvalidTokenError
 
@@ -416,7 +470,9 @@ class TestAuthenticationMiddlewareCoverage:
 
     # ── _decode_and_validate_token: wrong token_type (lines 247-251) ───────
 
-    def test_decode_and_validate_token_wrong_type(self, auth_middleware, mock_user_payload):
+    def test_decode_and_validate_token_wrong_type(
+        self, auth_middleware: AuthenticationMiddleware, mock_user_payload: TokenPayload
+    ) -> None:
         """Raises InvalidTokenError when token_type is not 'access'."""
         from app.exceptions import InvalidTokenError
 
@@ -441,7 +497,9 @@ class TestAuthenticationMiddlewareCoverage:
 
     # ── _decode_and_validate_token: manual expiry check (line 267) ──────────
 
-    def test_decode_and_validate_token_expired_manually(self, auth_middleware):
+    def test_decode_and_validate_token_expired_manually(
+        self, auth_middleware: AuthenticationMiddleware
+    ) -> None:
         """Raises ExpiredTokenError when exp is in the past (manual check)."""
         from app.exceptions import ExpiredTokenError
 
@@ -472,7 +530,9 @@ class TestAuthenticationMiddlewareCoverage:
 
     # ── _decode_and_validate_token: jwt.ExpiredSignatureError (line 281) ────
 
-    def test_decode_and_validate_token_jwt_expired_signature(self, auth_middleware):
+    def test_decode_and_validate_token_jwt_expired_signature(
+        self, auth_middleware: AuthenticationMiddleware
+    ) -> None:
         """Raises ExpiredTokenError when jwt raises ExpiredSignatureError."""
         import jwt as pyjwt
         from app.exceptions import ExpiredTokenError
@@ -483,7 +543,9 @@ class TestAuthenticationMiddlewareCoverage:
 
     # ── _decode_and_validate_token: jwt.InvalidTokenError (line 287) ────────
 
-    def test_decode_and_validate_token_jwt_invalid_token_error(self, auth_middleware):
+    def test_decode_and_validate_token_jwt_invalid_token_error(
+        self, auth_middleware: AuthenticationMiddleware
+    ) -> None:
         """Raises InvalidTokenError when jwt raises InvalidTokenError."""
         import jwt as pyjwt
         from app.exceptions import InvalidTokenError
@@ -494,7 +556,9 @@ class TestAuthenticationMiddlewareCoverage:
 
     # ── _decode_and_validate_token: generic Exception (lines 291-298) ───────
 
-    def test_decode_and_validate_token_generic_exception(self, auth_middleware):
+    def test_decode_and_validate_token_generic_exception(
+        self, auth_middleware: AuthenticationMiddleware
+    ) -> None:
         """Raises InvalidTokenError when an unexpected exception occurs."""
         from app.exceptions import InvalidTokenError
 
@@ -504,7 +568,9 @@ class TestAuthenticationMiddlewareCoverage:
 
     # ── _blocking_verify_api_key: no secret key (line 331) ──────────────────
 
-    def test_blocking_verify_api_key_no_secret_key(self, auth_middleware):
+    def test_blocking_verify_api_key_no_secret_key(
+        self, auth_middleware: AuthenticationMiddleware
+    ) -> None:
         """Raises ValueError when AuthManager has no secret key."""
         with patch("app.middleware.authentication.SessionLocal") as mock_session_class:
             with patch("app.middleware.authentication.AuthManager") as mock_auth_manager_class:
@@ -520,7 +586,9 @@ class TestAuthenticationMiddlewareCoverage:
 
     # ── _blocking_verify_api_key: no matching key after loop (line 367) ─────
 
-    def test_blocking_verify_api_key_no_match_after_loop(self, auth_middleware):
+    def test_blocking_verify_api_key_no_match_after_loop(
+        self, auth_middleware: AuthenticationMiddleware
+    ) -> None:
         """Raises ValueError when prefix matches but password check fails for all candidates."""
         mock_api_key = MagicMock()
         mock_api_key.key_prefix = "prefix1230000000"
@@ -551,7 +619,9 @@ class TestAuthenticationMiddlewareCoverage:
 
     # ── _blocking_verify_api_key: commit failure → warning + rollback (lines 377-382) ──
 
-    def test_blocking_verify_api_key_commit_failure_logs_warning(self, auth_middleware):
+    def test_blocking_verify_api_key_commit_failure_logs_warning(
+        self, auth_middleware: AuthenticationMiddleware
+    ) -> None:
         """When db.commit() raises, logs a warning and rolls back without failing auth."""
         mock_api_key = MagicMock()
         mock_api_key.key_id = "key_123"
@@ -593,8 +663,8 @@ class TestAuthenticationMiddlewareCoverage:
 
     @pytest.mark.asyncio
     async def test_extract_and_verify_credentials_jwt_fails_api_key_fails(
-        self, auth_middleware, mock_request
-    ):
+        self, auth_middleware: AuthenticationMiddleware, mock_request: "MockRequest"
+    ) -> None:
         """Returns None when JWT is invalid and API key is also invalid."""
         from app.exceptions import InvalidTokenError
 
@@ -607,15 +677,18 @@ class TestAuthenticationMiddlewareCoverage:
             with patch.object(
                 auth_middleware, "_verify_api_key", side_effect=ValueError("bad key")
             ):
-                result = await auth_middleware._extract_and_verify_credentials(mock_request)
+                result = await auth_middleware._extract_and_verify_credentials(mock_request)  # type: ignore[arg-type]
                 assert result is None
 
     # ── dispatch: valid JWT token on protected path → 200 ───────────────────
 
     @pytest.mark.asyncio
     async def test_dispatch_valid_jwt_protected_path(
-        self, auth_middleware, mock_request, mock_user_payload
-    ):
+        self,
+        auth_middleware: AuthenticationMiddleware,
+        mock_request: "MockRequest",
+        mock_user_payload: TokenPayload,
+    ) -> None:
         """Valid JWT on a protected path passes through and returns the downstream response."""
         mock_request.url.path = "/api/protected"
         mock_request.headers = {"Authorization": "Bearer valid.jwt.token"}
@@ -627,7 +700,7 @@ class TestAuthenticationMiddlewareCoverage:
             "_extract_and_verify_credentials",
             return_value=("jwt", mock_user_payload),
         ):
-            result = await auth_middleware.dispatch(mock_request, call_next)
+            result = await auth_middleware.dispatch(mock_request, call_next)  # type: ignore[arg-type]
 
         assert result is downstream_response
         assert mock_request.state.authenticated is True
@@ -637,7 +710,9 @@ class TestAuthenticationMiddlewareCoverage:
     # ── dispatch: missing token on protected path → 401 ─────────────────────
 
     @pytest.mark.asyncio
-    async def test_dispatch_missing_token_protected_path(self, auth_middleware, mock_request):
+    async def test_dispatch_missing_token_protected_path(
+        self, auth_middleware: AuthenticationMiddleware, mock_request: "MockRequest"
+    ) -> None:
         """No auth headers on a protected path returns 401 authentication_required."""
         import json
 
@@ -645,18 +720,20 @@ class TestAuthenticationMiddlewareCoverage:
         mock_request.headers = {}
         call_next = AsyncMock()
 
-        result = await auth_middleware.dispatch(mock_request, call_next)
+        result = await auth_middleware.dispatch(mock_request, call_next)  # type: ignore[arg-type]
 
         assert isinstance(result, JSONResponse)
         assert result.status_code == 401
-        body = json.loads(result.body)
+        body = json.loads(bytes(result.body))
         assert body["error"]["code"] == "authentication_required"
         call_next.assert_not_called()
 
     # ── dispatch: expired JWT token → 401 ───────────────────────────────────
 
     @pytest.mark.asyncio
-    async def test_dispatch_expired_jwt_protected_path(self, auth_middleware, mock_request):
+    async def test_dispatch_expired_jwt_protected_path(
+        self, auth_middleware: AuthenticationMiddleware, mock_request: "MockRequest"
+    ) -> None:
         """Expired JWT on a protected path returns 401 invalid_credentials."""
         import json
 
@@ -666,17 +743,17 @@ class TestAuthenticationMiddlewareCoverage:
 
         # _extract_and_verify_credentials returns None (expired token → no valid creds)
         with patch.object(auth_middleware, "_extract_and_verify_credentials", return_value=None):
-            result = await auth_middleware.dispatch(mock_request, call_next)
+            result = await auth_middleware.dispatch(mock_request, call_next)  # type: ignore[arg-type]
 
         assert isinstance(result, JSONResponse)
         assert result.status_code == 401
-        body = json.loads(result.body)
+        body = json.loads(bytes(result.body))
         assert body["error"]["code"] == "invalid_credentials"
         call_next.assert_not_called()
 
     # ── _create_error_response: non-401 status code (no WWW-Authenticate) ───
 
-    def test_create_error_response_non_401(self, auth_middleware):
+    def test_create_error_response_non_401(self, auth_middleware: AuthenticationMiddleware) -> None:
         """Non-401 error response does not include WWW-Authenticate header."""
         response = auth_middleware._create_error_response(403, "forbidden", "Access denied")
         assert response.status_code == 403

@@ -22,7 +22,7 @@ class Settings:
     Settings can be overridden via environment variables.
     """
 
-    def __init__(self):
+    def __init__(self) -> None:
         # Environment Detection
         self.environment: str = os.getenv("ENVIRONMENT", "development")
 
@@ -265,7 +265,7 @@ class Settings:
             return "WARNING"
         return "INFO"
 
-    def __post_init__(self):
+    def __post_init__(self) -> None:
         """Validate critical security settings after initialization."""
         errors = []
 

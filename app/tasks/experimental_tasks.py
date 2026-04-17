@@ -20,13 +20,13 @@ from celery import Task
 
 # apgi_system is an optional dependency for experimental paradigms
 try:
-    from apgi_system.experiments.tasks.attentional_blink import AttentionalBlinkTask  # type: ignore[import-untyped]
-    from apgi_system.experiments.tasks.binocular_rivalry import BinocularRivalryTask  # type: ignore[import-untyped]
-    from apgi_system.experiments.tasks.change_blindness import ChangeBlindnessTask  # type: ignore[import-untyped]
-    from apgi_system.experiments.tasks.iowa_gambling import IowaGamblingTask  # type: ignore[import-untyped]
-    from apgi_system.experiments.tasks.masking_paradigm import MaskingParadigmTask  # type: ignore[import-untyped]
-    from apgi_system.platform_utils import get_resource_path  # type: ignore[import-untyped]
-    from apgi_system.system import APGISystem  # type: ignore[import-untyped]
+    from apgi_system.experiments.tasks.attentional_blink import AttentionalBlinkTask  # type: ignore[import-not-found]
+    from apgi_system.experiments.tasks.binocular_rivalry import BinocularRivalryTask  # type: ignore[import-not-found]
+    from apgi_system.experiments.tasks.change_blindness import ChangeBlindnessTask  # type: ignore[import-not-found]
+    from apgi_system.experiments.tasks.iowa_gambling import IowaGamblingTask  # type: ignore[import-not-found]
+    from apgi_system.experiments.tasks.masking_paradigm import MaskingParadigmTask  # type: ignore[import-not-found]
+    from apgi_system.platform_utils import get_resource_path  # type: ignore[import-not-found]
+    from apgi_system.system import APGISystem  # type: ignore[import-not-found]
 
     APGI_SYSTEM_AVAILABLE = True
 except ImportError:
@@ -160,7 +160,7 @@ class APGITask(Task):  # type: ignore[misc]
 
 @celery_app.task(
     bind=True, base=APGITask, name="app.tasks.experimental_tasks.execute_iowa_gambling_task"
-)  # type: ignore[misc]
+)  # type: ignore[untyped-decorator]
 def execute_iowa_gambling_task(
     self: Any, session_id: str, parameters: Dict[str, Any]
 ) -> Dict[str, Any]:
@@ -244,7 +244,7 @@ def execute_iowa_gambling_task(
 
 @celery_app.task(
     bind=True, base=APGITask, name="app.tasks.experimental_tasks.execute_masking_paradigm_task"
-)  # type: ignore[misc]
+)  # type: ignore[untyped-decorator]
 def execute_masking_paradigm_task(
     self: Any, session_id: str, parameters: Dict[str, Any]
 ) -> Dict[str, Any]:
@@ -329,7 +329,7 @@ def execute_masking_paradigm_task(
 
 @celery_app.task(
     bind=True, base=APGITask, name="app.tasks.experimental_tasks.execute_attentional_blink_task"
-)  # type: ignore[misc]
+)  # type: ignore[untyped-decorator]
 def execute_attentional_blink_task(
     self: Any, session_id: str, parameters: Dict[str, Any]
 ) -> Dict[str, Any]:
@@ -411,7 +411,7 @@ def execute_attentional_blink_task(
 
 @celery_app.task(
     bind=True, base=APGITask, name="app.tasks.experimental_tasks.execute_change_blindness_task"
-)  # type: ignore[misc]
+)  # type: ignore[untyped-decorator]
 def execute_change_blindness_task(
     self: Any, session_id: str, parameters: Dict[str, Any]
 ) -> Dict[str, Any]:
@@ -445,12 +445,11 @@ def execute_change_blindness_task(
 
         # Create task instance
         # noqa: E501 - Parameters are from external apgi_system classes
-        # type: ignore[arg-type] - External library parameters
         task = ChangeBlindnessTask(
-            image_size=image_size,  # type: ignore[arg-type]
-            change_magnitude=change_magnitude,  # type: ignore[arg-type]
-            flicker_duration_ms=flicker_duration_ms,  # type: ignore[arg-type]
-            num_trials=num_trials,  # type: ignore[arg-type]
+            image_size=image_size,
+            change_magnitude=change_magnitude,
+            flicker_duration_ms=flicker_duration_ms,
+            num_trials=num_trials,
         )
 
         # Run all trials
@@ -487,7 +486,7 @@ def execute_change_blindness_task(
 
 @celery_app.task(
     bind=True, base=APGITask, name="app.tasks.experimental_tasks.execute_binocular_rivalry_task"
-)  # type: ignore[misc]
+)  # type: ignore[untyped-decorator]
 def execute_binocular_rivalry_task(
     self: Any, session_id: str, parameters: Dict[str, Any]
 ) -> Dict[str, Any]:
@@ -522,13 +521,12 @@ def execute_binocular_rivalry_task(
 
         # Create task instance
         # noqa: E501 - Parameters are from external apgi_system classes
-        # type: ignore[arg-type] - External library parameters
         task = BinocularRivalryTask(
-            pattern_size=pattern_size,  # type: ignore[arg-type]
-            contrast_left=contrast_left,  # type: ignore[arg-type]
-            contrast_right=contrast_right,  # type: ignore[arg-type]
-            duration_seconds=duration_seconds,  # type: ignore[arg-type]
-            sampling_rate_hz=sampling_rate_hz,  # type: ignore[arg-type]
+            pattern_size=pattern_size,
+            contrast_left=contrast_left,
+            contrast_right=contrast_right,
+            duration_seconds=duration_seconds,
+            sampling_rate_hz=sampling_rate_hz,
         )
 
         # Run all trials

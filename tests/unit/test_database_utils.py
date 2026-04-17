@@ -2,6 +2,7 @@
 Unit tests for database utilities.
 """
 
+from typing import Generator, Any
 import pytest
 from unittest.mock import Mock, MagicMock, patch
 from app.database.sharded_connection import ShardedDatabaseManager
@@ -16,7 +17,7 @@ class TestShardedDatabaseManager:
     """Test sharded database connection management."""
 
     @pytest.fixture
-    def mock_sharding_service(self):
+    def mock_sharding_service(self) -> Generator[MagicMock, None, None]:
         """Mock sharding service."""
         with patch("app.database.sharded_connection.sharding_service") as mock:
             mock.get_all_shards.return_value = [
@@ -27,7 +28,7 @@ class TestShardedDatabaseManager:
             yield mock
 
     @pytest.fixture
-    def manager(self, mock_sharding_service):
+    def manager(self, mock_sharding_service: MagicMock) -> ShardedDatabaseManager:
         """Create a ShardedDatabaseManager instance."""
         mock_engine = MagicMock()
         mock_session_factory = MagicMock()
@@ -41,99 +42,103 @@ class TestShardedDatabaseManager:
         ):
             return ShardedDatabaseManager()
 
-    def test_initialization(self, manager):
+    def test_initialization(self, manager: ShardedDatabaseManager) -> None:
         """Test manager initializes with engines and session factories."""
         assert len(manager.engines) == 2
         assert len(manager.session_factories) == 2
         assert "shard1" in manager.engines
         assert "shard2" in manager.engines
 
-    def test_get_shard_for_user(self, manager, mock_sharding_service):
+    def test_get_shard_for_user(
+        self, manager: ShardedDatabaseManager, mock_sharding_service: MagicMock
+    ) -> None:
         """Test getting shard ID for a user."""
         shard_id = manager.get_shard_for_user("user123")
         assert shard_id == "shard1"
         mock_sharding_service.get_shard_for_user.assert_called_once_with("user123")
 
-    def test_get_engine_for_shard(self, manager):
+    def test_get_engine_for_shard(self, manager: ShardedDatabaseManager) -> None:
         """Test getting engine for a specific shard."""
         engine = manager.get_engine_for_shard("shard1")
         assert engine is not None
 
-    def test_get_engine_for_nonexistent_shard(self, manager):
+    def test_get_engine_for_nonexistent_shard(self, manager: ShardedDatabaseManager) -> None:
         """Test getting engine for non-existent shard."""
         engine = manager.get_engine_for_shard("nonexistent")
         assert engine is None
 
-    def test_get_session_for_user(self, manager):
+    def test_get_session_for_user(self, manager: ShardedDatabaseManager) -> None:
         """Test getting session for a user."""
         session = manager.get_session_for_user("user123")
         assert session is not None
         session.close()
 
-    def test_get_session_for_user_invalid_shard(self, manager, mock_sharding_service):
+    def test_get_session_for_user_invalid_shard(
+        self, manager: ShardedDatabaseManager, mock_sharding_service: MagicMock
+    ) -> None:
         """Test getting session for user with invalid shard."""
         mock_sharding_service.get_shard_for_user.return_value = "invalid_shard"
         with pytest.raises(ValueError, match="No session factory available"):
             manager.get_session_for_user("user123")
 
-    def test_get_session_for_shard(self, manager):
+    def test_get_session_for_shard(self, manager: ShardedDatabaseManager) -> None:
         """Test getting session for a specific shard."""
         session = manager.get_session_for_shard("shard1")
         assert session is not None
         session.close()
 
-    def test_get_session_for_invalid_shard(self, manager):
+    def test_get_session_for_invalid_shard(self, manager: ShardedDatabaseManager) -> None:
         """Test getting session for invalid shard."""
         with pytest.raises(ValueError, match="No session factory available"):
             manager.get_session_for_shard("invalid")
 
-    def test_user_session_context_manager(self, manager):
+    def test_user_session_context_manager(self, manager: ShardedDatabaseManager) -> None:
         """Test user session context manager."""
         with manager.get_user_session("user123") as session:
             assert session is not None
 
-    def test_user_session_context_manager_rollback(self, manager):
+    def test_user_session_context_manager_rollback(self, manager: ShardedDatabaseManager) -> None:
         """Test user session context manager rolls back on error."""
         with pytest.raises(Exception):
             with manager.get_user_session("user123") as session:
                 raise Exception("Test error")
 
-    def test_shard_session_context_manager(self, manager):
+    def test_shard_session_context_manager(self, manager: ShardedDatabaseManager) -> None:
         """Test shard session context manager."""
         with manager.get_shard_session("shard1") as session:
             assert session is not None
 
-    def test_execute_cross_shard_query(self, manager):
+    def test_execute_cross_shard_query(self, manager: ShardedDatabaseManager) -> None:
         """Test executing query across all shards."""
 
-        def query_func(session):
+        def query_func(session: Any) -> list[dict[str, int]]:
             return [{"id": 1}, {"id": 2}]
 
         results = manager.execute_cross_shard_query(query_func)
         assert len(results) == 4  # 2 results per shard
 
-    def test_execute_cross_shard_query_with_error(self, manager):
+    def test_execute_cross_shard_query_with_error(self, manager: ShardedDatabaseManager) -> None:
         """Test cross-shard query handles errors gracefully."""
 
-        def query_func(session):
+        def query_func(session: Any) -> list[dict[str, int]]:
             raise Exception("Query failed")
 
         results = manager.execute_cross_shard_query(query_func)
         assert results == []
 
-    def test_get_shard_stats(self, manager):
+    def test_get_shard_stats(self, manager: ShardedDatabaseManager) -> None:
         """Test getting statistics for all shards."""
         stats = manager.get_shard_stats()
         assert "total_shards" in stats
         assert "shards" in stats
         assert stats["total_shards"] == 2
 
-    def test_close_all_connections(self, manager):
+    def test_close_all_connections(self, manager: ShardedDatabaseManager) -> None:
         """Test closing all database connections."""
         manager.close_all_connections()
         # Should not raise any errors
 
-    def test_sqlite_engine_configuration(self):
+    def test_sqlite_engine_configuration(self) -> None:
         """Test SQLite engine configuration."""
         with patch("app.database.sharded_connection.sharding_service") as mock_service:
             mock_service.get_all_shards.return_value = [
@@ -144,7 +149,7 @@ class TestShardedDatabaseManager:
             manager = ShardedDatabaseManager()
             assert "sqlite_shard" in manager.engines
 
-    def test_postgresql_engine_configuration(self):
+    def test_postgresql_engine_configuration(self) -> None:
         """Test PostgreSQL engine configuration."""
         with patch("app.database.sharded_connection.sharding_service") as mock_service:
             mock_service.get_all_shards.return_value = [
@@ -160,7 +165,7 @@ class TestCreateDatabase:
     """Test database creation utility."""
 
     @patch("app.create_db.psycopg2")
-    def test_create_database_success(self, mock_psycopg2):
+    def test_create_database_success(self, mock_psycopg2: MagicMock) -> None:
         """Test successful database creation."""
         from app.create_db import create_database
 
@@ -175,7 +180,7 @@ class TestCreateDatabase:
         mock_conn.close.assert_called_once()
 
     @patch("app.create_db.psycopg2")
-    def test_create_database_already_exists(self, mock_psycopg2):
+    def test_create_database_already_exists(self, mock_psycopg2: MagicMock) -> None:
         """Test handling when database already exists."""
         from app.create_db import create_database
 
@@ -185,7 +190,7 @@ class TestCreateDatabase:
         create_database()  # Should not raise
 
     @patch("app.create_db.psycopg2")
-    def test_create_database_duplicate_user(self, mock_psycopg2):
+    def test_create_database_duplicate_user(self, mock_psycopg2: MagicMock) -> None:
         """Test handling when user already exists."""
         from app.create_db import create_database
 
@@ -200,7 +205,7 @@ class TestCreateDatabase:
         create_database()  # Should not raise
 
     @patch("app.create_db.psycopg2")
-    def test_create_database_error(self, mock_psycopg2):
+    def test_create_database_error(self, mock_psycopg2: MagicMock) -> None:
         """Test handling database creation errors."""
         from app.create_db import create_database
 
@@ -219,7 +224,9 @@ class TestResetDatabase:
 
     @patch("app.reset_db.psycopg2")
     @patch("app.reset_db.os.getenv")
-    def test_recreate_database_success(self, mock_getenv, mock_psycopg2):
+    def test_recreate_database_success(
+        self, mock_getenv: MagicMock, mock_psycopg2: MagicMock
+    ) -> None:
         """Test successful database recreation."""
         # Set environment variable before importing
         mock_getenv.return_value = "postgresql://postgres:password@localhost:5432/apgi_api_dev"
@@ -239,7 +246,9 @@ class TestResetDatabase:
 
     @patch("app.reset_db.psycopg2")
     @patch("app.reset_db.os.getenv")
-    def test_recreate_database_error(self, mock_getenv, mock_psycopg2):
+    def test_recreate_database_error(
+        self, mock_getenv: MagicMock, mock_psycopg2: MagicMock
+    ) -> None:
         """Test handling database recreation errors."""
         # Set environment variable before importing
         mock_getenv.return_value = "postgresql://postgres:password@localhost:5432/apgi_api_dev"
@@ -261,7 +270,7 @@ class TestAlterAlembic:
     """Test alembic version alteration utility."""
 
     @patch("app.alter_alembic.engine")
-    def test_alter_alembic_version_success(self, mock_engine):
+    def test_alter_alembic_version_success(self, mock_engine: MagicMock) -> None:
         """Test successful alembic version update."""
         from app.alter_alembic import alter_alembic_version
 
@@ -281,7 +290,7 @@ class TestAlterAlembic:
         mock_conn.commit.assert_called()
 
     @patch("app.alter_alembic.engine")
-    def test_alter_alembic_version_error(self, mock_engine):
+    def test_alter_alembic_version_error(self, mock_engine: MagicMock) -> None:
         """Test handling alembic version update errors."""
         from app.alter_alembic import alter_alembic_version
 
@@ -297,7 +306,9 @@ class TestCreateDemoUser:
 
     @patch("app.create_demo_user.SessionLocal")
     @patch("app.create_demo_user.AuthManager")
-    def test_create_demo_user_new(self, mock_auth_manager, mock_session):
+    def test_create_demo_user_new(
+        self, mock_auth_manager: MagicMock, mock_session: MagicMock
+    ) -> None:
         """Test creating new demo user."""
         from app.create_demo_user import create_demo_user
 
@@ -313,7 +324,7 @@ class TestCreateDemoUser:
         mock_db.close.assert_called_once()
 
     @patch("app.create_demo_user.SessionLocal")
-    def test_create_demo_user_existing(self, mock_session):
+    def test_create_demo_user_existing(self, mock_session: MagicMock) -> None:
         """Test handling existing demo user with admin role."""
         from app.create_demo_user import create_demo_user
 
@@ -328,7 +339,7 @@ class TestCreateDemoUser:
         mock_db.commit.assert_not_called()
 
     @patch("app.create_demo_user.SessionLocal")
-    def test_create_demo_user_update_roles(self, mock_session):
+    def test_create_demo_user_update_roles(self, mock_session: MagicMock) -> None:
         """Test updating demo user roles."""
         from app.create_demo_user import create_demo_user
 
@@ -344,7 +355,7 @@ class TestCreateDemoUser:
         assert mock_user.roles == ["user", "admin"]
 
     @patch("app.create_demo_user.SessionLocal")
-    def test_create_demo_user_error(self, mock_session):
+    def test_create_demo_user_error(self, mock_session: MagicMock) -> None:
         """Test handling demo user creation errors."""
         from app.create_demo_user import create_demo_user
 

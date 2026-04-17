@@ -7,10 +7,10 @@ Tests universal properties of JWT token validation and authentication.
 
 from hypothesis import given, strategies as st, assume, settings
 from datetime import datetime, timedelta
+from typing import Any, cast
 from unittest.mock import Mock
 import jwt
 import asyncio
-from typing import cast
 
 # Import after setting up environment
 import sys
@@ -28,7 +28,7 @@ from app.middleware.authentication import AuthenticationMiddleware
 # ============================================================================
 
 
-def create_mock_request(path="/v1/sessions", headers=None):
+def create_mock_request(path: str = "/v1/sessions", headers: dict[str, str] | None = None) -> Mock:
     """Create a fresh mock FastAPI request."""
     request = Mock()
     request.url.path = path
@@ -37,7 +37,7 @@ def create_mock_request(path="/v1/sessions", headers=None):
     return request
 
 
-def create_auth_middleware():
+def create_auth_middleware() -> AuthenticationMiddleware:
     """Create authentication middleware instance."""
     mock_app = Mock()
     return AuthenticationMiddleware(mock_app)
@@ -59,7 +59,7 @@ def create_auth_middleware():
         ]
     ),
 )
-def test_property_5_jwt_validation_no_token(path):
+def test_property_5_jwt_validation_no_token(path: str) -> None:
     """
     **Validates: Requirements 8.4**
 
@@ -75,7 +75,7 @@ def test_property_5_jwt_validation_no_token(path):
     mock_request = create_mock_request(path=path, headers={})
 
     # Mock the call_next function
-    async def mock_call_next(request):
+    async def mock_call_next(request: Any) -> Any:
         return Mock(status_code=200)
 
     # Test that middleware allows request to pass through (no token = no auth attached)
@@ -111,7 +111,7 @@ def test_property_5_jwt_validation_no_token(path):
         lambda x: x.count(".") >= 2
     ),  # Must have at least 2 dots like a JWT
 )
-def test_property_5_jwt_validation_invalid_token(path, invalid_token):
+def test_property_5_jwt_validation_invalid_token(path: str, invalid_token: str) -> None:
     """
     **Validates: Requirements 8.4**
 
@@ -129,7 +129,7 @@ def test_property_5_jwt_validation_invalid_token(path, invalid_token):
     )
 
     # Mock the call_next function
-    async def mock_call_next(request):
+    async def mock_call_next(request: Any) -> Any:
         return Mock(status_code=200)
 
     # Test that middleware rejects invalid token
@@ -172,7 +172,7 @@ def test_property_5_jwt_validation_invalid_token(path, invalid_token):
         ),
     ),
 )
-def test_property_5_jwt_validation_expired_token(path, user_id, username):
+def test_property_5_jwt_validation_expired_token(path: str, user_id: str, username: str) -> None:
     """
     **Validates: Requirements 8.4**
 
@@ -208,7 +208,7 @@ def test_property_5_jwt_validation_expired_token(path, user_id, username):
     )
 
     # Mock the call_next function
-    async def mock_call_next(request):
+    async def mock_call_next(request: Any) -> Any:
         return Mock(status_code=200)
 
     # Test that middleware rejects expired token
@@ -251,7 +251,7 @@ def test_property_5_jwt_validation_expired_token(path, user_id, username):
         ),
     ),
 )
-def test_property_5_jwt_validation_wrong_token_type(path, user_id, username):
+def test_property_5_jwt_validation_wrong_token_type(path: str, user_id: str, username: str) -> None:
     """
     **Validates: Requirements 8.4**
 
@@ -287,7 +287,7 @@ def test_property_5_jwt_validation_wrong_token_type(path, user_id, username):
     )
 
     # Mock the call_next function
-    async def mock_call_next(request):
+    async def mock_call_next(request: Any) -> Any:
         return Mock(status_code=200)
 
     # Test that middleware rejects wrong token type
@@ -325,7 +325,7 @@ def test_property_5_jwt_validation_wrong_token_type(path, user_id, username):
         ]
     ),
 )
-def test_property_5_jwt_validation_malformed_header(path, malformed_header):
+def test_property_5_jwt_validation_malformed_header(path: str, malformed_header: str) -> None:
     """
     **Validates: Requirements 8.4**
 
@@ -342,7 +342,7 @@ def test_property_5_jwt_validation_malformed_header(path, malformed_header):
     mock_request = create_mock_request(path=path, headers=headers)
 
     # Mock the call_next function
-    async def mock_call_next(request):
+    async def mock_call_next(request: Any) -> Any:
         return Mock(status_code=200)
 
     # Test that middleware handles malformed header
@@ -372,7 +372,7 @@ def test_property_5_jwt_validation_malformed_header(path, malformed_header):
         ),
     )
 )
-def test_property_6_password_hashing_verification(password):
+def test_property_6_password_hashing_verification(password: str) -> None:
     """
     **Validates: Requirements 8.7**
 
@@ -421,7 +421,9 @@ def test_property_6_password_hashing_verification(password):
         ),
     ),
 )
-def test_property_6_password_hashing_different_password_fails(password, different_password):
+def test_property_6_password_hashing_different_password_fails(
+    password: str, different_password: str
+) -> None:
     """
     **Validates: Requirements 8.7**
 
@@ -454,7 +456,7 @@ def test_property_6_password_hashing_different_password_fails(password, differen
         ),
     )
 )
-def test_property_6_password_hashing_deterministic_verification(password):
+def test_property_6_password_hashing_deterministic_verification(password: str) -> None:
     """
     **Validates: Requirements 8.7**
 
@@ -486,7 +488,7 @@ def test_property_6_password_hashing_deterministic_verification(password):
         ),
     )
 )
-def test_property_6_password_hashing_unique_salts(password):
+def test_property_6_password_hashing_unique_salts(password: str) -> None:
     """
     **Validates: Requirements 8.7**
 
@@ -524,7 +526,7 @@ def test_property_6_password_hashing_unique_salts(password):
         ),
     )
 )
-def test_property_6_password_hashing_long_passwords(password):
+def test_property_6_password_hashing_long_passwords(password: str) -> None:
     """
     **Validates: Requirements 8.7**
 

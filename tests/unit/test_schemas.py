@@ -61,7 +61,7 @@ from app.models.schemas import (
 class TestUserCreateRequest:
     """Tests for UserCreateRequest schema."""
 
-    def test_valid_user_create(self):
+    def test_valid_user_create(self) -> None:
         """Test creating a valid user."""
         user = UserCreateRequest(
             username="testuser",
@@ -71,7 +71,7 @@ class TestUserCreateRequest:
         assert user.username == "testuser"
         assert user.email == "test@example.com"
 
-    def test_username_too_short(self):
+    def test_username_too_short(self) -> None:
         """Test username validation — too short."""
         with pytest.raises(ValidationError) as exc_info:
             UserCreateRequest(
@@ -81,7 +81,7 @@ class TestUserCreateRequest:
             )
         assert "Username must be 3-50 characters" in str(exc_info.value)
 
-    def test_username_invalid_characters(self):
+    def test_username_invalid_characters(self) -> None:
         """Test username validation — invalid characters."""
         with pytest.raises(ValidationError) as exc_info:
             UserCreateRequest(
@@ -91,7 +91,7 @@ class TestUserCreateRequest:
             )
         assert "Username must be 3-50 characters" in str(exc_info.value)
 
-    def test_email_invalid_format(self):
+    def test_email_invalid_format(self) -> None:
         """Test email validation — invalid format."""
         with pytest.raises(ValidationError) as exc_info:
             UserCreateRequest(
@@ -101,7 +101,7 @@ class TestUserCreateRequest:
             )
         assert "Invalid email format" in str(exc_info.value)
 
-    def test_password_too_short(self):
+    def test_password_too_short(self) -> None:
         """Test password validation — too short."""
         with pytest.raises(ValidationError) as exc_info:
             UserCreateRequest(
@@ -111,7 +111,7 @@ class TestUserCreateRequest:
             )
         assert "at least 8 characters" in str(exc_info.value)
 
-    def test_password_missing_uppercase(self):
+    def test_password_missing_uppercase(self) -> None:
         """Test password validation — missing uppercase."""
         with pytest.raises(ValidationError) as exc_info:
             UserCreateRequest(
@@ -121,7 +121,7 @@ class TestUserCreateRequest:
             )
         assert "uppercase letter" in str(exc_info.value)
 
-    def test_password_missing_lowercase(self):
+    def test_password_missing_lowercase(self) -> None:
         """Test password validation — missing lowercase."""
         with pytest.raises(ValidationError) as exc_info:
             UserCreateRequest(
@@ -131,7 +131,7 @@ class TestUserCreateRequest:
             )
         assert "lowercase letter" in str(exc_info.value)
 
-    def test_password_missing_digit(self):
+    def test_password_missing_digit(self) -> None:
         """Test password validation — missing digit."""
         with pytest.raises(ValidationError) as exc_info:
             UserCreateRequest(
@@ -141,7 +141,7 @@ class TestUserCreateRequest:
             )
         assert "digit" in str(exc_info.value)
 
-    def test_password_missing_special_char(self):
+    def test_password_missing_special_char(self) -> None:
         """Test password validation — missing special character."""
         with pytest.raises(ValidationError) as exc_info:
             UserCreateRequest(
@@ -151,7 +151,7 @@ class TestUserCreateRequest:
             )
         assert "special character" in str(exc_info.value)
 
-    def test_password_common_weak_password(self):
+    def test_password_common_weak_password(self) -> None:
         """Test password validation — common weak password."""
         with pytest.raises(ValidationError) as exc_info:
             UserCreateRequest(
@@ -162,7 +162,7 @@ class TestUserCreateRequest:
         # This password has sequential characters "ass" so it fails on that check first
         assert "sequential" in str(exc_info.value) or "too common" in str(exc_info.value)
 
-    def test_password_repeated_characters(self):
+    def test_password_repeated_characters(self) -> None:
         """Test password validation — repeated characters."""
         with pytest.raises(ValidationError) as exc_info:
             UserCreateRequest(
@@ -173,7 +173,7 @@ class TestUserCreateRequest:
         # This password has sequential characters "sss" so it fails on that check first
         assert "sequential" in str(exc_info.value) or "consecutive" in str(exc_info.value)
 
-    def test_password_sequential_characters(self):
+    def test_password_sequential_characters(self) -> None:
         """Test password validation — sequential characters."""
         with pytest.raises(ValidationError) as exc_info:
             UserCreateRequest(
@@ -183,7 +183,7 @@ class TestUserCreateRequest:
             )
         assert "sequential characters" in str(exc_info.value)
 
-    def test_email_normalized_to_lowercase(self):
+    def test_email_normalized_to_lowercase(self) -> None:
         """Test email normalization to lowercase."""
         user = UserCreateRequest(
             username="testuser",
@@ -192,7 +192,7 @@ class TestUserCreateRequest:
         )
         assert user.email == "test@example.com"
 
-    def test_username_stripped(self):
+    def test_username_stripped(self) -> None:
         """Test username whitespace stripping."""
         user = UserCreateRequest(
             username="testuser",
@@ -201,7 +201,7 @@ class TestUserCreateRequest:
         )
         assert user.username == "testuser"
 
-    def test_invalid_type_username_int(self):
+    def test_invalid_type_username_int(self) -> None:
         """Test invalid type rejection — username as int."""
         with pytest.raises(ValidationError):
             UserCreateRequest(
@@ -210,7 +210,7 @@ class TestUserCreateRequest:
                 password="SecurePass123!",
             )
 
-    def test_invalid_type_email_int(self):
+    def test_invalid_type_email_int(self) -> None:
         """Test invalid type rejection — email as int."""
         with pytest.raises(ValidationError):
             UserCreateRequest(
@@ -219,7 +219,7 @@ class TestUserCreateRequest:
                 password="SecurePass123!",
             )
 
-    def test_invalid_type_password_int(self):
+    def test_invalid_type_password_int(self) -> None:
         """Test invalid type rejection — password as int."""
         with pytest.raises(ValidationError):
             UserCreateRequest(
@@ -232,7 +232,7 @@ class TestUserCreateRequest:
 class TestLoginRequest:
     """Tests for LoginRequest schema."""
 
-    def test_valid_login_with_username(self):
+    def test_valid_login_with_username(self) -> None:
         """Test valid login with username."""
         login = LoginRequest(
             username="testuser",
@@ -243,7 +243,7 @@ class TestLoginRequest:
         assert login.username == "testuser"
         assert login.remember_me is False
 
-    def test_valid_login_with_email(self):
+    def test_valid_login_with_email(self) -> None:
         """Test valid login with email."""
         login = LoginRequest(
             username="test@example.com",
@@ -253,7 +253,7 @@ class TestLoginRequest:
         )
         assert login.username == "test@example.com"
 
-    def test_login_with_mfa_code(self):
+    def test_login_with_mfa_code(self) -> None:
         """Test login with MFA code."""
         login = LoginRequest(
             username="testuser",
@@ -263,7 +263,7 @@ class TestLoginRequest:
         )
         assert login.mfa_code == "123456"
 
-    def test_login_remember_me(self):
+    def test_login_remember_me(self) -> None:
         """Test login with remember_me flag."""
         login = LoginRequest(
             username="testuser",
@@ -273,7 +273,7 @@ class TestLoginRequest:
         )
         assert login.remember_me is True
 
-    def test_invalid_username_empty(self):
+    def test_invalid_username_empty(self) -> None:
         """Test invalid username — empty."""
         with pytest.raises(ValidationError) as exc_info:
             LoginRequest(
@@ -284,7 +284,7 @@ class TestLoginRequest:
             )
         assert "Username cannot be empty" in str(exc_info.value)
 
-    def test_invalid_password_empty(self):
+    def test_invalid_password_empty(self) -> None:
         """Test invalid password — empty."""
         with pytest.raises(ValidationError) as exc_info:
             LoginRequest(
@@ -297,7 +297,7 @@ class TestLoginRequest:
             exc_info.value
         )
 
-    def test_invalid_type_username_int(self):
+    def test_invalid_type_username_int(self) -> None:
         """Test invalid type rejection — username as int."""
         with pytest.raises(ValidationError):
             LoginRequest(
@@ -307,7 +307,7 @@ class TestLoginRequest:
                 remember_me=False,
             )
 
-    def test_invalid_type_password_int(self):
+    def test_invalid_type_password_int(self) -> None:
         """Test invalid type rejection — password as int."""
         with pytest.raises(ValidationError):
             LoginRequest(
@@ -321,12 +321,12 @@ class TestLoginRequest:
 class TestPasswordResetRequest:
     """Tests for PasswordResetRequest schema."""
 
-    def test_valid_password_reset(self):
+    def test_valid_password_reset(self) -> None:
         """Test valid password reset."""
         reset = PasswordResetRequest(new_password="NewSecurePass123!")
         assert reset.new_password == "NewSecurePass123!"
 
-    def test_invalid_type_password_int(self):
+    def test_invalid_type_password_int(self) -> None:
         """Test invalid type rejection — password as int."""
         with pytest.raises(ValidationError):
             PasswordResetRequest(new_password=123)  # type: ignore[arg-type]  # Pass actual int
@@ -335,23 +335,23 @@ class TestPasswordResetRequest:
 class TestPasswordResetEmailRequest:
     """Tests for PasswordResetEmailRequest schema."""
 
-    def test_valid_email_request(self):
+    def test_valid_email_request(self) -> None:
         """Test valid password reset email request."""
         req = PasswordResetEmailRequest(email="test@example.com")
         assert req.email == "test@example.com"
 
-    def test_email_normalized_to_lowercase(self):
+    def test_email_normalized_to_lowercase(self) -> None:
         """Test email normalization."""
         req = PasswordResetEmailRequest(email="Test@Example.COM")
         assert req.email == "test@example.com"
 
-    def test_invalid_email_format(self):
+    def test_invalid_email_format(self) -> None:
         """Test invalid email format."""
         with pytest.raises(ValidationError) as exc_info:
             PasswordResetEmailRequest(email="invalid-email")
         assert "Invalid email format" in str(exc_info.value)
 
-    def test_invalid_type_email_int(self):
+    def test_invalid_type_email_int(self) -> None:
         """Test invalid type rejection — email as int."""
         with pytest.raises(ValidationError):
             PasswordResetEmailRequest(email=456)  # type: ignore[arg-type]  # Pass actual int
@@ -360,7 +360,7 @@ class TestPasswordResetEmailRequest:
 class TestPasswordResetConfirmRequest:
     """Tests for PasswordResetConfirmRequest schema."""
 
-    def test_valid_reset_confirm(self):
+    def test_valid_reset_confirm(self) -> None:
         """Test valid password reset confirmation."""
         req = PasswordResetConfirmRequest(
             token="valid_token_123",
@@ -368,7 +368,7 @@ class TestPasswordResetConfirmRequest:
         )
         assert req.token == "valid_token_123"
 
-    def test_token_stripped(self):
+    def test_token_stripped(self) -> None:
         """Test token whitespace stripping."""
         req = PasswordResetConfirmRequest(
             token="  valid_token_123  ",
@@ -376,7 +376,7 @@ class TestPasswordResetConfirmRequest:
         )
         assert req.token == "valid_token_123"
 
-    def test_invalid_token_empty(self):
+    def test_invalid_token_empty(self) -> None:
         """Test invalid token — empty."""
         with pytest.raises(ValidationError) as exc_info:
             PasswordResetConfirmRequest(
@@ -385,7 +385,7 @@ class TestPasswordResetConfirmRequest:
             )
         assert "Token cannot be empty" in str(exc_info.value)
 
-    def test_invalid_type_token_int(self):
+    def test_invalid_type_token_int(self) -> None:
         """Test invalid type rejection — token as int."""
         with pytest.raises(ValidationError):
             PasswordResetConfirmRequest(
@@ -397,39 +397,39 @@ class TestPasswordResetConfirmRequest:
 class TestMFARequests:
     """Tests for MFA-related schemas."""
 
-    def test_mfa_enable_request(self):
+    def test_mfa_enable_request(self) -> None:
         """Test MFA enable request."""
         req = MFAEnableRequest(code="123456")
         assert req.code == "123456"
 
-    def test_mfa_disable_request(self):
+    def test_mfa_disable_request(self) -> None:
         """Test MFA disable request."""
         req = MFADisableRequest(password="SecurePass123!")
         assert req.password == "SecurePass123!"
 
-    def test_mfa_backup_code_verify_valid(self):
+    def test_mfa_backup_code_verify_valid(self) -> None:
         """Test MFA backup code verification — valid."""
         req = MFABackupCodeVerifyRequest(code="ABCD1234")
         assert req.code == "ABCD1234"
 
-    def test_mfa_backup_code_verify_normalized(self):
+    def test_mfa_backup_code_verify_normalized(self) -> None:
         """Test MFA backup code normalization to uppercase."""
         req = MFABackupCodeVerifyRequest(code="abcd1234")
         assert req.code == "ABCD1234"
 
-    def test_mfa_backup_code_invalid_format(self):
+    def test_mfa_backup_code_invalid_format(self) -> None:
         """Test MFA backup code — invalid format."""
         with pytest.raises(ValidationError) as exc_info:
             MFABackupCodeVerifyRequest(code="INVALID")
         assert "Invalid backup code format" in str(exc_info.value)
 
-    def test_mfa_backup_code_empty(self):
+    def test_mfa_backup_code_empty(self) -> None:
         """Test MFA backup code — empty."""
         with pytest.raises(ValidationError) as exc_info:
             MFABackupCodeVerifyRequest(code="")
         assert "Backup code cannot be empty" in str(exc_info.value)
 
-    def test_invalid_type_code_int(self):
+    def test_invalid_type_code_int(self) -> None:
         """Test invalid type rejection — code as int."""
         with pytest.raises(ValidationError):
             MFAEnableRequest(code=123456)  # type: ignore[arg-type]  # Pass actual int
@@ -443,7 +443,7 @@ class TestMFARequests:
 class TestSessionCreateRequest:
     """Tests for SessionCreateRequest schema."""
 
-    def test_valid_session_with_template_id(self):
+    def test_valid_session_with_template_id(self) -> None:
         """Test valid session creation with template ID."""
         session = SessionCreateRequest(
             template_id="550e8400-e29b-41d4-a716-446655440000",
@@ -453,7 +453,7 @@ class TestSessionCreateRequest:
         )
         assert session.template_id == "550e8400-e29b-41d4-a716-446655440000"
 
-    def test_valid_session_with_config_path(self):
+    def test_valid_session_with_config_path(self) -> None:
         """Test valid session creation with config path."""
         session = SessionCreateRequest(
             template_id=None,
@@ -463,7 +463,7 @@ class TestSessionCreateRequest:
         )
         assert session.config_path == "config/default.yaml"
 
-    def test_valid_session_with_custom_config(self):
+    def test_valid_session_with_custom_config(self) -> None:
         """Test valid session creation with custom config."""
         session = SessionCreateRequest(
             template_id=None,
@@ -473,7 +473,7 @@ class TestSessionCreateRequest:
         )
         assert session.custom_config == {"key": "value"}
 
-    def test_session_description(self):
+    def test_session_description(self) -> None:
         """Test session with description."""
         session = SessionCreateRequest(
             template_id="550e8400-e29b-41d4-a716-446655440000",
@@ -483,7 +483,7 @@ class TestSessionCreateRequest:
         )
         assert session.description == "Test session"
 
-    def test_invalid_template_id_format(self):
+    def test_invalid_template_id_format(self) -> None:
         """Test invalid template ID format."""
         with pytest.raises(ValidationError) as exc_info:
             SessionCreateRequest(
@@ -494,7 +494,7 @@ class TestSessionCreateRequest:
             )
         assert "Invalid template ID format" in str(exc_info.value)
 
-    def test_invalid_config_path_directory_traversal(self):
+    def test_invalid_config_path_directory_traversal(self) -> None:
         """Test invalid config path — directory traversal."""
         with pytest.raises(ValidationError) as exc_info:
             SessionCreateRequest(
@@ -505,7 +505,7 @@ class TestSessionCreateRequest:
             )
         assert "directory traversal" in str(exc_info.value)
 
-    def test_invalid_config_path_wrong_extension(self):
+    def test_invalid_config_path_wrong_extension(self) -> None:
         """Test invalid config path — wrong extension."""
         with pytest.raises(ValidationError) as exc_info:
             SessionCreateRequest(
@@ -516,7 +516,7 @@ class TestSessionCreateRequest:
             )
         assert ".yaml or .yml" in str(exc_info.value)
 
-    def test_invalid_config_path_too_long(self):
+    def test_invalid_config_path_too_long(self) -> None:
         """Test invalid config path — too long."""
         with pytest.raises(ValidationError) as exc_info:
             SessionCreateRequest(
@@ -527,7 +527,7 @@ class TestSessionCreateRequest:
             )
         assert "too long" in str(exc_info.value)
 
-    def test_invalid_custom_config_dangerous_key(self):
+    def test_invalid_custom_config_dangerous_key(self) -> None:
         """Test invalid custom config — dangerous key."""
         with pytest.raises(ValidationError) as exc_info:
             SessionCreateRequest(
@@ -538,7 +538,7 @@ class TestSessionCreateRequest:
             )
         assert "not allowed" in str(exc_info.value)
 
-    def test_invalid_description_too_long(self):
+    def test_invalid_description_too_long(self) -> None:
         """Test invalid description — too long."""
         with pytest.raises(ValidationError) as exc_info:
             SessionCreateRequest(
@@ -549,7 +549,7 @@ class TestSessionCreateRequest:
             )
         assert "too long" in str(exc_info.value)
 
-    def test_missing_all_config_sources(self):
+    def test_missing_all_config_sources(self) -> None:
         """Test missing all config sources."""
         with pytest.raises(ValidationError) as exc_info:
             SessionCreateRequest(
@@ -560,7 +560,7 @@ class TestSessionCreateRequest:
             )
         assert "must be provided" in str(exc_info.value)
 
-    def test_invalid_type_template_id_int(self):
+    def test_invalid_type_template_id_int(self) -> None:
         """Test invalid type rejection — template_id as int."""
         with pytest.raises(ValidationError):
             SessionCreateRequest(
@@ -570,7 +570,7 @@ class TestSessionCreateRequest:
                 description=None,
             )
 
-    def test_invalid_type_custom_config_list(self):
+    def test_invalid_type_custom_config_list(self) -> None:
         """Test invalid type rejection — custom_config as list."""
         with pytest.raises(ValidationError):
             SessionCreateRequest(
@@ -584,7 +584,7 @@ class TestSessionCreateRequest:
 class TestSessionTemplateCreateRequest:
     """Tests for SessionTemplateCreateRequest schema."""
 
-    def test_valid_template_with_config_path(self):
+    def test_valid_template_with_config_path(self) -> None:
         """Test valid template creation with config path."""
         template = SessionTemplateCreateRequest(
             name="Test Template",
@@ -597,7 +597,7 @@ class TestSessionTemplateCreateRequest:
         )
         assert template.name == "Test Template"
 
-    def test_valid_template_with_custom_config(self):
+    def test_valid_template_with_custom_config(self) -> None:
         """Test valid template creation with custom config."""
         template = SessionTemplateCreateRequest(
             name="Test Template",
@@ -610,7 +610,7 @@ class TestSessionTemplateCreateRequest:
         )
         assert template.custom_config == {"key": "value"}
 
-    def test_template_with_tags(self):
+    def test_template_with_tags(self) -> None:
         """Test template with tags."""
         template = SessionTemplateCreateRequest(
             name="Test Template",
@@ -623,7 +623,7 @@ class TestSessionTemplateCreateRequest:
         )
         assert template.tags == ["tag1", "tag2"]
 
-    def test_template_tags_stripped(self):
+    def test_template_tags_stripped(self) -> None:
         """Test template tags whitespace stripping."""
         template = SessionTemplateCreateRequest(
             name="Test Template",
@@ -636,7 +636,7 @@ class TestSessionTemplateCreateRequest:
         )
         assert template.tags == ["tag1", "tag2"]
 
-    def test_invalid_name_empty(self):
+    def test_invalid_name_empty(self) -> None:
         """Test invalid name — empty."""
         with pytest.raises(ValidationError) as exc_info:
             SessionTemplateCreateRequest(
@@ -650,7 +650,7 @@ class TestSessionTemplateCreateRequest:
             )
         assert "cannot be empty" in str(exc_info.value)
 
-    def test_invalid_name_too_long(self):
+    def test_invalid_name_too_long(self) -> None:
         """Test invalid name — too long."""
         with pytest.raises(ValidationError) as exc_info:
             SessionTemplateCreateRequest(
@@ -664,7 +664,7 @@ class TestSessionTemplateCreateRequest:
             )
         assert "too long" in str(exc_info.value)
 
-    def test_invalid_tag_too_long(self):
+    def test_invalid_tag_too_long(self) -> None:
         """Test invalid tag — too long."""
         with pytest.raises(ValidationError) as exc_info:
             SessionTemplateCreateRequest(
@@ -678,7 +678,7 @@ class TestSessionTemplateCreateRequest:
             )
         assert "too long" in str(exc_info.value)
 
-    def test_invalid_tag_empty(self):
+    def test_invalid_tag_empty(self) -> None:
         """Test invalid tag — empty."""
         with pytest.raises(ValidationError) as exc_info:
             SessionTemplateCreateRequest(
@@ -692,7 +692,7 @@ class TestSessionTemplateCreateRequest:
             )
         assert "non-whitespace" in str(exc_info.value)
 
-    def test_invalid_type_tags_string(self):
+    def test_invalid_type_tags_string(self) -> None:
         """Test invalid type rejection — tags as string."""
         with pytest.raises(ValidationError):
             SessionTemplateCreateRequest(
@@ -705,7 +705,7 @@ class TestSessionTemplateCreateRequest:
                 is_public=False,
             )
 
-    def test_missing_config_sources(self):
+    def test_missing_config_sources(self) -> None:
         """Test missing config sources."""
         with pytest.raises(ValidationError) as exc_info:
             SessionTemplateCreateRequest(
@@ -723,30 +723,30 @@ class TestSessionTemplateCreateRequest:
 class TestCustomConfig:
     """Tests for CustomConfig schema."""
 
-    def test_valid_custom_config(self):
+    def test_valid_custom_config(self) -> None:
         """Test valid custom config."""
         config = CustomConfig(config={"key": "value"})
         assert config.config == {"key": "value"}
 
-    def test_invalid_custom_config_empty_key(self):
+    def test_invalid_custom_config_empty_key(self) -> None:
         """Test invalid custom config — empty key."""
         with pytest.raises(ValidationError) as exc_info:
             CustomConfig(config={"": "value"})
         assert "non-empty string" in str(exc_info.value)
 
-    def test_invalid_custom_config_dangerous_key(self):
+    def test_invalid_custom_config_dangerous_key(self) -> None:
         """Test invalid custom config — dangerous key."""
         with pytest.raises(ValidationError) as exc_info:
             CustomConfig(config={"secret_key": "value"})
         assert "not allowed" in str(exc_info.value)
 
-    def test_invalid_custom_config_list_validation(self):
+    def test_invalid_custom_config_list_validation(self) -> None:
         """Test invalid custom config — list with invalid item."""
         with pytest.raises(ValidationError) as exc_info:
             CustomConfig(config={"items": [1, 2, object()]})
         assert "must be a string, number, boolean, null" in str(exc_info.value)
 
-    def test_invalid_custom_config_invalid_type(self):
+    def test_invalid_custom_config_invalid_type(self) -> None:
         """Test invalid custom config — invalid value type."""
         with pytest.raises(ValidationError) as exc_info:
             CustomConfig(config={"key": object()})
@@ -756,21 +756,45 @@ class TestCustomConfig:
 class TestSessionTemplateUpdateRequest:
     """Tests for SessionTemplateUpdateRequest schema."""
 
-    def test_valid_template_update(self):
+    def test_valid_template_update(self) -> None:
         """Test valid template update."""
-        template = SessionTemplateUpdateRequest(name="Updated Name")
+        template = SessionTemplateUpdateRequest(
+            name="Updated Name",
+            description=None,
+            config_path=None,
+            custom_config=None,
+            default_description=None,
+            tags=None,
+            is_public=None,
+        )
         assert template.name == "Updated Name"
 
-    def test_invalid_name_empty(self):
+    def test_invalid_name_empty(self) -> None:
         """Test invalid template update — empty name."""
         with pytest.raises(ValidationError) as exc_info:
-            SessionTemplateUpdateRequest(name="  ")
+            SessionTemplateUpdateRequest(
+                name="  ",
+                description=None,
+                config_path=None,
+                custom_config=None,
+                default_description=None,
+                tags=None,
+                is_public=None,
+            )
         assert "cannot be empty" in str(exc_info.value)
 
-    def test_invalid_name_too_long(self):
+    def test_invalid_name_too_long(self) -> None:
         """Test invalid template update — name too long."""
         with pytest.raises(ValidationError) as exc_info:
-            SessionTemplateUpdateRequest(name="x" * 101)
+            SessionTemplateUpdateRequest(
+                name="x" * 101,
+                description=None,
+                config_path=None,
+                custom_config=None,
+                default_description=None,
+                tags=None,
+                is_public=None,
+            )
         assert "too long" in str(exc_info.value)
 
 
@@ -782,7 +806,7 @@ class TestSessionTemplateUpdateRequest:
 class TestTaskSubmitRequest:
     """Tests for TaskSubmitRequest schema."""
 
-    def test_valid_task_submit(self):
+    def test_valid_task_submit(self) -> None:
         """Test valid task submission."""
         task = TaskSubmitRequest(
             task_type="attentional_blink",
@@ -793,7 +817,7 @@ class TestTaskSubmitRequest:
         assert task.task_type == "attentional_blink"
         assert task.priority == 5
 
-    def test_task_with_webhook_url(self):
+    def test_task_with_webhook_url(self) -> None:
         """Test task with webhook URL."""
         task = TaskSubmitRequest(
             task_type="attentional_blink",
@@ -803,7 +827,7 @@ class TestTaskSubmitRequest:
         )
         assert task.webhook_url == "https://example.com/webhook"
 
-    def test_invalid_task_type_empty(self):
+    def test_invalid_task_type_empty(self) -> None:
         """Test invalid task type — empty."""
         with pytest.raises(ValidationError) as exc_info:
             TaskSubmitRequest(
@@ -814,7 +838,7 @@ class TestTaskSubmitRequest:
             )
         assert "cannot be empty" in str(exc_info.value)
 
-    def test_invalid_parameters_not_dict(self):
+    def test_invalid_parameters_not_dict(self) -> None:
         """Test invalid parameters — not dict."""
         with pytest.raises(ValidationError) as exc_info:
             TaskSubmitRequest(
@@ -825,7 +849,7 @@ class TestTaskSubmitRequest:
             )
         assert "dictionary" in str(exc_info.value).lower()
 
-    def test_invalid_parameter_negative_numeric(self):
+    def test_invalid_parameter_negative_numeric(self) -> None:
         """Test invalid parameter — negative numeric."""
         with pytest.raises(ValidationError) as exc_info:
             TaskSubmitRequest(
@@ -836,7 +860,7 @@ class TestTaskSubmitRequest:
             )
         assert "cannot be negative" in str(exc_info.value)
 
-    def test_invalid_parameter_string_too_long(self):
+    def test_invalid_parameter_string_too_long(self) -> None:
         """Test invalid parameter — string too long."""
         with pytest.raises(ValidationError) as exc_info:
             TaskSubmitRequest(
@@ -847,7 +871,7 @@ class TestTaskSubmitRequest:
             )
         assert "too long" in str(exc_info.value)
 
-    def test_invalid_webhook_url_format(self):
+    def test_invalid_webhook_url_format(self) -> None:
         """Test invalid webhook URL format."""
         with pytest.raises(ValidationError) as exc_info:
             TaskSubmitRequest(
@@ -858,7 +882,7 @@ class TestTaskSubmitRequest:
             )
         assert "Invalid webhook URL format" in str(exc_info.value)
 
-    def test_attentional_blink_stream_length_validation(self):
+    def test_attentional_blink_stream_length_validation(self) -> None:
         """Test attentional_blink stream_length validation."""
         with pytest.raises(ValidationError) as exc_info:
             TaskSubmitRequest(
@@ -869,7 +893,7 @@ class TestTaskSubmitRequest:
             )
         assert "between 1 and 100" in str(exc_info.value)
 
-    def test_attentional_blink_item_duration_validation(self):
+    def test_attentional_blink_item_duration_validation(self) -> None:
         """Test attentional_blink item_duration_ms validation."""
         with pytest.raises(ValidationError) as exc_info:
             TaskSubmitRequest(
@@ -880,7 +904,7 @@ class TestTaskSubmitRequest:
             )
         assert "between 10 and 2000" in str(exc_info.value)
 
-    def test_attentional_blink_lags_validation(self):
+    def test_attentional_blink_lags_validation(self) -> None:
         """Test attentional_blink lags validation."""
         with pytest.raises(ValidationError) as exc_info:
             TaskSubmitRequest(
@@ -891,7 +915,7 @@ class TestTaskSubmitRequest:
             )
         assert "between 1 and 20" in str(exc_info.value)
 
-    def test_iowa_gambling_num_trials_validation(self):
+    def test_iowa_gambling_num_trials_validation(self) -> None:
         """Test iowa_gambling num_trials validation."""
         with pytest.raises(ValidationError) as exc_info:
             TaskSubmitRequest(
@@ -902,7 +926,7 @@ class TestTaskSubmitRequest:
             )
         assert "between 10 and 1000" in str(exc_info.value)
 
-    def test_iowa_gambling_initial_balance_validation(self):
+    def test_iowa_gambling_initial_balance_validation(self) -> None:
         """Test iowa_gambling initial_balance validation."""
         with pytest.raises(ValidationError) as exc_info:
             TaskSubmitRequest(
@@ -913,7 +937,7 @@ class TestTaskSubmitRequest:
             )
         assert "between 100 and 10000" in str(exc_info.value)
 
-    def test_iowa_gambling_deck_selection_strategy_validation(self):
+    def test_iowa_gambling_deck_selection_strategy_validation(self) -> None:
         """Test iowa_gambling deck_selection_strategy validation."""
         with pytest.raises(ValidationError) as exc_info:
             TaskSubmitRequest(
@@ -924,7 +948,7 @@ class TestTaskSubmitRequest:
             )
         assert "one of" in str(exc_info.value)
 
-    def test_invalid_type_task_type_int(self):
+    def test_invalid_type_task_type_int(self) -> None:
         """Test invalid type rejection — task_type as int."""
         with pytest.raises(ValidationError):
             TaskSubmitRequest(
@@ -938,7 +962,7 @@ class TestTaskSubmitRequest:
 class TestTaskDependencyCreateRequest:
     """Tests for TaskDependencyCreateRequest schema."""
 
-    def test_valid_dependency(self):
+    def test_valid_dependency(self) -> None:
         """Test valid task dependency."""
         dep = TaskDependencyCreateRequest(
             prerequisite_task_id="550e8400-e29b-41d4-a716-446655440000",
@@ -947,7 +971,7 @@ class TestTaskDependencyCreateRequest:
         assert dep.prerequisite_task_id == "550e8400-e29b-41d4-a716-446655440000"
         assert dep.dependency_type == "completion"
 
-    def test_invalid_prerequisite_id_format(self):
+    def test_invalid_prerequisite_id_format(self) -> None:
         """Test invalid prerequisite ID format."""
         with pytest.raises(ValidationError) as exc_info:
             TaskDependencyCreateRequest(
@@ -956,7 +980,7 @@ class TestTaskDependencyCreateRequest:
             )
         assert "Invalid prerequisite task ID format" in str(exc_info.value)
 
-    def test_invalid_dependency_type(self):
+    def test_invalid_dependency_type(self) -> None:
         """Test invalid dependency type."""
         with pytest.raises(ValidationError) as exc_info:
             TaskDependencyCreateRequest(
@@ -965,7 +989,7 @@ class TestTaskDependencyCreateRequest:
             )
         assert "must be one of" in str(exc_info.value)
 
-    def test_invalid_type_prerequisite_id_int(self):
+    def test_invalid_type_prerequisite_id_int(self) -> None:
         """Test invalid type rejection — prerequisite_task_id as int."""
         with pytest.raises(ValidationError):
             TaskDependencyCreateRequest(
@@ -982,7 +1006,7 @@ class TestTaskDependencyCreateRequest:
 class TestWebhookDeliveryResponse:
     """Tests for WebhookDeliveryResponse schema."""
 
-    def test_valid_webhook_delivery(self):
+    def test_valid_webhook_delivery(self) -> None:
         """Test valid webhook delivery response."""
         now = datetime.now(timezone.utc)
         delivery = WebhookDeliveryResponse(
@@ -1001,7 +1025,7 @@ class TestWebhookDeliveryResponse:
         assert delivery.delivery_id == "delivery_123"
         assert delivery.status == "delivered"
 
-    def test_webhook_delivery_with_error(self):
+    def test_webhook_delivery_with_error(self) -> None:
         """Test webhook delivery with error."""
         now = datetime.now(timezone.utc)
         delivery = WebhookDeliveryResponse(
@@ -1020,7 +1044,7 @@ class TestWebhookDeliveryResponse:
         assert delivery.status == "failed"
         assert delivery.error_message == "Connection timeout"
 
-    def test_invalid_type_delivery_id_int(self):
+    def test_invalid_type_delivery_id_int(self) -> None:
         """Test invalid type rejection — delivery_id as int."""
         now = datetime.now(timezone.utc)
         with pytest.raises(ValidationError):
@@ -1042,7 +1066,7 @@ class TestWebhookDeliveryResponse:
 class TestWebhookRetryResponse:
     """Tests for WebhookRetryResponse schema."""
 
-    def test_valid_webhook_retry(self):
+    def test_valid_webhook_retry(self) -> None:
         """Test valid webhook retry response."""
         now = datetime.now(timezone.utc)
         retry = WebhookRetryResponse(
@@ -1055,7 +1079,7 @@ class TestWebhookRetryResponse:
         assert retry.success is True
         assert retry.attempts == 2
 
-    def test_invalid_type_delivery_id_int(self):
+    def test_invalid_type_delivery_id_int(self) -> None:
         """Test invalid type rejection — delivery_id as int."""
         now = datetime.now(timezone.utc)
         with pytest.raises(ValidationError):
@@ -1076,7 +1100,7 @@ class TestWebhookRetryResponse:
 class TestStateSchemas:
     """Tests for state-related schemas."""
 
-    def test_ignition_event(self):
+    def test_ignition_event(self) -> None:
         """Test IgnitionEvent schema."""
         event = IgnitionEvent(
             time_ms=100.0,
@@ -1087,7 +1111,7 @@ class TestStateSchemas:
         assert event.time_ms == 100.0
         assert event.trigger_signal == 0.5
 
-    def test_body_state(self):
+    def test_body_state(self) -> None:
         """Test BodyState schema."""
         state = BodyState(
             heart_rate=72.0,
@@ -1096,12 +1120,12 @@ class TestStateSchemas:
         )
         assert state.heart_rate == 72.0
 
-    def test_allostatic_state(self):
+    def test_allostatic_state(self) -> None:
         """Test AllostaticState schema."""
         state = AllostaticState(allostatic_load=2.5)
         assert state.allostatic_load == 2.5
 
-    def test_metabolic_state(self):
+    def test_metabolic_state(self) -> None:
         """Test MetabolicState schema."""
         state = MetabolicState(
             reserves=100.0,
@@ -1109,7 +1133,7 @@ class TestStateSchemas:
         )
         assert state.reserves == 100.0
 
-    def test_precision_state(self):
+    def test_precision_state(self) -> None:
         """Test PrecisionState schema."""
         state = PrecisionState(
             exteroceptive=0.9,
@@ -1117,17 +1141,17 @@ class TestStateSchemas:
         )
         assert state.exteroceptive == 0.9
 
-    def test_minimal_self_state(self):
+    def test_minimal_self_state(self) -> None:
         """Test MinimalSelfState schema."""
         state = MinimalSelfState(coherence=0.85)
         assert state.coherence == 0.85
 
-    def test_narrative_self_state(self):
+    def test_narrative_self_state(self) -> None:
         """Test NarrativeSelfState schema."""
         state = NarrativeSelfState(narrative="I am focused")
         assert state.narrative == "I am focused"
 
-    def test_workspace_state(self):
+    def test_workspace_state(self) -> None:
         """Test WorkspaceState schema."""
         state = WorkspaceState(
             is_broadcasting=True,
@@ -1136,7 +1160,7 @@ class TestStateSchemas:
         )
         assert state.is_broadcasting is True
 
-    def test_ignition_state(self):
+    def test_ignition_state(self) -> None:
         """Test IgnitionState schema."""
         state = IgnitionState(
             ignition_occurred=True,
@@ -1146,7 +1170,7 @@ class TestStateSchemas:
         )
         assert state.ignition_occurred is True
 
-    def test_self_model_state(self):
+    def test_self_model_state(self) -> None:
         """Test SelfModelState schema."""
         state = SelfModelState(
             minimal=MinimalSelfState(coherence=0.85),
@@ -1154,7 +1178,7 @@ class TestStateSchemas:
         )
         assert state.minimal.coherence == 0.85
 
-    def test_system_state_response(self):
+    def test_system_state_response(self) -> None:
         """Test SystemStateResponse schema."""
         now = datetime.now(timezone.utc)
         response = SystemStateResponse(
@@ -1181,7 +1205,7 @@ class TestStateSchemas:
         )
         assert response.time_ms == 1000.0
 
-    def test_invalid_type_time_ms_string(self):
+    def test_invalid_type_time_ms_string(self) -> None:
         """Test invalid type rejection — time_ms as string."""
         # Pydantic coerces strings to floats, so this won't raise
         event = IgnitionEvent(
@@ -1201,7 +1225,7 @@ class TestStateSchemas:
 class TestAPIKeyCreateRequest:
     """Tests for APIKeyCreateRequest schema."""
 
-    def test_valid_api_key_create(self):
+    def test_valid_api_key_create(self) -> None:
         """Test valid API key creation."""
         future = datetime.now(timezone.utc) + timedelta(days=365)
         req = APIKeyCreateRequest(
@@ -1212,7 +1236,7 @@ class TestAPIKeyCreateRequest:
         assert req.name == "My API Key"
         assert "read" in req.permissions
 
-    def test_api_key_with_expiry(self):
+    def test_api_key_with_expiry(self) -> None:
         """Test API key with custom expiry."""
         future = datetime.now(timezone.utc) + timedelta(days=30)
         req = APIKeyCreateRequest(
@@ -1222,7 +1246,7 @@ class TestAPIKeyCreateRequest:
         )
         assert req.expires_at == future
 
-    def test_invalid_name_empty(self):
+    def test_invalid_name_empty(self) -> None:
         """Test invalid name — empty."""
         with pytest.raises(ValidationError) as exc_info:
             APIKeyCreateRequest(
@@ -1232,7 +1256,7 @@ class TestAPIKeyCreateRequest:
             )
         assert "cannot be empty" in str(exc_info.value)
 
-    def test_invalid_name_too_long(self):
+    def test_invalid_name_too_long(self) -> None:
         """Test invalid name — too long."""
         with pytest.raises(ValidationError) as exc_info:
             APIKeyCreateRequest(
@@ -1242,7 +1266,7 @@ class TestAPIKeyCreateRequest:
             )
         assert "too long" in str(exc_info.value)
 
-    def test_invalid_expiry_in_past(self):
+    def test_invalid_expiry_in_past(self) -> None:
         """Test invalid expiry — in past."""
         past = datetime.now(timezone.utc) - timedelta(days=1)
         with pytest.raises(ValidationError) as exc_info:
@@ -1253,7 +1277,7 @@ class TestAPIKeyCreateRequest:
             )
         assert "must be in the future" in str(exc_info.value)
 
-    def test_invalid_expiry_too_far_future(self):
+    def test_invalid_expiry_too_far_future(self) -> None:
         """Test invalid expiry — too far in future."""
         far_future = datetime.now(timezone.utc) + timedelta(days=800)
         with pytest.raises(ValidationError) as exc_info:
@@ -1264,7 +1288,7 @@ class TestAPIKeyCreateRequest:
             )
         assert "cannot exceed 2 years" in str(exc_info.value)
 
-    def test_invalid_permission(self):
+    def test_invalid_permission(self) -> None:
         """Test invalid permission."""
         with pytest.raises(ValidationError) as exc_info:
             APIKeyCreateRequest(
@@ -1274,7 +1298,7 @@ class TestAPIKeyCreateRequest:
             )
         assert "Invalid permission" in str(exc_info.value)
 
-    def test_invalid_type_name_int(self):
+    def test_invalid_type_name_int(self) -> None:
         """Test invalid type rejection — name as int."""
         with pytest.raises(ValidationError):
             APIKeyCreateRequest(
@@ -1283,7 +1307,7 @@ class TestAPIKeyCreateRequest:
                 expires_at=datetime.now(timezone.utc) + timedelta(days=365),
             )
 
-    def test_invalid_type_permissions_string(self):
+    def test_invalid_type_permissions_string(self) -> None:
         """Test invalid type rejection — permissions as string."""
         with pytest.raises(ValidationError):
             APIKeyCreateRequest(
@@ -1296,7 +1320,7 @@ class TestAPIKeyCreateRequest:
 class TestAPIKeyResponse:
     """Tests for APIKeyResponse schema."""
 
-    def test_valid_api_key_response(self):
+    def test_valid_api_key_response(self) -> None:
         """Test valid API key response."""
         now = datetime.now(timezone.utc)
         future = now + timedelta(days=365)
@@ -1312,7 +1336,7 @@ class TestAPIKeyResponse:
         assert resp.key_id == "key_123"
         assert resp.is_active is True
 
-    def test_invalid_type_key_id_int(self):
+    def test_invalid_type_key_id_int(self) -> None:
         """Test invalid type rejection — key_id as int."""
         now = datetime.now(timezone.utc)
         with pytest.raises(ValidationError):
@@ -1330,7 +1354,7 @@ class TestAPIKeyResponse:
 class TestAPIKeyUpdateRequest:
     """Tests for APIKeyUpdateRequest schema."""
 
-    def test_valid_api_key_update(self):
+    def test_valid_api_key_update(self) -> None:
         """Test valid API key update."""
         req = APIKeyUpdateRequest(
             name="Updated Name",
@@ -1340,7 +1364,7 @@ class TestAPIKeyUpdateRequest:
         assert req.name == "Updated Name"
         assert req.is_active is False
 
-    def test_partial_update(self):
+    def test_partial_update(self) -> None:
         """Test partial API key update."""
         req = APIKeyUpdateRequest(
             name="Updated Name",
@@ -1350,7 +1374,7 @@ class TestAPIKeyUpdateRequest:
         assert req.name == "Updated Name"
         assert req.permissions is None
 
-    def test_invalid_name_empty(self):
+    def test_invalid_name_empty(self) -> None:
         """Test invalid name — empty."""
         with pytest.raises(ValidationError) as exc_info:
             APIKeyUpdateRequest(
@@ -1360,7 +1384,7 @@ class TestAPIKeyUpdateRequest:
             )
         assert "cannot be empty" in str(exc_info.value)
 
-    def test_invalid_permission(self):
+    def test_invalid_permission(self) -> None:
         """Test invalid permission."""
         with pytest.raises(ValidationError) as exc_info:
             APIKeyUpdateRequest(
@@ -1379,7 +1403,7 @@ class TestAPIKeyUpdateRequest:
 class TestPaginationInfo:
     """Tests for PaginationInfo schema."""
 
-    def test_valid_pagination(self):
+    def test_valid_pagination(self) -> None:
         """Test valid pagination info."""
         pagination = PaginationInfo(
             page=1,
@@ -1389,7 +1413,7 @@ class TestPaginationInfo:
         assert pagination.page == 1
         assert pagination.total == 100
 
-    def test_invalid_type_page_string(self):
+    def test_invalid_type_page_string(self) -> None:
         """Test invalid type rejection — page as string."""
         # Pydantic coerces strings to ints, so this won't raise
         pagination = PaginationInfo(
@@ -1403,7 +1427,7 @@ class TestPaginationInfo:
 class TestErrorDetail:
     """Tests for ErrorDetail schema."""
 
-    def test_valid_error_detail(self):
+    def test_valid_error_detail(self) -> None:
         """Test valid error detail."""
         now = datetime.now(timezone.utc)
         error = ErrorDetail(
@@ -1414,7 +1438,7 @@ class TestErrorDetail:
         )
         assert error.code == "VALIDATION_ERROR"
 
-    def test_error_detail_with_details(self):
+    def test_error_detail_with_details(self) -> None:
         """Test error detail with additional details."""
         now = datetime.now(timezone.utc)
         error = ErrorDetail(
@@ -1425,7 +1449,7 @@ class TestErrorDetail:
         )
         assert error.details is not None and error.details["field"] == "username"
 
-    def test_invalid_type_code_int(self):
+    def test_invalid_type_code_int(self) -> None:
         """Test invalid type rejection — code as int."""
         now = datetime.now(timezone.utc)
         with pytest.raises(ValidationError):
@@ -1440,7 +1464,7 @@ class TestErrorDetail:
 class TestTokenPayload:
     """Tests for TokenPayload class."""
 
-    def test_valid_token_payload(self):
+    def test_valid_token_payload(self) -> None:
         """Test valid token payload."""
         exp = datetime.now(timezone.utc) + timedelta(hours=1)
         payload = TokenPayload(
@@ -1452,7 +1476,7 @@ class TestTokenPayload:
         assert payload.user_id == "user_123"
         assert payload.token_type == "access"
 
-    def test_token_payload_to_dict(self):
+    def test_token_payload_to_dict(self) -> None:
         """Test token payload to_dict conversion."""
         exp = datetime.now(timezone.utc) + timedelta(hours=1)
         payload = TokenPayload(
@@ -1468,7 +1492,7 @@ class TestTokenPayload:
         assert data["jti"] == "jti_123"
         assert "exp" in data
 
-    def test_token_payload_from_dict(self):
+    def test_token_payload_from_dict(self) -> None:
         """Test token payload from_dict conversion."""
         exp = datetime.now(timezone.utc) + timedelta(hours=1)
         data = {
@@ -1502,7 +1526,7 @@ user_create_strategy = st.builds(
 
 @given(user_create_strategy)
 @settings(max_examples=50, deadline=None)
-def test_user_create_dict_round_trip(user):
+def test_user_create_dict_round_trip(user: UserCreateRequest) -> None:
     """Property: UserCreateRequest dict round-trip.
 
     **Validates: Requirements 6.1, 12.1**
@@ -1514,7 +1538,7 @@ def test_user_create_dict_round_trip(user):
 
 @given(user_create_strategy)
 @settings(max_examples=50, deadline=None)
-def test_user_create_json_round_trip(user):
+def test_user_create_json_round_trip(user: UserCreateRequest) -> None:
     """Property: UserCreateRequest JSON round-trip.
 
     **Validates: Requirements 6.2**
@@ -1538,7 +1562,7 @@ session_create_strategy = st.builds(
 
 @given(session_create_strategy)
 @settings(max_examples=50, deadline=None)
-def test_session_create_dict_round_trip(session):
+def test_session_create_dict_round_trip(session: SessionCreateRequest) -> None:
     """Property: SessionCreateRequest dict round-trip.
 
     **Validates: Requirements 6.1, 12.1**
@@ -1550,7 +1574,7 @@ def test_session_create_dict_round_trip(session):
 
 @given(session_create_strategy)
 @settings(max_examples=50, deadline=None)
-def test_session_create_json_round_trip(session):
+def test_session_create_json_round_trip(session: SessionCreateRequest) -> None:
     """Property: SessionCreateRequest JSON round-trip.
 
     **Validates: Requirements 6.2**
@@ -1572,7 +1596,7 @@ task_submit_strategy = st.builds(
 
 @given(task_submit_strategy)
 @settings(max_examples=50, deadline=None)
-def test_task_submit_dict_round_trip(task):
+def test_task_submit_dict_round_trip(task: TaskSubmitRequest) -> None:
     """Property: TaskSubmitRequest dict round-trip.
 
     **Validates: Requirements 6.1, 12.1**
@@ -1584,7 +1608,7 @@ def test_task_submit_dict_round_trip(task):
 
 @given(task_submit_strategy)
 @settings(max_examples=50, deadline=None)
-def test_task_submit_json_round_trip(task):
+def test_task_submit_json_round_trip(task: TaskSubmitRequest) -> None:
     """Property: TaskSubmitRequest JSON round-trip.
 
     **Validates: Requirements 6.2**
@@ -1610,7 +1634,7 @@ webhook_delivery_strategy = st.builds(
 
 @given(webhook_delivery_strategy)
 @settings(max_examples=50, deadline=None)
-def test_webhook_delivery_dict_round_trip(delivery):
+def test_webhook_delivery_dict_round_trip(delivery: WebhookDeliveryResponse) -> None:
     """Property: WebhookDeliveryResponse dict round-trip.
 
     **Validates: Requirements 6.1, 12.1**
@@ -1622,7 +1646,7 @@ def test_webhook_delivery_dict_round_trip(delivery):
 
 @given(webhook_delivery_strategy)
 @settings(max_examples=50, deadline=None)
-def test_webhook_delivery_json_round_trip(delivery):
+def test_webhook_delivery_json_round_trip(delivery: WebhookDeliveryResponse) -> None:
     """Property: WebhookDeliveryResponse JSON round-trip.
 
     **Validates: Requirements 6.2**
@@ -1652,7 +1676,7 @@ api_key_response_strategy = st.builds(
 
 @given(api_key_response_strategy)
 @settings(max_examples=50, deadline=None)
-def test_api_key_response_dict_round_trip(api_key):
+def test_api_key_response_dict_round_trip(api_key: APIKeyResponse) -> None:
     """Property: APIKeyResponse dict round-trip.
 
     **Validates: Requirements 6.1, 12.1**
@@ -1664,7 +1688,7 @@ def test_api_key_response_dict_round_trip(api_key):
 
 @given(api_key_response_strategy)
 @settings(max_examples=50, deadline=None)
-def test_api_key_response_json_round_trip(api_key):
+def test_api_key_response_json_round_trip(api_key: APIKeyResponse) -> None:
     """Property: APIKeyResponse JSON round-trip.
 
     **Validates: Requirements 6.2**
@@ -1687,7 +1711,7 @@ pagination_strategy = st.builds(
 
 @given(pagination_strategy)
 @settings(max_examples=50, deadline=None)
-def test_pagination_dict_round_trip(pagination):
+def test_pagination_dict_round_trip(pagination: PaginationInfo) -> None:
     """Property: PaginationInfo dict round-trip.
 
     **Validates: Requirements 6.1, 12.1**
@@ -1699,7 +1723,7 @@ def test_pagination_dict_round_trip(pagination):
 
 @given(pagination_strategy)
 @settings(max_examples=50, deadline=None)
-def test_pagination_json_round_trip(pagination):
+def test_pagination_json_round_trip(pagination: PaginationInfo) -> None:
     """Property: PaginationInfo JSON round-trip.
 
     **Validates: Requirements 6.2**
@@ -1717,7 +1741,7 @@ def test_pagination_json_round_trip(pagination):
 class TestSerializers:
     """Tests for schema serialization behavior."""
 
-    def test_user_create_serialization(self):
+    def test_user_create_serialization(self) -> None:
         """Test UserCreateRequest serialization."""
         user = UserCreateRequest(
             username="testuser",
@@ -1729,7 +1753,7 @@ class TestSerializers:
         assert data["username"] == "testuser"
         assert data["email"] == "test@example.com"
 
-    def test_user_create_json_serialization(self):
+    def test_user_create_json_serialization(self) -> None:
         """Test UserCreateRequest JSON serialization."""
         user = UserCreateRequest(
             username="testuser",
@@ -1741,7 +1765,7 @@ class TestSerializers:
         assert "testuser" in json_str
         assert "test@example.com" in json_str
 
-    def test_session_create_serialization(self):
+    def test_session_create_serialization(self) -> None:
         """Test SessionCreateRequest serialization."""
         session = SessionCreateRequest(
             template_id="550e8400-e29b-41d4-a716-446655440000",
@@ -1753,7 +1777,7 @@ class TestSerializers:
         assert isinstance(data, dict)
         assert data["template_id"] == "550e8400-e29b-41d4-a716-446655440000"
 
-    def test_task_submit_serialization(self):
+    def test_task_submit_serialization(self) -> None:
         """Test TaskSubmitRequest serialization."""
         task = TaskSubmitRequest(
             task_type="attentional_blink",
@@ -1766,7 +1790,7 @@ class TestSerializers:
         assert data["task_type"] == "attentional_blink"
         assert data["parameters"]["stream_length"] == 15
 
-    def test_pagination_serialization(self):
+    def test_pagination_serialization(self) -> None:
         """Test PaginationInfo serialization."""
         pagination = PaginationInfo(page=1, per_page=10, total=100)
         data = pagination.model_dump()
@@ -1775,7 +1799,7 @@ class TestSerializers:
         assert data["per_page"] == 10
         assert data["total"] == 100
 
-    def test_error_detail_serialization(self):
+    def test_error_detail_serialization(self) -> None:
         """Test ErrorDetail serialization."""
         now = datetime.now(timezone.utc)
         error = ErrorDetail(
@@ -1789,7 +1813,7 @@ class TestSerializers:
         assert data["code"] == "VALIDATION_ERROR"
         assert data["message"] == "Invalid request"
 
-    def test_token_payload_serialization(self):
+    def test_token_payload_serialization(self) -> None:
         """Test TokenPayload to_dict serialization."""
         exp = datetime.now(timezone.utc) + timedelta(hours=1)
         payload = TokenPayload(

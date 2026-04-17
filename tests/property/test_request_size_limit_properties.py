@@ -6,6 +6,7 @@ Tests universal properties of request size limiting to prevent DoS attacks.
 """
 
 from hypothesis import given, strategies as st, assume, settings
+from typing import Any
 import sys
 from pathlib import Path
 
@@ -21,7 +22,7 @@ from app.middleware.request_size_limit import RequestSizeLimitMiddleware
 # ============================================================================
 
 
-def create_test_app_with_size_limit(max_size_mb: int = 10, enabled: bool = True):
+def create_test_app_with_size_limit(max_size_mb: int = 10, enabled: bool = True) -> FastAPI:
     """Create a test FastAPI app with request size limiting middleware."""
     app = FastAPI()
 
@@ -34,19 +35,19 @@ def create_test_app_with_size_limit(max_size_mb: int = 10, enabled: bool = True)
 
     # Add test endpoints
     @app.post("/test")
-    async def test_endpoint(data: dict):
+    async def test_endpoint(data: dict[str, Any]) -> dict[str, Any]:
         return {"message": "success", "data_size": len(str(data))}
 
     @app.post("/v1/sessions")
-    async def create_session_endpoint(data: dict):
+    async def create_session_endpoint(data: dict[str, Any]) -> dict[str, Any]:
         return {"session_id": "test-123", "data_size": len(str(data))}
 
     @app.put("/v1/sessions/{session_id}")
-    async def update_session_endpoint(session_id: str, data: dict):
+    async def update_session_endpoint(session_id: str, data: dict[str, Any]) -> dict[str, Any]:
         return {"session_id": session_id, "data_size": len(str(data))}
 
     @app.get("/test")
-    async def test_get_endpoint():
+    async def test_get_endpoint() -> dict[str, Any]:
         return {"message": "success"}
 
     return app
@@ -62,7 +63,7 @@ def create_test_app_with_size_limit(max_size_mb: int = 10, enabled: bool = True)
     payload_size_mb=st.floats(min_value=10.1, max_value=50.0),
     path=st.sampled_from(["/test", "/v1/sessions"]),
 )
-def test_property_30_request_size_limiting_exceeds_limit(payload_size_mb, path):
+def test_property_30_request_size_limiting_exceeds_limit(payload_size_mb: float, path: str) -> None:
     """
     **Validates: Requirements 20.2**
 
@@ -128,7 +129,7 @@ def test_property_30_request_size_limiting_exceeds_limit(payload_size_mb, path):
     payload_size_kb=st.integers(min_value=1, max_value=1024),
     path=st.sampled_from(["/test", "/v1/sessions"]),
 )
-def test_property_30_request_size_limiting_within_limit(payload_size_kb, path):
+def test_property_30_request_size_limiting_within_limit(payload_size_kb: int, path: str) -> None:
     """
     **Validates: Requirements 20.2**
 
@@ -173,7 +174,9 @@ def test_property_30_request_size_limiting_within_limit(payload_size_kb, path):
     max_size_mb=st.integers(min_value=1, max_value=100),
     payload_size_mb=st.floats(min_value=0.1, max_value=0.9),
 )
-def test_property_30_request_size_limiting_configurable_limit(max_size_mb, payload_size_mb):
+def test_property_30_request_size_limiting_configurable_limit(
+    max_size_mb: int, payload_size_mb: float
+) -> None:
     """
     **Validates: Requirements 20.2**
 
@@ -210,7 +213,7 @@ def test_property_30_request_size_limiting_configurable_limit(max_size_mb, paylo
     method=st.sampled_from(["GET", "HEAD", "OPTIONS", "DELETE"]),
     path=st.sampled_from(["/test"]),
 )
-def test_property_30_request_size_limiting_skips_no_body_methods(method, path):
+def test_property_30_request_size_limiting_skips_no_body_methods(method: str, path: str) -> None:
     """
     **Validates: Requirements 20.2**
 
@@ -249,7 +252,7 @@ def test_property_30_request_size_limiting_skips_no_body_methods(method, path):
 @given(
     payload_size_mb=st.floats(min_value=15.0, max_value=50.0),
 )
-def test_property_30_request_size_limiting_disabled(payload_size_mb):
+def test_property_30_request_size_limiting_disabled(payload_size_mb: float) -> None:
     """
     **Validates: Requirements 20.2**
 
@@ -292,7 +295,7 @@ def test_property_30_request_size_limiting_disabled(payload_size_mb):
 @given(
     payload_size_mb=st.floats(min_value=10.1, max_value=20.0),
 )
-def test_property_30_request_size_limiting_content_length_header(payload_size_mb):
+def test_property_30_request_size_limiting_content_length_header(payload_size_mb: float) -> None:
     """
     **Validates: Requirements 20.2**
 
@@ -341,7 +344,9 @@ def test_property_30_request_size_limiting_content_length_header(payload_size_mb
     path=st.sampled_from(["/test", "/v1/sessions"]),
     method=st.sampled_from(["POST", "PUT"]),
 )
-def test_property_30_request_size_limiting_applies_to_all_endpoints(payload_size_mb, path, method):
+def test_property_30_request_size_limiting_applies_to_all_endpoints(
+    payload_size_mb: float, path: str, method: str
+) -> None:
     """
     **Validates: Requirements 20.2**
 

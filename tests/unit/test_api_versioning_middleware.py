@@ -4,6 +4,8 @@ Unit tests for app/middleware/api_versioning.py
 Tests the APIVersioningMiddleware that adds semantic versioning headers to responses.
 """
 
+from typing import Any
+
 import pytest
 from unittest.mock import AsyncMock, MagicMock, patch
 from starlette.responses import Response, JSONResponse
@@ -11,13 +13,13 @@ from starlette.requests import Request
 
 
 @pytest.fixture
-def mock_app():
+def mock_app() -> AsyncMock:
     """Create a mock ASGI app."""
     return AsyncMock()
 
 
 @pytest.fixture
-def middleware(mock_app):
+def middleware(mock_app: AsyncMock) -> Any:
     """Create APIVersioningMiddleware instance."""
     from app.middleware.api_versioning import APIVersioningMiddleware
 
@@ -25,7 +27,7 @@ def middleware(mock_app):
 
 
 @pytest.fixture
-def mock_request():
+def mock_request() -> MagicMock:
     """Create a mock request."""
     request = MagicMock(spec=Request)
     request.url = MagicMock()
@@ -36,7 +38,7 @@ def mock_request():
 class TestAPIVersioningMiddlewareInit:
     """Test middleware initialization."""
 
-    def test_init_creates_middleware(self, mock_app):
+    def test_init_creates_middleware(self, mock_app: AsyncMock) -> None:
         """Middleware can be initialized with an app."""
         from app.middleware.api_versioning import APIVersioningMiddleware
 
@@ -48,7 +50,9 @@ class TestAPIVersioningMiddlewareDispatch:
     """Test middleware dispatch and header injection."""
 
     @pytest.mark.asyncio
-    async def test_dispatch_adds_version_headers(self, middleware, mock_request):
+    async def test_dispatch_adds_version_headers(
+        self, middleware: Any, mock_request: MagicMock
+    ) -> None:
         """Dispatch adds API-Version and API-Version-Prefix headers."""
         response = JSONResponse({"status": "ok"})
         middleware.app = AsyncMock(return_value=response)
@@ -60,7 +64,9 @@ class TestAPIVersioningMiddlewareDispatch:
         assert result.headers["API-Version-Prefix"] == "v1"
 
     @pytest.mark.asyncio
-    async def test_dispatch_calls_next_middleware(self, middleware, mock_request):
+    async def test_dispatch_calls_next_middleware(
+        self, middleware: Any, mock_request: MagicMock
+    ) -> None:
         """Dispatch calls the next middleware/handler."""
         response = JSONResponse({"status": "ok"})
         call_next = AsyncMock(return_value=response)
@@ -70,7 +76,9 @@ class TestAPIVersioningMiddlewareDispatch:
         call_next.assert_called_once_with(mock_request)
 
     @pytest.mark.asyncio
-    async def test_dispatch_preserves_response_body(self, middleware, mock_request):
+    async def test_dispatch_preserves_response_body(
+        self, middleware: Any, mock_request: MagicMock
+    ) -> None:
         """Dispatch preserves the response body."""
         response_data = {"status": "ok", "data": [1, 2, 3]}
         response = JSONResponse(response_data)
@@ -82,7 +90,9 @@ class TestAPIVersioningMiddlewareDispatch:
         assert result.status_code == 200
 
     @pytest.mark.asyncio
-    async def test_dispatch_preserves_status_code(self, middleware, mock_request):
+    async def test_dispatch_preserves_status_code(
+        self, middleware: Any, mock_request: MagicMock
+    ) -> None:
         """Dispatch preserves the response status code."""
         response = JSONResponse({"error": "not found"}, status_code=404)
         call_next = AsyncMock(return_value=response)
@@ -92,7 +102,9 @@ class TestAPIVersioningMiddlewareDispatch:
         assert result.status_code == 404
 
     @pytest.mark.asyncio
-    async def test_dispatch_with_non_json_response(self, middleware, mock_request):
+    async def test_dispatch_with_non_json_response(
+        self, middleware: Any, mock_request: MagicMock
+    ) -> None:
         """Dispatch handles non-JSON responses."""
         response = Response(content="plain text", media_type="text/plain")
         call_next = AsyncMock(return_value=response)
@@ -104,7 +116,9 @@ class TestAPIVersioningMiddlewareDispatch:
         assert "text/plain" in result.headers.get("content-type", "")
 
     @pytest.mark.asyncio
-    async def test_dispatch_with_json_response_updates_content_type(self, middleware, mock_request):
+    async def test_dispatch_with_json_response_updates_content_type(
+        self, middleware: Any, mock_request: MagicMock
+    ) -> None:
         """Dispatch updates Content-Type header for JSON responses."""
         response = JSONResponse({"status": "ok"})
         call_next = AsyncMock(return_value=response)
@@ -121,7 +135,9 @@ class TestAPIVersioningMiddlewareDeprecation:
     """Test deprecation header injection."""
 
     @pytest.mark.asyncio
-    async def test_dispatch_no_deprecation_for_active_endpoint(self, middleware, mock_request):
+    async def test_dispatch_no_deprecation_for_active_endpoint(
+        self, middleware: Any, mock_request: MagicMock
+    ) -> None:
         """Dispatch does not add deprecation headers for active endpoints."""
         response = JSONResponse({"status": "ok"})
         call_next = AsyncMock(return_value=response)
@@ -136,8 +152,8 @@ class TestAPIVersioningMiddlewareDeprecation:
 
     @pytest.mark.asyncio
     async def test_dispatch_adds_deprecation_headers_for_deprecated_endpoint(
-        self, middleware, mock_request
-    ):
+        self, middleware: Any, mock_request: MagicMock
+    ) -> None:
         """Dispatch adds deprecation headers for deprecated endpoints."""
         response = JSONResponse({"status": "ok"})
         call_next = AsyncMock(return_value=response)
@@ -156,7 +172,9 @@ class TestAPIVersioningMiddlewareDeprecation:
             assert "Warning" in result.headers
 
     @pytest.mark.asyncio
-    async def test_dispatch_deprecation_without_sunset(self, middleware, mock_request):
+    async def test_dispatch_deprecation_without_sunset(
+        self, middleware: Any, mock_request: MagicMock
+    ) -> None:
         """Dispatch handles deprecation info without sunset date."""
         response = JSONResponse({"status": "ok"})
         call_next = AsyncMock(return_value=response)
@@ -173,7 +191,9 @@ class TestAPIVersioningMiddlewareDeprecation:
             assert "successor-version" in result.headers.get("Link", "")
 
     @pytest.mark.asyncio
-    async def test_dispatch_deprecation_without_replacement(self, middleware, mock_request):
+    async def test_dispatch_deprecation_without_replacement(
+        self, middleware: Any, mock_request: MagicMock
+    ) -> None:
         """Dispatch handles deprecation info without replacement."""
         response = JSONResponse({"status": "ok"})
         call_next = AsyncMock(return_value=response)
@@ -190,7 +210,9 @@ class TestAPIVersioningMiddlewareDeprecation:
             assert "Link" not in result.headers
 
     @pytest.mark.asyncio
-    async def test_dispatch_deprecation_warning_includes_sunset(self, middleware, mock_request):
+    async def test_dispatch_deprecation_warning_includes_sunset(
+        self, middleware: Any, mock_request: MagicMock
+    ) -> None:
         """Dispatch deprecation warning includes sunset date."""
         response = JSONResponse({"status": "ok"})
         call_next = AsyncMock(return_value=response)
@@ -211,7 +233,9 @@ class TestAPIVersioningMiddlewareVersionHeaders:
     """Test version header values."""
 
     @pytest.mark.asyncio
-    async def test_dispatch_version_header_from_env(self, middleware, mock_request):
+    async def test_dispatch_version_header_from_env(
+        self, middleware: Any, mock_request: MagicMock
+    ) -> None:
         """Dispatch uses CURRENT_VERSION from environment."""
         response = JSONResponse({"status": "ok"})
         call_next = AsyncMock(return_value=response)
@@ -222,7 +246,9 @@ class TestAPIVersioningMiddlewareVersionHeaders:
             assert result.headers.get("API-Version") == "2.5.3"
 
     @pytest.mark.asyncio
-    async def test_dispatch_version_prefix_from_env(self, middleware, mock_request):
+    async def test_dispatch_version_prefix_from_env(
+        self, middleware: Any, mock_request: MagicMock
+    ) -> None:
         """Dispatch uses API_VERSION from environment."""
         response = JSONResponse({"status": "ok"})
         call_next = AsyncMock(return_value=response)
@@ -233,7 +259,9 @@ class TestAPIVersioningMiddlewareVersionHeaders:
             assert result.headers.get("API-Version-Prefix") == "v2"
 
     @pytest.mark.asyncio
-    async def test_dispatch_json_content_type_includes_version(self, middleware, mock_request):
+    async def test_dispatch_json_content_type_includes_version(
+        self, middleware: Any, mock_request: MagicMock
+    ) -> None:
         """Dispatch JSON Content-Type header includes version."""
         response = JSONResponse({"status": "ok"})
         call_next = AsyncMock(return_value=response)
@@ -249,7 +277,9 @@ class TestAPIVersioningMiddlewareEdgeCases:
     """Test edge cases and error conditions."""
 
     @pytest.mark.asyncio
-    async def test_dispatch_with_empty_response(self, middleware, mock_request):
+    async def test_dispatch_with_empty_response(
+        self, middleware: Any, mock_request: MagicMock
+    ) -> None:
         """Dispatch handles empty response."""
         response = Response(content="")
         call_next = AsyncMock(return_value=response)
@@ -259,7 +289,7 @@ class TestAPIVersioningMiddlewareEdgeCases:
         assert "API-Version" in result.headers
 
     @pytest.mark.asyncio
-    async def test_dispatch_with_different_paths(self, middleware):
+    async def test_dispatch_with_different_paths(self, middleware: Any) -> None:
         """Dispatch works with different request paths."""
         paths = ["/v1/sessions", "/v1/tasks", "/health", "/v2/users"]
 
@@ -276,7 +306,9 @@ class TestAPIVersioningMiddlewareEdgeCases:
             assert "API-Version" in result.headers
 
     @pytest.mark.asyncio
-    async def test_dispatch_with_existing_headers(self, middleware, mock_request):
+    async def test_dispatch_with_existing_headers(
+        self, middleware: Any, mock_request: MagicMock
+    ) -> None:
         """Dispatch preserves existing response headers."""
         response = JSONResponse({"status": "ok"})
         response.headers["X-Custom-Header"] = "custom-value"
@@ -288,7 +320,7 @@ class TestAPIVersioningMiddlewareEdgeCases:
         assert "API-Version" in result.headers
 
     @pytest.mark.asyncio
-    async def test_dispatch_multiple_calls_independent(self, middleware):
+    async def test_dispatch_multiple_calls_independent(self, middleware: Any) -> None:
         """Multiple dispatch calls are independent."""
         request1 = MagicMock(spec=Request)
         request1.url = MagicMock()

@@ -22,7 +22,7 @@ def mock_celery_task_decorator(
         return func
 
     if args and callable(args[0]):
-        return decorator(args[0])
+        return decorator(args[0])  # type: ignore[no-any-return]
     return decorator
 
 
@@ -119,7 +119,7 @@ class TestTaskRegistry:
     def test_get_task_function_invalid(self) -> None:
         """Test get_task_function with invalid task type."""
         with pytest.raises(ValueError, match="Unsupported task type"):
-            get_task_function("invalid_task")  # type: ignore[arg-type]
+            get_task_function("invalid_task")  # type: ignore
 
     def test_get_task_function_invalid_enum_value(self) -> None:
         """Test get_task_function with invalid enum value."""
@@ -130,7 +130,7 @@ class TestTaskRegistry:
 
         invalid_task = InvalidTaskType()
         with pytest.raises(ValueError, match="Unsupported task type"):
-            get_task_function(invalid_task)  # type: ignore[arg-type]
+            get_task_function(invalid_task)  # type: ignore
 
     def test_get_task_name_valid(self) -> None:
         """Test get_task_name with valid task type."""

@@ -10,7 +10,9 @@ class TestCreateDemoUser:
     @patch("app.create_demo_user.SessionLocal")
     @patch("app.create_demo_user.AuthManager")
     @patch("app.create_demo_user.User")
-    def test_create_demo_user_success(self, mock_user, mock_auth_manager, mock_session_local):
+    def test_create_demo_user_success(
+        self, mock_user: MagicMock, mock_auth_manager: MagicMock, mock_session_local: MagicMock
+    ) -> None:
         """Test successful demo user creation."""
         mock_db = MagicMock()
         mock_session_local.return_value = mock_db
@@ -31,8 +33,8 @@ class TestCreateDemoUser:
     @patch("app.create_demo_user.AuthManager")
     @patch("app.create_demo_user.User")
     def test_create_demo_user_existing_user_update_roles(
-        self, mock_user, mock_auth_manager, mock_session_local
-    ):
+        self, mock_user: MagicMock, mock_auth_manager: MagicMock, mock_session_local: MagicMock
+    ) -> None:
         """Test updating existing user with missing roles."""
         mock_db = MagicMock()
         mock_session_local.return_value = mock_db
@@ -51,8 +53,8 @@ class TestCreateDemoUser:
     @patch("app.create_demo_user.AuthManager")
     @patch("app.create_demo_user.User")
     def test_create_demo_user_existing_user_has_roles(
-        self, mock_user, mock_auth_manager, mock_session_local
-    ):
+        self, mock_user: MagicMock, mock_auth_manager: MagicMock, mock_session_local: MagicMock
+    ) -> None:
         """Test existing user already has required roles."""
         mock_db = MagicMock()
         mock_session_local.return_value = mock_db
@@ -70,8 +72,8 @@ class TestCreateDemoUser:
     @patch("app.create_demo_user.AuthManager")
     @patch("app.create_demo_user.User")
     def test_create_demo_user_database_error(
-        self, mock_user, mock_auth_manager, mock_session_local
-    ):
+        self, mock_user: MagicMock, mock_auth_manager: MagicMock, mock_session_local: MagicMock
+    ) -> None:
         """Test handling when database operation fails."""
         mock_db = MagicMock()
         mock_session_local.return_value = mock_db
@@ -87,7 +89,9 @@ class TestCreateDemoUser:
     @patch("app.create_demo_user.SessionLocal")
     @patch("app.create_demo_user.AuthManager")
     @patch("app.create_demo_user.User")
-    def test_create_demo_user_session_error(self, mock_user, mock_auth_manager, mock_session_local):
+    def test_create_demo_user_session_error(
+        self, mock_user: MagicMock, mock_auth_manager: MagicMock, mock_session_local: MagicMock
+    ) -> None:
         """Test handling when session creation fails."""
         mock_session_local.side_effect = Exception("Session error")
 
@@ -99,7 +103,9 @@ class TestCreateDemoUser:
     @patch("app.create_demo_user.SessionLocal")
     @patch("app.create_demo_user.AuthManager")
     @patch("app.create_demo_user.User")
-    def test_create_demo_user_query_error(self, mock_user, mock_auth_manager, mock_session_local):
+    def test_create_demo_user_query_error(
+        self, mock_user: MagicMock, mock_auth_manager: MagicMock, mock_session_local: MagicMock
+    ) -> None:
         """Test handling when query fails."""
         mock_db = MagicMock()
         mock_session_local.return_value = mock_db

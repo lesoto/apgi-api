@@ -5,7 +5,7 @@ Configures OpenTelemetry for distributed tracing across the application.
 """
 
 import logging
-from typing import Optional
+from typing import Any, Optional
 
 # Make OpenTelemetry imports conditional to handle compatibility issues
 try:
@@ -22,7 +22,7 @@ try:
 
     # Try to import JaegerExporter conditionally
     try:
-        from opentelemetry.exporter.jaeger.thrift import JaegerExporter  # type: ignore
+        from opentelemetry.exporter.jaeger.thrift import JaegerExporter
 
         JAEGER_EXPORTER_AVAILABLE = True
     except ImportError as jaeger_error:
@@ -48,7 +48,7 @@ def configure_distributed_tracing(
     otlp_endpoint: Optional[str] = None,
     enable_console_exporter: bool = False,
     sampling_rate: float = 1.0,
-):
+) -> None:
     """
     Configure distributed tracing with OpenTelemetry.
 
@@ -137,7 +137,7 @@ def configure_distributed_tracing(
         raise
 
 
-def _server_request_hook(span, scope):
+def _server_request_hook(span: Any, scope: Any) -> None:
     """Hook to add request-specific information to spans."""
     if span and span.is_recording():
         # Add route information
@@ -155,20 +155,20 @@ def _server_request_hook(span, scope):
                 span.set_attribute("user.username", getattr(user, "username", None))
 
 
-def _client_request_hook(span, method, url):
+def _client_request_hook(span: Any, method: str, url: Any) -> None:
     """Hook for client requests."""
     if span and span.is_recording():
         span.set_attribute("http.method", method)
         span.set_attribute("http.url", str(url))
 
 
-def _client_response_hook(span, response_headers, response_body):
+def _client_response_hook(span: Any, response_headers: Any, response_body: Any) -> None:
     """Hook for client responses."""
     if span and span.is_recording():
         span.set_attribute("http.response_complete", True)
 
 
-def instrument_application():
+def instrument_application() -> None:
     """
     Instrument the FastAPI application with OpenTelemetry.
 

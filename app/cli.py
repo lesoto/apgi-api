@@ -16,7 +16,7 @@ logger = logging.getLogger(__name__)
 
 @click.group(invoke_without_command=True)
 @click.pass_context
-def cli(ctx: click.Context):
+def cli(ctx: click.Context) -> None:
     """APGI API command-line interface."""
     if ctx.invoked_subcommand is None:
         click.echo(ctx.get_help())
@@ -26,7 +26,7 @@ def cli(ctx: click.Context):
 @cli.command()
 @click.option("--revision", "-r", default="head", help="Revision to upgrade to")
 @click.option("--verbose", "-v", is_flag=True, help="Enable verbose output")
-def migrate(revision: str, verbose: bool):
+def migrate(revision: str, verbose: bool) -> None:
     """
     Run database migrations.
 
@@ -57,7 +57,7 @@ def migrate(revision: str, verbose: bool):
 @click.option("--concurrency", "-c", default=1, help="Number of worker processes")
 @click.option("--loglevel", "-l", default="info", help="Logging level")
 @click.option("--hostname", "-n", help="Worker hostname")
-def worker(queues: str, concurrency: int, loglevel: str, hostname: str):
+def worker(queues: str, concurrency: int, loglevel: str, hostname: str) -> None:
     """
     Start Celery worker.
 
@@ -93,7 +93,7 @@ def worker(queues: str, concurrency: int, loglevel: str, hostname: str):
 @click.option("--tasks", "-T", default=50, help="Number of tasks to create")
 @click.option("--clear", "-c", is_flag=True, help="Clear existing test data first")
 @click.option("--verbose", "-v", is_flag=True, help="Enable verbose output")
-def seed(users: int, templates: int, sessions: int, tasks: int, clear: bool, verbose: bool):
+def seed(users: int, templates: int, sessions: int, tasks: int, clear: bool, verbose: bool) -> None:
     """
     Seed database with test data.
 
@@ -147,7 +147,7 @@ def seed(users: int, templates: int, sessions: int, tasks: int, clear: bool, ver
 
 @cli.command()
 @click.option("--confirm", is_flag=True, help="Confirm clearing of all test data")
-def clear_seed_data(confirm: bool):
+def clear_seed_data(confirm: bool) -> None:
     """
     Clear all seeded test data from database.
 

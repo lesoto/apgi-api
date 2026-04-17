@@ -18,7 +18,7 @@ from app.services.business_metrics import (
 
 
 @pytest.fixture
-def mock_cache():
+def mock_cache() -> MagicMock:
     cache = MagicMock()
     cache.get_query_result = AsyncMock(return_value=None)
     cache.set_query_result = AsyncMock(return_value=None)
@@ -26,13 +26,13 @@ def mock_cache():
 
 
 @pytest.fixture
-def service(mock_cache):
+def service(mock_cache: MagicMock) -> BusinessMetricsService:
     with patch("app.services.business_metrics.get_cache_service", return_value=mock_cache):
         svc = BusinessMetricsService()
     return svc
 
 
-def _make_mock_db():
+def _make_mock_db() -> MagicMock:
     """Build a mock DB that returns sensible scalar/all values."""
     db = MagicMock()
     # Default scalar returns 0
@@ -58,17 +58,17 @@ def _make_mock_db():
 
 
 class TestGenerateCacheKey:
-    def test_returns_string(self, service):
+    def test_returns_string(self, service: BusinessMetricsService) -> None:
         key = service._generate_cache_key("test_method", "arg1", kwarg1="val1")
         assert isinstance(key, str)
         assert len(key) == 32  # MD5 hex digest
 
-    def test_different_args_produce_different_keys(self, service):
+    def test_different_args_produce_different_keys(self, service: BusinessMetricsService) -> None:
         k1 = service._generate_cache_key("method", "a")
         k2 = service._generate_cache_key("method", "b")
         assert k1 != k2
 
-    def test_same_args_produce_same_key(self, service):
+    def test_same_args_produce_same_key(self, service: BusinessMetricsService) -> None:
         k1 = service._generate_cache_key("method", "a", x=1)
         k2 = service._generate_cache_key("method", "a", x=1)
         assert k1 == k2
@@ -81,20 +81,24 @@ class TestGenerateCacheKey:
 
 class TestGetCachedOrCompute:
     @pytest.mark.asyncio
-    async def test_returns_cached_value_when_available(self, service, mock_cache):
+    async def test_returns_cached_value_when_available(
+        self, service: BusinessMetricsService, mock_cache: MagicMock
+    ) -> None:
         mock_cache.get_query_result.return_value = {"cached": True}
         result = await service._get_cached_or_compute("key", lambda: {"fresh": True})
         assert result == {"cached": True}
 
     @pytest.mark.asyncio
-    async def test_computes_and_caches_when_no_cache(self, service, mock_cache):
+    async def test_computes_and_caches_when_no_cache(
+        self, service: BusinessMetricsService, mock_cache: MagicMock
+    ) -> None:
         mock_cache.get_query_result.return_value = None
         result = await service._get_cached_or_compute("key", lambda: {"computed": True})
         assert result == {"computed": True}
         mock_cache.set_query_result.assert_called_once()
 
     @pytest.mark.asyncio
-    async def test_works_without_cache_service(self):
+    async def test_works_without_cache_service(self) -> None:
         with patch("app.services.business_metrics.get_cache_service", return_value=None):
             svc = BusinessMetricsService()
         result = await svc._get_cached_or_compute("key", lambda: {"no_cache": True})
@@ -108,7 +112,9 @@ class TestGetCachedOrCompute:
 
 class TestGetOverviewMetrics:
     @pytest.mark.asyncio
-    async def test_returns_overview_dict(self, service, mock_cache):
+    async def test_returns_overview_dict(
+        self, service: BusinessMetricsService, mock_cache: MagicMock
+    ) -> None:
         mock_db = _make_mock_db()
         with patch("app.services.business_metrics.get_db_context") as mock_ctx:
             mock_ctx.return_value.__enter__.return_value = mock_db
@@ -126,7 +132,9 @@ class TestGetOverviewMetrics:
         assert "public_templates" in overview
 
     @pytest.mark.asyncio
-    async def test_metric_values_are_metric_value_instances(self, service, mock_cache):
+    async def test_metric_values_are_metric_value_instances(
+        self, service: BusinessMetricsService, mock_cache: MagicMock
+    ) -> None:
         mock_db = _make_mock_db()
         with patch("app.services.business_metrics.get_db_context") as mock_ctx:
             mock_ctx.return_value.__enter__.return_value = mock_db
@@ -136,7 +144,9 @@ class TestGetOverviewMetrics:
             assert isinstance(val, MetricValue), f"{key} should be MetricValue"
 
     @pytest.mark.asyncio
-    async def test_uses_cache_on_second_call(self, service, mock_cache):
+    async def test_uses_cache_on_second_call(
+        self, service: BusinessMetricsService, mock_cache: MagicMock
+    ) -> None:
         mock_db = _make_mock_db()
         cached_result: Dict[str, Any] = {"overview": {}}
         mock_cache.get_query_result.return_value = cached_result
@@ -145,7 +155,9 @@ class TestGetOverviewMetrics:
         assert result == cached_result
 
     @pytest.mark.asyncio
-    async def test_task_completion_rate_zero_when_no_tasks(self, service, mock_cache):
+    async def test_task_completion_rate_zero_when_no_tasks(
+        self, service: BusinessMetricsService, mock_cache: MagicMock
+    ) -> None:
         mock_db = _make_mock_db()
         # total_tasks = 0, completed_tasks = 0
         mock_db.query.return_value.scalar.return_value = 0
@@ -165,7 +177,7 @@ class TestGetOverviewMetrics:
 
 
 class TestGetSessionMetrics:
-    def test_returns_session_metrics_dict(self, service):
+    def test_returns_session_metrics_dict(self, service: BusinessMetricsService) -> None:
         mock_db = _make_mock_db()
         with patch("app.services.business_metrics.get_db_context") as mock_ctx:
             mock_ctx.return_value.__enter__.return_value = mock_db
@@ -175,7 +187,7 @@ class TestGetSessionMetrics:
         assert "template_usage_rate" in result
         assert "session_timeline" in result
 
-    def test_template_usage_rate_is_metric_value(self, service):
+    def test_template_usage_rate_is_metric_value(self, service: BusinessMetricsService) -> None:
         mock_db = _make_mock_db()
         with patch("app.services.business_metrics.get_db_context") as mock_ctx:
             mock_ctx.return_value.__enter__.return_value = mock_db
@@ -183,7 +195,7 @@ class TestGetSessionMetrics:
 
         assert isinstance(result["template_usage_rate"], MetricValue)
 
-    def test_session_timeline_is_list(self, service):
+    def test_session_timeline_is_list(self, service: BusinessMetricsService) -> None:
         mock_db = _make_mock_db()
         with patch("app.services.business_metrics.get_db_context") as mock_ctx:
             mock_ctx.return_value.__enter__.return_value = mock_db
@@ -191,7 +203,9 @@ class TestGetSessionMetrics:
 
         assert isinstance(result["session_timeline"], list)
 
-    def test_template_usage_rate_zero_when_no_sessions(self, service):
+    def test_template_usage_rate_zero_when_no_sessions(
+        self, service: BusinessMetricsService
+    ) -> None:
         mock_db = _make_mock_db()
         mock_db.query.return_value.filter.return_value.scalar.return_value = 0
 
@@ -208,7 +222,7 @@ class TestGetSessionMetrics:
 
 
 class TestGetTaskMetrics:
-    def test_returns_task_metrics_dict(self, service):
+    def test_returns_task_metrics_dict(self, service: BusinessMetricsService) -> None:
         mock_db = _make_mock_db()
         with patch("app.services.business_metrics.get_db_context") as mock_ctx:
             mock_ctx.return_value.__enter__.return_value = mock_db
@@ -219,7 +233,7 @@ class TestGetTaskMetrics:
         assert "average_durations" in result
         assert "task_timeline" in result
 
-    def test_task_timeline_is_list(self, service):
+    def test_task_timeline_is_list(self, service: BusinessMetricsService) -> None:
         mock_db = _make_mock_db()
         with patch("app.services.business_metrics.get_db_context") as mock_ctx:
             mock_ctx.return_value.__enter__.return_value = mock_db
@@ -227,7 +241,7 @@ class TestGetTaskMetrics:
 
         assert isinstance(result["task_timeline"], list)
 
-    def test_distributions_are_dicts(self, service):
+    def test_distributions_are_dicts(self, service: BusinessMetricsService) -> None:
         mock_db = _make_mock_db()
         with patch("app.services.business_metrics.get_db_context") as mock_ctx:
             mock_ctx.return_value.__enter__.return_value = mock_db
@@ -244,7 +258,7 @@ class TestGetTaskMetrics:
 
 
 class TestGetUserMetrics:
-    def test_returns_user_metrics_dict(self, service):
+    def test_returns_user_metrics_dict(self, service: BusinessMetricsService) -> None:
         mock_db = _make_mock_db()
         with patch("app.services.business_metrics.get_db_context") as mock_ctx:
             mock_ctx.return_value.__enter__.return_value = mock_db
@@ -254,7 +268,7 @@ class TestGetUserMetrics:
         assert "user_logins_timeline" in result
         assert "users_by_role" in result
 
-    def test_timelines_are_lists(self, service):
+    def test_timelines_are_lists(self, service: BusinessMetricsService) -> None:
         mock_db = _make_mock_db()
         with patch("app.services.business_metrics.get_db_context") as mock_ctx:
             mock_ctx.return_value.__enter__.return_value = mock_db
@@ -270,7 +284,7 @@ class TestGetUserMetrics:
 
 
 class TestGetTemplateMetrics:
-    def test_returns_template_metrics_dict(self, service):
+    def test_returns_template_metrics_dict(self, service: BusinessMetricsService) -> None:
         mock_db = _make_mock_db()
         with patch("app.services.business_metrics.get_db_context") as mock_ctx:
             mock_ctx.return_value.__enter__.return_value = mock_db
@@ -279,7 +293,7 @@ class TestGetTemplateMetrics:
         assert "most_used_templates" in result
         assert "templates_by_user" in result
 
-    def test_most_used_templates_is_list(self, service):
+    def test_most_used_templates_is_list(self, service: BusinessMetricsService) -> None:
         mock_db = _make_mock_db()
         with patch("app.services.business_metrics.get_db_context") as mock_ctx:
             mock_ctx.return_value.__enter__.return_value = mock_db
@@ -296,7 +310,7 @@ class TestGetTemplateMetrics:
 
 class TestGetDashboardData:
     @pytest.mark.asyncio
-    async def test_returns_all_sections(self, service):
+    async def test_returns_all_sections(self, service: BusinessMetricsService) -> None:
         mock_db = _make_mock_db()
         with (
             patch("app.services.business_metrics.get_db_context") as mock_ctx,
@@ -315,7 +329,7 @@ class TestGetDashboardData:
         assert result["time_range_days"] == 30
 
     @pytest.mark.asyncio
-    async def test_generated_at_is_datetime(self, service):
+    async def test_generated_at_is_datetime(self, service: BusinessMetricsService) -> None:
         mock_db = _make_mock_db()
         with (
             patch("app.services.business_metrics.get_db_context") as mock_ctx,
@@ -334,7 +348,7 @@ class TestGetDashboardData:
 
 
 class TestMetricValue:
-    def test_basic_creation(self):
+    def test_basic_creation(self) -> None:
         mv = MetricValue(value=42, label="Test", description="A test metric")
         assert mv.value == 42
         assert mv.label == "Test"
@@ -342,7 +356,7 @@ class TestMetricValue:
         assert mv.unit is None
         assert mv.change_percentage is None
 
-    def test_with_optional_fields(self):
+    def test_with_optional_fields(self) -> None:
         mv = MetricValue(
             value=99.5, label="Rate", description="Rate metric", unit="%", change_percentage=5.2
         )
@@ -351,11 +365,11 @@ class TestMetricValue:
 
 
 class TestTimeSeriesPoint:
-    def test_basic_creation(self):
+    def test_basic_creation(self) -> None:
         ts = TimeSeriesPoint(timestamp=datetime.now(timezone.utc), value=1.5)
         assert ts.value == 1.5
         assert ts.label is None
 
-    def test_with_label(self):
+    def test_with_label(self) -> None:
         ts = TimeSeriesPoint(timestamp=datetime.now(timezone.utc), value=10.0, label="10 items")
         assert ts.label == "10 items"

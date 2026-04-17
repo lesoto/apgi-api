@@ -8,11 +8,15 @@ for task management, dependency handling, and Celery submission.
 import logging
 from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from app.services.task_execution.dependency_manager import DependencyManager
 
 try:
     from celery.result import AsyncResult
 except ImportError:  # pragma: no cover
-    AsyncResult = None  # type: ignore
+    AsyncResult = None
 
 from app.celery_app import celery_app
 from app.database.connection import get_db_context
@@ -37,7 +41,7 @@ class TaskExecutor:
     def __init__(self) -> None:
         """Initialize the task executor with its component strategies."""
         self.strategy_registry = get_task_strategy_registry()
-        self.dependency_manager = DependencyManager()
+        self.dependency_manager: DependencyManager = DependencyManager()
         self.task_submitter = TaskSubmitter()
 
         # Map of task types to Celery task names (used by TaskSubmitter)

@@ -3,6 +3,7 @@ Root conftest.py — sets all required environment variables BEFORE any app impo
 registers Hypothesis profiles, and provides shared SQLite in-memory fixtures.
 """
 
+from typing import Any, Callable, Generator
 import os
 
 # ── Environment variables ────────────────────────────────────────────────────
@@ -60,7 +61,7 @@ import pytest
 
 
 @pytest.fixture
-def reset_logging():
+def reset_logging() -> Generator[None, None, None]:
     """Reset logging configuration to prevent LogRecord conflicts.
 
     Use this fixture only when necessary, as it interferes with caplog.
@@ -115,13 +116,15 @@ apgi_modules = {
 
 # Mock other problematic dependencies
 # Create a custom Celery mock that returns actual decorated functions
-def mock_celery_task_decorator(*args, bind=False, base=None, name=None, **kwargs):
+def mock_celery_task_decorator(
+    *args: Any, bind: bool = False, base: Any = None, name: str | None = None, **kwargs: Any
+) -> Callable[..., Any]:
     """Mock decorator that returns the actual function being decorated."""
 
-    def decorator(func):
-        func.name = name or func.__name__
-        func.bind = bind
-        func.base = base
+    def decorator(func: Callable[..., Any]) -> Callable[..., Any]:
+        func.name = name or func.__name__  # type: ignore[attr-defined]
+        func.bind = bind  # type: ignore[attr-defined]
+        func.base = base  # type: ignore[attr-defined]
         return func
 
     if args and callable(args[0]):
@@ -139,16 +142,23 @@ class MockCeleryTask:
 class MockCelery:
     """Mock Celery class that returns actual decorated functions."""
 
-    def __init__(self, *args, **kwargs):
+    def __init__(self, *args: Any, **kwargs: Any) -> None:
         self.conf = MagicMock()
         self.conf.task_routes = {}
         self.conf.beat_schedule = {}
         self.conf.update = MagicMock()
-        self.tasks = {}  # Add tasks registry
+        self.tasks: dict[str, Any] = {}  # Add tasks registry
         self.send_task = MagicMock()
         self.control = MagicMock()  # Add control for revoke, etc.
 
-    def task(self, *args, bind=False, base=None, name=None, **kwargs):
+    def task(
+        self,
+        *args: Any,
+        bind: bool = False,
+        base: Any = None,
+        name: str | None = None,
+        **kwargs: Any,
+    ) -> Callable[..., Any]:
         """Return actual decorated function."""
         return mock_celery_task_decorator(*args, bind=bind, base=base, name=name, **kwargs)
 
@@ -188,7 +198,7 @@ _TEST_DATABASE_URL = "sqlite:///:memory:"
 
 
 @pytest.fixture(scope="function")
-def test_db_engine():
+def test_db_engine() -> Generator[Any, None, None]:
     """SQLite in-memory engine, one per test function."""
     engine = create_engine(
         _TEST_DATABASE_URL,
@@ -200,7 +210,7 @@ def test_db_engine():
 
 
 @pytest.fixture(scope="function")
-def test_db_session(test_db_engine):
+def test_db_session(test_db_engine: Any) -> Generator[Any, None, None]:
     """SQLAlchemy session bound to the in-memory SQLite engine."""
     Session = sessionmaker(autocommit=False, autoflush=False, bind=test_db_engine)
     session = Session()
@@ -211,7 +221,7 @@ def test_db_session(test_db_engine):
 
 
 @pytest.fixture
-def test_environment():
+def test_environment() -> Generator[dict[str, str], None, None]:
     """Set test environment variables."""
     original_env = {}
     test_vars = {
@@ -238,7 +248,7 @@ def test_environment():
 
 
 @pytest.fixture
-def mock_database_connection():
+def mock_database_connection() -> Generator[tuple[Any, Any, Any], None, None]:
     """Mock database connection for tests that don't need actual DB."""
     with (
         patch("app.database.connection.engine") as mock_engine,

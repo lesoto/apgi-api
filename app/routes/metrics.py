@@ -7,7 +7,7 @@ Endpoints for exposing Prometheus metrics and business dashboard metrics.
 from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.responses import HTMLResponse
 from starlette.responses import Response as StarletteResponse
-from typing import Optional
+from typing import Any, Optional
 import json
 import logging
 import html
@@ -66,7 +66,7 @@ async def metrics_endpoint() -> StarletteResponse:
 )
 async def get_dashboard_overview(
     service: BusinessMetricsService = Depends(get_business_metrics_service),
-):
+) -> dict[str, Any]:
     """
     Get dashboard overview metrics.
 
@@ -91,7 +91,7 @@ async def get_dashboard_overview(
 )
 async def get_dashboard_sessions(
     days: int = 30, service: BusinessMetricsService = Depends(get_business_metrics_service)
-):
+) -> dict[str, Any]:
     """
     Get session metrics for dashboard.
 
@@ -125,7 +125,7 @@ async def get_dashboard_sessions(
 )
 async def get_dashboard_tasks(
     days: int = 30, service: BusinessMetricsService = Depends(get_business_metrics_service)
-):
+) -> dict[str, Any]:
     """
     Get task metrics for dashboard.
 
@@ -159,7 +159,7 @@ async def get_dashboard_tasks(
 )
 async def get_dashboard_users(
     days: int = 30, service: BusinessMetricsService = Depends(get_business_metrics_service)
-):
+) -> dict[str, Any]:
     """
     Get user metrics for dashboard.
 
@@ -193,7 +193,7 @@ async def get_dashboard_users(
 )
 async def get_dashboard_templates(
     days: int = 30, service: BusinessMetricsService = Depends(get_business_metrics_service)
-):
+) -> dict[str, Any]:
     """
     Get template metrics for dashboard.
 
@@ -227,7 +227,7 @@ async def get_dashboard_templates(
 )
 async def get_complete_dashboard(
     days: int = 30, service: BusinessMetricsService = Depends(get_business_metrics_service)
-):
+) -> dict[str, Any]:
     """
     Get complete dashboard data.
 
@@ -278,7 +278,7 @@ async def get_complete_dashboard(
 )
 async def get_dashboard_html(
     days: int = 30, service: BusinessMetricsService = Depends(get_business_metrics_service)
-):
+) -> HTMLResponse:
     """
     Get HTML dashboard interface for API analytics.
 
@@ -459,7 +459,9 @@ async def get_dashboard_html(
     description="Start collecting detailed memory usage information",
     dependencies=[Depends(require_permission(Permission.SYSTEM_ADMIN))],
 )
-async def start_memory_tracing(service: ProfilingService = Depends(get_profiling_service)):
+async def start_memory_tracing(
+    service: ProfilingService = Depends(get_profiling_service),
+) -> dict[str, str]:
     """
     Start memory tracing for performance analysis.
 
@@ -483,7 +485,9 @@ async def start_memory_tracing(service: ProfilingService = Depends(get_profiling
     description="Stop collecting detailed memory usage information",
     dependencies=[Depends(require_permission(Permission.SYSTEM_ADMIN))],
 )
-async def stop_memory_tracing(service: ProfilingService = Depends(get_profiling_service)):
+async def stop_memory_tracing(
+    service: ProfilingService = Depends(get_profiling_service),
+) -> dict[str, str]:
     """
     Stop memory tracing.
 
@@ -507,7 +511,7 @@ async def stop_memory_tracing(service: ProfilingService = Depends(get_profiling_
     description="Retrieve current memory usage and allocation details",
     dependencies=[Depends(require_permission(Permission.DATA_READ))],
 )
-async def get_memory_snapshot(service: ProfilingService = Depends(get_profiling_service)):
+async def get_memory_snapshot(service: ProfilingService = Depends(get_profiling_service)) -> Any:
     """
     Get current memory usage snapshot.
 
@@ -530,7 +534,7 @@ async def get_memory_snapshot(service: ProfilingService = Depends(get_profiling_
     description="Retrieve current system performance metrics (CPU, memory, threads)",
     dependencies=[Depends(require_permission(Permission.DATA_READ))],
 )
-async def get_system_performance(service: ProfilingService = Depends(get_profiling_service)):
+async def get_system_performance(service: ProfilingService = Depends(get_profiling_service)) -> Any:
     """
     Get current system performance metrics.
 
@@ -555,7 +559,7 @@ async def get_system_performance(service: ProfilingService = Depends(get_profili
 )
 async def get_performance_history(
     hours: int = 1, service: ProfilingService = Depends(get_profiling_service)
-):
+) -> Any:
     """
     Get performance history for the specified time period.
 
@@ -587,7 +591,9 @@ async def get_performance_history(
     description="Analyze performance data to identify bottlenecks and recommendations",
     dependencies=[Depends(require_permission(Permission.DATA_READ))],
 )
-async def get_bottleneck_analysis(service: ProfilingService = Depends(get_profiling_service)):
+async def get_bottleneck_analysis(
+    service: ProfilingService = Depends(get_profiling_service),
+) -> Any:
     """
     Get performance bottleneck analysis.
 

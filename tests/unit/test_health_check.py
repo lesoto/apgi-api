@@ -12,26 +12,28 @@ class TestHealthCheckService:
     """Test health check service functionality."""
 
     @pytest.fixture
-    def mock_redis_client(self):
+    def mock_redis_client(self) -> AsyncMock:
         """Create a mock Redis client."""
         client = AsyncMock(spec=redis.Redis)
         client.ping = AsyncMock(return_value=True)
         return client
 
     @pytest.fixture
-    def health_service(self, mock_redis_client):
+    def health_service(self, mock_redis_client: AsyncMock) -> HealthCheckService:
         """Create health check service with mock dependencies."""
         return HealthCheckService(mock_redis_client)
 
-    async def test_init(self, mock_redis_client):
+    async def test_init(self, mock_redis_client: AsyncMock) -> None:
         """Test service initialization."""
         service = HealthCheckService(mock_redis_client)
         assert service.redis_client is mock_redis_client
 
-    async def test_perform_readiness_check_success(self, health_service):
+    async def test_perform_readiness_check_success(
+        self, health_service: HealthCheckService
+    ) -> None:
         """Test successful readiness check."""
         # Mock Redis ping to return quickly
-        health_service.redis_client.ping.return_value = True
+        health_service.redis_client.ping.return_value = True  # type: ignore[attr-defined]
 
         with patch("app.database.connection.engine") as mock_engine:
             mock_conn = MagicMock()  # Use MagicMock for sync connections
@@ -50,15 +52,17 @@ class TestHealthCheckService:
         assert result["dependencies"]["redis"]["status"] == "ready"
         assert result["dependencies"]["database"]["status"] == "ready"
 
-    async def test_perform_readiness_check_redis_slow(self, health_service):
+    async def test_perform_readiness_check_redis_slow(
+        self, health_service: HealthCheckService
+    ) -> None:
         """Test readiness check with slow Redis response."""
 
         # Mock Redis ping to be slow
-        async def slow_ping():
+        async def slow_ping() -> bool:
             await asyncio.sleep(0.2)  # 200ms delay
             return True
 
-        health_service.redis_client.ping = slow_ping
+        health_service.redis_client.ping = slow_ping  # type: ignore[assignment,method-assign]
 
         with patch("app.database.connection.engine") as mock_engine:
             mock_conn = MagicMock()  # Use MagicMock for sync connections
@@ -72,9 +76,11 @@ class TestHealthCheckService:
         assert result["status"] == "not_ready"
         assert result["dependencies"]["redis"]["status"] == "degraded"
 
-    async def test_perform_readiness_check_redis_error(self, health_service):
+    async def test_perform_readiness_check_redis_error(
+        self, health_service: HealthCheckService
+    ) -> None:
         """Test readiness check with Redis error."""
-        health_service.redis_client.ping.side_effect = Exception("Redis connection failed")
+        health_service.redis_client.ping.side_effect = Exception("Redis connection failed")  # type: ignore[attr-defined]
 
         with patch("app.database.connection.engine") as mock_engine:
             mock_conn = MagicMock()  # Use MagicMock for sync connections
@@ -87,10 +93,10 @@ class TestHealthCheckService:
         assert result["status"] == "not_ready"
         assert result["dependencies"]["redis"]["status"] == "not_ready"
 
-    async def test_perform_health_check_success(self, health_service):
+    async def test_perform_health_check_success(self, health_service: HealthCheckService) -> None:
         """Test comprehensive health check with all dependencies healthy."""
         # Mock Redis
-        health_service.redis_client.ping.return_value = True
+        health_service.redis_client.ping.return_value = True  # type: ignore[attr-defined]
 
         with patch("app.database.connection.engine") as mock_engine:
             # Mock both database connections
@@ -121,9 +127,11 @@ class TestHealthCheckService:
         assert result["dependencies"]["database"]["status"] == "healthy"
         assert result["dependencies"]["celery"]["status"] == "healthy"
 
-    async def test_perform_health_check_redis_error(self, health_service):
+    async def test_perform_health_check_redis_error(
+        self, health_service: HealthCheckService
+    ) -> None:
         """Test comprehensive health check with Redis error."""
-        health_service.redis_client.ping.side_effect = Exception("Redis connection failed")
+        health_service.redis_client.ping.side_effect = Exception("Redis connection failed")  # type: ignore[attr-defined]
 
         with patch("app.database.connection.engine") as mock_engine:
             mock_conn = MagicMock()  # Use MagicMock for sync connections
@@ -136,9 +144,11 @@ class TestHealthCheckService:
         assert result["status"] == "unhealthy"
         assert result["dependencies"]["redis"]["status"] == "unhealthy"
 
-    async def test_perform_health_check_database_error(self, health_service):
+    async def test_perform_health_check_database_error(
+        self, health_service: HealthCheckService
+    ) -> None:
         """Test comprehensive health check with database error."""
-        health_service.redis_client.ping.return_value = True
+        health_service.redis_client.ping.return_value = True  # type: ignore[attr-defined]
 
         with patch("app.database.connection.engine") as mock_engine:
             mock_conn = MagicMock()  # Use MagicMock for sync connections

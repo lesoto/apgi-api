@@ -5,12 +5,14 @@ API endpoints for executing and managing experimental tasks.
 """
 
 import logging
-from typing import Optional
+from typing import Any, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, status, Request
 from starlette.responses import Response as StarletteResponse, JSONResponse
+from sqlalchemy.orm import Session
 
 from app.database.connection import get_db
+from app.services.task_executor import TaskExecutor
 from app.database.models import Task as TaskModel, Session as SessionModel
 from app.database.models import TaskDependency as TaskDependencyModel
 from app.models.schemas import (
@@ -27,8 +29,8 @@ from app.services.authorization import (
     Permission,
     require_permission,
     get_current_user,
+    TokenPayload,
 )
-from app.services.task_executor import TaskExecutor
 
 logger = logging.getLogger(__name__)
 
@@ -72,8 +74,9 @@ def init_task_routes() -> None:
     dependencies=[Depends(require_permission(Permission.TASK_READ))],
 )
 async def list_tasks(
-    executor: TaskExecutor = Depends(get_task_executor), current_user=Depends(get_current_user)
-):
+    executor: TaskExecutor = Depends(get_task_executor),
+    current_user: TokenPayload = Depends(get_current_user),
+) -> TaskListResponse:
     """
     List all available experimental tasks.
 
@@ -107,8 +110,8 @@ async def execute_task(
     session_id: str,
     request: TaskSubmitRequest,
     executor: TaskExecutor = Depends(get_task_executor),
-    current_user=Depends(get_current_user),
-):
+    current_user: TokenPayload = Depends(get_current_user),
+) -> TaskSubmitResponse:
     """
     Execute experimental task on a session.
 
@@ -165,8 +168,8 @@ async def get_task_status(
     request: Request,
     task_id: str,
     executor: TaskExecutor = Depends(get_task_executor),
-    current_user=Depends(get_current_user),
-):
+    current_user: TokenPayload = Depends(get_current_user),
+) -> TaskStatusResponse | StarletteResponse:
     """
     Get task status and results.
 
@@ -243,9 +246,9 @@ async def get_task_status(
 )
 async def get_task_result(
     task_id: str,
-    db=Depends(get_db),
-    current_user=Depends(get_current_user),
-):
+    db: Session = Depends(get_db),
+    current_user: TokenPayload = Depends(get_current_user),
+) -> TaskResultResponse:
     """
     Get task result.
 
@@ -292,7 +295,7 @@ async def get_task_result(
 
         return TaskResultResponse(
             task_id=task_id,
-            result=task.result_data,
+            result=task.result_data,  # type: ignore[arg-type]
         )
 
     except HTTPException:
@@ -315,10 +318,10 @@ async def get_task_result(
 async def cancel_task_in_session(
     session_id: str,
     task_id: str,
-    db=Depends(get_db),
+    db: Session = Depends(get_db),
     executor: TaskExecutor = Depends(get_task_executor),
-    current_user=Depends(get_current_user),
-):
+    current_user: TokenPayload = Depends(get_current_user),
+) -> dict[str, Any]:
     """
     Cancel a running task in a specific session.
 
@@ -397,8 +400,8 @@ async def cancel_task_in_session(
 async def cancel_task(
     task_id: str,
     executor: TaskExecutor = Depends(get_task_executor),
-    current_user=Depends(get_current_user),
-):
+    current_user: TokenPayload = Depends(get_current_user),
+) -> dict[str, Any]:
     """
     Cancel a running task.
 
@@ -448,9 +451,9 @@ async def cancel_task(
 async def create_task_dependency(
     task_id: str,
     request: TaskDependencyCreateRequest,
-    db=Depends(get_db),
-    current_user=Depends(get_current_user),
-):
+    db: Session = Depends(get_db),
+    current_user: TokenPayload = Depends(get_current_user),
+) -> TaskDependencyResponse:
     """
     Create a task dependency.
 
@@ -593,9 +596,9 @@ async def create_task_dependency(
 )
 async def list_task_dependencies(
     task_id: str,
-    db=Depends(get_db),
-    current_user=Depends(get_current_user),
-):
+    db: Session = Depends(get_db),
+    current_user: TokenPayload = Depends(get_current_user),
+) -> list[TaskDependencyResponse]:
     """
     List task dependencies.
 
@@ -631,11 +634,11 @@ async def list_task_dependencies(
 
         return [
             TaskDependencyResponse(
-                id=dep.id,
-                dependent_task_id=dep.dependent_task_id,
-                prerequisite_task_id=dep.prerequisite_task_id,
-                dependency_type=dep.dependency_type,
-                created_at=dep.created_at,
+                id=dep.id,  # type: ignore[arg-type]
+                dependent_task_id=dep.dependent_task_id,  # type: ignore[arg-type]
+                prerequisite_task_id=dep.prerequisite_task_id,  # type: ignore[arg-type]
+                dependency_type=dep.dependency_type,  # type: ignore[arg-type]
+                created_at=dep.created_at,  # type: ignore[arg-type]
             )
             for dep in dependencies
         ]
@@ -660,9 +663,9 @@ async def list_task_dependencies(
 async def delete_task_dependency(
     task_id: str,
     dependency_id: int,
-    db=Depends(get_db),
-    current_user=Depends(get_current_user),
-):
+    db: Session = Depends(get_db),
+    current_user: TokenPayload = Depends(get_current_user),
+) -> None:
     """
     Delete a task dependency.
 

@@ -13,7 +13,7 @@ from app.database.models import TaskStatus
 class TestTaskExecutor:
     """Test task executor functionality."""
 
-    def test_task_map_exists(self):
+    def test_task_map_exists(self) -> None:
         """Test that TASK_MAP is properly defined."""
         assert hasattr(TaskExecutor, "TASK_MAP")
         assert "iowa_gambling" in TaskExecutor.TASK_MAP
@@ -22,21 +22,21 @@ class TestTaskExecutor:
         assert "change_blindness" in TaskExecutor.TASK_MAP
         assert "binocular_rivalry" in TaskExecutor.TASK_MAP
 
-    def test_allowed_task_types(self):
+    def test_allowed_task_types(self) -> None:
         """Test that ALLOWED_TASK_TYPES is properly defined."""
         assert hasattr(TaskExecutor, "ALLOWED_TASK_TYPES")
         assert "iowa_gambling" in TaskExecutor.ALLOWED_TASK_TYPES
         assert "masking_paradigm" in TaskExecutor.ALLOWED_TASK_TYPES
         assert len(TaskExecutor.ALLOWED_TASK_TYPES) == 5
 
-    def test_task_info_exists(self):
+    def test_task_info_exists(self) -> None:
         """Test that TASK_INFO is properly defined."""
         assert hasattr(TaskExecutor, "TASK_INFO")
         assert "iowa_gambling" in TaskExecutor.TASK_INFO
         assert TaskExecutor.TASK_INFO["iowa_gambling"]["name"] == "Iowa Gambling Task"
         assert "parameters" in TaskExecutor.TASK_INFO["iowa_gambling"]
 
-    async def test_list_available_tasks(self):
+    async def test_list_available_tasks(self) -> None:
         """Test listing available tasks."""
         task_executor = TaskExecutor()
         result = await task_executor.list_available_tasks()
@@ -47,7 +47,7 @@ class TestTaskExecutor:
         assert "Iowa Gambling Task" in task_names
         assert "Masking Paradigm Task" in task_names
 
-    async def test_submit_task_success(self):
+    async def test_submit_task_success(self) -> None:
         """Test successful task submission."""
         session_id = "session123"
         task_type = "iowa_gambling"
@@ -78,7 +78,7 @@ class TestTaskExecutor:
         except ValueError:
             pytest.fail("Result is not a valid UUID string")
 
-    async def test_submit_task_invalid_type(self):
+    async def test_submit_task_invalid_type(self) -> None:
         """Test task submission with invalid task type."""
         session_id = "session123"
         task_type = "invalid_task"
@@ -89,7 +89,7 @@ class TestTaskExecutor:
         with pytest.raises(ValueError, match="Invalid task type"):
             await task_executor.submit_task(session_id, task_type, parameters, user_id)
 
-    async def test_submit_task_dependency_cycle(self):
+    async def test_submit_task_dependency_cycle(self) -> None:
         """Test task submission with dependency cycle detection via TaskDependency table."""
         session_id = "session123"
         task_type = "iowa_gambling"
@@ -118,7 +118,7 @@ class TestTaskExecutor:
                 with pytest.raises(ValueError, match="Task dependency cycle detected"):
                     await task_executor.submit_task(session_id, task_type, parameters, user_id)
 
-    def test_has_cycle_detection(self):
+    def test_has_cycle_detection(self) -> None:
         """Test cycle detection in dependencies via TaskDependency table."""
         task_executor = TaskExecutor()
         # Simple cycle: A -> B -> A
@@ -150,7 +150,7 @@ class TestTaskExecutor:
 
         assert has_cycle is True
 
-    def test_no_cycle_detection(self):
+    def test_no_cycle_detection(self) -> None:
         """Test no cycle in dependencies via TaskDependency table."""
         task_executor = TaskExecutor()
         # Simple chain: A -> B -> C (no cycle)

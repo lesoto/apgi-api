@@ -9,7 +9,7 @@ from datetime import datetime, timezone
 
 
 @pytest.fixture
-def mock_db():
+def mock_db() -> MagicMock:
     """Mock database session."""
     db = MagicMock()
     db.execute = MagicMock()
@@ -23,7 +23,7 @@ def mock_db():
 
 
 @pytest.fixture
-def mock_current_user():
+def mock_current_user() -> Mock:
     """Mock current user."""
     user = Mock()
     user.user_id = "user123"
@@ -33,7 +33,7 @@ def mock_current_user():
 
 
 @pytest.fixture
-def mock_order():
+def mock_order() -> MagicMock:
     """Mock order."""
     order = MagicMock()
     order.order_id = "order123"
@@ -48,7 +48,7 @@ def mock_order():
 
 
 @pytest.fixture
-def mock_subscription():
+def mock_subscription() -> MagicMock:
     """Mock subscription."""
     subscription = MagicMock()
     subscription.subscription_id = "sub123"
@@ -68,8 +68,8 @@ class TestPaymentsIntegration:
     @patch("app.routes.payments.stripe")
     async def test_create_payment_intent_success(
         self,
-        mock_stripe,
-    ):
+        mock_stripe: MagicMock,
+    ) -> None:
         """Test successful payment intent creation."""
         # Mock Stripe response
         mock_payment_intent = MagicMock()
@@ -96,8 +96,8 @@ class TestPaymentsIntegration:
     @patch("app.routes.payments.stripe")
     async def test_create_payment_intent_invalid_product(
         self,
-        mock_stripe,
-    ):
+        mock_stripe: MagicMock,
+    ) -> None:
         """Test payment intent creation with invalid product."""
         from app.routes.payments import (
             create_payment_intent,
@@ -118,8 +118,8 @@ class TestPaymentsIntegration:
     @patch("app.routes.payments.stripe")
     async def test_create_payment_intent_stripe_error(
         self,
-        mock_stripe,
-    ):
+        mock_stripe: MagicMock,
+    ) -> None:
         """Test payment intent creation with Stripe error."""
         mock_stripe.PaymentIntent.create.side_effect = Exception("Stripe API error")
 
@@ -142,11 +142,11 @@ class TestPaymentsIntegration:
     @patch("app.routes.payments.get_db")
     async def test_webhook_payment_success(
         self,
-        mock_get_db,
-        mock_stripe,
-        mock_db,
-        mock_order,
-    ):
+        mock_get_db: MagicMock,
+        mock_stripe: MagicMock,
+        mock_db: MagicMock,
+        mock_order: MagicMock,
+    ) -> None:
         """Test successful payment webhook handling."""
         mock_get_db.return_value = mock_db
 
@@ -186,11 +186,11 @@ class TestPaymentsIntegration:
     @patch("app.routes.payments.get_db")
     async def test_webhook_payment_failed(
         self,
-        mock_get_db,
-        mock_stripe,
-        mock_db,
-        mock_order,
-    ):
+        mock_get_db: MagicMock,
+        mock_stripe: MagicMock,
+        mock_db: MagicMock,
+        mock_order: MagicMock,
+    ) -> None:
         """Test failed payment webhook handling."""
         mock_get_db.return_value = mock_db
 
@@ -223,10 +223,10 @@ class TestPaymentsIntegration:
     @patch("app.routes.payments.get_db")
     async def test_webhook_invalid_signature(
         self,
-        mock_get_db,
-        mock_stripe,
-        mock_db,
-    ):
+        mock_get_db: MagicMock,
+        mock_stripe: MagicMock,
+        mock_db: MagicMock,
+    ) -> None:
         """Test webhook with invalid signature."""
         mock_get_db.return_value = mock_db
 

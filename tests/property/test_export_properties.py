@@ -7,7 +7,7 @@ and content-type headers.
 """
 
 import json
-from typing import cast, Dict, Optional, Any
+from typing import cast, Dict, Optional, Any, Tuple
 from hypothesis import given, strategies as st, assume, settings
 from unittest.mock import Mock, AsyncMock
 import sys
@@ -27,17 +27,17 @@ from app.services.data_export import DataExportService
 # ============================================================================
 
 
-def create_export_endpoint():
+def create_export_endpoint() -> Tuple[FastAPI, Dict[str, Optional[Mock]]]:
     """Create a test FastAPI app with a single export endpoint."""
     app = FastAPI()
 
     # Global mock service that tests can override
-    mock_service_holder: Dict[str, Optional[Any]] = {"service": None}
+    mock_service_holder: Dict[str, Optional[Mock]] = {"service": None}
 
-    def get_data_export_service():
+    def get_data_export_service() -> DataExportService:
         if mock_service_holder["service"] is None:
             raise HTTPException(status_code=503, detail="Service not initialized")
-        return mock_service_holder["service"]
+        return cast(DataExportService, mock_service_holder["service"])
 
     @app.get("/v1/sessions/{session_id}/export")
     async def export_session_data(
@@ -47,7 +47,7 @@ def create_export_endpoint():
         start_time: float = Query(None),
         end_time: float = Query(None),
         service: DataExportService = Depends(get_data_export_service),
-    ):
+    ) -> StreamingResponse:
         """Export session data endpoint."""
         try:
             var_list = None
@@ -94,8 +94,8 @@ def create_export_endpoint():
     session_id=st.uuids(),
 )
 def test_property_19_export_authorization_different_user(
-    session_owner_id, requesting_user_id, session_id
-):
+    session_owner_id: str, requesting_user_id: str, session_id: str
+) -> None:
     """
     **Validates: Requirements 17.3**
 
@@ -115,7 +115,9 @@ def test_property_19_export_authorization_different_user(
     # Create mock service that denies access
     mock_service = Mock(spec=DataExportService)
 
-    async def mock_export(session_id, format, variables, start_time, end_time):
+    async def mock_export(
+        session_id: str, format: str, variables: Any, start_time: Any, end_time: Any
+    ) -> tuple[bytes, str]:
         # Simulate authorization check failure
         raise ValueError(f"Session {session_id} not found or access denied")
 
@@ -141,7 +143,7 @@ def test_property_19_export_authorization_different_user(
     ),
     session_id=st.uuids(),
 )
-def test_property_19_export_authorization_own_session(user_id, session_id):
+def test_property_19_export_authorization_own_session(user_id: str, session_id: str) -> None:
     """
     **Validates: Requirements 17.3**
 
@@ -167,7 +169,9 @@ def test_property_19_export_authorization_own_session(user_id, session_id):
         "data": [],
     }
 
-    async def mock_export(session_id, format, variables, start_time, end_time):
+    async def mock_export(
+        session_id: str, format: str, variables: Any, start_time: Any, end_time: Any
+    ) -> tuple[bytes, str]:
         return (json.dumps(export_data).encode(), "application/json")
 
     mock_service.export_session_data = AsyncMock(side_effect=mock_export)
@@ -203,7 +207,9 @@ def test_property_19_export_authorization_own_session(user_id, session_id):
     ),
     state=st.sampled_from(["created", "running", "paused", "stopped", "completed"]),
 )
-def test_property_20_export_metadata_completeness_json(session_id, user_id, config, state):
+def test_property_20_export_metadata_completeness_json(
+    session_id: str, user_id: str, config: Dict[str, Any], state: str
+) -> None:
     """
     **Validates: Requirements 17.4**
 
@@ -230,7 +236,9 @@ def test_property_20_export_metadata_completeness_json(session_id, user_id, conf
 
     mock_service = Mock(spec=DataExportService)
 
-    async def mock_export(session_id, format, variables, start_time, end_time):
+    async def mock_export(
+        session_id: str, format: str, variables: Any, start_time: Any, end_time: Any
+    ) -> tuple[bytes, str]:
         return (json.dumps(export_data).encode(), "application/json")
 
     mock_service.export_session_data = AsyncMock(side_effect=mock_export)
@@ -278,7 +286,7 @@ def test_property_20_export_metadata_completeness_json(session_id, user_id, conf
         min_size=1, max_size=50, alphabet=st.characters(whitelist_categories=("L", "N"))
     ),
 )
-def test_property_20_export_metadata_completeness_csv(session_id, user_id):
+def test_property_20_export_metadata_completeness_csv(session_id: str, user_id: str) -> None:
     """
     **Validates: Requirements 17.4**
 
@@ -306,7 +314,9 @@ def test_property_20_export_metadata_completeness_csv(session_id, user_id):
 
     mock_service = Mock(spec=DataExportService)
 
-    async def mock_export(session_id, format, variables, start_time, end_time):
+    async def mock_export(
+        session_id: str, format: str, variables: Any, start_time: Any, end_time: Any
+    ) -> tuple[bytes, str]:
         return (csv_data.encode(), "text/csv")
 
     mock_service.export_session_data = AsyncMock(side_effect=mock_export)
@@ -351,7 +361,9 @@ def test_property_20_export_metadata_completeness_csv(session_id, user_id):
     ),
     format=st.sampled_from(["json", "csv"]),
 )
-def test_property_21_export_content_type_headers(session_id, user_id, format):
+def test_property_21_export_content_type_headers(
+    session_id: str, user_id: str, format: str
+) -> None:
     """
     **Validates: Requirements 17.6**
 
@@ -366,8 +378,8 @@ def test_property_21_export_content_type_headers(session_id, user_id, format):
     app, mock_service_holder = create_export_endpoint()
 
     # Determine expected content type
-    expected_content_type = "application/json" if format == "json" else "text/csv"
-    expected_extension = "json" if format == "json" else "csv"
+    expected_content_type: str = "application/json" if format == "json" else "text/csv"
+    expected_extension: str = "json" if format == "json" else "csv"
 
     # Create export data
     if format == "json":
@@ -377,7 +389,9 @@ def test_property_21_export_content_type_headers(session_id, user_id, format):
 
     mock_service = Mock(spec=DataExportService)
 
-    async def mock_export(session_id, format, variables, start_time, end_time):
+    async def mock_export(
+        session_id: str, format: str, variables: Any, start_time: Any, end_time: Any
+    ) -> tuple[bytes, str]:
         return (export_data, expected_content_type)
 
     mock_service.export_session_data = AsyncMock(side_effect=mock_export)
@@ -424,7 +438,7 @@ def test_property_21_export_content_type_headers(session_id, user_id, format):
         min_size=1, max_size=50, alphabet=st.characters(whitelist_categories=("L", "N"))
     ),
 )
-def test_property_21_export_content_type_default_json(session_id, user_id):
+def test_property_21_export_content_type_default_json(session_id: str, user_id: str) -> None:
     """
     **Validates: Requirements 17.6**
 
@@ -442,7 +456,9 @@ def test_property_21_export_content_type_default_json(session_id, user_id):
 
     mock_service = Mock(spec=DataExportService)
 
-    async def mock_export(session_id, format, variables, start_time, end_time):
+    async def mock_export(
+        session_id: str, format: str, variables: Any, start_time: Any, end_time: Any
+    ) -> tuple[bytes, str]:
         return (export_data, "application/json")
 
     mock_service.export_session_data = AsyncMock(side_effect=mock_export)

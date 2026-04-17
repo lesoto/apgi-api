@@ -497,7 +497,7 @@ class TestConfigCORSValidation:
 class TestConfigEnvironmentValidation:
     """Test environment detection and validation."""
 
-    def test_invalid_environment_raises_error(self):
+    def test_invalid_environment_raises_error(self) -> None:
         """Test that invalid ENVIRONMENT value raises ValueError."""
         with patch.dict(
             os.environ,
@@ -509,7 +509,7 @@ class TestConfigEnvironmentValidation:
             },
         ):
             with pytest.raises(ValueError, match="Invalid ENVIRONMENT"):
-                Settings()  # type: ignore
+                Settings()
 
     def test_prod_alias_accepted(self) -> None:
         """Test that 'prod' is accepted as alias for 'production'."""
@@ -530,7 +530,7 @@ class TestConfigEnvironmentValidation:
                 "SMTP_SERVER": "smtp.example.com",
             },
         ):
-            settings = Settings()  # type: ignore
+            settings = Settings()
             assert settings.environment == "prod"
 
 
@@ -550,7 +550,7 @@ class TestConfigLoggingValidation:
             },
         ):
             with pytest.raises(ValueError, match="Invalid LOG_LEVEL"):
-                Settings()  # type: ignore
+                Settings()
 
     def test_valid_log_levels(self) -> None:
         """Test that all valid log levels are accepted."""
@@ -566,7 +566,7 @@ class TestConfigLoggingValidation:
                     "LOG_LEVEL": level,
                 },
             ):
-                settings = Settings()  # type: ignore
+                settings = Settings()
                 assert settings.log_level == level
 
     def test_default_log_level_development(self) -> None:
@@ -581,7 +581,7 @@ class TestConfigLoggingValidation:
             },
         ):
             os.environ.pop("LOG_LEVEL", None)
-            settings = Settings()  # type: ignore
+            settings = Settings()
             assert settings.log_level == "DEBUG"
 
     def test_default_log_level_staging(self) -> None:
@@ -600,7 +600,7 @@ class TestConfigLoggingValidation:
             },
         ):
             os.environ.pop("LOG_LEVEL", None)
-            settings = Settings()  # type: ignore
+            settings = Settings()
             assert settings.log_level == "INFO"
 
     def test_default_log_level_production(self) -> None:
@@ -623,7 +623,7 @@ class TestConfigLoggingValidation:
             },
         ):
             os.environ.pop("LOG_LEVEL", None)
-            settings = Settings()  # type: ignore
+            settings = Settings()
             assert settings.log_level == "WARNING"
 
 
@@ -642,7 +642,7 @@ class TestConfigParsingAndDefaults:
                 "CORS_ORIGINS": "https://example.com, https://app.example.com , https://admin.example.com",
             },
         ):
-            settings = Settings()  # type: ignore
+            settings = Settings()
             assert len(settings.cors_origins) == 3
             assert "https://example.com" in settings.cors_origins
             assert "https://app.example.com" in settings.cors_origins
@@ -663,7 +663,7 @@ class TestConfigParsingAndDefaults:
                 "RATE_LIMIT_PER_MINUTE": "120",
             },
         ):
-            settings = Settings()  # type: ignore
+            settings = Settings()
             assert settings.port == 9000
             assert settings.pool_size == 50
             assert settings.max_overflow == 100
@@ -683,7 +683,7 @@ class TestConfigParsingAndDefaults:
                 "PROFILING_ENABLED": "true",
             },
         ):
-            settings = Settings()  # type: ignore
+            settings = Settings()
             assert settings.rate_limit_enabled is False
             assert settings.schema_validation_enabled is True
             assert settings.profiling_enabled is True

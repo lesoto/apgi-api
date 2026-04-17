@@ -5,6 +5,7 @@ Middleware for limiting the size of incoming requests.
 """
 
 from datetime import datetime, timezone
+from typing import Any
 
 from fastapi import Request
 from starlette.middleware.base import BaseHTTPMiddleware
@@ -22,7 +23,7 @@ class RequestSizeLimitMiddleware(BaseHTTPMiddleware):
     Rejects requests with body size exceeding configured limits.
     """
 
-    def __init__(self, app, max_size_mb: int = 10, enabled: bool = True):
+    def __init__(self, app: Any, max_size_mb: int = 10, enabled: bool = True) -> None:
         """
         Initialize request size limiting middleware.
 
@@ -64,7 +65,7 @@ class RequestSizeLimitMiddleware(BaseHTTPMiddleware):
 
         return True
 
-    async def dispatch(self, request: Request, call_next):
+    async def dispatch(self, request: Request, call_next: Any) -> Any:
         """
         Process request with size limiting.
 

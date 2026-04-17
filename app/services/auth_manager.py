@@ -21,6 +21,8 @@ from app.database.models import RefreshToken, User
 from app.exceptions import AuthenticationError, ExpiredTokenError, InvalidTokenError
 from app.models.schemas import TokenPayload
 
+__all__ = ["AuthManager", "TokenPayload"]
+
 logger = logging.getLogger(__name__)
 
 
@@ -35,7 +37,7 @@ class AuthManager:
     - Token refresh
     """
 
-    def __init__(self, db: Session, redis_client=None):
+    def __init__(self, db: Session, redis_client: Optional[Any] = None):
         """
         Initialize AuthManager.
 

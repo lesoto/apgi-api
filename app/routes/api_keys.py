@@ -52,7 +52,7 @@ async def create_api_key(
     request: APIKeyCreateRequest,
     db: Session = Depends(get_db),
     current_user: TokenPayload = Depends(get_current_user),
-):
+) -> APIKeyCreateResponse:
     """
     Create a new API key.
 
@@ -128,7 +128,7 @@ async def list_api_keys(
     per_page: int = 10,
     db: Session = Depends(get_db),
     current_user: TokenPayload = Depends(get_current_user),
-):
+) -> APIKeyListResponse:
     """
     List API keys for the current user.
 
@@ -200,7 +200,7 @@ async def get_api_key(
     key_id: str,
     db: Session = Depends(get_db),
     current_user: TokenPayload = Depends(get_current_user),
-):
+) -> APIKeyResponse:
     """
     Get details of a specific API key.
 
@@ -243,7 +243,7 @@ async def update_api_key(
     request: APIKeyUpdateRequest,
     db: Session = Depends(get_db),
     current_user: TokenPayload = Depends(get_current_user),
-):
+) -> APIKeyResponse:
     """
     Update an existing API key.
 
@@ -307,7 +307,7 @@ async def rotate_api_key(
     deactivate_old: bool = True,
     db: Session = Depends(get_db),
     current_user: TokenPayload = Depends(get_current_user),
-):
+) -> APIKeyCreateResponse:
     """
     Rotate an existing API key.
 
@@ -401,7 +401,7 @@ async def delete_api_key(
     key_id: str,
     db: Session = Depends(get_db),
     current_user: TokenPayload = Depends(get_current_user),
-):
+) -> None:
     """
     Delete an existing API key.
 

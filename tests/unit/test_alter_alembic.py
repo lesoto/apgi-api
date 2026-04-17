@@ -10,7 +10,7 @@ from app.alter_alembic import alter_alembic_version
 class TestAlterAlembicVersion:
     """Test alter_alembic.py functionality."""
 
-    def test_alter_alembic_version_success(self):
+    def test_alter_alembic_version_success(self) -> None:
         """Test successful version alteration when version doesn't exist."""
         with patch("app.alter_alembic.engine") as mock_engine:
             mock_conn = MagicMock()
@@ -23,7 +23,7 @@ class TestAlterAlembicVersion:
             assert mock_conn.execute.call_count >= 2  # Check version and insert
             mock_conn.commit.assert_called_once()
 
-    def test_alter_alembic_version_database_error(self):
+    def test_alter_alembic_version_database_error(self) -> None:
         """Test handling when database operation fails."""
         with patch("app.alter_alembic.engine") as mock_engine:
             mock_conn = MagicMock()
@@ -40,7 +40,7 @@ class TestAlterAlembicVersion:
 
             assert mock_conn.execute.call_count >= 1
 
-    def test_alter_alembic_version_connection_error(self):
+    def test_alter_alembic_version_connection_error(self) -> None:
         """Test handling when connection fails."""
         with patch("app.alter_alembic.engine") as mock_engine:
             mock_engine.connect.side_effect = Exception("Connection failed")
@@ -49,7 +49,7 @@ class TestAlterAlembicVersion:
                 with pytest.raises(Exception, match="Connection failed"):
                     alter_alembic_version()
 
-    def test_alter_alembic_version_commit_error(self):
+    def test_alter_alembic_version_commit_error(self) -> None:
         """Test handling when commit fails."""
         with patch("app.alter_alembic.engine") as mock_engine:
             mock_conn = MagicMock()
@@ -65,7 +65,7 @@ class TestAlterAlembicVersion:
             assert mock_conn.execute.call_count >= 1
             mock_conn.commit.assert_called_once()
 
-    def test_alter_alembic_version_already_exists(self):
+    def test_alter_alembic_version_already_exists(self) -> None:
         """Test early return when version already exists in alembic_version."""
         with patch("app.alter_alembic.engine") as mock_engine:
             mock_conn = MagicMock()
@@ -84,7 +84,7 @@ class TestAlterAlembicVersion:
             assert mock_conn.execute.call_count == 1  # Only the check query
             mock_conn.commit.assert_not_called()
 
-    def test_alter_alembic_version_postgresql_dialect(self):
+    def test_alter_alembic_version_postgresql_dialect(self) -> None:
         """Test PostgreSQL-specific table creation and alter statements."""
         with patch("app.alter_alembic.engine") as mock_engine:
             mock_conn = MagicMock()
@@ -103,7 +103,7 @@ class TestAlterAlembicVersion:
             # Verify commit was called twice (once after PostgreSQL setup, once at end)
             assert mock_conn.commit.call_count >= 1
 
-    def test_alter_alembic_version_non_postgresql_dialect(self):
+    def test_alter_alembic_version_non_postgresql_dialect(self) -> None:
         """Test with non-PostgreSQL dialect (no table creation)."""
         with patch("app.alter_alembic.engine") as mock_engine:
             mock_conn = MagicMock()
@@ -120,7 +120,7 @@ class TestAlterAlembicVersion:
             # SQLite path: check version, select versions, insert
             assert mock_conn.execute.call_count >= 2
 
-    def test_alter_alembic_version_with_existing_versions(self):
+    def test_alter_alembic_version_with_existing_versions(self) -> None:
         """Test deletion of existing versions before inserting new one."""
         with patch("app.alter_alembic.engine") as mock_engine:
             mock_conn = MagicMock()
@@ -129,7 +129,7 @@ class TestAlterAlembicVersion:
             mock_conn.dialect.name = "sqlite"
 
             # Setup execute side effects for multiple queries
-            def execute_side_effect(query):
+            def execute_side_effect(query: object) -> MagicMock:
                 query_str = str(query)
                 mock_result = MagicMock()
 
@@ -159,7 +159,7 @@ class TestAlterAlembicVersion:
             assert any("Deleted existing alembic_version entries" in str(c) for c in print_calls)
             assert any("Set alembic_version" in str(c) for c in print_calls)
 
-    def test_alter_alembic_version_empty_existing_versions(self):
+    def test_alter_alembic_version_empty_existing_versions(self) -> None:
         """Test when current_versions list is empty (no deletion needed)."""
         with patch("app.alter_alembic.engine") as mock_engine:
             mock_conn = MagicMock()
@@ -167,7 +167,7 @@ class TestAlterAlembicVersion:
             # Non-PostgreSQL dialect
             mock_conn.dialect.name = "sqlite"
 
-            def execute_side_effect(query):
+            def execute_side_effect(query: object) -> MagicMock:
                 query_str = str(query)
                 mock_result = MagicMock()
 
@@ -196,7 +196,7 @@ class TestAlterAlembicVersion:
 class TestAlterAlembicMain:
     """Test the __main__ block execution."""
 
-    def test_module_import_does_not_execute_main(self):
+    def test_module_import_does_not_execute_main(self) -> None:
         """Test that importing as module does NOT execute main block."""
         # Reload the module to ensure fresh import
         import importlib
@@ -210,7 +210,7 @@ class TestAlterAlembicMain:
             # (the if __name__ == "__main__" condition prevents it)
             mock_engine.connect.assert_not_called()
 
-    def test_main_block_functionality(self):
+    def test_main_block_functionality(self) -> None:
         """Test main block by directly invoking the guarded code."""
         # This tests the actual code inside if __name__ == "__main__":
         from app.alter_alembic import alter_alembic_version

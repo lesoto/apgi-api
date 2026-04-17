@@ -22,7 +22,7 @@ from app.middleware.security_headers import SecurityHeadersMiddleware
 class TestSecurityHeadersMiddlewareInit:
     """Test SecurityHeadersMiddleware initialization."""
 
-    def test_init_creates_security_headers_dict(self):
+    def test_init_creates_security_headers_dict(self) -> None:
         """Test that __init__ creates security headers dictionary."""
         app = MagicMock()
         middleware = SecurityHeadersMiddleware(app)
@@ -31,7 +31,7 @@ class TestSecurityHeadersMiddlewareInit:
         assert isinstance(middleware.security_headers, dict)
         assert len(middleware.security_headers) > 0
 
-    def test_init_sets_required_headers(self):
+    def test_init_sets_required_headers(self) -> None:
         """Test that __init__ sets all required security headers."""
         app = MagicMock()
         middleware = SecurityHeadersMiddleware(app)
@@ -51,7 +51,7 @@ class TestSecurityHeadersMiddlewareInit:
         for header in required_headers:
             assert header in middleware.security_headers
 
-    def test_init_sets_hsts_header(self):
+    def test_init_sets_hsts_header(self) -> None:
         """Test that __init__ sets HSTS header template."""
         app = MagicMock()
         middleware = SecurityHeadersMiddleware(app)
@@ -61,7 +61,7 @@ class TestSecurityHeadersMiddlewareInit:
         assert "includeSubDomains" in middleware.hsts_header
         assert "preload" in middleware.hsts_header
 
-    def test_init_sets_csp_header(self):
+    def test_init_sets_csp_header(self) -> None:
         """Test that __init__ sets CSP header."""
         app = MagicMock()
         middleware = SecurityHeadersMiddleware(app)
@@ -71,35 +71,35 @@ class TestSecurityHeadersMiddlewareInit:
         assert "script-src 'self'" in middleware.csp_header
         assert "style-src 'self'" in middleware.csp_header
 
-    def test_x_content_type_options_is_nosniff(self):
+    def test_x_content_type_options_is_nosniff(self) -> None:
         """Test that X-Content-Type-Options is set to nosniff."""
         app = MagicMock()
         middleware = SecurityHeadersMiddleware(app)
 
         assert middleware.security_headers["X-Content-Type-Options"] == "nosniff"
 
-    def test_x_frame_options_is_deny(self):
+    def test_x_frame_options_is_deny(self) -> None:
         """Test that X-Frame-Options is set to DENY."""
         app = MagicMock()
         middleware = SecurityHeadersMiddleware(app)
 
         assert middleware.security_headers["X-Frame-Options"] == "DENY"
 
-    def test_x_xss_protection_enabled(self):
+    def test_x_xss_protection_enabled(self) -> None:
         """Test that X-XSS-Protection is enabled."""
         app = MagicMock()
         middleware = SecurityHeadersMiddleware(app)
 
         assert middleware.security_headers["X-XSS-Protection"] == "1; mode=block"
 
-    def test_referrer_policy_set(self):
+    def test_referrer_policy_set(self) -> None:
         """Test that Referrer-Policy is set."""
         app = MagicMock()
         middleware = SecurityHeadersMiddleware(app)
 
         assert middleware.security_headers["Referrer-Policy"] == "strict-origin-when-cross-origin"
 
-    def test_permissions_policy_restrictive(self):
+    def test_permissions_policy_restrictive(self) -> None:
         """Test that Permissions-Policy is restrictive."""
         app = MagicMock()
         middleware = SecurityHeadersMiddleware(app)
@@ -109,7 +109,7 @@ class TestSecurityHeadersMiddlewareInit:
         assert "microphone=()" in policy
         assert "camera=()" in policy
 
-    def test_cross_origin_policies_set(self):
+    def test_cross_origin_policies_set(self) -> None:
         """Test that Cross-Origin policies are set."""
         app = MagicMock()
         middleware = SecurityHeadersMiddleware(app)
@@ -118,7 +118,7 @@ class TestSecurityHeadersMiddlewareInit:
         assert middleware.security_headers["Cross-Origin-Opener-Policy"] == "same-origin"
         assert middleware.security_headers["Cross-Origin-Resource-Policy"] == "same-origin"
 
-    def test_dns_prefetch_control_off(self):
+    def test_dns_prefetch_control_off(self) -> None:
         """Test that DNS prefetch control is off."""
         app = MagicMock()
         middleware = SecurityHeadersMiddleware(app)
@@ -130,20 +130,20 @@ class TestSecurityHeadersMiddlewareDispatch:
     """Test SecurityHeadersMiddleware.dispatch method."""
 
     @pytest.fixture
-    def middleware(self):
+    def middleware(self) -> SecurityHeadersMiddleware:
         """Create middleware instance."""
         app = MagicMock()
         return SecurityHeadersMiddleware(app)
 
     @pytest.fixture
-    def mock_request(self):
+    def mock_request(self) -> MagicMock:
         """Create a mock request."""
         request = MagicMock()
         request.url.scheme = "http"
         return request
 
     @pytest.fixture
-    def mock_response(self):
+    def mock_response(self) -> MagicMock:
         """Create a mock response."""
         response = MagicMock()
         response.headers = {}
@@ -151,8 +151,11 @@ class TestSecurityHeadersMiddlewareDispatch:
 
     @pytest.mark.asyncio
     async def test_dispatch_adds_security_headers_to_response(
-        self, middleware, mock_request, mock_response
-    ):
+        self,
+        middleware: SecurityHeadersMiddleware,
+        mock_request: MagicMock,
+        mock_response: MagicMock,
+    ) -> None:
         """Test that dispatch adds security headers to response."""
         call_next = AsyncMock(return_value=mock_response)
 
@@ -165,7 +168,12 @@ class TestSecurityHeadersMiddlewareDispatch:
         assert "Permissions-Policy" in result.headers
 
     @pytest.mark.asyncio
-    async def test_dispatch_adds_csp_header(self, middleware, mock_request, mock_response):
+    async def test_dispatch_adds_csp_header(
+        self,
+        middleware: SecurityHeadersMiddleware,
+        mock_request: MagicMock,
+        mock_response: MagicMock,
+    ) -> None:
         """Test that dispatch adds Content-Security-Policy header."""
         call_next = AsyncMock(return_value=mock_response)
 
@@ -177,8 +185,11 @@ class TestSecurityHeadersMiddlewareDispatch:
 
     @pytest.mark.asyncio
     async def test_dispatch_adds_cross_origin_headers(
-        self, middleware, mock_request, mock_response
-    ):
+        self,
+        middleware: SecurityHeadersMiddleware,
+        mock_request: MagicMock,
+        mock_response: MagicMock,
+    ) -> None:
         """Test that dispatch adds Cross-Origin headers."""
         call_next = AsyncMock(return_value=mock_response)
 
@@ -189,7 +200,12 @@ class TestSecurityHeadersMiddlewareDispatch:
         assert "Cross-Origin-Resource-Policy" in result.headers
 
     @pytest.mark.asyncio
-    async def test_dispatch_calls_next_middleware(self, middleware, mock_request, mock_response):
+    async def test_dispatch_calls_next_middleware(
+        self,
+        middleware: SecurityHeadersMiddleware,
+        mock_request: MagicMock,
+        mock_response: MagicMock,
+    ) -> None:
         """Test that dispatch calls the next middleware."""
         call_next = AsyncMock(return_value=mock_response)
 
@@ -198,7 +214,12 @@ class TestSecurityHeadersMiddlewareDispatch:
         call_next.assert_called_once_with(mock_request)
 
     @pytest.mark.asyncio
-    async def test_dispatch_returns_response(self, middleware, mock_request, mock_response):
+    async def test_dispatch_returns_response(
+        self,
+        middleware: SecurityHeadersMiddleware,
+        mock_request: MagicMock,
+        mock_response: MagicMock,
+    ) -> None:
         """Test that dispatch returns the response."""
         call_next = AsyncMock(return_value=mock_response)
 
@@ -207,7 +228,12 @@ class TestSecurityHeadersMiddlewareDispatch:
         assert result is mock_response
 
     @pytest.mark.asyncio
-    async def test_dispatch_header_values_correct(self, middleware, mock_request, mock_response):
+    async def test_dispatch_header_values_correct(
+        self,
+        middleware: SecurityHeadersMiddleware,
+        mock_request: MagicMock,
+        mock_response: MagicMock,
+    ) -> None:
         """Test that dispatch sets correct header values."""
         call_next = AsyncMock(return_value=mock_response)
 
@@ -220,7 +246,12 @@ class TestSecurityHeadersMiddlewareDispatch:
         assert result.headers["X-DNS-Prefetch-Control"] == "off"
 
     @pytest.mark.asyncio
-    async def test_dispatch_csp_header_value_correct(self, middleware, mock_request, mock_response):
+    async def test_dispatch_csp_header_value_correct(
+        self,
+        middleware: SecurityHeadersMiddleware,
+        mock_request: MagicMock,
+        mock_response: MagicMock,
+    ) -> None:
         """Test that dispatch sets correct CSP header value."""
         call_next = AsyncMock(return_value=mock_response)
 
@@ -235,8 +266,11 @@ class TestSecurityHeadersMiddlewareDispatch:
 
     @pytest.mark.asyncio
     async def test_dispatch_cross_origin_embedder_policy_correct(
-        self, middleware, mock_request, mock_response
-    ):
+        self,
+        middleware: SecurityHeadersMiddleware,
+        mock_request: MagicMock,
+        mock_response: MagicMock,
+    ) -> None:
         """Test that Cross-Origin-Embedder-Policy is correct."""
         call_next = AsyncMock(return_value=mock_response)
 
@@ -246,8 +280,11 @@ class TestSecurityHeadersMiddlewareDispatch:
 
     @pytest.mark.asyncio
     async def test_dispatch_cross_origin_opener_policy_correct(
-        self, middleware, mock_request, mock_response
-    ):
+        self,
+        middleware: SecurityHeadersMiddleware,
+        mock_request: MagicMock,
+        mock_response: MagicMock,
+    ) -> None:
         """Test that Cross-Origin-Opener-Policy is correct."""
         call_next = AsyncMock(return_value=mock_response)
 
@@ -257,8 +294,11 @@ class TestSecurityHeadersMiddlewareDispatch:
 
     @pytest.mark.asyncio
     async def test_dispatch_cross_origin_resource_policy_correct(
-        self, middleware, mock_request, mock_response
-    ):
+        self,
+        middleware: SecurityHeadersMiddleware,
+        mock_request: MagicMock,
+        mock_response: MagicMock,
+    ) -> None:
         """Test that Cross-Origin-Resource-Policy is correct."""
         call_next = AsyncMock(return_value=mock_response)
 
@@ -268,8 +308,11 @@ class TestSecurityHeadersMiddlewareDispatch:
 
     @pytest.mark.asyncio
     async def test_dispatch_permissions_policy_correct(
-        self, middleware, mock_request, mock_response
-    ):
+        self,
+        middleware: SecurityHeadersMiddleware,
+        mock_request: MagicMock,
+        mock_response: MagicMock,
+    ) -> None:
         """Test that Permissions-Policy is correct."""
         call_next = AsyncMock(return_value=mock_response)
 
@@ -285,20 +328,22 @@ class TestSecurityHeadersMiddlewareHSTS:
     """Test HSTS header conditional logic."""
 
     @pytest.fixture
-    def middleware(self):
+    def middleware(self) -> SecurityHeadersMiddleware:
         """Create middleware instance."""
         app = MagicMock()
         return SecurityHeadersMiddleware(app)
 
     @pytest.fixture
-    def mock_response(self):
+    def mock_response(self) -> MagicMock:
         """Create a mock response."""
         response = MagicMock()
         response.headers = {}
         return response
 
     @pytest.mark.asyncio
-    async def test_hsts_header_in_production_https(self, middleware, mock_response):
+    async def test_hsts_header_in_production_https(
+        self, middleware: SecurityHeadersMiddleware, mock_response: MagicMock
+    ) -> None:
         """Test that HSTS header is added in production with HTTPS."""
         with patch.dict(os.environ, {"ENVIRONMENT": "production"}):
             # Reload settings to pick up new environment
@@ -316,7 +361,9 @@ class TestSecurityHeadersMiddlewareHSTS:
                 assert "Strict-Transport-Security" in result.headers
 
     @pytest.mark.asyncio
-    async def test_hsts_header_in_development(self, middleware, mock_response):
+    async def test_hsts_header_in_development(
+        self, middleware: SecurityHeadersMiddleware, mock_response: MagicMock
+    ) -> None:
         """Test that HSTS header is set to max-age=0 in development."""
         with patch("app.middleware.security_headers.settings") as mock_settings:
             mock_settings.environment = "development"
@@ -334,7 +381,9 @@ class TestSecurityHeadersMiddlewareHSTS:
             assert "max-age=0" in hsts
 
     @pytest.mark.asyncio
-    async def test_hsts_header_in_staging(self, middleware, mock_response):
+    async def test_hsts_header_in_staging(
+        self, middleware: SecurityHeadersMiddleware, mock_response: MagicMock
+    ) -> None:
         """Test that HSTS header is set to max-age=0 in staging."""
         with patch("app.middleware.security_headers.settings") as mock_settings:
             mock_settings.environment = "staging"
@@ -352,7 +401,9 @@ class TestSecurityHeadersMiddlewareHSTS:
             assert "max-age=0" in hsts
 
     @pytest.mark.asyncio
-    async def test_hsts_header_production_https_has_preload(self, middleware, mock_response):
+    async def test_hsts_header_production_https_has_preload(
+        self, middleware: SecurityHeadersMiddleware, mock_response: MagicMock
+    ) -> None:
         """Test that HSTS header in production HTTPS includes preload."""
         with patch("app.middleware.security_headers.settings") as mock_settings:
             mock_settings.environment = "production"
@@ -371,7 +422,7 @@ class TestSecurityHeadersMiddlewareHSTS:
                 assert "preload" in hsts
 
     @pytest.mark.asyncio
-    async def test_hsts_header_production_http_is_zero(self, mock_response):
+    async def test_hsts_header_production_http_is_zero(self, mock_response: MagicMock) -> None:
         """Test that HSTS header in production HTTP is not set (no HSTS in non-HTTPS)."""
         with patch("app.middleware.security_headers.settings") as mock_settings:
             mock_settings.environment = "production"
@@ -393,20 +444,22 @@ class TestSecurityHeadersMiddlewareMultipleRequests:
     """Test that headers are added consistently across multiple requests."""
 
     @pytest.fixture
-    def middleware(self):
+    def middleware(self) -> SecurityHeadersMiddleware:
         """Create middleware instance."""
         app = MagicMock()
         return SecurityHeadersMiddleware(app)
 
     @pytest.fixture
-    def mock_response(self):
+    def mock_response(self) -> MagicMock:
         """Create a mock response."""
         response = MagicMock()
         response.headers = {}
         return response
 
     @pytest.mark.asyncio
-    async def test_headers_consistent_across_requests(self, middleware, mock_response):
+    async def test_headers_consistent_across_requests(
+        self, middleware: SecurityHeadersMiddleware, mock_response: MagicMock
+    ) -> None:
         """Test that headers are consistent across multiple requests."""
         call_next = AsyncMock(return_value=mock_response)
         request = MagicMock()
@@ -426,7 +479,9 @@ class TestSecurityHeadersMiddlewareMultipleRequests:
         )
 
     @pytest.mark.asyncio
-    async def test_headers_do_not_duplicate(self, middleware, mock_response):
+    async def test_headers_do_not_duplicate(
+        self, middleware: SecurityHeadersMiddleware, mock_response: MagicMock
+    ) -> None:
         """Test that headers are not duplicated."""
         call_next = AsyncMock(return_value=mock_response)
         request = MagicMock()
@@ -444,20 +499,22 @@ class TestSecurityHeadersMiddlewareEdgeCases:
     """Test edge cases and error conditions."""
 
     @pytest.fixture
-    def middleware(self):
+    def middleware(self) -> SecurityHeadersMiddleware:
         """Create middleware instance."""
         app = MagicMock()
         return SecurityHeadersMiddleware(app)
 
     @pytest.fixture
-    def mock_response(self):
+    def mock_response(self) -> MagicMock:
         """Create a mock response."""
         response = MagicMock()
         response.headers = {}
         return response
 
     @pytest.mark.asyncio
-    async def test_dispatch_with_empty_response_headers(self, middleware, mock_response):
+    async def test_dispatch_with_empty_response_headers(
+        self, middleware: SecurityHeadersMiddleware, mock_response: MagicMock
+    ) -> None:
         """Test that dispatch works with empty response headers."""
         call_next = AsyncMock(return_value=mock_response)
         request = MagicMock()
@@ -468,7 +525,9 @@ class TestSecurityHeadersMiddlewareEdgeCases:
         assert "X-Content-Type-Options" in result.headers
 
     @pytest.mark.asyncio
-    async def test_dispatch_with_existing_headers(self, middleware, mock_response):
+    async def test_dispatch_with_existing_headers(
+        self, middleware: SecurityHeadersMiddleware, mock_response: MagicMock
+    ) -> None:
         """Test that dispatch preserves existing headers."""
         mock_response.headers = {"X-Custom-Header": "custom-value"}
         call_next = AsyncMock(return_value=mock_response)
@@ -482,7 +541,9 @@ class TestSecurityHeadersMiddlewareEdgeCases:
         assert result.headers.get("X-Custom-Header") == "custom-value"
 
     @pytest.mark.asyncio
-    async def test_csp_header_no_unsafe_inline(self, middleware, mock_response):
+    async def test_csp_header_no_unsafe_inline(
+        self, middleware: SecurityHeadersMiddleware, mock_response: MagicMock
+    ) -> None:
         """Test that CSP header does not include unsafe-inline."""
         call_next = AsyncMock(return_value=mock_response)
         request = MagicMock()
@@ -494,7 +555,9 @@ class TestSecurityHeadersMiddlewareEdgeCases:
         assert "unsafe-inline" not in csp
 
     @pytest.mark.asyncio
-    async def test_csp_header_no_unsafe_eval(self, middleware, mock_response):
+    async def test_csp_header_no_unsafe_eval(
+        self, middleware: SecurityHeadersMiddleware, mock_response: MagicMock
+    ) -> None:
         """Test that CSP header does not include unsafe-eval."""
         call_next = AsyncMock(return_value=mock_response)
         request = MagicMock()
@@ -506,7 +569,9 @@ class TestSecurityHeadersMiddlewareEdgeCases:
         assert "unsafe-eval" not in csp
 
     @pytest.mark.asyncio
-    async def test_permissions_policy_no_payment(self, middleware, mock_response):
+    async def test_permissions_policy_no_payment(
+        self, middleware: SecurityHeadersMiddleware, mock_response: MagicMock
+    ) -> None:
         """Test that Permissions-Policy disables payment API."""
         call_next = AsyncMock(return_value=mock_response)
         request = MagicMock()
@@ -518,7 +583,9 @@ class TestSecurityHeadersMiddlewareEdgeCases:
         assert "payment=()" in policy
 
     @pytest.mark.asyncio
-    async def test_permissions_policy_no_usb(self, middleware, mock_response):
+    async def test_permissions_policy_no_usb(
+        self, middleware: SecurityHeadersMiddleware, mock_response: MagicMock
+    ) -> None:
         """Test that Permissions-Policy disables USB API."""
         call_next = AsyncMock(return_value=mock_response)
         request = MagicMock()
@@ -530,7 +597,9 @@ class TestSecurityHeadersMiddlewareEdgeCases:
         assert "usb=()" in policy
 
     @pytest.mark.asyncio
-    async def test_permissions_policy_no_autoplay(self, middleware, mock_response):
+    async def test_permissions_policy_no_autoplay(
+        self, middleware: SecurityHeadersMiddleware, mock_response: MagicMock
+    ) -> None:
         """Test that Permissions-Policy disables autoplay."""
         call_next = AsyncMock(return_value=mock_response)
         request = MagicMock()
@@ -542,7 +611,9 @@ class TestSecurityHeadersMiddlewareEdgeCases:
         assert "autoplay=()" in policy
 
     @pytest.mark.asyncio
-    async def test_csp_restricts_script_sources(self, middleware, mock_response):
+    async def test_csp_restricts_script_sources(
+        self, middleware: SecurityHeadersMiddleware, mock_response: MagicMock
+    ) -> None:
         """Test that CSP restricts script sources."""
         call_next = AsyncMock(return_value=mock_response)
         request = MagicMock()
@@ -554,7 +625,9 @@ class TestSecurityHeadersMiddlewareEdgeCases:
         assert "script-src 'self'" in csp
 
     @pytest.mark.asyncio
-    async def test_csp_restricts_style_sources(self, middleware, mock_response):
+    async def test_csp_restricts_style_sources(
+        self, middleware: SecurityHeadersMiddleware, mock_response: MagicMock
+    ) -> None:
         """Test that CSP restricts style sources."""
         call_next = AsyncMock(return_value=mock_response)
         request = MagicMock()
@@ -566,7 +639,9 @@ class TestSecurityHeadersMiddlewareEdgeCases:
         assert "style-src 'self'" in csp
 
     @pytest.mark.asyncio
-    async def test_csp_disables_plugins(self, middleware, mock_response):
+    async def test_csp_disables_plugins(
+        self, middleware: SecurityHeadersMiddleware, mock_response: MagicMock
+    ) -> None:
         """Test that CSP disables plugins."""
         call_next = AsyncMock(return_value=mock_response)
         request = MagicMock()
@@ -578,7 +653,9 @@ class TestSecurityHeadersMiddlewareEdgeCases:
         assert "object-src 'none'" in csp
 
     @pytest.mark.asyncio
-    async def test_csp_disables_frames(self, middleware, mock_response):
+    async def test_csp_disables_frames(
+        self, middleware: SecurityHeadersMiddleware, mock_response: MagicMock
+    ) -> None:
         """Test that CSP disables frames."""
         call_next = AsyncMock(return_value=mock_response)
         request = MagicMock()
@@ -590,7 +667,9 @@ class TestSecurityHeadersMiddlewareEdgeCases:
         assert "frame-ancestors 'none'" in csp
 
     @pytest.mark.asyncio
-    async def test_referrer_policy_strict(self, middleware, mock_response):
+    async def test_referrer_policy_strict(
+        self, middleware: SecurityHeadersMiddleware, mock_response: MagicMock
+    ) -> None:
         """Test that Referrer-Policy is strict."""
         call_next = AsyncMock(return_value=mock_response)
         request = MagicMock()
@@ -601,7 +680,9 @@ class TestSecurityHeadersMiddlewareEdgeCases:
         assert result.headers["Referrer-Policy"] == "strict-origin-when-cross-origin"
 
     @pytest.mark.asyncio
-    async def test_cross_origin_policies_restrictive(self, middleware, mock_response):
+    async def test_cross_origin_policies_restrictive(
+        self, middleware: SecurityHeadersMiddleware, mock_response: MagicMock
+    ) -> None:
         """Test that Cross-Origin policies are restrictive."""
         call_next = AsyncMock(return_value=mock_response)
         request = MagicMock()

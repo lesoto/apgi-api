@@ -9,7 +9,7 @@ from app.database.connection import engine
 from sqlalchemy import text
 
 
-def alter_alembic_version():
+def alter_alembic_version() -> None:
     with engine.connect() as conn:
         # Ensure alembic_version table exists (similar to alembic env.py)
         if conn.dialect.name == "postgresql":

@@ -20,7 +20,8 @@ logger = logging.getLogger(__name__)
 class DatabaseSeedingService:
     """Service for seeding the database with test data."""
 
-    def __init__(self):
+    def __init__(self) -> None:
+        """Initialize the seeding service."""
         self.faker = Faker()
         self.faker.seed_instance(42)  # For reproducible data
 

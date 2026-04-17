@@ -63,7 +63,7 @@ class UtilsRunnerGUI:
         self.scripts = self.get_script_list()
 
         # Store running processes
-        self.running_processes: Dict[str, subprocess.Popen] = {}
+        self.running_processes: Dict[str, subprocess.Popen[str]] = {}
 
         # Progress bar state management
         self.progress_active = False
@@ -77,7 +77,7 @@ class UtilsRunnerGUI:
         # Handle window close button
         self.root.protocol("WM_DELETE_WINDOW", self.quit_application)
 
-    def _detect_system_theme(self):
+    def _detect_system_theme(self) -> str:
         """Detect system theme preference (dark/light)."""
         try:
             # Check macOS system preference
@@ -95,13 +95,13 @@ class UtilsRunnerGUI:
         # Fallback to light theme
         return "normal"
 
-    def start_progress(self):
+    def start_progress(self) -> None:
         """Start progress bar if not already active."""
         if not self.progress_active:
             self.progress.start()
             self.progress_active = True
 
-    def stop_progress(self):
+    def stop_progress(self) -> None:
         """Stop progress bar if active."""
         if self.progress_active:
             self.progress.stop()
@@ -257,7 +257,7 @@ class UtilsRunnerGUI:
         except (UnicodeDecodeError, IOError):
             return False
 
-    def setup_ui(self):
+    def setup_ui(self) -> None:
         """Setup the user interface.
 
         Creates the main layout with script list, control buttons,
@@ -368,7 +368,7 @@ class UtilsRunnerGUI:
         # Start processing output queue
         self.process_output_queue()
 
-    def log_output(self, message: str, tag: Optional[str] = None):
+    def log_output(self, message: str, tag: Optional[str] = None) -> None:
         """Add message to output queue for thread-safe logging.
 
         Args:
@@ -379,7 +379,7 @@ class UtilsRunnerGUI:
             tag = self.TAG_INFO
         self.output_buffer.append((message, tag))
 
-    def _log_output(self, message: str, tag: str):
+    def _log_output(self, message: str, tag: str) -> None:
         """Thread-safe output logging."""
         self.output_text.insert(tk.END, message + "\n", tag)
         self.output_text.see(tk.END)
@@ -390,7 +390,7 @@ class UtilsRunnerGUI:
             # Keep only the last max_output_lines lines
             self.output_text.delete(1.0, f"{line_count - self.max_output_lines + 1}.0")
 
-    def process_output_queue(self):
+    def process_output_queue(self) -> None:
         """Process queued output messages in the main thread."""
         try:
             while self.output_buffer:
@@ -400,7 +400,7 @@ class UtilsRunnerGUI:
             pass
         self.root.after(100, self.process_output_queue)
 
-    def update_status(self, message: str):
+    def update_status(self, message: str) -> None:
         """Update status label.
 
         Args:
@@ -408,7 +408,7 @@ class UtilsRunnerGUI:
         """
         self.root.after_idle(lambda: self._safe_update_status(message))
 
-    def _safe_update_status(self, message: str):
+    def _safe_update_status(self, message: str) -> None:
         """Safely update the status label from any thread."""
         try:
             if hasattr(self, "status_label") and self.status_label:
@@ -423,7 +423,7 @@ class UtilsRunnerGUI:
         Returns:
             Path to the selected script or None if no selection.
         """
-        selection = self.scripts_listbox.curselection()
+        selection: Tuple[int, ...] = self.scripts_listbox.curselection()  # type: ignore[no-untyped-call]
         if selection:
             index = selection[0]
             if 0 <= index < len(self.scripts):
@@ -437,11 +437,11 @@ class UtilsRunnerGUI:
         Returns:
             Tuple (Path, str) for the selected script or None if no selection.
         """
-        selection = self.scripts_listbox.curselection()
+        selection: Tuple[int, ...] = self.scripts_listbox.curselection()  # type: ignore[no-untyped-call]
         if selection:
             index = selection[0]
             if 0 <= index < len(self.scripts):
-                return cast(Tuple[Path, str], self.scripts[index])
+                return self.scripts[index]
         return None
 
     def get_selected_script(self) -> Optional[Path]:
@@ -452,7 +452,7 @@ class UtilsRunnerGUI:
         """
         return self.get_selected_script_path()
 
-    def run_selected_script(self):
+    def run_selected_script(self) -> None:
         """Run the selected script in a separate thread."""
         script = self.get_selected_script()
         if not script:
@@ -461,7 +461,7 @@ class UtilsRunnerGUI:
 
         self.run_script(script)
 
-    def run_selected_script_with_args(self):
+    def run_selected_script_with_args(self) -> None:
         """Run the selected script with custom arguments."""
         script = self.get_selected_script()
         if not script:
@@ -471,13 +471,13 @@ class UtilsRunnerGUI:
         args = self.prompt_for_arguments(script.name)
         self.run_script(script, args=args)
 
-    def run_all_scripts(self):
+    def run_all_scripts(self) -> None:
         """Run all scripts sequentially."""
         if not self.scripts:
             self.log_output("No scripts found", self.TAG_ERROR)
             return
 
-        def run_all():
+        def run_all() -> None:
             for i, script_info in enumerate(self.scripts):
                 script_path, dir_name = script_info
                 script_name = script_path.name
@@ -582,7 +582,7 @@ class UtilsRunnerGUI:
             self.running_processes[script_name] = process
 
             # Read output in real-time
-            def read_output():
+            def read_output() -> None:
                 script_timeout = self.get_script_timeout(script_name)
                 start_time = time.time()
 
@@ -661,7 +661,7 @@ class UtilsRunnerGUI:
                 return self.run_script(script, wait, retry_count + 1, timeout)
             return False
 
-    def _force_kill_process(self, process: subprocess.Popen, script_name: str):
+    def _force_kill_process(self, process: subprocess.Popen[str], script_name: str) -> None:
         """Force kill a stubborn process.
 
         Args:
@@ -679,7 +679,7 @@ class UtilsRunnerGUI:
         except Exception as e:
             self.log_output(f"Error killing process {script_name}: {e}", self.TAG_ERROR)
 
-    def _update_button_states(self):
+    def _update_button_states(self) -> None:
         """Update button states based on running processes."""
         if self.running_processes:
             self.run_button.config(state=tk.DISABLED)
@@ -692,14 +692,14 @@ class UtilsRunnerGUI:
             self.run_all_button.config(state=tk.NORMAL)
             self.stop_button.config(state=tk.DISABLED)
 
-    def _update_stop_button_state(self):
+    def _update_stop_button_state(self) -> None:
         """Update stop button state based on running processes."""
         if self.running_processes:
             self.stop_button.config(state=tk.NORMAL)
         else:
             self.stop_button.config(state=tk.DISABLED)
 
-    def stop_selected_script(self):
+    def stop_selected_script(self) -> None:
         """Stop the selected script if it's running."""
         script = self.get_selected_script()
         if not script:
@@ -721,13 +721,13 @@ class UtilsRunnerGUI:
         else:
             self.log_output(f"Script {script.name} is not running", self.TAG_WARNING)
 
-    def clear_output(self):
+    def clear_output(self) -> None:
         """Clear the output text area."""
         self.output_text.delete(1.0, tk.END)
         self.output_buffer.clear()
         self.log_output("Output cleared", self.TAG_INFO)
 
-    def quit_application(self):
+    def quit_application(self) -> None:
         """Quit the application safely.
 
         Stops all running processes and closes the application.
@@ -747,7 +747,7 @@ class UtilsRunnerGUI:
         # Log quit message
 
 
-def main():
+def main() -> None:
     """Launch the utils runner GUI."""
     try:
         # Create and run the GUI

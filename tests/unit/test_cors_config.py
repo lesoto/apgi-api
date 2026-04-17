@@ -7,10 +7,11 @@ Tests CORS middleware configuration with environment-based settings.
 import pytest
 from unittest.mock import MagicMock, patch
 import logging
+from typing import Any
 
 
 @pytest.fixture
-def mock_app():
+def mock_app() -> MagicMock:
     """Create a mock FastAPI app."""
     app = MagicMock()
     app.add_middleware = MagicMock()
@@ -18,7 +19,7 @@ def mock_app():
 
 
 @pytest.fixture
-def mock_settings():
+def mock_settings() -> MagicMock:
     """Create mock settings."""
     settings = MagicMock()
     settings.cors_origins = ["http://localhost:3000", "http://localhost:8000"]
@@ -31,7 +32,9 @@ def mock_settings():
 class TestConfigureCorsBasic:
     """Test basic CORS configuration."""
 
-    def test_configure_cors_calls_add_middleware(self, mock_app, mock_settings):
+    def test_configure_cors_calls_add_middleware(
+        self, mock_app: MagicMock, mock_settings: MagicMock
+    ) -> None:
         """configure_cors calls app.add_middleware with CORSMiddleware."""
         from app.middleware.cors_config import configure_cors
         from fastapi.middleware.cors import CORSMiddleware
@@ -43,7 +46,9 @@ class TestConfigureCorsBasic:
             call_args = mock_app.add_middleware.call_args
             assert call_args[0][0] == CORSMiddleware
 
-    def test_configure_cors_passes_origins(self, mock_app, mock_settings):
+    def test_configure_cors_passes_origins(
+        self, mock_app: MagicMock, mock_settings: MagicMock
+    ) -> None:
         """configure_cors passes allow_origins from settings."""
         from app.middleware.cors_config import configure_cors
 
@@ -53,7 +58,9 @@ class TestConfigureCorsBasic:
             call_kwargs = mock_app.add_middleware.call_args[1]
             assert call_kwargs["allow_origins"] == mock_settings.cors_origins
 
-    def test_configure_cors_passes_credentials(self, mock_app, mock_settings):
+    def test_configure_cors_passes_credentials(
+        self, mock_app: MagicMock, mock_settings: MagicMock
+    ) -> None:
         """configure_cors passes allow_credentials from settings."""
         from app.middleware.cors_config import configure_cors
 
@@ -63,7 +70,9 @@ class TestConfigureCorsBasic:
             call_kwargs = mock_app.add_middleware.call_args[1]
             assert call_kwargs["allow_credentials"] == mock_settings.cors_allow_credentials
 
-    def test_configure_cors_passes_methods(self, mock_app, mock_settings):
+    def test_configure_cors_passes_methods(
+        self, mock_app: MagicMock, mock_settings: MagicMock
+    ) -> None:
         """configure_cors passes allow_methods from settings."""
         from app.middleware.cors_config import configure_cors
 
@@ -73,7 +82,9 @@ class TestConfigureCorsBasic:
             call_kwargs = mock_app.add_middleware.call_args[1]
             assert call_kwargs["allow_methods"] == mock_settings.cors_allow_methods
 
-    def test_configure_cors_passes_headers(self, mock_app, mock_settings):
+    def test_configure_cors_passes_headers(
+        self, mock_app: MagicMock, mock_settings: MagicMock
+    ) -> None:
         """configure_cors passes allow_headers from settings."""
         from app.middleware.cors_config import configure_cors
 
@@ -87,7 +98,9 @@ class TestConfigureCorsBasic:
 class TestConfigureCorsExposedHeaders:
     """Test exposed headers configuration."""
 
-    def test_configure_cors_exposes_rate_limit_headers(self, mock_app, mock_settings):
+    def test_configure_cors_exposes_rate_limit_headers(
+        self, mock_app: MagicMock, mock_settings: MagicMock
+    ) -> None:
         """configure_cors exposes rate limit headers."""
         from app.middleware.cors_config import configure_cors
 
@@ -101,7 +114,9 @@ class TestConfigureCorsExposedHeaders:
             assert "X-RateLimit-Remaining" in expose_headers
             assert "X-RateLimit-Reset" in expose_headers
 
-    def test_configure_cors_max_age_set(self, mock_app, mock_settings):
+    def test_configure_cors_max_age_set(
+        self, mock_app: MagicMock, mock_settings: MagicMock
+    ) -> None:
         """configure_cors sets max_age for preflight caching."""
         from app.middleware.cors_config import configure_cors
 
@@ -115,7 +130,9 @@ class TestConfigureCorsExposedHeaders:
 class TestConfigureCorsLogging:
     """Test logging behavior."""
 
-    def test_configure_cors_logs_configuration(self, mock_app, mock_settings, caplog):
+    def test_configure_cors_logs_configuration(
+        self, mock_app: MagicMock, mock_settings: MagicMock, caplog: Any
+    ) -> None:
         """configure_cors logs the configuration."""
         from app.middleware.cors_config import configure_cors
 
@@ -126,7 +143,9 @@ class TestConfigureCorsLogging:
             # Check that configuration was logged
             assert any("CORS" in record.message for record in caplog.records)
 
-    def test_configure_cors_logs_success(self, mock_app, mock_settings, caplog):
+    def test_configure_cors_logs_success(
+        self, mock_app: MagicMock, mock_settings: MagicMock, caplog: Any
+    ) -> None:
         """configure_cors logs successful configuration."""
         from app.middleware.cors_config import configure_cors
 
@@ -137,7 +156,9 @@ class TestConfigureCorsLogging:
             # Check that success message was logged
             assert any("successfully" in record.message.lower() for record in caplog.records)
 
-    def test_configure_cors_logs_origins(self, mock_app, mock_settings, caplog):
+    def test_configure_cors_logs_origins(
+        self, mock_app: MagicMock, mock_settings: MagicMock, caplog: Any
+    ) -> None:
         """configure_cors logs the configured origins."""
         from app.middleware.cors_config import configure_cors
 
@@ -155,7 +176,7 @@ class TestConfigureCorsLogging:
 class TestConfigureCorsWithDifferentSettings:
     """Test CORS configuration with various settings."""
 
-    def test_configure_cors_with_single_origin(self, mock_app):
+    def test_configure_cors_with_single_origin(self, mock_app: MagicMock) -> None:
         """configure_cors works with a single origin."""
         from app.middleware.cors_config import configure_cors
 
@@ -171,7 +192,7 @@ class TestConfigureCorsWithDifferentSettings:
             call_kwargs = mock_app.add_middleware.call_args[1]
             assert call_kwargs["allow_origins"] == ["https://example.com"]
 
-    def test_configure_cors_with_wildcard_origin(self, mock_app):
+    def test_configure_cors_with_wildcard_origin(self, mock_app: MagicMock) -> None:
         """configure_cors works with wildcard origin."""
         from app.middleware.cors_config import configure_cors
 
@@ -187,7 +208,7 @@ class TestConfigureCorsWithDifferentSettings:
             call_kwargs = mock_app.add_middleware.call_args[1]
             assert call_kwargs["allow_origins"] == ["*"]
 
-    def test_configure_cors_with_multiple_origins(self, mock_app):
+    def test_configure_cors_with_multiple_origins(self, mock_app: MagicMock) -> None:
         """configure_cors works with multiple origins."""
         from app.middleware.cors_config import configure_cors
 
@@ -207,7 +228,7 @@ class TestConfigureCorsWithDifferentSettings:
             call_kwargs = mock_app.add_middleware.call_args[1]
             assert len(call_kwargs["allow_origins"]) == 3
 
-    def test_configure_cors_credentials_disabled(self, mock_app):
+    def test_configure_cors_credentials_disabled(self, mock_app: MagicMock) -> None:
         """configure_cors works with credentials disabled."""
         from app.middleware.cors_config import configure_cors
 
@@ -223,7 +244,7 @@ class TestConfigureCorsWithDifferentSettings:
             call_kwargs = mock_app.add_middleware.call_args[1]
             assert call_kwargs["allow_credentials"] is False
 
-    def test_configure_cors_credentials_enabled(self, mock_app):
+    def test_configure_cors_credentials_enabled(self, mock_app: MagicMock) -> None:
         """configure_cors works with credentials enabled."""
         from app.middleware.cors_config import configure_cors
 
@@ -243,7 +264,7 @@ class TestConfigureCorsWithDifferentSettings:
 class TestConfigureCorsMethodsAndHeaders:
     """Test methods and headers configuration."""
 
-    def test_configure_cors_with_all_methods(self, mock_app):
+    def test_configure_cors_with_all_methods(self, mock_app: MagicMock) -> None:
         """configure_cors works with all HTTP methods."""
         from app.middleware.cors_config import configure_cors
 
@@ -259,7 +280,7 @@ class TestConfigureCorsMethodsAndHeaders:
             call_kwargs = mock_app.add_middleware.call_args[1]
             assert len(call_kwargs["allow_methods"]) == 7
 
-    def test_configure_cors_with_custom_headers(self, mock_app):
+    def test_configure_cors_with_custom_headers(self, mock_app: MagicMock) -> None:
         """configure_cors works with custom headers."""
         from app.middleware.cors_config import configure_cors
 
@@ -280,7 +301,7 @@ class TestConfigureCorsMethodsAndHeaders:
             call_kwargs = mock_app.add_middleware.call_args[1]
             assert "X-Custom-Header" in call_kwargs["allow_headers"]
 
-    def test_configure_cors_with_minimal_methods(self, mock_app):
+    def test_configure_cors_with_minimal_methods(self, mock_app: MagicMock) -> None:
         """configure_cors works with minimal methods."""
         from app.middleware.cors_config import configure_cors
 
@@ -300,7 +321,7 @@ class TestConfigureCorsMethodsAndHeaders:
 class TestConfigureCorsEdgeCases:
     """Test edge cases."""
 
-    def test_configure_cors_with_empty_origins_list(self, mock_app):
+    def test_configure_cors_with_empty_origins_list(self, mock_app: MagicMock) -> None:
         """configure_cors works with empty origins list."""
         from app.middleware.cors_config import configure_cors
 
@@ -316,7 +337,9 @@ class TestConfigureCorsEdgeCases:
             call_kwargs = mock_app.add_middleware.call_args[1]
             assert call_kwargs["allow_origins"] == []
 
-    def test_configure_cors_multiple_calls(self, mock_app, mock_settings):
+    def test_configure_cors_multiple_calls(
+        self, mock_app: MagicMock, mock_settings: MagicMock
+    ) -> None:
         """configure_cors can be called multiple times."""
         from app.middleware.cors_config import configure_cors
 
@@ -326,7 +349,7 @@ class TestConfigureCorsEdgeCases:
 
             assert mock_app.add_middleware.call_count == 2
 
-    def test_configure_cors_with_localhost_origins(self, mock_app):
+    def test_configure_cors_with_localhost_origins(self, mock_app: MagicMock) -> None:
         """configure_cors works with localhost origins."""
         from app.middleware.cors_config import configure_cors
 
@@ -343,7 +366,7 @@ class TestConfigureCorsEdgeCases:
             assert "http://localhost:3000" in call_kwargs["allow_origins"]
             assert "http://localhost:8000" in call_kwargs["allow_origins"]
 
-    def test_configure_cors_with_https_origins(self, mock_app):
+    def test_configure_cors_with_https_origins(self, mock_app: MagicMock) -> None:
         """configure_cors works with HTTPS origins."""
         from app.middleware.cors_config import configure_cors
 
@@ -359,7 +382,9 @@ class TestConfigureCorsEdgeCases:
             call_kwargs = mock_app.add_middleware.call_args[1]
             assert all(origin.startswith("https://") for origin in call_kwargs["allow_origins"])
 
-    def test_configure_cors_preserves_settings_object(self, mock_app, mock_settings):
+    def test_configure_cors_preserves_settings_object(
+        self, mock_app: MagicMock, mock_settings: MagicMock
+    ) -> None:
         """configure_cors does not modify the settings object."""
         from app.middleware.cors_config import configure_cors
 

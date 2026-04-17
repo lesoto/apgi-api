@@ -28,7 +28,7 @@ def limiter(mock_redis: MagicMock) -> RateLimiter:
     return RateLimiter(mock_redis, requests_per_minute=60)
 
 
-def _make_pipeline_mock(zcard_result: int):
+def _make_pipeline_mock(zcard_result: int) -> MagicMock:
     """Return a pipeline mock whose execute() returns [None, zcard_result, None, None].
 
     pipeline() is called synchronously in RateLimiter, so the pipeline object itself

@@ -7,7 +7,7 @@ supported versions, and deprecation notices.
 
 import os
 from datetime import datetime, timezone
-from typing import Dict, List, Optional
+from typing import Any, Dict, List, Optional
 from urllib.parse import urlparse
 
 from fastapi import APIRouter
@@ -49,7 +49,7 @@ async def get_version_info() -> JSONResponse:
 
 
 @router.get("/client-docs")
-async def get_client_documentation(language: str = "python"):
+async def get_client_documentation(language: str = "python") -> Any:
     """
     Generate client SDK documentation and examples.
 
@@ -269,7 +269,7 @@ func main() {{
     }
 
 
-def configure_deprecated_endpoints(deprecated_config: Dict[str, Dict[str, str]]):
+def configure_deprecated_endpoints(deprecated_config: Dict[str, Dict[str, str]]) -> None:
     """
     Configure deprecated endpoints.
 

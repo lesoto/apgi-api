@@ -125,7 +125,7 @@ class TestsRunnerGUI:
         self.theme_manager: Optional[Any] = None
         self.theme_manager_available = False
         try:
-            from apgi_gui.theme_manager import ThemeManager  # type: ignore[import-untyped]
+            from apgi_gui.theme_manager import ThemeManager  # type: ignore[import-not-found]
 
             # Detect system dark mode preference
             initial_theme = self._detect_system_theme()
@@ -434,7 +434,7 @@ class TestsRunnerGUI:
         Returns:
             Path to selected script or None if no selection.
         """
-        selection = tuple(self.scripts_listbox.curselection())
+        selection = tuple(self.scripts_listbox.curselection())  # type: ignore[no-untyped-call]
         if selection and 0 <= selection[0] < len(self.scripts):
             return cast(Optional[Path], self.scripts[selection[0]])
         return None

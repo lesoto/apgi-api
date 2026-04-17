@@ -19,6 +19,7 @@ from app.services.authorization import (
     Permission,
     require_permission,
     get_current_user,
+    TokenPayload,
 )
 from pydantic import BaseModel
 
@@ -73,8 +74,8 @@ async def query_audit_logs(
     page: int = Query(1, ge=1, description="Page number"),
     per_page: int = Query(20, ge=1, le=100, description="Items per page"),
     db: Session = Depends(get_db),
-    current_user=Depends(get_current_user),
-):
+    current_user: TokenPayload = Depends(get_current_user),
+) -> AuditLogListResponse:
     """
     Query system audit logs.
     """

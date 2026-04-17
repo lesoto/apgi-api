@@ -5,13 +5,14 @@ Tests sharded database connection management with support for multiple database 
 """
 
 import pytest
+from typing import Any
 from unittest.mock import MagicMock, patch
 from sqlalchemy.orm import Session
 from sqlalchemy.exc import SQLAlchemyError
 
 
 @pytest.fixture
-def mock_sharding_service():
+def mock_sharding_service() -> MagicMock:
     """Create a mock sharding service."""
     service = MagicMock()
     service.get_shard_for_user = MagicMock(return_value="shard_0")
@@ -25,7 +26,7 @@ def mock_sharding_service():
 
 
 @pytest.fixture
-def mock_settings():
+def mock_settings() -> MagicMock:
     """Create mock settings."""
     settings = MagicMock()
     settings.database_shards_enabled = True
@@ -34,7 +35,7 @@ def mock_settings():
 
 
 @pytest.fixture
-def mock_engine():
+def mock_engine() -> MagicMock:
     """Create a mock SQLAlchemy engine."""
     engine = MagicMock()
     engine.pool = MagicMock()
@@ -46,7 +47,7 @@ def mock_engine():
 
 
 @pytest.fixture
-def mock_session_factory():
+def mock_session_factory() -> MagicMock:
     """Create a mock session factory."""
     factory = MagicMock()
     session = MagicMock(spec=Session)
@@ -60,7 +61,9 @@ def mock_session_factory():
 class TestShardedDatabaseManagerInitialization:
     """Test ShardedDatabaseManager initialization."""
 
-    def test_manager_initializes_with_shards(self, mock_sharding_service, mock_settings):
+    def test_manager_initializes_with_shards(
+        self, mock_sharding_service: MagicMock, mock_settings: MagicMock
+    ) -> None:
         """ShardedDatabaseManager initializes engines for all shards."""
         from app.database.sharded_connection import ShardedDatabaseManager
 
@@ -74,7 +77,9 @@ class TestShardedDatabaseManagerInitialization:
                 assert "shard_0" in manager.engines
                 assert "shard_1" in manager.engines
 
-    def test_manager_creates_session_factories(self, mock_sharding_service, mock_settings):
+    def test_manager_creates_session_factories(
+        self, mock_sharding_service: MagicMock, mock_settings: MagicMock
+    ) -> None:
         """ShardedDatabaseManager creates session factories for each shard."""
         from app.database.sharded_connection import ShardedDatabaseManager
 
@@ -88,7 +93,9 @@ class TestShardedDatabaseManagerInitialization:
                 assert "shard_0" in manager.session_factories
                 assert "shard_1" in manager.session_factories
 
-    def test_manager_configures_sqlite_engine(self, mock_sharding_service, mock_settings):
+    def test_manager_configures_sqlite_engine(
+        self, mock_sharding_service: MagicMock, mock_settings: MagicMock
+    ) -> None:
         """ShardedDatabaseManager configures SQLite engines correctly."""
         from app.database.sharded_connection import ShardedDatabaseManager
 
@@ -105,7 +112,9 @@ class TestShardedDatabaseManagerInitialization:
                 assert "sqlite" in first_call[0][0]
                 assert first_call[1].get("connect_args", {}).get("check_same_thread") is False
 
-    def test_manager_configures_postgresql_engine(self, mock_sharding_service, mock_settings):
+    def test_manager_configures_postgresql_engine(
+        self, mock_sharding_service: MagicMock, mock_settings: MagicMock
+    ) -> None:
         """ShardedDatabaseManager configures PostgreSQL engines correctly."""
         from app.database.sharded_connection import ShardedDatabaseManager
 
@@ -141,7 +150,9 @@ class TestShardedDatabaseManagerInitialization:
 class TestGetShardForUser:
     """Test get_shard_for_user method."""
 
-    def test_get_shard_for_user_returns_shard_id(self, mock_sharding_service, mock_settings):
+    def test_get_shard_for_user_returns_shard_id(
+        self, mock_sharding_service: MagicMock, mock_settings: MagicMock
+    ) -> None:
         """get_shard_for_user returns the correct shard ID."""
         from app.database.sharded_connection import ShardedDatabaseManager
 
@@ -156,8 +167,8 @@ class TestGetShardForUser:
                 mock_sharding_service.get_shard_for_user.assert_called_once_with("user_123")
 
     def test_get_shard_for_user_consistent_for_same_user(
-        self, mock_sharding_service, mock_settings
-    ):
+        self, mock_sharding_service: MagicMock, mock_settings: MagicMock
+    ) -> None:
         """get_shard_for_user returns the same shard for the same user."""
         from app.database.sharded_connection import ShardedDatabaseManager
 
@@ -175,7 +186,9 @@ class TestGetShardForUser:
 class TestGetEngineForShard:
     """Test get_engine_for_shard method."""
 
-    def test_get_engine_for_shard_returns_engine(self, mock_sharding_service, mock_settings):
+    def test_get_engine_for_shard_returns_engine(
+        self, mock_sharding_service: MagicMock, mock_settings: MagicMock
+    ) -> None:
         """get_engine_for_shard returns the engine for a shard."""
         from app.database.sharded_connection import ShardedDatabaseManager
 
@@ -192,8 +205,8 @@ class TestGetEngineForShard:
                 assert engine == mock_engine
 
     def test_get_engine_for_shard_returns_none_for_invalid_shard(
-        self, mock_sharding_service, mock_settings
-    ):
+        self, mock_sharding_service: MagicMock, mock_settings: MagicMock
+    ) -> None:
         """get_engine_for_shard returns None for invalid shard."""
         from app.database.sharded_connection import ShardedDatabaseManager
 
@@ -209,7 +222,9 @@ class TestGetEngineForShard:
 class TestGetSessionForUser:
     """Test get_session_for_user method."""
 
-    def test_get_session_for_user_returns_session(self, mock_sharding_service, mock_settings):
+    def test_get_session_for_user_returns_session(
+        self, mock_sharding_service: MagicMock, mock_settings: MagicMock
+    ) -> None:
         """get_session_for_user returns a session for the user's shard."""
         from app.database.sharded_connection import ShardedDatabaseManager
 
@@ -228,8 +243,8 @@ class TestGetSessionForUser:
                     assert session == mock_session
 
     def test_get_session_for_user_raises_for_missing_factory(
-        self, mock_sharding_service, mock_settings
-    ):
+        self, mock_sharding_service: MagicMock, mock_settings: MagicMock
+    ) -> None:
         """get_session_for_user raises ValueError if session factory not found."""
         from app.database.sharded_connection import ShardedDatabaseManager
 
@@ -246,7 +261,9 @@ class TestGetSessionForUser:
 class TestGetSessionForShard:
     """Test get_session_for_shard method."""
 
-    def test_get_session_for_shard_returns_session(self, mock_sharding_service, mock_settings):
+    def test_get_session_for_shard_returns_session(
+        self, mock_sharding_service: MagicMock, mock_settings: MagicMock
+    ) -> None:
         """get_session_for_shard returns a session for the shard."""
         from app.database.sharded_connection import ShardedDatabaseManager
 
@@ -264,8 +281,8 @@ class TestGetSessionForShard:
                     assert session == mock_session
 
     def test_get_session_for_shard_raises_for_invalid_shard(
-        self, mock_sharding_service, mock_settings
-    ):
+        self, mock_sharding_service: MagicMock, mock_settings: MagicMock
+    ) -> None:
         """get_session_for_shard raises ValueError for invalid shard."""
         from app.database.sharded_connection import ShardedDatabaseManager
 
@@ -281,7 +298,9 @@ class TestGetSessionForShard:
 class TestGetUserSessionContextManager:
     """Test get_user_session context manager."""
 
-    def test_get_user_session_yields_session(self, mock_sharding_service, mock_settings):
+    def test_get_user_session_yields_session(
+        self, mock_sharding_service: MagicMock, mock_settings: MagicMock
+    ) -> None:
         """get_user_session yields a session."""
         from app.database.sharded_connection import ShardedDatabaseManager
 
@@ -297,7 +316,9 @@ class TestGetUserSessionContextManager:
                     with manager.get_user_session("user_123") as session:
                         assert session == mock_session
 
-    def test_get_user_session_commits_on_success(self, mock_sharding_service, mock_settings):
+    def test_get_user_session_commits_on_success(
+        self, mock_sharding_service: MagicMock, mock_settings: MagicMock
+    ) -> None:
         """get_user_session commits the session on success."""
         from app.database.sharded_connection import ShardedDatabaseManager
 
@@ -315,7 +336,9 @@ class TestGetUserSessionContextManager:
 
                     mock_session.commit.assert_called_once()
 
-    def test_get_user_session_rollback_on_exception(self, mock_sharding_service, mock_settings):
+    def test_get_user_session_rollback_on_exception(
+        self, mock_sharding_service: MagicMock, mock_settings: MagicMock
+    ) -> None:
         """get_user_session rolls back on exception."""
         from app.database.sharded_connection import ShardedDatabaseManager
 
@@ -334,7 +357,9 @@ class TestGetUserSessionContextManager:
 
                     mock_session.rollback.assert_called_once()
 
-    def test_get_user_session_closes_session(self, mock_sharding_service, mock_settings):
+    def test_get_user_session_closes_session(
+        self, mock_sharding_service: MagicMock, mock_settings: MagicMock
+    ) -> None:
         """get_user_session closes the session."""
         from app.database.sharded_connection import ShardedDatabaseManager
 
@@ -356,7 +381,9 @@ class TestGetUserSessionContextManager:
 class TestGetShardSessionContextManager:
     """Test get_shard_session context manager."""
 
-    def test_get_shard_session_yields_session(self, mock_sharding_service, mock_settings):
+    def test_get_shard_session_yields_session(
+        self, mock_sharding_service: MagicMock, mock_settings: MagicMock
+    ) -> None:
         """get_shard_session yields a session."""
         from app.database.sharded_connection import ShardedDatabaseManager
 
@@ -372,7 +399,9 @@ class TestGetShardSessionContextManager:
                     with manager.get_shard_session("shard_0") as session:
                         assert session == mock_session
 
-    def test_get_shard_session_commits_on_success(self, mock_sharding_service, mock_settings):
+    def test_get_shard_session_commits_on_success(
+        self, mock_sharding_service: MagicMock, mock_settings: MagicMock
+    ) -> None:
         """get_shard_session commits the session on success."""
         from app.database.sharded_connection import ShardedDatabaseManager
 
@@ -390,7 +419,9 @@ class TestGetShardSessionContextManager:
 
                     mock_session.commit.assert_called_once()
 
-    def test_get_shard_session_rollback_on_exception(self, mock_sharding_service, mock_settings):
+    def test_get_shard_session_rollback_on_exception(
+        self, mock_sharding_service: MagicMock, mock_settings: MagicMock
+    ) -> None:
         """get_shard_session rolls back on exception."""
         from app.database.sharded_connection import ShardedDatabaseManager
 
@@ -409,7 +440,9 @@ class TestGetShardSessionContextManager:
 
                     mock_session.rollback.assert_called_once()
 
-    def test_get_shard_session_closes_session(self, mock_sharding_service, mock_settings):
+    def test_get_shard_session_closes_session(
+        self, mock_sharding_service: MagicMock, mock_settings: MagicMock
+    ) -> None:
         """get_shard_session closes the session."""
         from app.database.sharded_connection import ShardedDatabaseManager
 
@@ -431,7 +464,9 @@ class TestGetShardSessionContextManager:
 class TestExecuteCrossShardQuery:
     """Test execute_cross_shard_query method."""
 
-    def test_execute_cross_shard_query_calls_query_func(self, mock_sharding_service, mock_settings):
+    def test_execute_cross_shard_query_calls_query_func(
+        self, mock_sharding_service: MagicMock, mock_settings: MagicMock
+    ) -> None:
         """execute_cross_shard_query calls query_func for each shard."""
         from app.database.sharded_connection import ShardedDatabaseManager
 
@@ -450,7 +485,9 @@ class TestExecuteCrossShardQuery:
 
                     assert query_func.call_count == 2
 
-    def test_execute_cross_shard_query_combines_results(self, mock_sharding_service, mock_settings):
+    def test_execute_cross_shard_query_combines_results(
+        self, mock_sharding_service: MagicMock, mock_settings: MagicMock
+    ) -> None:
         """execute_cross_shard_query combines results from all shards."""
         from app.database.sharded_connection import ShardedDatabaseManager
 
@@ -472,7 +509,9 @@ class TestExecuteCrossShardQuery:
                     assert len(results) == 4
                     assert results == [{"id": 1}, {"id": 2}, {"id": 3}, {"id": 4}]
 
-    def test_execute_cross_shard_query_handles_errors(self, mock_sharding_service, mock_settings):
+    def test_execute_cross_shard_query_handles_errors(
+        self, mock_sharding_service: MagicMock, mock_settings: MagicMock
+    ) -> None:
         """execute_cross_shard_query continues on error."""
         from app.database.sharded_connection import ShardedDatabaseManager
 
@@ -493,8 +532,8 @@ class TestExecuteCrossShardQuery:
                     assert results == [{"id": 1}]
 
     def test_execute_cross_shard_query_passes_args_and_kwargs(
-        self, mock_sharding_service, mock_settings
-    ):
+        self, mock_sharding_service: MagicMock, mock_settings: MagicMock
+    ) -> None:
         """execute_cross_shard_query passes args and kwargs to query_func."""
         from app.database.sharded_connection import ShardedDatabaseManager
 
@@ -521,7 +560,9 @@ class TestExecuteCrossShardQuery:
 class TestGetShardStats:
     """Test get_shard_stats method."""
 
-    def test_get_shard_stats_returns_stats(self, mock_sharding_service, mock_settings):
+    def test_get_shard_stats_returns_stats(
+        self, mock_sharding_service: MagicMock, mock_settings: MagicMock
+    ) -> None:
         """get_shard_stats returns statistics for all shards."""
         from app.database.sharded_connection import ShardedDatabaseManager
 
@@ -544,7 +585,9 @@ class TestGetShardStats:
                 assert "shard_0" in stats["shards"]
                 assert "shard_1" in stats["shards"]
 
-    def test_get_shard_stats_includes_pool_info(self, mock_sharding_service, mock_settings):
+    def test_get_shard_stats_includes_pool_info(
+        self, mock_sharding_service: MagicMock, mock_settings: MagicMock
+    ) -> None:
         """get_shard_stats includes pool information."""
         from app.database.sharded_connection import ShardedDatabaseManager
 
@@ -565,7 +608,9 @@ class TestGetShardStats:
                 assert "pool_size" in shard_stats
                 assert "overflow" in shard_stats
 
-    def test_get_shard_stats_handles_errors(self, mock_sharding_service, mock_settings):
+    def test_get_shard_stats_handles_errors(
+        self, mock_sharding_service: MagicMock, mock_settings: MagicMock
+    ) -> None:
         """get_shard_stats handles errors gracefully."""
         from app.database.sharded_connection import ShardedDatabaseManager
 
@@ -592,7 +637,9 @@ class TestGetShardStats:
 class TestCloseAllConnections:
     """Test close_all_connections method."""
 
-    def test_close_all_connections_disposes_engines(self, mock_sharding_service, mock_settings):
+    def test_close_all_connections_disposes_engines(
+        self, mock_sharding_service: MagicMock, mock_settings: MagicMock
+    ) -> None:
         """close_all_connections disposes all engines."""
         from app.database.sharded_connection import ShardedDatabaseManager
 
@@ -608,7 +655,9 @@ class TestCloseAllConnections:
 
                 assert mock_engine.dispose.call_count == 2
 
-    def test_close_all_connections_handles_errors(self, mock_sharding_service, mock_settings):
+    def test_close_all_connections_handles_errors(
+        self, mock_sharding_service: MagicMock, mock_settings: MagicMock
+    ) -> None:
         """close_all_connections handles errors gracefully."""
         from app.database.sharded_connection import ShardedDatabaseManager
 
@@ -628,8 +677,8 @@ class TestGlobalShardedDatabaseManager:
     """Test global sharded_db_manager instance."""
 
     def test_manager_initialization_with_sharding_enabled(
-        self, mock_sharding_service, mock_settings
-    ):
+        self, mock_sharding_service: MagicMock, mock_settings: MagicMock
+    ) -> None:
         """ShardedDatabaseManager is created when sharding is enabled."""
         from app.database.sharded_connection import ShardedDatabaseManager
 
@@ -644,8 +693,8 @@ class TestGlobalShardedDatabaseManager:
                 assert len(manager.engines) > 0
 
     def test_manager_initialization_with_multiple_shards(
-        self, mock_sharding_service, mock_settings
-    ):
+        self, mock_sharding_service: MagicMock, mock_settings: MagicMock
+    ) -> None:
         """ShardedDatabaseManager initializes multiple shard engines."""
         from app.database.sharded_connection import ShardedDatabaseManager
 
@@ -669,8 +718,8 @@ class TestEdgeCasesAndErrorHandling:
     """Test edge cases and error handling."""
 
     def test_get_session_for_user_with_different_users_different_shards(
-        self, mock_sharding_service, mock_settings
-    ):
+        self, mock_sharding_service: MagicMock, mock_settings: MagicMock
+    ) -> None:
         """get_session_for_user returns different shards for different users."""
         from app.database.sharded_connection import ShardedDatabaseManager
 
@@ -696,8 +745,8 @@ class TestEdgeCasesAndErrorHandling:
                     assert session_1 == mock_session_1
 
     def test_execute_cross_shard_query_with_empty_results(
-        self, mock_sharding_service, mock_settings
-    ):
+        self, mock_sharding_service: MagicMock, mock_settings: MagicMock
+    ) -> None:
         """execute_cross_shard_query handles empty results."""
         from app.database.sharded_connection import ShardedDatabaseManager
 
@@ -717,8 +766,8 @@ class TestEdgeCasesAndErrorHandling:
                     assert results == []
 
     def test_execute_cross_shard_query_with_none_results(
-        self, mock_sharding_service, mock_settings
-    ):
+        self, mock_sharding_service: MagicMock, mock_settings: MagicMock
+    ) -> None:
         """execute_cross_shard_query handles None results."""
         from app.database.sharded_connection import ShardedDatabaseManager
 
@@ -737,7 +786,9 @@ class TestEdgeCasesAndErrorHandling:
 
                     assert results == []
 
-    def test_get_shard_stats_with_multiple_shards(self, mock_sharding_service, mock_settings):
+    def test_get_shard_stats_with_multiple_shards(
+        self, mock_sharding_service: MagicMock, mock_settings: MagicMock
+    ) -> None:
         """get_shard_stats returns stats for multiple shards."""
         from app.database.sharded_connection import ShardedDatabaseManager
 
@@ -760,7 +811,9 @@ class TestEdgeCasesAndErrorHandling:
                     assert shard_id in stats["shards"]
                     assert "pool_size" in stats["shards"][shard_id]
 
-    def test_close_all_connections_with_multiple_shards(self, mock_sharding_service, mock_settings):
+    def test_close_all_connections_with_multiple_shards(
+        self, mock_sharding_service: MagicMock, mock_settings: MagicMock
+    ) -> None:
         """close_all_connections closes all shard engines."""
         from app.database.sharded_connection import ShardedDatabaseManager
 
@@ -777,7 +830,9 @@ class TestEdgeCasesAndErrorHandling:
                 # Should be called for each shard
                 assert mock_engine.dispose.call_count == 2
 
-    def test_get_user_session_with_database_error(self, mock_sharding_service, mock_settings):
+    def test_get_user_session_with_database_error(
+        self, mock_sharding_service: MagicMock, mock_settings: MagicMock
+    ) -> None:
         """get_user_session handles database errors."""
         from app.database.sharded_connection import ShardedDatabaseManager
 
@@ -797,7 +852,9 @@ class TestEdgeCasesAndErrorHandling:
 
                     mock_session.rollback.assert_called_once()
 
-    def test_get_shard_session_with_database_error(self, mock_sharding_service, mock_settings):
+    def test_get_shard_session_with_database_error(
+        self, mock_sharding_service: MagicMock, mock_settings: MagicMock
+    ) -> None:
         """get_shard_session handles database errors."""
         from app.database.sharded_connection import ShardedDatabaseManager
 
@@ -817,7 +874,9 @@ class TestEdgeCasesAndErrorHandling:
 
                     mock_session.rollback.assert_called_once()
 
-    def test_initialize_shard_engines_logs_info(self, mock_sharding_service, mock_settings, caplog):
+    def test_initialize_shard_engines_logs_info(
+        self, mock_sharding_service: MagicMock, mock_settings: MagicMock, caplog: Any
+    ) -> None:
         """_initialize_shard_engines logs initialization info."""
         from app.database.sharded_connection import ShardedDatabaseManager
         import logging
@@ -832,7 +891,9 @@ class TestEdgeCasesAndErrorHandling:
                         "Initialized database engine" in record.message for record in caplog.records
                     )
 
-    def test_get_engine_for_shard_with_valid_shard(self, mock_sharding_service, mock_settings):
+    def test_get_engine_for_shard_with_valid_shard(
+        self, mock_sharding_service: MagicMock, mock_settings: MagicMock
+    ) -> None:
         """get_engine_for_shard returns correct engine for valid shard."""
         from app.database.sharded_connection import ShardedDatabaseManager
 
@@ -851,8 +912,8 @@ class TestEdgeCasesAndErrorHandling:
                 assert engine_1 == mock_engine_1
 
     def test_execute_cross_shard_query_with_mixed_results(
-        self, mock_sharding_service, mock_settings
-    ):
+        self, mock_sharding_service: MagicMock, mock_settings: MagicMock
+    ) -> None:
         """execute_cross_shard_query handles mixed success and error results."""
         from app.database.sharded_connection import ShardedDatabaseManager
 
@@ -878,7 +939,9 @@ class TestEdgeCasesAndErrorHandling:
                     # Should have results from successful shards
                     assert len(results) >= 1
 
-    def test_get_shard_for_user_delegates_to_service(self, mock_sharding_service, mock_settings):
+    def test_get_shard_for_user_delegates_to_service(
+        self, mock_sharding_service: MagicMock, mock_settings: MagicMock
+    ) -> None:
         """get_shard_for_user delegates to sharding_service."""
         from app.database.sharded_connection import ShardedDatabaseManager
 

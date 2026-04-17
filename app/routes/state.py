@@ -11,6 +11,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.orm import Session
 
 from app.services.authorization import Permission, get_current_user, require_permission
+from app.services.auth_manager import TokenPayload
 from app.routes.sessions import get_session_manager, validate_session_ownership
 from app.services.session_manager import SessionManager
 from app.database.connection import get_db
@@ -57,10 +58,10 @@ router = APIRouter(
 )
 async def get_system_state(
     session_id: str,
-    manager: "SessionManager" = Depends(get_session_manager),
-    current_user=Depends(get_current_user),
+    manager: SessionManager = Depends(get_session_manager),
+    current_user: TokenPayload = Depends(get_current_user),
     db: Session = Depends(get_db),
-):
+) -> SystemStateResponse:
     """
     Get complete system state.
 
@@ -174,10 +175,10 @@ async def get_ignition_history(  # noqa: C901
         description="Maximum number of events to return (warning: values > 500 may be slow)",
     ),
     cursor: Optional[str] = Query(None, description="Pagination cursor"),
-    manager: "SessionManager" = Depends(get_session_manager),
-    current_user=Depends(get_current_user),
+    manager: SessionManager = Depends(get_session_manager),
+    current_user: TokenPayload = Depends(get_current_user),
     db: Session = Depends(get_db),
-):
+) -> IgnitionHistoryResponse:
     """
     Get ignition event history.
 
@@ -337,10 +338,10 @@ async def get_ignition_history(  # noqa: C901
 )
 async def get_interoceptive_state(
     session_id: str,
-    manager: "SessionManager" = Depends(get_session_manager),
-    current_user=Depends(get_current_user),
+    manager: SessionManager = Depends(get_session_manager),
+    current_user: TokenPayload = Depends(get_current_user),
     db: Session = Depends(get_db),
-):
+) -> BodyState:
     """
     Get interoceptive body state.
 
@@ -401,10 +402,10 @@ async def get_interoceptive_state(
 )
 async def get_prediction_errors(
     session_id: str,
-    manager: "SessionManager" = Depends(get_session_manager),
-    current_user=Depends(get_current_user),
+    manager: SessionManager = Depends(get_session_manager),
+    current_user: TokenPayload = Depends(get_current_user),
     db: Session = Depends(get_db),
-):
+) -> PredictionErrorsResponse:
     """
     Get prediction errors.
 
@@ -466,10 +467,10 @@ async def get_prediction_errors(
 )
 async def get_somatic_markers(
     session_id: str,
-    manager: "SessionManager" = Depends(get_session_manager),
-    current_user=Depends(get_current_user),
+    manager: SessionManager = Depends(get_session_manager),
+    current_user: TokenPayload = Depends(get_current_user),
     db: Session = Depends(get_db),
-):
+) -> SomaticMarkersResponse:
     """
     Get somatic markers.
 
