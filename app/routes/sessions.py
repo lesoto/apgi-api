@@ -6,35 +6,36 @@ API endpoints for creating, controlling, and managing APGI simulation sessions.
 
 import asyncio
 import logging
-from typing import Optional, Dict, Any, List, cast
+from datetime import datetime
+from typing import Any, Dict, List, Optional, cast
 
 import redis.asyncio as redis
-from fastapi import APIRouter, Depends, HTTPException, status, Request
+from fastapi import APIRouter, Depends, HTTPException, Request, status
 from sqlalchemy.orm import Session
 
 from app.database.connection import SessionLocal, get_db
-from datetime import datetime
-from app.database.models import Session as SessionModel, Task
+from app.database.models import Session as SessionModel
+from app.database.models import Task
 from app.exceptions import ServiceUnavailableError, SessionNotFoundError, SessionStateConflictError
 from app.models.schemas import (
-    SessionCreateResponse,
+    ErrorResponse,
+    PaginationInfo,
     SessionActionResponse,
     SessionCreateRequest,
+    SessionCreateResponse,
     SessionListResponse,
     SessionMetricsResponse,
     SessionResponse,
     SessionTaskListResponse,
     TaskStatusResponse,
-    PaginationInfo,
-    ErrorResponse,
 )
 from app.services.authorization import (
     Permission,
-    require_permission,
-    get_current_user,
     Role,
-    has_any_role,
     TokenPayload,
+    get_current_user,
+    has_any_role,
+    require_permission,
 )
 from app.services.session_manager import SessionLifecycleState, SessionManager
 

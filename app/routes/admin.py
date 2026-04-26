@@ -5,11 +5,12 @@ API endpoints for administrative tasks, including audit log queries.
 """
 
 import logging
-from typing import Optional, List, Dict, Any
 from datetime import datetime
+from typing import Any, Dict, List, Optional
 
-from fastapi import APIRouter, Depends, HTTPException, status, Query  # noqa: F401
-from sqlalchemy import desc, and_
+from fastapi import APIRouter, Depends, HTTPException, Query, status  # noqa: F401
+from pydantic import BaseModel
+from sqlalchemy import and_, desc
 from sqlalchemy.orm import Session
 
 from app.database.connection import get_db
@@ -17,11 +18,10 @@ from app.database.models import AuditLog
 from app.models.schemas import ErrorResponse, PaginationInfo
 from app.services.authorization import (
     Permission,
-    require_permission,
-    get_current_user,
     TokenPayload,
+    get_current_user,
+    require_permission,
 )
-from pydantic import BaseModel
 
 logger = logging.getLogger(__name__)
 

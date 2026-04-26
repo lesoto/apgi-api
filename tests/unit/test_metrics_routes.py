@@ -22,9 +22,10 @@ Also tests:
   - get_profiling_service() singleton factory
 """
 
-import pytest
 from typing import Any, Dict
-from unittest.mock import patch, MagicMock, AsyncMock
+from unittest.mock import AsyncMock, MagicMock, patch
+
+import pytest
 from fastapi import HTTPException
 
 # ---------------------------------------------------------------------------
@@ -37,8 +38,8 @@ class TestServiceFactories:
 
     def test_get_business_metrics_service_creates_instance(self) -> None:
         """First call creates an instance; subsequent calls return the same one."""
-        from app.routes.metrics import get_business_metrics_service
         import app.routes.metrics as metrics_module
+        from app.routes.metrics import get_business_metrics_service
 
         # Reset singleton
         metrics_module._business_metrics_service = None
@@ -55,8 +56,8 @@ class TestServiceFactories:
 
     def test_get_business_metrics_service_reuses_existing(self) -> None:
         """If the singleton already exists it is returned without re-creating."""
-        from app.routes.metrics import get_business_metrics_service
         import app.routes.metrics as metrics_module
+        from app.routes.metrics import get_business_metrics_service
 
         existing = MagicMock()
         metrics_module._business_metrics_service = existing
@@ -72,8 +73,8 @@ class TestServiceFactories:
 
     def test_get_profiling_service_creates_instance(self) -> None:
         """First call creates a ProfilingService; subsequent calls reuse it."""
-        from app.routes.metrics import get_profiling_service
         import app.routes.metrics as metrics_module
+        from app.routes.metrics import get_profiling_service
 
         metrics_module._profiling_service = None
 
@@ -89,8 +90,8 @@ class TestServiceFactories:
 
     def test_get_profiling_service_reuses_existing(self) -> None:
         """If the singleton already exists it is returned without re-creating."""
-        from app.routes.metrics import get_profiling_service
         import app.routes.metrics as metrics_module
+        from app.routes.metrics import get_profiling_service
 
         existing = MagicMock()
         metrics_module._profiling_service = existing
@@ -427,8 +428,9 @@ class TestDashboardHTML:
     @pytest.mark.asyncio
     async def test_returns_html_response(self) -> None:
         """Returns an HTMLResponse containing dashboard metrics."""
-        from app.routes.metrics import get_dashboard_html
         from fastapi.responses import HTMLResponse
+
+        from app.routes.metrics import get_dashboard_html
 
         mock_service = MagicMock()
         mock_service.get_dashboard_data = AsyncMock(
@@ -773,3 +775,111 @@ class TestBoundaryConditions:
         mock_service.get_performance_history.return_value = {}
         result = await get_performance_history(hours=24, service=mock_service)
         assert result == {}
+
+
+# ---------------------------------------------------------------------------
+# Template rendering functions
+# ---------------------------------------------------------------------------
+
+
+class TestLoadDashboardTemplate:
+    """Tests for _load_dashboard_template function."""
+
+    def test_load_template_success(self) -> None:
+        """Successfully load the dashboard template file."""
+        from app.routes.metrics import _load_dashboard_template
+
+        template = _load_dashboard_template()
+
+        assert "<!DOCTYPE html>" in template
+        assert "APGI API Analytics Dashboard" in template
+        assert "{{days}}" in template
+        assert "{{dashboard_data_json}}" in template
+
+    def test_load_template_file_not_found(self) -> None:
+        """Raise FileNotFoundError when template is missing."""
+        from app.routes.metrics import _load_dashboard_template
+
+        with patch("builtins.open", side_effect=FileNotFoundError("not found")):
+            with pytest.raises(FileNotFoundError):
+                _load_dashboard_template()
+
+
+class TestRenderDashboardTemplate:
+    """Tests for _render_dashboard_template function."""
+
+    def test_render_replaces_all_placeholders(self) -> None:
+        """All template placeholders are replaced with data."""
+        from app.routes.metrics import _render_dashboard_template
+
+        template = """
+        Days: {{days}}
+        Requests: {{total_requests}}
+        Users: {{active_users}}
+        Avg Time: {{avg_response_time}}ms
+        Error Rate: {{error_rate}}%
+        Uptime: {{uptime_hours}}h
+        CPU: {{cpu_usage}}%
+        Memory: {{memory_usage}}%
+        Data: {{dashboard_data_json}}
+        """
+
+        dashboard_data = {
+            "overview": {
+                "total_requests": 1000,
+                "active_users": 50,
+                "avg_response_time": 12.34,
+                "error_rate": 0.5,
+            },
+            "system": {
+                "uptime_hours": 24.5,
+                "cpu_usage": 45.6,
+                "memory_usage": 78.9,
+            },
+        }
+
+        result = _render_dashboard_template(template, 30, dashboard_data)
+
+        assert "Days: 30" in result
+        assert "Requests: 1000" in result
+        assert "Users: 50" in result
+        assert "Avg Time: 12.34ms" in result
+        assert "Error Rate: 0.50%" in result
+        assert "Uptime: 24.5h" in result
+        assert "CPU: 45.6%" in result
+        assert "Memory: 78.9%" in result
+        assert '"total_requests": 1000' in result
+
+    def test_render_escapes_html_special_chars(self) -> None:
+        """HTML special characters are escaped to prevent XSS."""
+        from app.routes.metrics import _render_dashboard_template
+
+        template = "Requests: {{total_requests}}"
+
+        dashboard_data = {
+            "overview": {
+                "total_requests": "<script>alert('xss')</script>",
+                "active_users": 5,
+                "avg_response_time": 12.3,
+                "error_rate": 0.5,
+            },
+            "system": {"uptime_hours": 24.0, "cpu_usage": 30.0, "memory_usage": 45.0},
+        }
+
+        result = _render_dashboard_template(template, 30, dashboard_data)
+
+        assert "<script>" not in result
+        assert "&lt;script&gt;" in result
+
+    def test_render_handles_missing_data(self) -> None:
+        """Handle missing keys in dashboard data gracefully."""
+        from app.routes.metrics import _render_dashboard_template
+
+        template = "Requests: {{total_requests}}"
+
+        # Missing overview keys
+        dashboard_data: dict[str, Any] = {"overview": {}, "system": {}}
+
+        result = _render_dashboard_template(template, 30, dashboard_data)
+
+        assert "Requests: 0" in result

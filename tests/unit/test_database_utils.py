@@ -2,13 +2,14 @@
 Unit tests for database utilities.
 """
 
-from typing import Generator, Any
-import pytest
-from unittest.mock import Mock, MagicMock, patch
-from app.database.sharded_connection import ShardedDatabaseManager
-
 # Mock DATABASE_URL for reset_db tests
 import os
+from typing import Any, Generator
+from unittest.mock import MagicMock, Mock, patch
+
+import pytest
+
+from app.database.sharded_connection import ShardedDatabaseManager
 
 os.environ["DATABASE_URL"] = "postgresql://postgres:password@localhost:5432/apgi_api_dev"
 

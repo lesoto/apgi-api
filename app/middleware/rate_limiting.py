@@ -4,16 +4,15 @@ Rate Limiting Middleware
 Middleware for enforcing rate limits on API requests.
 """
 
-from datetime import datetime, timedelta, timezone
-
 import ipaddress
-import redis.asyncio as redis
 import threading
+from datetime import datetime, timedelta, timezone
+from typing import Any, Optional
+
+import redis.asyncio as redis
 from fastapi import Request
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.responses import JSONResponse
-
-from typing import Any, Optional
 
 from app.middleware.logging import StructuredLogger
 from app.services.rate_limiter import RateLimiter

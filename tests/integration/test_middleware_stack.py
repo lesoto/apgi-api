@@ -8,11 +8,11 @@ Requirements: 7.1, 7.2, 7.3, 7.4, 7.5, 7.6
 """
 
 import os
-import jwt
 from datetime import datetime, timedelta, timezone
-from unittest.mock import patch, MagicMock, AsyncMock
-from typing import Optional, Iterator
+from typing import Iterator, Optional
+from unittest.mock import AsyncMock, MagicMock, patch
 
+import jwt
 import pytest
 from starlette.testclient import TestClient
 

@@ -12,7 +12,6 @@ from typing import Any, Dict, List, Optional, cast
 import bcrypt
 import jwt
 import pyotp
-
 from sqlalchemy import and_
 from sqlalchemy.orm import Session
 
@@ -138,8 +137,8 @@ class AuthManager:
         Returns:
             Encoded JWT token string
         """
-        from datetime import timezone
         import uuid
+        from datetime import timezone
 
         expires_at = datetime.now(timezone.utc) + timedelta(
             minutes=self.access_token_expire_minutes

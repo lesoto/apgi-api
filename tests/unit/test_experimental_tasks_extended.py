@@ -4,9 +4,10 @@ Comprehensive tests for experimental_tasks.py covering task execution paths.
 Tests the actual task execution when APGI system is available (mocked).
 """
 
-import pytest
 from typing import Any, Generator
-from unittest.mock import MagicMock, patch, AsyncMock
+from unittest.mock import AsyncMock, MagicMock, patch
+
+import pytest
 
 
 class MockTask:
@@ -92,8 +93,8 @@ class TestIowaGamblingTaskExecution:
     def test_iowa_gambling_task_success(self, mock_apgi_modules: Any) -> None:
         """Test Iowa Gambling task returns unavailable response when APGI not available."""
         from app.tasks.experimental_tasks import (
-            execute_iowa_gambling_task,
             APGI_SYSTEM_AVAILABLE,
+            execute_iowa_gambling_task,
         )
 
         # When APGI is not available, task should return unavailable response
@@ -227,8 +228,8 @@ class TestAPGITaskBaseClass:
 
     def test_apgi_task_lazy_initialization(self) -> None:
         """Test APGI task lazy initialization property."""
-        from app.tasks.experimental_tasks import APGITask
         from app.tasks import experimental_tasks
+        from app.tasks.experimental_tasks import APGITask
 
         # When APGI not available, accessing apgi_system should raise ImportError
         if not experimental_tasks.APGI_SYSTEM_AVAILABLE:
@@ -298,8 +299,8 @@ class TestTriggerWebhookOnCompletion:
     @pytest.mark.asyncio
     async def test_trigger_webhook_task_executor_exception(self, mock_db: MagicMock) -> None:
         """Test webhook trigger when task executor fails."""
-        from app.tasks.experimental_tasks import trigger_webhook_on_completion
         from app.services.task_executor import TaskExecutor
+        from app.tasks.experimental_tasks import trigger_webhook_on_completion
 
         with patch("app.tasks.experimental_tasks.get_db") as mock_get_db:
             mock_get_db.return_value = iter([mock_db])

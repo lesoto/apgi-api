@@ -5,10 +5,12 @@ Feature: api-migration
 Tests universal properties of GZip response compression for large responses.
 """
 
-from hypothesis import given, strategies as st, assume, settings
 import sys
 from pathlib import Path
 from typing import Any, Dict, List
+
+from hypothesis import assume, given, settings
+from hypothesis import strategies as st
 
 # Add app directory to path for imports
 sys.path.insert(0, str(Path(__file__).parent.parent.parent / "app"))

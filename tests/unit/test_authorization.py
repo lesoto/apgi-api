@@ -7,27 +7,28 @@ Target: ≥ 90% line coverage for app/services/authorization.py
 Validates: Requirements 2.12
 """
 
-import pytest
 from typing import cast
-from unittest.mock import Mock, MagicMock, patch, AsyncMock
+from unittest.mock import AsyncMock, MagicMock, Mock, patch
+
+import pytest
 from fastapi import Request
 
+from app.exceptions import AuthorizationError, InvalidTokenError
 from app.services.authorization import (
-    Role,
-    Permission,
     ROLE_PERMISSIONS,
-    get_permissions_for_roles,
-    has_permission,
-    has_any_role,
+    Permission,
+    Role,
     check_permission,
+    check_resource_ownership,
     get_current_user,
+    get_permissions_for_roles,
+    has_any_role,
+    has_permission,
+    log_audit_event,
+    require_any_role,
     require_permission,
     require_role,
-    require_any_role,
-    log_audit_event,
-    check_resource_ownership,
 )
-from app.exceptions import AuthorizationError, InvalidTokenError
 
 # ---------------------------------------------------------------------------
 # Helpers

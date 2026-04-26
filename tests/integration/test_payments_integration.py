@@ -2,10 +2,11 @@
 Integration tests for payments routes.
 """
 
-import pytest
-from unittest.mock import Mock, MagicMock, AsyncMock, patch
-from fastapi import HTTPException, status
 from datetime import datetime, timezone
+from unittest.mock import AsyncMock, MagicMock, Mock, patch
+
+import pytest
+from fastapi import HTTPException, status
 
 
 @pytest.fixture
@@ -79,8 +80,8 @@ class TestPaymentsIntegration:
         mock_stripe.PaymentIntent.create.return_value = mock_payment_intent
 
         from app.routes.payments import (
-            create_payment_intent,
             PaymentIntentCreateRequest,
+            create_payment_intent,
         )
 
         request_data = PaymentIntentCreateRequest(
@@ -100,8 +101,8 @@ class TestPaymentsIntegration:
     ) -> None:
         """Test payment intent creation with invalid product."""
         from app.routes.payments import (
-            create_payment_intent,
             PaymentIntentCreateRequest,
+            create_payment_intent,
         )
 
         request_data = PaymentIntentCreateRequest(
@@ -124,8 +125,8 @@ class TestPaymentsIntegration:
         mock_stripe.PaymentIntent.create.side_effect = Exception("Stripe API error")
 
         from app.routes.payments import (
-            create_payment_intent,
             PaymentIntentCreateRequest,
+            create_payment_intent,
         )
 
         request_data = PaymentIntentCreateRequest(
@@ -166,8 +167,9 @@ class TestPaymentsIntegration:
         # Mock database query
         mock_db.query.return_value.filter.return_value.first.return_value = mock_order
 
-        from app.routes.payments import stripe_webhook
         from fastapi import Request
+
+        from app.routes.payments import stripe_webhook
 
         # Create a mock request
         mock_request = MagicMock(spec=Request)
@@ -203,8 +205,9 @@ class TestPaymentsIntegration:
         # Mock database query
         mock_db.query.return_value.filter.return_value.first.return_value = mock_order
 
-        from app.routes.payments import stripe_webhook
         from fastapi import Request
+
+        from app.routes.payments import stripe_webhook
 
         # Create a mock request
         mock_request = MagicMock(spec=Request)
@@ -230,8 +233,9 @@ class TestPaymentsIntegration:
         """Test webhook with invalid signature."""
         mock_get_db.return_value = mock_db
 
-        from app.routes.payments import stripe_webhook
         from fastapi import Request
+
+        from app.routes.payments import stripe_webhook
 
         # Create a mock request
         mock_request = MagicMock(spec=Request)

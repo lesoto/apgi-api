@@ -6,8 +6,8 @@ Each task type has its own parameter schema and validation logic.
 """
 
 from abc import ABC, abstractmethod
-from typing import Any, Dict, List, Optional
 from dataclasses import dataclass
+from typing import Any, Dict, List, Optional
 
 
 @dataclass

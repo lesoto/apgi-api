@@ -9,17 +9,18 @@ Validates Requirements 2.3.
 
 import json
 import time
-from typing import Any
-import pytest
-from datetime import datetime, timezone
-from unittest.mock import MagicMock, AsyncMock, patch
 from collections.abc import Generator
+from datetime import datetime, timezone
+from typing import Any
+from unittest.mock import AsyncMock, MagicMock, patch
+
+import pytest
 
 from app.services.session_manager import (
+    ALLOWED_TRANSITIONS,
+    SessionLifecycleState,
     SessionManager,
     SimulationSession,
-    SessionLifecycleState,
-    ALLOWED_TRANSITIONS,
     validate_session_id,
 )
 
@@ -323,8 +324,8 @@ class TestCreateSession:
     async def test_create_session_raises_when_max_sessions_reached(
         self, session_manager: SessionManager, mock_db: MagicMock, apgi_patch: MagicMock
     ) -> None:
-        from app.models.schemas import SessionCreateRequest
         from app.config import settings
+        from app.models.schemas import SessionCreateRequest
 
         mock_db.scalar.return_value = settings.max_sessions_per_user
         req = SessionCreateRequest(
@@ -337,8 +338,9 @@ class TestCreateSession:
     async def test_create_session_raises_without_config(
         self, session_manager: SessionManager, mock_db: MagicMock, apgi_patch: MagicMock
     ) -> None:
-        from app.models.schemas import SessionCreateRequest
         from pydantic import ValidationError
+
+        from app.models.schemas import SessionCreateRequest
 
         # The schema itself rejects all-None input
         with pytest.raises((ValidationError, ValueError)):

@@ -4,14 +4,15 @@ Health Check Service
 Provides health check functionality for monitoring API dependencies.
 """
 
-from datetime import datetime, timezone
-from typing import Dict, Any
 import time
+from datetime import datetime, timezone
+from typing import Any, Dict
+
 import redis.asyncio as redis
 from sqlalchemy import text
 
-from app.config import settings
 from app.celery_app import celery_app
+from app.config import settings
 
 
 class HealthCheckService:

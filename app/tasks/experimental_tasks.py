@@ -14,19 +14,30 @@ from typing import Any, Dict
 # Add /app to Python path for proper imports
 sys.path.insert(0, "/app")
 
+from celery import Task
+
 from app.database.connection import get_db
 from app.database.models import Task as TaskModel
-from celery import Task
 
 # apgi_system is an optional dependency for experimental paradigms
 try:
-    from apgi_system.experiments.tasks.attentional_blink import AttentionalBlinkTask  # type: ignore[import-not-found]
-    from apgi_system.experiments.tasks.binocular_rivalry import BinocularRivalryTask  # type: ignore[import-not-found]
-    from apgi_system.experiments.tasks.change_blindness import ChangeBlindnessTask  # type: ignore[import-not-found]
-    from apgi_system.experiments.tasks.iowa_gambling import IowaGamblingTask  # type: ignore[import-not-found]
-    from apgi_system.experiments.tasks.masking_paradigm import MaskingParadigmTask  # type: ignore[import-not-found]
-    from apgi_system.platform_utils import get_resource_path  # type: ignore[import-not-found]
-    from apgi_system.system import APGISystem  # type: ignore[import-not-found]
+    from apgi_system.experiments.tasks.attentional_blink import (
+        AttentionalBlinkTask,
+    )
+    from apgi_system.experiments.tasks.binocular_rivalry import (
+        BinocularRivalryTask,
+    )
+    from apgi_system.experiments.tasks.change_blindness import (
+        ChangeBlindnessTask,
+    )
+    from apgi_system.experiments.tasks.iowa_gambling import (
+        IowaGamblingTask,
+    )
+    from apgi_system.experiments.tasks.masking_paradigm import (
+        MaskingParadigmTask,
+    )
+    from apgi_system.platform_utils import get_resource_path
+    from apgi_system.system import APGISystem
 
     APGI_SYSTEM_AVAILABLE = True
 except ImportError:

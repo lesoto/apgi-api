@@ -5,13 +5,14 @@ Feature: api-migration
 Tests universal properties of CORS header inclusion in responses.
 """
 
-from hypothesis import given, strategies as st, assume, settings
 import sys
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
+from hypothesis import assume, given, settings
+from hypothesis import strategies as st
 from starlette.middleware.cors import CORSMiddleware
 
 # Add app directory to path for imports

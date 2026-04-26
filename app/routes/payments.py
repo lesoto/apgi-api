@@ -5,17 +5,17 @@ API endpoints for creating Stripe PaymentIntents.
 """
 
 import logging
+from datetime import timezone
 from typing import Any
 
 import stripe
-from datetime import timezone
+from fastapi import APIRouter, Depends, HTTPException, Request, status
 from pydantic import BaseModel
-from fastapi import APIRouter, Depends, HTTPException, status, Request
 from sqlalchemy.orm import Session
 
 from app.config import settings
 from app.database.connection import get_db
-from app.database.models import Order, Subscription, ProcessedWebhookEvent, User
+from app.database.models import Order, ProcessedWebhookEvent, Subscription, User
 from app.models.schemas import ErrorResponse
 from app.services.authorization import Permission, require_permission
 
@@ -453,8 +453,8 @@ async def _handle_subscription_event(
                 .first()
             )
             if not sub and user_id:
-                from datetime import datetime
                 import time
+                from datetime import datetime
 
                 sub = Subscription(
                     user_id=user_id,
@@ -486,8 +486,8 @@ async def _handle_subscription_event(
                 .first()
             )
             if sub:
-                from datetime import datetime
                 import time
+                from datetime import datetime
 
                 sub.status = status  # type: ignore[assignment]
                 sub.plan_id = subscription.get("plan", {}).get("id", sub.plan_id)

@@ -4,10 +4,12 @@ Integration tests for session routes.
 Tests for session management, lifecycle, and cleanup.
 """
 
-import pytest
-from unittest.mock import MagicMock, AsyncMock, patch
-from fastapi import HTTPException, status
 from datetime import datetime, timedelta, timezone
+from unittest.mock import AsyncMock, MagicMock, patch
+
+import pytest
+from fastapi import HTTPException, status
+
 from app.models.schemas import SessionCreateRequest
 
 
@@ -88,8 +90,8 @@ class TestSessionCreation:
         mock_redis_client: MagicMock,
     ) -> None:
         """Test successful session creation."""
-        from app.routes.sessions import create_session
         from app.models.schemas import SessionCreateRequest
+        from app.routes.sessions import create_session
 
         session_request = SessionCreateRequest(
             template_id="550e8400-e29b-41d4-a716-446655440000",
@@ -329,8 +331,9 @@ class TestSessionValidation:
         self, mock_db: MagicMock, mock_current_user: MagicMock, mock_manager: MagicMock
     ) -> None:
         """Test validating ownership of non-existent session."""
-        from app.routes.sessions import validate_session_ownership
         from fastapi import status
+
+        from app.routes.sessions import validate_session_ownership
 
         mock_db.query.return_value.filter.return_value.filter.return_value.first.return_value = None
 
@@ -350,8 +353,9 @@ class TestSessionValidation:
         self, mock_db: MagicMock, mock_current_user: MagicMock, mock_manager: MagicMock
     ) -> None:
         """Test validating ownership of another user's session."""
-        from app.routes.sessions import validate_session_ownership
         from fastapi import status
+
+        from app.routes.sessions import validate_session_ownership
 
         mock_session = MagicMock()
         mock_session.session_id = "session123"
@@ -469,10 +473,10 @@ class TestSessionMaintenance:
     ) -> None:
         """Test session state update operations."""
         from app.routes.sessions import (
-            start_session,
             pause_session,
-            stop_session,
             reset_session,
+            start_session,
+            stop_session,
         )
 
         mock_session = MagicMock()
@@ -540,8 +544,8 @@ class TestSessionList:
         self, mock_db: MagicMock, mock_current_user: MagicMock, mock_manager: MagicMock
     ) -> None:
         """Test listing user's sessions."""
-        from app.routes.sessions import list_sessions
         from app.models.schemas import SessionListResponse
+        from app.routes.sessions import list_sessions
 
         mock_sessions_data = {
             "sessions": [
@@ -578,8 +582,8 @@ class TestSessionList:
         self, mock_db: MagicMock, mock_current_user: MagicMock, mock_manager: MagicMock
     ) -> None:
         """Test listing sessions with pagination."""
-        from app.routes.sessions import list_sessions
         from app.models.schemas import SessionListResponse
+        from app.routes.sessions import list_sessions
 
         mock_sessions_data = {
             "sessions": [

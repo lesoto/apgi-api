@@ -4,53 +4,47 @@ Tests for app/models/schemas.py — Pydantic models, validators, serializers, an
 Validates: Requirements 5.12, 6.3, 6.4
 """
 
+from datetime import datetime, timedelta, timezone
+
 import pytest
-from datetime import datetime, timezone, timedelta
-from pydantic import ValidationError
 from hypothesis import given, settings
 from hypothesis import strategies as st
+from pydantic import ValidationError
 
-from app.models.schemas import (
-    # User schemas
-    UserCreateRequest,
-    LoginRequest,
-    PasswordResetRequest,
-    PasswordResetEmailRequest,
-    PasswordResetConfirmRequest,
-    MFAEnableRequest,
-    MFADisableRequest,
-    MFABackupCodeVerifyRequest,
-    # Session schemas
-    SessionCreateRequest,
-    SessionTemplateCreateRequest,
-    SessionTemplateUpdateRequest,
-    # Task schemas
-    TaskSubmitRequest,
-    TaskDependencyCreateRequest,
-    # Webhook schemas
-    WebhookDeliveryResponse,
-    WebhookRetryResponse,
-    # State schemas
-    IgnitionEvent,
-    BodyState,
+from app.models.schemas import (  # User schemas; Session schemas; Task schemas; Webhook schemas; State schemas; API Key schemas; Other schemas
     AllostaticState,
-    MetabolicState,
-    PrecisionState,
-    MinimalSelfState,
-    NarrativeSelfState,
-    SelfModelState,
-    WorkspaceState,
-    IgnitionState,
-    SystemStateResponse,
-    # API Key schemas
     APIKeyCreateRequest,
     APIKeyResponse,
     APIKeyUpdateRequest,
-    # Other schemas
-    PaginationInfo,
-    ErrorDetail,
-    TokenPayload,
+    BodyState,
     CustomConfig,
+    ErrorDetail,
+    IgnitionEvent,
+    IgnitionState,
+    LoginRequest,
+    MetabolicState,
+    MFABackupCodeVerifyRequest,
+    MFADisableRequest,
+    MFAEnableRequest,
+    MinimalSelfState,
+    NarrativeSelfState,
+    PaginationInfo,
+    PasswordResetConfirmRequest,
+    PasswordResetEmailRequest,
+    PasswordResetRequest,
+    PrecisionState,
+    SelfModelState,
+    SessionCreateRequest,
+    SessionTemplateCreateRequest,
+    SessionTemplateUpdateRequest,
+    SystemStateResponse,
+    TaskDependencyCreateRequest,
+    TaskSubmitRequest,
+    TokenPayload,
+    UserCreateRequest,
+    WebhookDeliveryResponse,
+    WebhookRetryResponse,
+    WorkspaceState,
 )
 
 # ============================================================================

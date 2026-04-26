@@ -52,8 +52,9 @@ class TestParseVersion:
 
     def test_parse_version_none(self) -> None:
         """Test parsing None version string."""
+        from typing import Optional, cast
+
         from app.dependency_checker import parse_version
-        from typing import cast, Optional
 
         result = parse_version(cast(Optional[str], None))
         assert result == (0, 0, 0)  # Returns default for None
@@ -90,8 +91,9 @@ class TestCheckPackageVersion:
     @patch("app.dependency_checker.importlib.metadata.version")
     def test_check_package_version_not_found(self, mock_version: MagicMock) -> None:
         """Test check when package is not installed."""
-        from app.dependency_checker import check_package_version
         import importlib.metadata
+
+        from app.dependency_checker import check_package_version
 
         mock_version.side_effect = importlib.metadata.PackageNotFoundError("test-package")
         is_satisfied, installed_version, error_msg = check_package_version("test-package", "1.0.0")
@@ -213,7 +215,7 @@ class TestCheckDependencies:
         self, mock_logger: MagicMock, mock_check: MagicMock
     ) -> None:
         """Test check uses REQUIRED_DEPENDENCIES when None provided."""
-        from app.dependency_checker import check_dependencies, REQUIRED_DEPENDENCIES
+        from app.dependency_checker import REQUIRED_DEPENDENCIES, check_dependencies
 
         mock_check.return_value = (True, "1.0.0", None)
 
@@ -366,10 +368,10 @@ class TestStandaloneExecution:
         mock_check.return_value = True
 
         with patch.dict("sys.modules", {"__name__": "__main__"}):
-            from app.dependency_checker import check_dependencies
-
             # Simulate main block execution
             import logging
+
+            from app.dependency_checker import check_dependencies
 
             logging.basicConfig(level=logging.INFO, format="%(levelname)s: %(message)s")
             success = check_dependencies(fail_fast=False)
@@ -387,9 +389,9 @@ class TestStandaloneExecution:
         mock_check.return_value = False
 
         with patch.dict("sys.modules", {"__name__": "__main__"}):
-            from app.dependency_checker import check_dependencies
-
             import logging
+
+            from app.dependency_checker import check_dependencies
 
             logging.basicConfig(level=logging.INFO, format="%(levelname)s: %(message)s")
             success = check_dependencies(fail_fast=False)

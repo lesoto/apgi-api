@@ -105,8 +105,8 @@ def seed(users: int, templates: int, sessions: int, tasks: int, clear: bool, ver
         sys.exit(1)
 
     try:
-        from app.services.seeding_service import DatabaseSeedingService
         from app.database.connection import init_db
+        from app.services.seeding_service import DatabaseSeedingService
 
         # Initialize database
         init_db()
@@ -161,8 +161,8 @@ def clear_seed_data(confirm: bool) -> None:
         sys.exit(1)
 
     try:
-        from app.services.seeding_service import DatabaseSeedingService
         from app.database.connection import init_db
+        from app.services.seeding_service import DatabaseSeedingService
 
         # Initialize database
         init_db()

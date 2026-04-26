@@ -4,10 +4,11 @@ Unit tests for app/middleware/cors_config.py
 Tests CORS middleware configuration with environment-based settings.
 """
 
-import pytest
-from unittest.mock import MagicMock, patch
 import logging
 from typing import Any
+from unittest.mock import MagicMock, patch
+
+import pytest
 
 
 @pytest.fixture
@@ -36,8 +37,9 @@ class TestConfigureCorsBasic:
         self, mock_app: MagicMock, mock_settings: MagicMock
     ) -> None:
         """configure_cors calls app.add_middleware with CORSMiddleware."""
-        from app.middleware.cors_config import configure_cors
         from fastapi.middleware.cors import CORSMiddleware
+
+        from app.middleware.cors_config import configure_cors
 
         with patch("app.middleware.cors_config.settings", mock_settings):
             configure_cors(mock_app)

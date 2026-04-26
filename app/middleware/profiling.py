@@ -6,10 +6,10 @@ Middleware for detailed performance profiling of API endpoints.
 
 import cProfile
 import io
+import logging
 import pstats
 import time
-import logging
-from typing import Any, cast, Optional
+from typing import Any, Optional, cast
 
 from fastapi import Request
 from starlette.middleware.base import BaseHTTPMiddleware

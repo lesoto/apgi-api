@@ -8,23 +8,26 @@ request ID propagation, and error logging with context.
 
 import json
 import logging
-from hypothesis import given, strategies as st, assume, settings
-from unittest.mock import Mock
-from typing import Dict, Any
-from contextlib import contextmanager
 import sys
-from pathlib import Path
+from contextlib import contextmanager
 from io import StringIO
+from pathlib import Path
+from typing import Any, Dict
+from unittest.mock import Mock
+
+from hypothesis import assume, given, settings
+from hypothesis import strategies as st
 
 # Add app directory to path for imports
 sys.path.insert(0, str(Path(__file__).parent.parent.parent / "app"))
 
-from fastapi import FastAPI, Request, HTTPException
+from fastapi import FastAPI, HTTPException, Request
 from fastapi.testclient import TestClient
+
 from app.middleware.logging import (
+    ErrorLoggingHandler,
     RequestLoggingMiddleware,
     StructuredLogger,
-    ErrorLoggingHandler,
 )
 
 # ============================================================================

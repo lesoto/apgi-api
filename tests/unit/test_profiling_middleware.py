@@ -3,8 +3,9 @@ Unit tests for ProfilingMiddleware covering dispatch with profiling enabled/disa
 Requirements: 1.7, 4.7
 """
 
-import pytest
 from unittest.mock import AsyncMock, MagicMock, patch
+
+import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 

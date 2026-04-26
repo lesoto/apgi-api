@@ -6,16 +6,17 @@ Validates Requirements 8.1, 8.2, 8.3.
 """
 
 import asyncio
-import pytest
 import time
+
+import pytest
 
 from app.services.error_recovery import (
     CircuitBreaker,
     CircuitBreakerOpenError,
     CircuitState,
-    RetryService,
-    RetryConfig,
     ErrorRecoveryService,
+    RetryConfig,
+    RetryService,
     get_error_recovery_service,
 )
 
@@ -28,6 +29,14 @@ class TestCircuitBreaker:
         cb = CircuitBreaker(service_name="test_service")
         assert cb.state == CircuitState.CLOSED
         assert cb.stats.total_requests == 0
+
+    def test_circuit_breaker_with_custom_logger(self) -> None:
+        """Test circuit breaker with custom logger."""
+        from app.middleware.logging import StructuredLogger
+
+        custom_logger = StructuredLogger("custom")
+        cb = CircuitBreaker(service_name="test_service", logger=custom_logger)
+        assert cb.logger == custom_logger
 
     @pytest.mark.asyncio
     async def test_call_success(self) -> None:
@@ -226,6 +235,40 @@ class TestRetryService:
         delay = retry_service._calculate_delay(5, config)
         assert delay == 20.0
 
+    @pytest.mark.asyncio
+    async def test_execute_with_retry_non_retryable_exception(
+        self, retry_service: RetryService
+    ) -> None:
+        """Test execution fails immediately on non-retryable exception."""
+        config = RetryConfig(max_attempts=3, retryable_exceptions=(ValueError,))
+
+        async def failing_func() -> None:
+            raise KeyError("non-retryable error")
+
+        with pytest.raises(KeyError, match="non-retryable error"):
+            await retry_service.execute_with_retry(failing_func, config)
+
+    @pytest.mark.asyncio
+    async def test_execute_with_retry_custom_exception_list(
+        self, retry_service: RetryService
+    ) -> None:
+        """Test execution with custom exception list."""
+        config = RetryConfig(max_attempts=3, retryable_exceptions=(ValueError, KeyError))
+
+        call_count = 0
+
+        async def intermittent_func() -> str:
+            nonlocal call_count
+            call_count += 1
+            if call_count < 2:
+                raise ValueError("temporary error")
+            return "success"
+
+        result = await retry_service.execute_with_retry(intermittent_func, config)
+
+        assert result == "success"
+        assert call_count == 2
+
 
 class TestErrorRecoveryService:
     """Test error recovery service functionality."""
@@ -265,7 +308,7 @@ class TestErrorRecoveryService:
     async def test_call_external_service_unregistered(
         self, error_recovery_service: ErrorRecoveryService
     ) -> None:
-        """Test calling unregistered service."""
+        """Test calling unregistered service logs warning and proceeds."""
 
         async def dummy_func() -> str:
             return "success"
@@ -273,6 +316,23 @@ class TestErrorRecoveryService:
         result = await error_recovery_service.call_external_service("unknown_service", dummy_func)
 
         assert result == "success"
+
+    @pytest.mark.asyncio
+    async def test_call_external_service_no_circuit_breaker(
+        self, error_recovery_service: ErrorRecoveryService
+    ) -> None:
+        """Test calling service with no circuit breaker raises error."""
+        error_recovery_service.register_service("test_service")
+
+        # Manually remove circuit breaker
+        service_config = error_recovery_service.services["test_service"]
+        service_config.circuit_breaker = None
+
+        async def dummy_func() -> str:
+            return "success"
+
+        with pytest.raises(ValueError, match="Circuit breaker not configured"):
+            await error_recovery_service.call_external_service("test_service", dummy_func)
 
     @pytest.mark.asyncio
     async def test_call_external_service_registered_success(
@@ -320,6 +380,49 @@ class TestErrorRecoveryService:
 
         assert stats is None
 
+    def test_get_service_stats_with_circuit_breaker_data(
+        self, error_recovery_service: ErrorRecoveryService
+    ) -> None:
+        """Test getting stats includes circuit breaker data."""
+        error_recovery_service.register_service("test_service")
+
+        # Simulate some activity
+        async def dummy_func() -> str:
+            return "success"
+
+        async def failing_func() -> None:
+            raise ValueError("test error")
+
+        # Execute some calls to populate stats
+        import asyncio
+
+        asyncio.run(error_recovery_service.call_external_service("test_service", dummy_func))
+
+        try:
+            asyncio.run(error_recovery_service.call_external_service("test_service", failing_func))
+        except ValueError:
+            pass
+
+        stats = error_recovery_service.get_service_stats("test_service")
+
+        assert stats is not None
+        assert stats["service_name"] == "test_service"
+        assert stats["circuit_breaker"]["total_requests"] > 0
+
+    def test_get_service_stats_no_circuit_breaker(
+        self, error_recovery_service: ErrorRecoveryService
+    ) -> None:
+        """Test getting stats returns None when circuit breaker not configured."""
+        error_recovery_service.register_service("test_service")
+
+        # Manually remove circuit breaker
+        service_config = error_recovery_service.services["test_service"]
+        service_config.circuit_breaker = None
+
+        stats = error_recovery_service.get_service_stats("test_service")
+
+        assert stats is None
+
     def test_get_all_stats(self, error_recovery_service: ErrorRecoveryService) -> None:
         """Test getting all service statistics."""
         error_recovery_service.register_service("service1")
@@ -344,6 +447,27 @@ class TestErrorRecoveryService:
 
         assert cb.state == CircuitState.CLOSED
         assert cb.stats.consecutive_failures == 0
+        assert cb.stats.state_changes == 1
+
+    def test_reset_circuit_breaker_no_circuit_breaker(
+        self, error_recovery_service: ErrorRecoveryService
+    ) -> None:
+        """Test reset raises error when circuit breaker not configured."""
+        error_recovery_service.register_service("test_service")
+
+        # Manually remove circuit breaker
+        service_config = error_recovery_service.services["test_service"]
+        service_config.circuit_breaker = None
+
+        with pytest.raises(ValueError, match="Circuit breaker not configured"):
+            error_recovery_service.reset_circuit_breaker("test_service")
+
+    def test_reset_circuit_breaker_unknown_service(
+        self, error_recovery_service: ErrorRecoveryService
+    ) -> None:
+        """Test reset for unknown service does nothing (no error)."""
+        # Should not raise an error for unknown service
+        error_recovery_service.reset_circuit_breaker("unknown_service")
 
 
 def test_get_error_recovery_service() -> None:

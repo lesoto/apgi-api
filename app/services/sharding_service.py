@@ -5,8 +5,8 @@ Service for managing database sharding based on user_id for horizontal scalabili
 """
 
 import hashlib
-from typing import Dict, List, Optional, Any
 from dataclasses import dataclass
+from typing import Any, Dict, List, Optional
 
 from app.config import settings
 

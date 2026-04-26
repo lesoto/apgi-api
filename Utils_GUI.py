@@ -13,12 +13,11 @@ import select
 import subprocess
 import sys
 import threading
+import tkinter as tk
 from collections import deque
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple, cast
-
-import tkinter as tk
 from tkinter import scrolledtext, simpledialog, ttk
+from typing import Any, Dict, List, Optional, Tuple, cast
 
 
 class UtilsRunnerGUI:

@@ -15,9 +15,10 @@ Tests cover:
 - Token expiry configuration
 """
 
+from typing import Any, Iterator
+from unittest.mock import AsyncMock, MagicMock, patch
+
 import pytest
-from typing import Iterator, Any
-from unittest.mock import MagicMock, AsyncMock, patch
 from fastapi import FastAPI, Request
 from fastapi.testclient import TestClient
 

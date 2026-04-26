@@ -4,15 +4,15 @@ Task Registry Module
 Registry for mapping task types to their corresponding Celery task functions.
 """
 
-from typing import Dict, Callable, Any
 from enum import Enum
+from typing import Any, Callable, Dict
 
 from app.tasks.experimental_tasks import (
+    execute_attentional_blink_task,
+    execute_binocular_rivalry_task,
+    execute_change_blindness_task,
     execute_iowa_gambling_task,
     execute_masking_paradigm_task,
-    execute_attentional_blink_task,
-    execute_change_blindness_task,
-    execute_binocular_rivalry_task,
 )
 
 

@@ -2,11 +2,12 @@
 Unit tests for app/routes/users.py
 """
 
-from typing import Any, AsyncGenerator
-import pytest
 from contextlib import asynccontextmanager
-from datetime import datetime, timezone, timedelta
+from datetime import datetime, timedelta, timezone
+from typing import Any, AsyncGenerator
 from unittest.mock import MagicMock, Mock, patch
+
+import pytest
 from fastapi.testclient import TestClient
 
 from app.models.schemas import TokenPayload
@@ -44,8 +45,8 @@ def db() -> MagicMock:
 
 @pytest.fixture
 def client(db: MagicMock) -> TestClient:
-    from app.main import create_app
     from app.database.connection import get_db
+    from app.main import create_app
     from app.services.authorization import get_current_user
 
     app = create_app(test_mode=True)
@@ -57,8 +58,8 @@ def client(db: MagicMock) -> TestClient:
 
 @pytest.fixture
 def viewer_client(db: MagicMock) -> TestClient:
-    from app.main import create_app
     from app.database.connection import get_db
+    from app.main import create_app
     from app.services.authorization import get_current_user
 
     app = create_app(test_mode=True)

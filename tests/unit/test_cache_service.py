@@ -7,13 +7,14 @@ Requirements: 2.8
 
 import json
 from typing import AsyncGenerator, AsyncIterator
+from unittest.mock import AsyncMock, patch
 
 import pytest
-from unittest.mock import AsyncMock, patch
+
 from app.services.cache_service import (
     CacheService,
-    init_cache_service,
     get_cache_service,
+    init_cache_service,
 )
 
 

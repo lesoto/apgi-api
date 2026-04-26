@@ -3,8 +3,8 @@ Root conftest.py — sets all required environment variables BEFORE any app impo
 registers Hypothesis profiles, and provides shared SQLite in-memory fixtures.
 """
 
-from typing import Any, Callable, Generator
 import os
+from typing import Any, Callable, Generator
 
 # ── Environment variables ────────────────────────────────────────────────────
 # These MUST be set before any app module is imported so that app.config.Settings()
@@ -19,7 +19,7 @@ os.environ.setdefault("TEST_MODE", "true")
 
 # ── Hypothesis profiles ──────────────────────────────────────────────────────
 import hypothesis  # noqa: E402
-from hypothesis import settings, HealthCheck  # noqa: E402
+from hypothesis import HealthCheck, settings  # noqa: E402
 
 settings.register_profile(
     "ci",
@@ -57,6 +57,7 @@ patch("app.middleware.logging.configure_structured_logging", lambda *args, **kwa
 
 # ── Logging configuration for tests ─────────────────────────────────────────────
 import logging
+
 import pytest
 
 
@@ -188,11 +189,12 @@ for module_name, module_mock in {**otel_modules, **apgi_modules, **other_modules
 # Suppress warnings about missing optional dependencies
 warnings.filterwarnings("ignore", category=ImportWarning)
 
+from unittest.mock import MagicMock, patch  # noqa: E402
+
 # ── Shared fixtures ──────────────────────────────────────────────────────────
 import pytest  # noqa: E402
 from sqlalchemy import create_engine  # noqa: E402
 from sqlalchemy.orm import sessionmaker  # noqa: E402
-from unittest.mock import patch, MagicMock  # noqa: E402
 
 _TEST_DATABASE_URL = "sqlite:///:memory:"
 

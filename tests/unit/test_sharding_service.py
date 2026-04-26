@@ -4,8 +4,9 @@ Unit tests for database sharding service.
 Tests sharding logic, configuration, and shard management.
 """
 
-import pytest
 from unittest.mock import MagicMock, patch
+
+import pytest
 
 from app.services.sharding_service import DatabaseShardingService, ShardConfig, ShardInfo
 

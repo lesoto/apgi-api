@@ -28,7 +28,8 @@ Usage:
 import json
 import random
 from typing import Any
-from locust import HttpUser, task, between, events
+
+from locust import HttpUser, between, events, task
 from locust.runners import MasterRunner
 
 # Performance thresholds

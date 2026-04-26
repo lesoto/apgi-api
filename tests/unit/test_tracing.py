@@ -4,17 +4,18 @@ Unit tests for app/tracing.py - OpenTelemetry distributed tracing configuration.
 Tests the actual configure_distributed_tracing implementation and related utilities.
 """
 
-from typing import Any
 import os
 import sys
 import warnings
-from unittest.mock import patch, MagicMock
+from typing import Any
+from unittest.mock import MagicMock, patch
+
+import app.tracing as tracing_module
 
 # ---------------------------------------------------------------------------
 # Import the module (conftest already mocked all otel modules)
 # ---------------------------------------------------------------------------
 
-import app.tracing as tracing_module
 
 # ---------------------------------------------------------------------------
 # Test: module-level state

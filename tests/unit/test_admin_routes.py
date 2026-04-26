@@ -5,16 +5,17 @@ Tests audit log queries, filtering, pagination, and error paths.
 Validates: Requirements 3.13, 3.15
 """
 
-import pytest
-from unittest.mock import MagicMock
-from datetime import datetime, timezone, timedelta
-from sqlalchemy.orm import Session
-from fastapi.testclient import TestClient
+from datetime import datetime, timedelta, timezone
 from typing import Generator
+from unittest.mock import MagicMock
+
+import pytest
+from fastapi.testclient import TestClient
+from sqlalchemy.orm import Session
 
 try:
-    from app.main import create_app
     from app.database.connection import get_db
+    from app.main import create_app
     from app.services.authorization import get_current_user, require_permission
 except ImportError:
     pytest.skip(

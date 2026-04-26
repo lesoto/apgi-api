@@ -4,11 +4,12 @@ Unit tests for app/database/sharded_connection.py
 Tests sharded database connection management with support for multiple database instances.
 """
 
-import pytest
 from typing import Any
 from unittest.mock import MagicMock, patch
-from sqlalchemy.orm import Session
+
+import pytest
 from sqlalchemy.exc import SQLAlchemyError
+from sqlalchemy.orm import Session
 
 
 @pytest.fixture
@@ -878,8 +879,9 @@ class TestEdgeCasesAndErrorHandling:
         self, mock_sharding_service: MagicMock, mock_settings: MagicMock, caplog: Any
     ) -> None:
         """_initialize_shard_engines logs initialization info."""
-        from app.database.sharded_connection import ShardedDatabaseManager
         import logging
+
+        from app.database.sharded_connection import ShardedDatabaseManager
 
         with patch("app.database.sharded_connection.sharding_service", mock_sharding_service):
             with patch("app.database.sharded_connection.create_engine"):

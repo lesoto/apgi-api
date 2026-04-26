@@ -5,10 +5,11 @@ Covers health check logic, dependency checks, and metrics collection.
 Requirements: 2.10
 """
 
-import pytest
-from unittest.mock import AsyncMock, MagicMock, patch
 from datetime import datetime
 from typing import Any
+from unittest.mock import AsyncMock, MagicMock, patch
+
+import pytest
 
 from app.services.health_check import HealthCheckService
 

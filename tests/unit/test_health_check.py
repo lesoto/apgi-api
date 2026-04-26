@@ -1,8 +1,9 @@
 """Test health check service."""
 
-import pytest
-from unittest.mock import AsyncMock, MagicMock, patch
 import asyncio
+from unittest.mock import AsyncMock, MagicMock, patch
+
+import pytest
 import redis.asyncio as redis
 
 from app.services.health_check import HealthCheckService

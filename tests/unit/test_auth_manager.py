@@ -7,11 +7,12 @@ refresh_access_token, revoke_refresh_token, revoke_access_token, revoke_all_user
 Uses MagicMock for DB session and AsyncMock for Redis client.
 """
 
-import pytest
 from datetime import datetime, timedelta, timezone
-from unittest.mock import MagicMock, AsyncMock, patch
 from typing import cast
+from unittest.mock import AsyncMock, MagicMock, patch
+
 import jwt
+import pytest
 
 from app.config import settings
 from app.exceptions import AuthenticationError, ExpiredTokenError, InvalidTokenError

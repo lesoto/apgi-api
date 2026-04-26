@@ -78,11 +78,11 @@ Issues = "https://github.com/apgi/standalone-api/issues"
 packages = ["app"]
 
 [tool.setuptools.package-data]
-app = ["py.typed"]
+app = ["py.typed", "templates/*"]
 
 [tool.black]
 line-length = 100
-target-version = ["py310", "py311", "py312"]
+target-version = ["py310", "py311", "py312", "py313", "py314"]
 include = '\.pyi?$'
 extend-exclude = '''
 /(
@@ -107,7 +107,7 @@ known_first_party = ["app"]
 
 [tool.ruff]
 line-length = 100
-target-version = "py310"
+target-version = "py314"
 select = [
     "E",   # pycodestyle errors
     "W",   # pycodestyle warnings
@@ -136,7 +136,7 @@ exclude = [
 ]
 
 [tool.mypy]
-python_version = "3.10"
+python_version = "3.14"
 warn_return_any = true
 warn_unused_configs = true
 disallow_untyped_defs = true
@@ -148,6 +148,12 @@ warn_unused_ignores = true
 warn_no_return = true
 strict_equality = true
 strict = true
+exclude = [
+    "^/opt/",
+    "^/usr/",
+    "^/homebrew/",
+    "^/opt/homebrew/",
+]
 
 [[tool.mypy.overrides]]
 module = [
@@ -155,6 +161,11 @@ module = [
     "kombu.*",
     "redis.*",
     "prometheus_client.*",
+    "apgi_system.*",
+    "apgi_gui.*",
+    "opentelemetry.instrumentation.celery",
+    "opentelemetry.instrumentation.httpx",
+    "sphinx.*",
 ]
 ignore_missing_imports = true
 

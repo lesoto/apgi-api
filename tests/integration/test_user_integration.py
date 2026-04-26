@@ -4,13 +4,13 @@ Integration Tests for User Routes
 Tests user management endpoints through HTTP requests with authentication.
 """
 
-import pytest
 import uuid
-from typing import Any, Generator
-from unittest.mock import AsyncMock, MagicMock, patch
-from httpx import AsyncClient, ASGITransport
 from datetime import datetime
-from typing import AsyncGenerator
+from typing import Any, AsyncGenerator, Generator
+from unittest.mock import AsyncMock, MagicMock, patch
+
+import pytest
+from httpx import ASGITransport, AsyncClient
 
 
 @pytest.fixture
@@ -18,9 +18,10 @@ async def authenticated_client(
     test_environment: None, mock_database_connection: None, mock_user_management_service: MagicMock
 ) -> AsyncGenerator[AsyncClient, None]:
     """Create authenticated test client for user integration tests."""
+    from unittest.mock import AsyncMock, patch
+
     from app.main import create_app
     from app.services.auth_manager import AuthManager
-    from unittest.mock import AsyncMock, patch
 
     # Mock Redis for the lifespan
     mock_redis_client = AsyncMock()
@@ -136,9 +137,11 @@ class TestUserRoutesIntegration:
     @pytest.mark.asyncio
     async def test_register_user(self, mock_user_management_service: MagicMock) -> None:
         """Test user registration."""
-        from app.main import create_app
-        from httpx import AsyncClient, ASGITransport
         from unittest.mock import patch
+
+        from httpx import ASGITransport, AsyncClient
+
+        from app.main import create_app
 
         request_data = {
             "username": "newuser",
@@ -194,8 +197,9 @@ class TestUserRoutesIntegration:
         self, authenticated_client: AsyncClient, mock_user_management_service: MagicMock
     ) -> None:
         """Test updating user with authentication."""
+        from datetime import timedelta, timezone
+
         from app.models.schemas import TokenPayload
-        from datetime import timezone, timedelta
 
         mock_token_payload = TokenPayload(
             user_id=str(uuid.uuid4()),

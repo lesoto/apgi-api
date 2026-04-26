@@ -7,7 +7,7 @@ FastAPI application providing RESTful access to the APGI System.
 import socket
 import sys
 from contextlib import asynccontextmanager
-from typing import Optional, Dict, AsyncGenerator
+from typing import AsyncGenerator, Dict, Optional
 
 import redis.asyncio as redis
 from fastapi import FastAPI
@@ -34,32 +34,32 @@ from app.middleware.authentication import AuthenticationMiddleware
 from app.middleware.cors_config import configure_cors
 from app.middleware.csrf import CSRFMiddleware
 from app.middleware.deprecation import DeprecationMiddleware
-from app.middleware.metrics import PrometheusMetricsMiddleware
-from app.middleware.request_size_limit import RequestSizeLimitMiddleware
-from app.middleware.schema_validation import ResponseSchemaValidationMiddleware
-from app.middleware.rate_limiting import RateLimitingMiddleware
-from app.middleware.security_headers import SecurityHeadersMiddleware
-from app.middleware.security_validation import SecurityValidationMiddleware
 from app.middleware.logging import (
     RequestLoggingMiddleware,
     StructuredLogger,
     configure_structured_logging,
 )
+from app.middleware.metrics import PrometheusMetricsMiddleware
 from app.middleware.profiling import ProfilingMiddleware
+from app.middleware.rate_limiting import RateLimitingMiddleware
+from app.middleware.request_size_limit import RequestSizeLimitMiddleware
+from app.middleware.schema_validation import ResponseSchemaValidationMiddleware
+from app.middleware.security_headers import SecurityHeadersMiddleware
+from app.middleware.security_validation import SecurityValidationMiddleware
 from app.routes import (
     admin,
+    api_keys,
     auth,
-    users,
+    export,
+    health,
+    metrics,
+    payments,
     sessions,
-    templates,
     state,
     tasks,
-    export,
-    metrics,
-    health,
+    templates,
+    users,
     version,
-    payments,
-    api_keys,
     webhooks,
 )
 

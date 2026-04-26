@@ -3,9 +3,10 @@ Unit tests for profiling service.
 """
 
 from typing import Any
+from unittest.mock import MagicMock, patch
 
 import pytest
-from unittest.mock import MagicMock, patch
+
 from app.services.profiling_service import ProfilingService
 
 
@@ -114,7 +115,7 @@ class TestProfilingService:
 
     def test_get_performance_history_filters_by_time(self, service: ProfilingService) -> None:
         """Test that get_performance_history filters by time window."""
-        from datetime import datetime, timezone, timedelta
+        from datetime import datetime, timedelta, timezone
 
         now = datetime.now(timezone.utc)
         from app.services.profiling_service import PerformanceSnapshot
@@ -150,7 +151,8 @@ class TestProfilingService:
 
     def test_get_bottleneck_analysis_no_recent_snapshots(self, service: ProfilingService) -> None:
         """Test bottleneck analysis with no recent snapshots."""
-        from datetime import datetime, timezone, timedelta
+        from datetime import datetime, timedelta, timezone
+
         from app.services.profiling_service import PerformanceSnapshot
 
         service.snapshots = [
@@ -169,7 +171,8 @@ class TestProfilingService:
 
     def test_get_bottleneck_analysis_high_cpu(self, service: ProfilingService) -> None:
         """Test bottleneck analysis with high CPU usage."""
-        from datetime import datetime, timezone, timedelta
+        from datetime import datetime, timedelta, timezone
+
         from app.services.profiling_service import PerformanceSnapshot
 
         now = datetime.now(timezone.utc)
@@ -191,7 +194,8 @@ class TestProfilingService:
 
     def test_get_bottleneck_analysis_medium_cpu(self, service: ProfilingService) -> None:
         """Test bottleneck analysis with medium CPU usage."""
-        from datetime import datetime, timezone, timedelta
+        from datetime import datetime, timedelta, timezone
+
         from app.services.profiling_service import PerformanceSnapshot
 
         now = datetime.now(timezone.utc)
@@ -211,7 +215,8 @@ class TestProfilingService:
 
     def test_get_bottleneck_analysis_high_memory(self, service: ProfilingService) -> None:
         """Test bottleneck analysis with high memory usage."""
-        from datetime import datetime, timezone, timedelta
+        from datetime import datetime, timedelta, timezone
+
         from app.services.profiling_service import PerformanceSnapshot
 
         now = datetime.now(timezone.utc)
@@ -233,7 +238,8 @@ class TestProfilingService:
 
     def test_get_bottleneck_analysis_medium_memory(self, service: ProfilingService) -> None:
         """Test bottleneck analysis with medium memory usage."""
-        from datetime import datetime, timezone, timedelta
+        from datetime import datetime, timedelta, timezone
+
         from app.services.profiling_service import PerformanceSnapshot
 
         now = datetime.now(timezone.utc)
@@ -255,7 +261,8 @@ class TestProfilingService:
         self, service: ProfilingService
     ) -> None:
         """Test bottleneck analysis recommendations when memory tracing is disabled."""
-        from datetime import datetime, timezone, timedelta
+        from datetime import datetime, timedelta, timezone
+
         from app.services.profiling_service import PerformanceSnapshot
 
         now = datetime.now(timezone.utc)
@@ -344,8 +351,9 @@ class TestProfilingService:
 # ---------------------------------------------------------------------------
 # Tests merged from test_profiling_service_simple.py
 # ---------------------------------------------------------------------------
-from datetime import datetime, timezone, timedelta
+from datetime import datetime, timedelta, timezone
 from unittest.mock import patch
+
 from app.services.profiling_service import (
     PerformanceSnapshot,
     ProfilingResult,

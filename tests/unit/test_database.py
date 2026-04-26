@@ -4,26 +4,27 @@ Unit tests for database connection and initialization.
 Tests database initialization, connection pooling, and health checks.
 """
 
-import pytest
 import asyncio
 import logging
 from typing import Generator
-from unittest.mock import patch, MagicMock
-from sqlalchemy import create_engine, inspect, text, Engine
+from unittest.mock import MagicMock, patch
+
+import pytest
+from sqlalchemy import Engine, create_engine, inspect, text
 from sqlalchemy.orm import Session, sessionmaker
 
 from app.config import settings
 from app.database.connection import (
     close_db,
-    get_db,
-    get_db_context,
-    get_async_db_context,
+    create_default_user,
     engine,
     generate_secure_password,
     generate_secure_username,
-    init_db,
-    create_default_user,
+    get_async_db_context,
+    get_db,
+    get_db_context,
     get_pool_status,
+    init_db,
     log_pool_status,
 )
 
@@ -37,7 +38,7 @@ def test_db_url() -> str:
 @pytest.fixture
 def test_engine(test_db_url: str) -> Generator[Engine, None, None]:
     """Create a test database engine using SQLite in-memory database."""
-    from sqlalchemy import Column, String, DateTime, Integer, Text, Float, Boolean, ForeignKey
+    from sqlalchemy import Boolean, Column, DateTime, Float, ForeignKey, Integer, String, Text
     from sqlalchemy.orm import DeclarativeBase, declarative_base
     from sqlalchemy.sql import func
 

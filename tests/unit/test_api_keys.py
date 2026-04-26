@@ -5,25 +5,26 @@ Tests API key creation, listing, updating, rotation, and deletion endpoints.
 Validates Requirements 8.1, 8.2, 8.3.
 """
 
-import pytest
+from datetime import datetime, timedelta, timezone
 from unittest.mock import MagicMock, patch
-from datetime import datetime, timezone, timedelta
+
+import pytest
 from fastapi import HTTPException
 
 try:
-    from app.routes.api_keys import (
-        create_api_key,
-        list_api_keys,
-        get_api_key,
-        update_api_key,
-        rotate_api_key,
-        delete_api_key,
-    )
-    from app.services.auth_manager import TokenPayload
     from app.models.schemas import (
         APIKeyCreateRequest,
         APIKeyUpdateRequest,
     )
+    from app.routes.api_keys import (
+        create_api_key,
+        delete_api_key,
+        get_api_key,
+        list_api_keys,
+        rotate_api_key,
+        update_api_key,
+    )
+    from app.services.auth_manager import TokenPayload
 except ImportError:
     pytest.skip(
         "Required app modules not available - skipping API keys tests", allow_module_level=True

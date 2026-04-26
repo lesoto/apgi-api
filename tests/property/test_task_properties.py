@@ -5,23 +5,25 @@ Feature: api-migration
 Tests universal properties of task status and result retrieval.
 """
 
-from typing import Any
-import pytest
-from hypothesis import given, strategies as st, settings
-from unittest.mock import MagicMock
 import json
 
 # Import after setting up environment
 import sys
 from pathlib import Path
+from typing import Any
+from unittest.mock import MagicMock
+
+import pytest
+from hypothesis import given, settings
+from hypothesis import strategies as st
 
 # Add app directory to path for imports
 sys.path.insert(0, str(Path(__file__).parent.parent.parent / "app"))
 
 # Import Celery with mock fallback for testing
 try:
-    from celery.result import AsyncResult
     from celery import states
+    from celery.result import AsyncResult
 
     CELERY_AVAILABLE = True
 except ImportError:

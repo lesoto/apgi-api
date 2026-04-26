@@ -6,7 +6,6 @@ Requirements: 1.3, 4.9
 """
 
 from typing import Any
-
 from unittest.mock import MagicMock, patch
 
 import pytest  # noqa: F401
@@ -14,12 +13,12 @@ from fastapi import FastAPI, Request
 from fastapi.testclient import TestClient
 
 from app.middleware.logging import (
-    StructuredLogger,
-    RequestLoggingMiddleware,
     ErrorLoggingHandler,
+    RequestLoggingMiddleware,
+    StructuredLogger,
     configure_structured_logging,
-    request_id_context,
     error_logger,
+    request_id_context,
 )
 
 

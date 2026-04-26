@@ -5,23 +5,24 @@ Tests login, logout, token-refresh, and error paths.
 Validates: Requirements 3.10, 3.15
 """
 
-import pytest
+from datetime import datetime, timedelta, timezone
 from typing import Generator
-from unittest.mock import MagicMock, patch, AsyncMock
-from datetime import datetime, timezone, timedelta
+from unittest.mock import AsyncMock, MagicMock, patch
+
+import pytest
 from sqlalchemy.orm import Session
 from starlette.testclient import TestClient
 
 try:
-    from app.main import create_app
     from app.database.connection import get_db
-    from app.models.schemas import (
-        TokenPayload,
-    )
     from app.exceptions import (
         AuthenticationError,
-        InvalidTokenError,
         ExpiredTokenError,
+        InvalidTokenError,
+    )
+    from app.main import create_app
+    from app.models.schemas import (
+        TokenPayload,
     )
 except ImportError:
     pytest.skip(

@@ -5,30 +5,28 @@ Feature: test-coverage-100
 Tests universal properties of schema serialization and deserialization.
 """
 
-from hypothesis import given, strategies as st, settings
-from hypothesis.strategies import SearchStrategy
-import pytest
 import sys
 from pathlib import Path
+
+import pytest
+from hypothesis import given, settings
+from hypothesis import strategies as st
+from hypothesis.strategies import SearchStrategy
 
 # Add app directory to path for imports
 sys.path.insert(0, str(Path(__file__).parent.parent.parent / "app"))
 
-from app.models.schemas import (
-    # User schemas
-    UserCreateRequest,
-    UserResponse,
-    UserUpdateRequest,
-    # Session schemas
+from app.models.schemas import (  # User schemas; Session schemas; Task schemas; Webhook schemas
     SessionCreateRequest,
     SessionResponse,
     SessionTemplateCreateRequest,
     SessionTemplateResponse,
-    # Task schemas
-    TaskSubmitRequest,
-    TaskStatusResponse,
     TaskDependencyCreateRequest,
-    # Webhook schemas
+    TaskStatusResponse,
+    TaskSubmitRequest,
+    UserCreateRequest,
+    UserResponse,
+    UserUpdateRequest,
     WebhookDeliveryResponse,
     WebhookRetryResponse,
 )

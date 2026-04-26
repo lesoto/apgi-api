@@ -7,31 +7,34 @@ authentication failures, authorization failures, not found responses,
 server errors, and sensitive information exclusion.
 """
 
-import pytest
-from hypothesis import given, strategies as st, settings
-from unittest.mock import Mock
-import sys
-from pathlib import Path
 import json
 import re
+import sys
+from pathlib import Path
+from unittest.mock import Mock
+
+import pytest
+from hypothesis import given, settings
+from hypothesis import strategies as st
 
 # Add app directory to path for imports
 sys.path.insert(0, str(Path(__file__).parent.parent.parent / "app"))
+
+from typing import Union
 
 from fastapi import FastAPI, Request
 from fastapi.testclient import TestClient
 from pydantic import BaseModel
 
+from app.exception_handlers import (
+    unhandled_exception_handler,
+)
 from app.exceptions import (
     AuthenticationError,
     AuthorizationError,
     SessionNotFoundError,
     TaskNotFoundError,
     UserNotFoundError,
-)
-from typing import Union
-from app.exception_handlers import (
-    unhandled_exception_handler,
 )
 
 # ============================================================================

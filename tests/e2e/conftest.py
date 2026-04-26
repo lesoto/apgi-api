@@ -8,7 +8,7 @@ import asyncio
 import logging
 import time
 from contextlib import asynccontextmanager
-from typing import Dict, List, Any, Optional, AsyncGenerator, cast
+from typing import Any, AsyncGenerator, Dict, List, Optional, cast
 
 import httpx
 import pytest

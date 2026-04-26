@@ -5,16 +5,19 @@ Feature: api-migration
 Tests universal properties of request size limiting to prevent DoS attacks.
 """
 
-from hypothesis import given, strategies as st, assume, settings
-from typing import Any
 import sys
 from pathlib import Path
+from typing import Any
+
+from hypothesis import assume, given, settings
+from hypothesis import strategies as st
 
 # Add app directory to path for imports
 sys.path.insert(0, str(Path(__file__).parent.parent.parent / "app"))
 
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
+
 from app.middleware.request_size_limit import RequestSizeLimitMiddleware
 
 # ============================================================================

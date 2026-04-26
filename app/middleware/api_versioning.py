@@ -4,15 +4,15 @@ API Versioning Middleware
 Adds semantic versioning headers to all API responses.
 """
 
-from typing import Callable, Awaitable
+from typing import Awaitable, Callable
 
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.requests import Request
 from starlette.responses import Response
 
 from app.routes.version import (
-    CURRENT_VERSION,
     API_VERSION,
+    CURRENT_VERSION,
     is_endpoint_deprecated,
 )
 

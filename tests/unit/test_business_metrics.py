@@ -5,10 +5,11 @@ Tests aggregation and reporting methods using mocked DB context and cache.
 Requirements: 2.9
 """
 
-import pytest
-from typing import Dict, Any
-from unittest.mock import MagicMock, AsyncMock, patch
 from datetime import datetime, timezone
+from typing import Any, Dict
+from unittest.mock import AsyncMock, MagicMock, patch
+
+import pytest
 
 from app.services.business_metrics import (
     BusinessMetricsService,

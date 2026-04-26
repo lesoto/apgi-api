@@ -9,8 +9,9 @@ Tests edge cases and uncovered lines:
 - Lines 124-157: Exception handling in body check
 """
 
-import pytest
 from unittest.mock import MagicMock
+
+import pytest
 from fastapi import FastAPI
 from starlette.testclient import TestClient
 

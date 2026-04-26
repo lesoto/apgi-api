@@ -2,20 +2,21 @@
 Comprehensive unit tests for exception_handlers.py to achieve 100% coverage.
 """
 
+from unittest.mock import AsyncMock, MagicMock, patch
+
 import pytest
-from unittest.mock import MagicMock, AsyncMock, patch
 from fastapi import Request
 from fastapi.exceptions import RequestValidationError
 from pydantic import ValidationError as PydanticValidationError
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from app.exception_handlers import (
-    generate_request_id,
     api_error_handler,
-    validation_error_handler,
+    generate_request_id,
     http_exception_handler,
-    unhandled_exception_handler,
     register_exception_handlers,
+    unhandled_exception_handler,
+    validation_error_handler,
 )
 from app.exceptions import APIError
 

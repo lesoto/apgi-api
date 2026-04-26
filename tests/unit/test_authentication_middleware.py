@@ -4,15 +4,16 @@ Unit tests for authentication middleware.
 Tests JWT token and API key authentication, middleware dispatch, and helper functions.
 """
 
+from datetime import datetime, timedelta, timezone
+from typing import TYPE_CHECKING, Any
+from unittest.mock import AsyncMock, MagicMock, patch
+
 import pytest
-from unittest.mock import MagicMock, patch, AsyncMock
-from datetime import datetime, timezone, timedelta
 from starlette.responses import JSONResponse
-from typing import Any, TYPE_CHECKING
 
 from app.middleware.authentication import (
-    AuthenticationMiddleware,
     APIKeyInfo,
+    AuthenticationMiddleware,
     get_current_user_from_request,
     is_authenticated,
 )
@@ -535,6 +536,7 @@ class TestAuthenticationMiddlewareCoverage:
     ) -> None:
         """Raises ExpiredTokenError when jwt raises ExpiredSignatureError."""
         import jwt as pyjwt
+
         from app.exceptions import ExpiredTokenError
 
         with patch("jwt.decode", side_effect=pyjwt.ExpiredSignatureError("expired")):
@@ -548,6 +550,7 @@ class TestAuthenticationMiddlewareCoverage:
     ) -> None:
         """Raises InvalidTokenError when jwt raises InvalidTokenError."""
         import jwt as pyjwt
+
         from app.exceptions import InvalidTokenError
 
         with patch("jwt.decode", side_effect=pyjwt.InvalidTokenError("bad token")):

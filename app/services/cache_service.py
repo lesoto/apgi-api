@@ -4,11 +4,11 @@ Redis Caching Service
 Comprehensive caching implementation for session states, user data, and frequent queries.
 """
 
+import base64
 import json
 from typing import Any, Dict, Optional
 
 import redis.asyncio as redis
-import base64
 from cryptography.fernet import Fernet
 from cryptography.hazmat.primitives import hashes
 from cryptography.hazmat.primitives.kdf.hkdf import HKDF

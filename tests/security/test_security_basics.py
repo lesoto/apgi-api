@@ -8,10 +8,11 @@ Validates Requirements 9.1-9.8 for security-focused tests.
 """
 
 import os
-import jwt
 from datetime import datetime, timedelta, timezone
 from typing import Any
 from unittest.mock import MagicMock
+
+import jwt
 
 
 class TestJWTWrongSecret:

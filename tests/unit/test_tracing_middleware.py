@@ -2,8 +2,9 @@
 
 from __future__ import annotations
 
-from unittest.mock import MagicMock, patch
 import sys
+from unittest.mock import MagicMock, patch
+
 import pytest
 
 sys.modules["opentelemetry"] = MagicMock()
@@ -19,10 +20,10 @@ sys.modules["opentelemetry.exporter.jaeger.thrift"] = MagicMock()
 sys.modules["opentelemetry.exporter.otlp.proto.grpc.trace_exporter"] = MagicMock()
 
 from app.middleware.tracing import (
-    configure_distributed_tracing,
-    _server_request_hook,
     _client_request_hook,
     _client_response_hook,
+    _server_request_hook,
+    configure_distributed_tracing,
     instrument_application,
 )
 

@@ -25,18 +25,18 @@ _Resource: Any = None
 # Handle OpenTelemetry compatibility issues with Python 3.14
 try:
     from opentelemetry import trace as _trace
-    from opentelemetry.sdk.trace import TracerProvider as _TracerProvider
-    from opentelemetry.sdk.trace.export import BatchSpanProcessor as _BatchSpanProcessor
     from opentelemetry.exporter.jaeger.thrift import JaegerExporter as _JaegerExporterInstance
     from opentelemetry.exporter.otlp.proto.grpc.trace_exporter import (
         OTLPSpanExporter as _OTLPSpanExporter,
     )
     from opentelemetry.instrumentation.fastapi import FastAPIInstrumentor as _FastAPIInstrumentor
+    from opentelemetry.instrumentation.redis import RedisInstrumentor as _RedisInstrumentor
     from opentelemetry.instrumentation.sqlalchemy import (
         SQLAlchemyInstrumentor as _SQLAlchemyInstrumentor,
     )
-    from opentelemetry.instrumentation.redis import RedisInstrumentor as _RedisInstrumentor
     from opentelemetry.sdk.resources import Resource as _Resource
+    from opentelemetry.sdk.trace import TracerProvider as _TracerProvider
+    from opentelemetry.sdk.trace.export import BatchSpanProcessor as _BatchSpanProcessor
 
     # For test compatibility, also expose as _mock_trace when mocked
     _mock_trace = _trace
@@ -139,7 +139,9 @@ def instrument_application() -> None:
     try:
         # Try to import and instrument Celery if available
         try:
-            from opentelemetry.instrumentation.celery import CeleryInstrumentor  # type: ignore[import-not-found]
+            from opentelemetry.instrumentation.celery import (
+                CeleryInstrumentor,
+            )
 
             CeleryInstrumentor().instrument()
             print("Celery tracing instrumentation enabled")
@@ -152,7 +154,7 @@ def instrument_application() -> None:
     try:
         # Try to import and instrument HTTPX if available
         try:
-            from opentelemetry.instrumentation.httpx import (  # type: ignore[import-not-found]
+            from opentelemetry.instrumentation.httpx import (
                 HTTPXClientInstrumentor,
             )
 

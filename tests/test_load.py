@@ -5,7 +5,8 @@ This script defines load tests for key API endpoints to establish performance ba
 """
 
 import os
-from locust import HttpUser, task, between
+
+from locust import HttpUser, between, task
 
 
 class APGIUser(HttpUser):

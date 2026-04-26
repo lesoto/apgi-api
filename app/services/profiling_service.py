@@ -12,8 +12,8 @@ import time
 import tracemalloc
 from contextlib import contextmanager
 from dataclasses import dataclass
-from typing import Dict, List, Any, Generator
 from datetime import datetime, timedelta, timezone
+from typing import Any, Dict, Generator, List
 
 logger = logging.getLogger(__name__)
 
@@ -236,8 +236,9 @@ class ProfilingService:
     def get_system_performance(self) -> Dict[str, Any]:
         """Get current system performance metrics."""
         try:
-            import psutil
             import threading
+
+            import psutil
 
             # CPU usage
             cpu_percent = psutil.cpu_percent(interval=1)

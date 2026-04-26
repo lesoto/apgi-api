@@ -5,22 +5,24 @@ Feature: api-migration
 Tests universal properties of session lifecycle and concurrent access.
 """
 
-from typing import Optional, Any, Tuple, TypedDict, List
-from hypothesis import given, strategies as st, assume, settings
 import asyncio
-from unittest.mock import MagicMock, patch
-import uuid
 
 # Import after setting up environment
 import sys
+import uuid
 from pathlib import Path
+from typing import Any, List, Optional, Tuple, TypedDict
+from unittest.mock import MagicMock, patch
+
+from hypothesis import assume, given, settings
+from hypothesis import strategies as st
 
 # Add app directory to path for imports
 sys.path.insert(0, str(Path(__file__).parent.parent.parent / "app"))
 
 from app.services.session_manager import (
-    SimulationSession,
     SessionLifecycleState,
+    SimulationSession,
 )
 
 

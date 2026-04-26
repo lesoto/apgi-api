@@ -8,12 +8,14 @@ Tests universal properties of the Alembic migration system.
 import os
 from pathlib import Path
 from typing import Any, Dict
+from unittest.mock import MagicMock
+
 import pytest
-from sqlalchemy import create_engine, inspect, text
 from alembic import command
 from alembic.config import Config
-from hypothesis import given, settings, strategies as st, HealthCheck
-from unittest.mock import MagicMock
+from hypothesis import HealthCheck, given, settings
+from hypothesis import strategies as st
+from sqlalchemy import create_engine, inspect, text
 
 
 def create_sqlite_compatible_migration() -> Any:

@@ -1,12 +1,13 @@
 #!/usr/bin/env python3
 
-import sys
 import os
+import sys
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
 
-from app.database.connection import engine
 from sqlalchemy import text
+
+from app.database.connection import engine
 
 
 def alter_alembic_version() -> None:

@@ -5,11 +5,12 @@ Tests task submission, status checking, listing, and cancellation endpoints
 through HTTP requests with authentication.
 """
 
-import pytest
 import uuid
 from typing import AsyncGenerator
 from unittest.mock import AsyncMock, MagicMock
-from httpx import AsyncClient, ASGITransport
+
+import pytest
+from httpx import ASGITransport, AsyncClient
 
 
 @pytest.fixture
@@ -17,9 +18,10 @@ async def authenticated_client(
     test_environment: None, mock_database_connection: None
 ) -> AsyncGenerator[AsyncClient, None]:
     """Create authenticated test client for task integration tests."""
+    from unittest.mock import AsyncMock, patch
+
     from app.main import create_app
     from app.services.auth_manager import AuthManager
-    from unittest.mock import AsyncMock, patch
 
     # Mock Redis for the lifespan
     mock_redis_client = AsyncMock()
@@ -269,9 +271,10 @@ class TestTaskRoutesIntegration:
         self, authenticated_client: AsyncClient
     ) -> None:
         """Test that task submission properly integrates with Celery."""
-        from unittest.mock import patch, MagicMock
+        from unittest.mock import MagicMock, patch
+
+        from app.database.connection import close_db, init_db
         from app.routes.tasks import init_task_routes
-        from app.database.connection import init_db, close_db
 
         # Initialize database for this test
         init_db()

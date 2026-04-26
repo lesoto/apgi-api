@@ -9,9 +9,10 @@ error handling logic rather than calling task functions directly.
 from __future__ import annotations
 
 import sys
-import pytest
 from typing import Any, Callable, Generator
 from unittest.mock import patch
+
+import pytest
 
 
 # Make Celery mock return actual decorated function
@@ -135,6 +136,7 @@ class TestTriggerWebhookFunction:
     def test_trigger_webhook_is_async(self) -> None:
         """Test that trigger_webhook_on_completion is async."""
         import inspect
+
         from app.tasks.experimental_tasks import trigger_webhook_on_completion
 
         assert inspect.iscoroutinefunction(trigger_webhook_on_completion)
@@ -142,6 +144,7 @@ class TestTriggerWebhookFunction:
     def test_trigger_webhook_accepts_parameters(self) -> None:
         """Test trigger_webhook_on_completion accepts required parameters."""
         import inspect
+
         from app.tasks.experimental_tasks import trigger_webhook_on_completion
 
         sig = inspect.signature(trigger_webhook_on_completion)

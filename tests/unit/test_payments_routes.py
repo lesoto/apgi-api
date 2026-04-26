@@ -4,23 +4,24 @@ Unit tests for payment routes — targeting ≥90% coverage of app/routes/paymen
 Validates: Requirements 3.1, 3.15
 """
 
+from typing import Any, Generator, Type
+from unittest.mock import AsyncMock, Mock, patch
+
 import pytest
-from unittest.mock import Mock, patch, AsyncMock
-from sqlalchemy.orm import Session
 from fastapi import HTTPException
+from sqlalchemy.orm import Session
 from starlette.testclient import TestClient
-from typing import Generator, Any, Type
 
 from app.routes.payments import (
-    create_payment_intent,
-    stripe_webhook,
-    _handle_payment_succeeded,
-    _handle_payment_failed,
-    _handle_dispute_created,
+    PaymentIntentCreateRequest,
     _handle_dispute_closed,
+    _handle_dispute_created,
+    _handle_payment_failed,
+    _handle_payment_succeeded,
     _handle_refund,
     _handle_subscription_event,
-    PaymentIntentCreateRequest,
+    create_payment_intent,
+    stripe_webhook,
 )
 
 # ---------------------------------------------------------------------------
@@ -53,8 +54,8 @@ def mock_settings() -> Generator[Mock, None, None]:
 @pytest.fixture
 def client(mock_db: Mock) -> Generator[tuple[TestClient, Mock], None, None]:
     """TestClient with DB dependency overridden and test_mode=True."""
-    from app.main import create_app
     from app.database.connection import get_db
+    from app.main import create_app
 
     app = create_app(test_mode=True)
     app.dependency_overrides[get_db] = lambda: mock_db
@@ -398,7 +399,7 @@ class TestHandlePaymentSucceeded:
     @pytest.mark.asyncio
     async def test_valid_user_order_found_success(self, mock_db: Mock) -> None:
         """Valid user + matching order → order.status = succeeded."""
-        from app.database.models import User, Order
+        from app.database.models import Order, User
 
         mock_user = Mock(spec=User)
         mock_order = Mock(spec=Order)
@@ -429,7 +430,7 @@ class TestHandlePaymentSucceeded:
     @pytest.mark.asyncio
     async def test_user_id_mismatch_on_order(self, mock_db: Mock) -> None:
         """Order user_id doesn't match metadata user_id → returns False."""
-        from app.database.models import User, Order
+        from app.database.models import Order, User
 
         mock_user = Mock(spec=User)
         mock_order = Mock(spec=Order)
@@ -459,7 +460,7 @@ class TestHandlePaymentSucceeded:
     @pytest.mark.asyncio
     async def test_amount_mismatch_on_order(self, mock_db: Mock) -> None:
         """Order amount doesn't match payment amount → returns False."""
-        from app.database.models import User, Order
+        from app.database.models import Order, User
 
         mock_user = Mock(spec=User)
         mock_order = Mock(spec=Order)
@@ -489,7 +490,7 @@ class TestHandlePaymentSucceeded:
     @pytest.mark.asyncio
     async def test_order_not_found(self, mock_db: Mock) -> None:
         """Order ID in metadata but order not in DB → returns False."""
-        from app.database.models import User, Order
+        from app.database.models import Order, User
 
         mock_user = Mock(spec=User)
 
@@ -560,7 +561,7 @@ class TestHandlePaymentFailed:
     @pytest.mark.asyncio
     async def test_valid_user_with_order(self, mock_db: Mock) -> None:
         """Card-declined path with valid user and order → order.status = failed."""
-        from app.database.models import User, Order
+        from app.database.models import Order, User
 
         mock_user = Mock(spec=User)
         mock_order = Mock(spec=Order)
@@ -589,7 +590,7 @@ class TestHandlePaymentFailed:
     @pytest.mark.asyncio
     async def test_order_not_found(self, mock_db: Mock) -> None:
         """Order ID in metadata but order not in DB → still returns True."""
-        from app.database.models import User, Order
+        from app.database.models import Order, User
 
         mock_user = Mock(spec=User)
 
@@ -689,7 +690,7 @@ class TestHandleRefund:
 
     @pytest.mark.asyncio
     async def test_valid_user_with_order(self, mock_db: Mock) -> None:
-        from app.database.models import User, Order
+        from app.database.models import Order, User
 
         mock_user = Mock(spec=User)
         mock_order = Mock(spec=Order)
@@ -716,7 +717,7 @@ class TestHandleRefund:
 
     @pytest.mark.asyncio
     async def test_order_not_found(self, mock_db: Mock) -> None:
-        from app.database.models import User, Order
+        from app.database.models import Order, User
 
         mock_user = Mock(spec=User)
 
@@ -778,7 +779,7 @@ class TestHandleSubscriptionEvent:
     @pytest.mark.asyncio
     async def test_created_with_valid_user_new_subscription(self, mock_db: Mock) -> None:
         """Valid user, no existing subscription → creates new Subscription record."""
-        from app.database.models import User, Subscription
+        from app.database.models import Subscription, User
 
         mock_user = Mock(spec=User)
 
@@ -814,7 +815,7 @@ class TestHandleSubscriptionEvent:
     @pytest.mark.asyncio
     async def test_created_existing_subscription(self, mock_db: Mock) -> None:
         """Valid user, existing subscription → no new insert."""
-        from app.database.models import User, Subscription
+        from app.database.models import Subscription, User
 
         mock_user = Mock(spec=User)
         mock_sub = Mock(spec=Subscription)
@@ -843,7 +844,7 @@ class TestHandleSubscriptionEvent:
     @pytest.mark.asyncio
     async def test_updated_existing_subscription(self, mock_db: Mock) -> None:
         """Subscription updated → updates existing record."""
-        from app.database.models import User, Subscription
+        from app.database.models import Subscription, User
 
         mock_user = Mock(spec=User)
         mock_sub = Mock(spec=Subscription)
@@ -878,7 +879,7 @@ class TestHandleSubscriptionEvent:
     @pytest.mark.asyncio
     async def test_updated_no_existing_subscription(self, mock_db: Mock) -> None:
         """Subscription updated but not found in DB → still returns True."""
-        from app.database.models import User, Subscription
+        from app.database.models import Subscription, User
 
         mock_user = Mock(spec=User)
 
@@ -904,7 +905,7 @@ class TestHandleSubscriptionEvent:
 
     @pytest.mark.asyncio
     async def test_paused_event(self, mock_db: Mock) -> None:
-        from app.database.models import User, Subscription
+        from app.database.models import Subscription, User
 
         mock_user = Mock(spec=User)
         mock_sub = Mock(spec=Subscription)
@@ -935,7 +936,7 @@ class TestHandleSubscriptionEvent:
 
     @pytest.mark.asyncio
     async def test_resumed_event(self, mock_db: Mock) -> None:
-        from app.database.models import User, Subscription
+        from app.database.models import Subscription, User
 
         mock_user = Mock(spec=User)
         mock_sub = Mock(spec=Subscription)
@@ -967,7 +968,7 @@ class TestHandleSubscriptionEvent:
     @pytest.mark.asyncio
     async def test_payment_failed_event_updates_past_due(self, mock_db: Mock) -> None:
         """Subscription payment_failed → status set to past_due."""
-        from app.database.models import User, Subscription
+        from app.database.models import Subscription, User
 
         mock_user = Mock(spec=User)
         mock_sub = Mock(spec=Subscription)
@@ -998,7 +999,7 @@ class TestHandleSubscriptionEvent:
     @pytest.mark.asyncio
     async def test_payment_failed_no_subscription(self, mock_db: Mock) -> None:
         """Subscription payment_failed but sub not in DB → still True."""
-        from app.database.models import User, Subscription
+        from app.database.models import Subscription, User
 
         mock_user = Mock(spec=User)
 

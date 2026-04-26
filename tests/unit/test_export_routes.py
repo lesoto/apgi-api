@@ -13,12 +13,13 @@ Also covers:
   - All 4xx/5xx error paths per endpoint
 """
 
-import pytest
 import io
 from contextlib import asynccontextmanager
-from datetime import datetime, timezone, timedelta
-from typing import Optional, AsyncGenerator
-from unittest.mock import MagicMock, AsyncMock, patch
+from datetime import datetime, timedelta, timezone
+from typing import AsyncGenerator, Optional
+from unittest.mock import AsyncMock, MagicMock, patch
+
+import pytest
 from fastapi import HTTPException
 from fastapi.testclient import TestClient
 
@@ -93,8 +94,8 @@ def make_client(
     user: Optional[TokenPayload] = None,
 ) -> tuple[TestClient, object]:
     """Create a TestClient with dependency overrides."""
-    from app.main import create_app
     from app.database.connection import get_db
+    from app.main import create_app
     from app.routes.export import get_data_export_service
     from app.services.authorization import get_current_user
 

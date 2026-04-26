@@ -3,10 +3,11 @@ Unit tests for security validation middleware.
 """
 
 from typing import Any
+from unittest.mock import AsyncMock
 
 import pytest
-from unittest.mock import AsyncMock
 from fastapi import Request, Response
+
 from app.middleware.security_validation import SecurityValidationMiddleware
 
 
@@ -240,6 +241,7 @@ class TestSecurityValidationMiddleware:
         # Test with SQL injection in username
         # Mock a Request object with the malicious data
         from unittest.mock import MagicMock
+
         from starlette.datastructures import Headers
 
         mock_request = MagicMock()
@@ -508,6 +510,7 @@ class TestSecurityValidationMiddlewareASGI:
 # Tests merged from test_security_validation_comprehensive.py
 # ---------------------------------------------------------------------------
 from unittest.mock import MagicMock
+
 from fastapi import Request
 from starlette.datastructures import Headers
 
@@ -849,8 +852,9 @@ class TestFormDataHandling:
     @pytest.mark.asyncio
     async def test_post_form_data_valid(self, middleware: Any) -> None:
         """Test POST request with form data."""
-        from unittest.mock import MagicMock, AsyncMock
-        from starlette.datastructures import Headers, FormData
+        from unittest.mock import AsyncMock, MagicMock
+
+        from starlette.datastructures import FormData, Headers
 
         mock_request = MagicMock()
         mock_request.method = "POST"
@@ -869,7 +873,8 @@ class TestFormDataHandling:
     @pytest.mark.asyncio
     async def test_post_form_data_empty(self, middleware: Any) -> None:
         """Test POST request with empty form data."""
-        from unittest.mock import MagicMock, AsyncMock
+        from unittest.mock import AsyncMock, MagicMock
+
         from starlette.datastructures import Headers
 
         mock_request = MagicMock()
@@ -887,7 +892,8 @@ class TestFormDataHandling:
     @pytest.mark.asyncio
     async def test_post_form_data_exception(self, middleware: Any) -> None:
         """Test POST request with form data exception."""
-        from unittest.mock import MagicMock, AsyncMock
+        from unittest.mock import AsyncMock, MagicMock
+
         from starlette.datastructures import Headers
 
         mock_request = MagicMock()
@@ -906,6 +912,7 @@ class TestFormDataHandling:
     async def test_get_empty_query_params(self, middleware: Any) -> None:
         """Test GET request with empty query parameters."""
         from unittest.mock import MagicMock
+
         from starlette.datastructures import Headers
 
         mock_request = MagicMock()
@@ -1023,7 +1030,8 @@ class TestPathMatchingAndRouting:
     @pytest.mark.asyncio
     async def test_login_path_with_trailing_slash(self, middleware: Any) -> None:
         """Test login path with trailing slash."""
-        from unittest.mock import MagicMock, AsyncMock
+        from unittest.mock import AsyncMock, MagicMock
+
         from starlette.datastructures import Headers
 
         mock_request = MagicMock()
@@ -1038,7 +1046,8 @@ class TestPathMatchingAndRouting:
     @pytest.mark.asyncio
     async def test_registration_path_with_trailing_slash(self, middleware: Any) -> None:
         """Test registration path with trailing slash."""
-        from unittest.mock import MagicMock, AsyncMock
+        from unittest.mock import AsyncMock, MagicMock
+
         from starlette.datastructures import Headers
 
         mock_request = MagicMock()
@@ -1059,7 +1068,8 @@ class TestPathMatchingAndRouting:
     @pytest.mark.asyncio
     async def test_user_profile_path_with_trailing_slash(self, middleware: Any) -> None:
         """Test user profile path with trailing slash."""
-        from unittest.mock import MagicMock, AsyncMock
+        from unittest.mock import AsyncMock, MagicMock
+
         from starlette.datastructures import Headers
 
         mock_request = MagicMock()
@@ -1075,6 +1085,7 @@ class TestPathMatchingAndRouting:
     async def test_user_profile_get_request_not_validated(self, middleware: Any) -> None:
         """Test user profile GET request is not validated as profile update."""
         from unittest.mock import MagicMock
+
         from starlette.datastructures import Headers
 
         mock_request = MagicMock()
@@ -1090,7 +1101,8 @@ class TestPathMatchingAndRouting:
     @pytest.mark.asyncio
     async def test_password_change_endpoint(self, middleware: Any) -> None:
         """Test password change endpoint validation."""
-        from unittest.mock import MagicMock, AsyncMock
+        from unittest.mock import AsyncMock, MagicMock
+
         from starlette.datastructures import Headers
 
         mock_request = MagicMock()
@@ -1105,7 +1117,8 @@ class TestPathMatchingAndRouting:
     @pytest.mark.asyncio
     async def test_password_change_endpoint_too_short(self, middleware: Any) -> None:
         """Test password change endpoint with short password."""
-        from unittest.mock import MagicMock, AsyncMock
+        from unittest.mock import AsyncMock, MagicMock
+
         from starlette.datastructures import Headers
 
         mock_request = MagicMock()
@@ -1121,7 +1134,8 @@ class TestPathMatchingAndRouting:
     @pytest.mark.asyncio
     async def test_unknown_endpoint_generic_validation(self, middleware: Any) -> None:
         """Test unknown endpoint uses generic validation."""
-        from unittest.mock import MagicMock, AsyncMock
+        from unittest.mock import AsyncMock, MagicMock
+
         from starlette.datastructures import Headers
 
         mock_request = MagicMock()
@@ -1407,7 +1421,8 @@ class TestExceptionHandling:
     @pytest.mark.asyncio
     async def test_validate_request_exception_in_url_path_access(self, middleware: Any) -> None:
         """Test exception handling when accessing request properties fails."""
-        from unittest.mock import MagicMock, AsyncMock
+        from unittest.mock import AsyncMock, MagicMock
+
         from starlette.datastructures import Headers
 
         mock_request = MagicMock()

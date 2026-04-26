@@ -4,12 +4,13 @@ Integration Tests for State Routes
 Tests state access endpoints through HTTP requests with authentication.
 """
 
-import pytest
 import uuid
-from typing import AsyncGenerator
 from datetime import datetime, timedelta, timezone
+from typing import AsyncGenerator
 from unittest.mock import MagicMock, patch
-from httpx import AsyncClient, ASGITransport
+
+import pytest
+from httpx import ASGITransport, AsyncClient
 from sqlalchemy.orm import Session
 
 
@@ -18,10 +19,11 @@ async def authenticated_client(
     test_environment: None, mock_database_connection: None
 ) -> AsyncGenerator[AsyncClient, None]:
     """Create authenticated test client for state integration tests."""
-    from app.main import create_app
-    from app.services.auth_manager import AuthManager
-    from app.models.schemas import TokenPayload
     from unittest.mock import AsyncMock
+
+    from app.main import create_app
+    from app.models.schemas import TokenPayload
+    from app.services.auth_manager import AuthManager
 
     # Mock Redis for the lifespan
     mock_redis_client = AsyncMock()

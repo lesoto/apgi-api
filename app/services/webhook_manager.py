@@ -4,22 +4,21 @@ Webhook Manager Service
 Handles webhook delivery and management for task completions.
 """
 
-import logging
-from datetime import datetime, timedelta, timezone
-from typing import Dict, Any, cast
-import uuid
+import hashlib
+import hmac
 import ipaddress
 import json
-import hmac
-import hashlib
+import logging
+import uuid
+from datetime import datetime, timedelta, timezone
+from typing import Any, Dict, cast
 
 import aiohttp
-
 from sqlalchemy.orm import Session
 
 from app.config import settings
 from app.database.models import WebhookDelivery
-from app.middleware.alerting import alert_manager, AlertSeverity
+from app.middleware.alerting import AlertSeverity, alert_manager
 
 logger = logging.getLogger(__name__)
 
@@ -55,9 +54,9 @@ class WebhookManager:
         Raises:
             ValueError: If URL is invalid or points to private/internal network
         """
-        from urllib.parse import urlparse
-        import socket
         import ipaddress
+        import socket
+        from urllib.parse import urlparse
 
         try:
             parsed = urlparse(webhook_url)

@@ -7,8 +7,7 @@ for task management, dependency handling, and Celery submission.
 
 import logging
 from datetime import datetime, timezone
-from typing import Any, Dict, List, Optional
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any, Dict, List, Optional
 
 if TYPE_CHECKING:
     from app.services.task_execution.dependency_manager import DependencyManager
@@ -22,8 +21,8 @@ from app.celery_app import celery_app
 from app.database.connection import get_db_context
 from app.database.models import Task, TaskStatus
 from app.services.task_execution.dependency_manager import DependencyManager
-from app.services.task_execution.task_submitter import TaskSubmitter, async_retry_with_backoff
 from app.services.task_execution.task_strategies import get_task_strategy_registry
+from app.services.task_execution.task_submitter import TaskSubmitter, async_retry_with_backoff
 
 logger = logging.getLogger(__name__)
 

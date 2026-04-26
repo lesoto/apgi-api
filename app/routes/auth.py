@@ -5,7 +5,8 @@ Endpoints for user authentication, token management, and logout.
 """
 
 import logging
-from fastapi import APIRouter, Depends, status, Request, Body
+
+from fastapi import APIRouter, Body, Depends, Request, status
 from sqlalchemy.orm import Session
 
 logger = logging.getLogger(__name__)
@@ -15,8 +16,8 @@ from app.exceptions import AuthenticationError, ExpiredTokenError, InvalidTokenE
 from app.models.schemas import (
     LoginRequest,
     TokenRefreshRequest,
-    TokenResponse,
     TokenRefreshResponse,
+    TokenResponse,
 )
 from app.services.auth_manager import AuthManager
 from app.services.authorization import TokenPayload, get_current_user
@@ -93,8 +94,9 @@ async def login(
 
     # Log successful authentication to AuditLog (best-effort, doesn't block token issuance)
     try:
+        from datetime import datetime, timezone
+
         from app.database.models import AuditLog
-        from datetime import timezone, datetime
 
         audit_entry = AuditLog(
             user_id=user.user_id,

@@ -4,8 +4,8 @@ Services Package
 Business logic and service layer components for the standalone API.
 """
 
-from app.services.auth_manager import AuthManager
 from app.models.schemas import TokenPayload
+from app.services.auth_manager import AuthManager
 from app.services.authorization import (
     Permission,
     Role,

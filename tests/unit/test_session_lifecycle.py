@@ -5,15 +5,16 @@ Verifies that every allowed transition succeeds and every disallowed
 transition raises ValueError.
 """
 
-import pytest
 import uuid
 from typing import Any, Generator
-from unittest.mock import patch, MagicMock
+from unittest.mock import MagicMock, patch
+
+import pytest
 
 from app.services.session_manager import (
-    SimulationSession,
-    SessionLifecycleState,
     ALLOWED_TRANSITIONS,
+    SessionLifecycleState,
+    SimulationSession,
 )
 
 # ---------------------------------------------------------------------------

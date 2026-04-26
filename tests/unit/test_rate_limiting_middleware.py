@@ -5,8 +5,9 @@ Tests the actual RateLimitingMiddleware ASGI interface, not a fictional API.
 """
 
 from typing import TYPE_CHECKING
-import pytest
 from unittest.mock import AsyncMock, MagicMock, patch
+
+import pytest
 
 if TYPE_CHECKING:
     from app.middleware.rate_limiting import RateLimitingMiddleware
@@ -532,8 +533,9 @@ class TestDispatch:
     @pytest.mark.asyncio
     async def test_rate_limited_request_returns_429(self) -> None:
         """A rate-limited request returns HTTP 429."""
-        from app.middleware.rate_limiting import RateLimitingMiddleware
         from starlette.responses import JSONResponse
+
+        from app.middleware.rate_limiting import RateLimitingMiddleware
 
         call_next = AsyncMock()
 

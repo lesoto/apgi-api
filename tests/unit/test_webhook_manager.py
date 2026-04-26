@@ -9,10 +9,11 @@ Requirements: 2.5, 12.4, 12.5, 12.6
 
 import asyncio
 import socket
-import pytest
 from datetime import datetime, timezone
 from typing import TYPE_CHECKING, Any, Dict, List, Optional
 from unittest.mock import AsyncMock, MagicMock, patch
+
+import pytest
 
 if TYPE_CHECKING:
     from app.services.webhook_manager import WebhookManager

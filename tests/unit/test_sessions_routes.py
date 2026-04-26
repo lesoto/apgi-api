@@ -2,23 +2,24 @@
 Unit tests for session routes.
 """
 
-import pytest
 from contextlib import asynccontextmanager
-from datetime import datetime, timezone, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import AsyncIterator
-from unittest.mock import Mock, AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock, Mock, patch
+
+import pytest
 from fastapi import HTTPException
 from fastapi.testclient import TestClient
 from sqlalchemy.orm import Session
 
-from app.routes.sessions import (
-    validate_session_ownership,
-    check_idempotency_key,
-    cache_idempotency_response,
-    init_session_routes,
-)
 from app.database.models import Session as SessionModel
 from app.models.schemas import TokenPayload
+from app.routes.sessions import (
+    cache_idempotency_response,
+    check_idempotency_key,
+    init_session_routes,
+    validate_session_ownership,
+)
 
 # ---------------------------------------------------------------------------
 # Shared helpers
@@ -95,10 +96,10 @@ def mock_redis() -> AsyncMock:
 
 @pytest.fixture
 def client(mock_db: MagicMock, mock_manager: AsyncMock, mock_redis: AsyncMock) -> TestClient:
-    from app.main import create_app
     from app.database.connection import get_db
+    from app.main import create_app
+    from app.routes.sessions import get_redis_client, get_session_manager
     from app.services.authorization import get_current_user
-    from app.routes.sessions import get_session_manager, get_redis_client
 
     app = create_app(test_mode=True)
     app.router.lifespan_context = noop_lifespan
@@ -117,8 +118,8 @@ def client(mock_db: MagicMock, mock_manager: AsyncMock, mock_redis: AsyncMock) -
 class TestDependencyErrors:
     def test_get_redis_client_not_initialized(self) -> None:
         """get_redis_client raises ServiceUnavailableError when not initialized."""
-        from app.routes.sessions import get_redis_client, _state
         from app.exceptions import ServiceUnavailableError
+        from app.routes.sessions import _state, get_redis_client
 
         original = _state.redis_client
         _state.redis_client = None
@@ -130,7 +131,7 @@ class TestDependencyErrors:
 
     def test_get_redis_client_initialized(self) -> None:
         """get_redis_client returns client when initialized."""
-        from app.routes.sessions import get_redis_client, _state
+        from app.routes.sessions import _state, get_redis_client
 
         mock_client = MagicMock()
         original = _state.redis_client
@@ -143,8 +144,8 @@ class TestDependencyErrors:
 
     def test_get_session_manager_not_initialized(self) -> None:
         """get_session_manager raises ServiceUnavailableError when not initialized."""
-        from app.routes.sessions import get_session_manager, _state
         from app.exceptions import ServiceUnavailableError
+        from app.routes.sessions import _state, get_session_manager
 
         original = _state.session_manager
         _state.session_manager = None
@@ -156,7 +157,7 @@ class TestDependencyErrors:
 
     def test_get_session_manager_initialized(self) -> None:
         """get_session_manager returns manager when initialized."""
-        from app.routes.sessions import get_session_manager, _state
+        from app.routes.sessions import _state, get_session_manager
 
         mock_mgr = MagicMock()
         original = _state.session_manager
@@ -543,10 +544,10 @@ class TestGetSessionRoute:
 
     def test_get_session_forbidden(self, client: TestClient, mock_db: MagicMock) -> None:
         """Non-admin user accessing another user's session."""
-        from app.main import create_app
         from app.database.connection import get_db
+        from app.main import create_app
+        from app.routes.sessions import get_redis_client, get_session_manager
         from app.services.authorization import get_current_user
-        from app.routes.sessions import get_session_manager, get_redis_client
 
         other_user = TokenPayload(
             user_id="other-user",
@@ -679,10 +680,10 @@ class TestGetSessionTasksRoute:
 
     def test_get_tasks_forbidden(self, client: TestClient, mock_db: MagicMock) -> None:
         """Non-admin user accessing another user's session tasks."""
-        from app.main import create_app
         from app.database.connection import get_db
+        from app.main import create_app
+        from app.routes.sessions import get_redis_client, get_session_manager
         from app.services.authorization import get_current_user
-        from app.routes.sessions import get_session_manager, get_redis_client
 
         other_user = TokenPayload(
             user_id="other-user",
@@ -1081,8 +1082,8 @@ class TestSessionRoutesGetSession:
             session_model
         )
 
-        from app.routes.sessions import get_session
         from app.exceptions import SessionNotFoundError
+        from app.routes.sessions import get_session
 
         with pytest.raises(SessionNotFoundError):
             await get_session("session123", mock_session_manager, mock_current_user, mock_db)
@@ -1144,8 +1145,8 @@ class TestSessionRoutesActions:
         mock_session_manager.update_session_state = AsyncMock()
         session.start = AsyncMock(side_effect=ValueError("already running"))
 
-        from app.routes.sessions import start_session
         from app.exceptions import SessionStateConflictError
+        from app.routes.sessions import start_session
 
         with pytest.raises(SessionStateConflictError):
             await start_session("session123", mock_session_manager, mock_current_user, mock_db)
@@ -1181,8 +1182,8 @@ class TestSessionRoutesActions:
         mock_session_manager.update_session_state = AsyncMock()
         session.pause = AsyncMock(side_effect=ValueError("cannot pause"))
 
-        from app.routes.sessions import pause_session
         from app.exceptions import SessionStateConflictError
+        from app.routes.sessions import pause_session
 
         with pytest.raises(SessionStateConflictError):
             await pause_session("session123", mock_session_manager, mock_current_user, mock_db)
@@ -1218,8 +1219,8 @@ class TestSessionRoutesActions:
         mock_session_manager.update_session_state = AsyncMock()
         session.stop = AsyncMock(side_effect=ValueError("cannot stop"))
 
-        from app.routes.sessions import stop_session
         from app.exceptions import SessionStateConflictError
+        from app.routes.sessions import stop_session
 
         with pytest.raises(SessionStateConflictError):
             await stop_session("session123", mock_session_manager, mock_current_user, mock_db)
@@ -1254,8 +1255,8 @@ class TestSessionRoutesActions:
         mock_session_manager.update_session_state = AsyncMock()
         session.reset = AsyncMock(side_effect=ValueError("cannot reset"))
 
-        from app.routes.sessions import reset_session
         from app.exceptions import SessionStateConflictError
+        from app.routes.sessions import reset_session
 
         with pytest.raises(SessionStateConflictError):
             await reset_session("session123", mock_session_manager, mock_current_user, mock_db)

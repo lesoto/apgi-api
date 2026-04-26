@@ -5,8 +5,10 @@ Tests RateLimiter allow/deny logic using an AsyncMock redis client.
 Validates Requirements 2.11.
 """
 
+from unittest.mock import AsyncMock, MagicMock
+
 import pytest
-from unittest.mock import MagicMock, AsyncMock
+
 from app.services.rate_limiter import RateLimiter
 
 

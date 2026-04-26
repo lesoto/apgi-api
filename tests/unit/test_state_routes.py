@@ -9,17 +9,18 @@ Tests cover all 5 endpoints with success and error paths:
 5. GET /{session_id}/somatic-markers - Somatic markers
 """
 
-import pytest
 from contextlib import asynccontextmanager
+from datetime import datetime, timedelta, timezone
 from typing import Any, AsyncIterator
-from datetime import datetime, timezone, timedelta
 from unittest.mock import AsyncMock, MagicMock
+
+import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy.orm import Session
 
 from app.database.models import Session as SessionModel
 from app.models.schemas import TokenPayload
-from app.services.authorization import require_permission, Permission  # noqa: F401
+from app.services.authorization import Permission, require_permission  # noqa: F401
 
 FAKE_USER = TokenPayload(
     user_id="user-123",
@@ -72,10 +73,10 @@ def mock_manager() -> AsyncMock:
 
 @pytest.fixture
 def client(mock_db: MagicMock, mock_manager: AsyncMock) -> TestClient:
-    from app.main import create_app
     from app.database.connection import get_db
-    from app.services.authorization import get_current_user
+    from app.main import create_app
     from app.routes.sessions import get_session_manager
+    from app.services.authorization import get_current_user
 
     app = create_app(test_mode=True)
     app.router.lifespan_context = noop_lifespan
@@ -452,9 +453,10 @@ class TestGetIgnitionHistory:
 
         # Now test with a valid cursor by generating one
         import base64
-        import json
-        import hmac
         import hashlib
+        import hmac
+        import json
+
         from app.config import settings
 
         cursor_data = {"offset": 3}
@@ -860,7 +862,7 @@ class TestStateRoutesPermissions:
         # This is enforced by the dependency, so we verify the endpoint is protected
         # by checking that the dependency is declared
         from app.routes.state import get_system_state
-        from app.services.authorization import require_permission, Permission  # noqa: F401
+        from app.services.authorization import Permission, require_permission  # noqa: F401
 
         # The endpoint should have the permission dependency
         # Check the dependencies in the route signature

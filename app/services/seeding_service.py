@@ -6,12 +6,13 @@ Service for populating the database with realistic test data for development and
 
 import logging
 import random
-from datetime import timedelta, datetime
-from typing import Dict, List, Any, Optional, cast
+from datetime import datetime, timedelta
+from typing import Any, Dict, List, Optional, cast
+
 from faker import Faker
 
 from app.database.connection import get_db_context
-from app.database.models import User, Session, SessionTemplate, Task, TaskDependency
+from app.database.models import Session, SessionTemplate, Task, TaskDependency, User
 from app.services.auth_manager import AuthManager
 
 logger = logging.getLogger(__name__)

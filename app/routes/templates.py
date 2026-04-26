@@ -9,20 +9,21 @@ from uuid import uuid4
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy import select
+
 from app.database.connection import get_async_db_context
 from app.database.models import SessionTemplate
 from app.models.schemas import (
-    SessionTemplateCreateRequest,
-    SessionTemplateUpdateRequest,
-    SessionTemplateResponse,
-    SessionTemplateListResponse,
     PaginationInfo,
+    SessionTemplateCreateRequest,
+    SessionTemplateListResponse,
+    SessionTemplateResponse,
+    SessionTemplateUpdateRequest,
 )
 from app.services.authorization import (
-    get_current_user,
-    require_permission,
     Permission,
     TokenPayload,
+    get_current_user,
+    require_permission,
 )
 
 logger = logging.getLogger(__name__)

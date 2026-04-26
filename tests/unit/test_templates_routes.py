@@ -4,23 +4,23 @@ Comprehensive test suite for templates routes (100% coverage target)
 Tests all CRUD operations, error handling, pagination, and access control.
 """
 
+from datetime import datetime, timedelta, timezone
 from typing import Any
-import pytest
-from datetime import datetime, timezone, timedelta
-from unittest.mock import MagicMock, patch, AsyncMock, PropertyMock
+from unittest.mock import AsyncMock, MagicMock, PropertyMock, patch
 from uuid import uuid4
 
-from fastapi.testclient import TestClient
+import pytest
 from fastapi import HTTPException
+from fastapi.testclient import TestClient
 
 from app.models.schemas import TokenPayload
 from app.routes.templates import (
+    create_template,
+    delete_template,
+    get_template,
     init_template_routes,
     list_templates,
-    create_template,
-    get_template,
     update_template,
-    delete_template,
 )
 
 FAKE_USER = TokenPayload(
@@ -277,8 +277,9 @@ class TestCreateTemplate:
     @pytest.mark.asyncio
     async def test_create_template_success(self, mock_template: MagicMock) -> None:
         """Create template with valid data should succeed."""
-        from app.models.schemas import SessionTemplateCreateRequest
         from datetime import datetime, timezone
+
+        from app.models.schemas import SessionTemplateCreateRequest
 
         mock_db = MagicMock()
 

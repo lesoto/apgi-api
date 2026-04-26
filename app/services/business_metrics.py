@@ -6,14 +6,15 @@ Service for collecting and aggregating business metrics for operational insights
 
 import hashlib
 import logging
-from datetime import datetime, timedelta, timezone
-from typing import Dict, Any, Optional, cast, Callable
 from dataclasses import dataclass
+from datetime import datetime, timedelta, timezone
+from typing import Any, Callable, Dict, Optional, cast
 
-from sqlalchemy import func, and_, or_
+from sqlalchemy import and_, func, or_
 
 from app.database.connection import get_db_context
-from app.database.models import User, Session as SessionModel, Task, SessionTemplate
+from app.database.models import Session as SessionModel
+from app.database.models import SessionTemplate, Task, User
 from app.services.cache_service import get_cache_service
 
 logger = logging.getLogger(__name__)

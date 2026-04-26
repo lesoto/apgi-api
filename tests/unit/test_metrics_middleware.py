@@ -3,13 +3,13 @@ Unit tests for PrometheusMetricsMiddleware and MetricsCollector.
 Requirements: 4.10
 """
 
+import sys
 from typing import Any
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
-from unittest.mock import MagicMock, patch, AsyncMock
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
-import sys
 
 # Patch bcrypt before importing metrics to avoid PyO3 initialization issues
 if "bcrypt" not in sys.modules:

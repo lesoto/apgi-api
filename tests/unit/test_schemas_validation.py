@@ -5,18 +5,19 @@ Achieves 100% coverage for schema validators and edge cases.
 
 # mypy: disable-error-code="attr-defined"
 
+from datetime import datetime, timedelta, timezone
+
 import pytest
-from datetime import datetime, timezone, timedelta
 
 from app.models.schemas import (
-    TokenPayload,
     CustomConfig,
-    SessionTemplateCreateRequest,
-    SessionTemplateUpdateRequest,
-    SessionTemplateResponse,
-    SessionTemplateListResponse,
-    SessionCreateRequest,
     PaginationInfo,
+    SessionCreateRequest,
+    SessionTemplateCreateRequest,
+    SessionTemplateListResponse,
+    SessionTemplateResponse,
+    SessionTemplateUpdateRequest,
+    TokenPayload,
 )
 
 # ============================================================================

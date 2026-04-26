@@ -10,12 +10,8 @@ from typing import Optional
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.orm import Session
 
-from app.services.authorization import Permission, get_current_user, require_permission
-from app.services.auth_manager import TokenPayload
-from app.routes.sessions import get_session_manager, validate_session_ownership
-from app.services.session_manager import SessionManager
+from app.config import settings
 from app.database.connection import get_db
-
 from app.models.schemas import (
     AllostaticState,
     BodyState,
@@ -27,13 +23,16 @@ from app.models.schemas import (
     MinimalSelfState,
     NarrativeSelfState,
     PrecisionState,
+    PredictionErrorsResponse,
     SelfModelState,
+    SomaticMarkersResponse,
     SystemStateResponse,
     WorkspaceState,
-    PredictionErrorsResponse,
-    SomaticMarkersResponse,
 )
-from app.config import settings
+from app.routes.sessions import get_session_manager, validate_session_ownership
+from app.services.auth_manager import TokenPayload
+from app.services.authorization import Permission, get_current_user, require_permission
+from app.services.session_manager import SessionManager
 
 logger = logging.getLogger(__name__)
 
@@ -263,9 +262,9 @@ async def get_ignition_history(  # noqa: C901
         if cursor:
             try:
                 import base64
-                import json
-                import hmac
                 import hashlib
+                import hmac
+                import json
 
                 signed_cursor = base64.b64decode(cursor).decode()
                 json_str, signature = signed_cursor.rsplit(".", 1)
@@ -293,9 +292,9 @@ async def get_ignition_history(  # noqa: C901
         next_cursor = None
         if has_more:
             import base64
-            import json
-            import hmac
             import hashlib
+            import hmac
+            import json
 
             cursor_data = {"offset": end_idx}
             json_str = json.dumps(cursor_data)

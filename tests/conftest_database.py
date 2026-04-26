@@ -6,11 +6,12 @@ database to avoid dependency on PostgreSQL during testing.
 """
 
 import os
+from typing import Any, Generator
+from unittest.mock import MagicMock, patch
+
 import pytest
-from unittest.mock import patch, MagicMock
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
-from typing import Generator, Any
 
 # Test database URL using SQLite in-memory database
 TEST_DATABASE_URL = "sqlite:///:memory:"

@@ -7,9 +7,9 @@ Monitors critical errors and triggers alerts through configured notification cha
 import asyncio
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
-from datetime import datetime, timezone, timedelta
+from datetime import datetime, timedelta, timezone
 from enum import Enum
-from typing import Dict, List, Optional, Any, Callable, cast
+from typing import Any, Callable, Dict, List, Optional, cast
 
 import httpx
 
@@ -272,8 +272,8 @@ class EmailNotificationChannel(NotificationChannel):
         """
         try:
             import smtplib
-            from email.mime.text import MIMEText
             from email.mime.multipart import MIMEMultipart
+            from email.mime.text import MIMEText
 
             if not self.to_emails:
                 logger.warning("No email recipients configured for alert", alert_title=alert.title)

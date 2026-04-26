@@ -1,8 +1,9 @@
 """Test app/__init__.py module."""
 
-import tempfile
 import os
-from app import MockSubSystem, APGISystem
+import tempfile
+
+from app import APGISystem, MockSubSystem
 
 
 class TestMockSubSystem:

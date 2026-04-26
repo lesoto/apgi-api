@@ -5,23 +5,25 @@ Feature: api-migration
 Tests universal properties of JWT token validation and authentication.
 """
 
-from hypothesis import given, strategies as st, assume, settings
-from datetime import datetime, timedelta
-from typing import Any, cast
-from unittest.mock import Mock
-import jwt
 import asyncio
 
 # Import after setting up environment
 import sys
+from datetime import datetime, timedelta
 from pathlib import Path
+from typing import Any, cast
+from unittest.mock import Mock
+
+import jwt
+from hypothesis import assume, given, settings
+from hypothesis import strategies as st
 
 # Add app directory to path for imports
 sys.path.insert(0, str(Path(__file__).parent.parent.parent / "app"))
 
 from app.config import settings as app_settings
-from app.services.auth_manager import AuthManager
 from app.middleware.authentication import AuthenticationMiddleware
+from app.services.auth_manager import AuthManager
 
 # ============================================================================
 # Helper Functions

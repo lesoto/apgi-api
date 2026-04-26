@@ -15,8 +15,8 @@ from sqlalchemy.orm import Session
 from app.database.connection import get_db
 from app.database.models import AuditLog
 from app.exceptions import AuthorizationError, InvalidTokenError
-from app.services.auth_manager import AuthManager
 from app.models.schemas import TokenPayload as TokenPayload
+from app.services.auth_manager import AuthManager
 
 logger = logging.getLogger(__name__)
 

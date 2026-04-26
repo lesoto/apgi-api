@@ -2,9 +2,11 @@
 
 import json
 import logging
+from typing import Any, Dict
+from unittest.mock import AsyncMock, MagicMock, Mock
+
 import pytest
-from typing import Dict, Any
-from unittest.mock import MagicMock, Mock, AsyncMock
+
 from app.middleware.schema_validation import ResponseSchemaValidationMiddleware
 
 
@@ -539,8 +541,9 @@ class TestResponseSchemaValidationMiddlewareAdditional:
 # Tests merged from test_schema_validation_middleware.py
 # ---------------------------------------------------------------------------
 import json as _json
-from typing import Dict, Any
-from unittest.mock import MagicMock as _MagicMock, AsyncMock as _AsyncMock
+from typing import Any, Dict
+from unittest.mock import AsyncMock as _AsyncMock
+from unittest.mock import MagicMock as _MagicMock
 
 
 class TestSchemaValidationMiddlewareExtra:

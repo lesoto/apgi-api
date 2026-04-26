@@ -3,12 +3,13 @@ Comprehensive Adversarial Test Suite for Experimental Tasks
 Tests Celery bound tasks with proper mocking of self (task instance).
 """
 
+from unittest.mock import AsyncMock, MagicMock, PropertyMock, patch
+
 import pytest
-from unittest.mock import MagicMock, patch, AsyncMock, PropertyMock
 
 from app.tasks.experimental_tasks import (
-    trigger_webhook_on_completion,
     APGITask,
+    trigger_webhook_on_completion,
 )
 
 # ============================================================================

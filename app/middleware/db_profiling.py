@@ -5,11 +5,11 @@ Provides detailed database query profiling, payload size tracking, and
 cache hit ratio metrics by endpoint for performance dashboards.
 """
 
-import time
 import logging
-from typing import Any, Awaitable, Callable, Dict, List, Optional
+import time
 from contextvars import ContextVar
 from dataclasses import dataclass, field
+from typing import Any, Awaitable, Callable, Dict, List, Optional
 
 from fastapi import Request
 from starlette.middleware.base import BaseHTTPMiddleware

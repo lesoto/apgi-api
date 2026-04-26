@@ -6,7 +6,7 @@ prerequisite checking, and dependency-based task scheduling.
 """
 
 import logging
-from typing import Dict, Optional, Set, List
+from typing import Dict, List, Optional, Set
 
 from app.database.connection import get_db_context
 from app.database.models import Task, TaskDependency, TaskStatus

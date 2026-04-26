@@ -4,13 +4,15 @@ Covers user CRUD operations, role management, and user validation.
 Requirements: 2.9
 """
 
-import pytest
 from datetime import datetime, timedelta, timezone
-from unittest.mock import patch, MagicMock
-from sqlalchemy.exc import IntegrityError
 from typing import Generator
-from app.services.user_management import UserManagementService
+from unittest.mock import MagicMock, patch
+
+import pytest
+from sqlalchemy.exc import IntegrityError
+
 from app.exceptions import UserNotFoundError, ValidationError
+from app.services.user_management import UserManagementService
 
 
 @pytest.fixture

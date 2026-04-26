@@ -10,6 +10,7 @@ Module-level patches (applied before any test file is imported by pytest):
 import sys
 from typing import Any, Callable, Generator
 from unittest.mock import MagicMock, patch
+
 import pytest
 
 # ---------------------------------------------------------------------------

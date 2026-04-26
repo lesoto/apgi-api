@@ -7,16 +7,17 @@ Covers success paths, error paths, and edge cases.
 Validates: Requirements 3.12, 3.15
 """
 
+from typing import Any, Generator
+from unittest.mock import AsyncMock, MagicMock, patch
+
 import pytest
-from unittest.mock import MagicMock, patch, AsyncMock
 from starlette.testclient import TestClient
-from typing import Generator, Any
 
 try:
     # Ensure app modules can be imported
     from app.routes.health import (
-        init_health_routes,
         get_health_service,
+        init_health_routes,
     )
 except ImportError:
     pytest.skip(
@@ -65,8 +66,8 @@ def mock_health_service(mock_redis_client: AsyncMock) -> MagicMock:
 @pytest.fixture
 def client(mock_db: MagicMock, mock_health_service: MagicMock) -> Generator[TestClient, None, None]:
     """Create a TestClient with mocked dependencies."""
-    from app.main import create_app
     from app.database.connection import get_db
+    from app.main import create_app
 
     app = create_app(test_mode=True)
     app.dependency_overrides[get_db] = lambda: mock_db

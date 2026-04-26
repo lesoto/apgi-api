@@ -6,8 +6,9 @@ Tests _validate_celery_urls function in isolation since conftest.py mocks celery
 
 import sys
 from typing import Any, Generator
-import pytest
 from unittest.mock import MagicMock, patch
+
+import pytest
 
 
 @pytest.fixture(autouse=True)

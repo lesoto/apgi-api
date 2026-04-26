@@ -6,13 +6,14 @@ Utilities for testing database state and managing test data in E2E tests.
 
 import logging
 from contextlib import contextmanager
-from typing import Dict, List, Any, Optional, Generator
+from typing import Any, Dict, Generator, List, Optional
 
 from sqlalchemy import text
 from sqlalchemy.orm import Session
 
 from app.database.connection import get_db_context
-from app.database.models import User, Session as SessionModel, Task, SessionTemplate, TaskDependency
+from app.database.models import Session as SessionModel
+from app.database.models import SessionTemplate, Task, TaskDependency, User
 
 logger = logging.getLogger(__name__)
 

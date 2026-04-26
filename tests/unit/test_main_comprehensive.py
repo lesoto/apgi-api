@@ -4,8 +4,9 @@ Comprehensive unit tests for main.py module to achieve 100% coverage.
 
 import socket
 import sys
-import pytest
 from unittest.mock import AsyncMock, MagicMock, patch
+
+import pytest
 from fastapi import FastAPI
 
 
@@ -147,7 +148,7 @@ class TestLifespanComprehensive:
     @patch("redis.asyncio.from_url")
     async def test_lifespan_tracing_disabled(self, mock_redis: AsyncMock) -> None:
         """Test lifespan when OpenTelemetry is not available."""
-        from app.main import lifespan, OPENTELEMETRY_AVAILABLE
+        from app.main import OPENTELEMETRY_AVAILABLE, lifespan
 
         # Temporarily disable OpenTelemetry
         original_value = OPENTELEMETRY_AVAILABLE
@@ -370,8 +371,9 @@ class TestCreateAppComprehensive:
 
     def test_create_app_root_endpoint(self) -> None:
         """Test that root endpoint is properly configured."""
-        from app.main import create_app
         from fastapi.testclient import TestClient
+
+        from app.main import create_app
 
         app = create_app(test_mode=True)
         client = TestClient(app)

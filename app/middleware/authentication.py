@@ -4,21 +4,22 @@ Authentication Middleware
 Middleware to extract and verify JWT tokens from Authorization headers.
 """
 
-import logging
-from typing import Any, Awaitable, Callable, Optional
-from dataclasses import dataclass
-from datetime import datetime, timezone, timedelta
 import asyncio
+import logging
+from dataclasses import dataclass
+from datetime import datetime, timedelta, timezone
+from typing import Any, Awaitable, Callable, Optional
+
 from fastapi import Request, Response
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.responses import JSONResponse
 from starlette.types import ASGIApp
 
-from app.database.models import APIKey
 from app.database.connection import SessionLocal
+from app.database.models import APIKey
 from app.exceptions import ExpiredTokenError, InvalidTokenError
-from app.services.auth_manager import AuthManager
 from app.models.schemas import TokenPayload
+from app.services.auth_manager import AuthManager
 
 logger = logging.getLogger(__name__)
 
@@ -257,10 +258,12 @@ class AuthenticationMiddleware(BaseHTTPMiddleware):
         """
         Blocking JWT decode and basic validation (without revocation check).
         """
+        from datetime import datetime, timezone
+
         import jwt
-        from app.services.auth_manager import TokenPayload
+
         from app.config import settings as _settings
-        from datetime import timezone, datetime
+        from app.services.auth_manager import TokenPayload
 
         try:
             secret_key = _settings.jwt_secret_key
@@ -325,8 +328,8 @@ class AuthenticationMiddleware(BaseHTTPMiddleware):
             auth_manager = AuthManager(db)
 
             # Compute HMAC prefix for fast lookup
-            import hmac
             import hashlib
+            import hmac
 
             if auth_manager.secret_key is None:
                 raise ValueError("Secret key not configured")
@@ -335,8 +338,9 @@ class AuthenticationMiddleware(BaseHTTPMiddleware):
             ).hexdigest()[:16]
 
             # Query API keys by prefix (should significantly reduce the number of candidates)
-            from sqlalchemy import or_
             from datetime import datetime, timezone
+
+            from sqlalchemy import or_
 
             now = datetime.now(timezone.utc)
             active_keys = (

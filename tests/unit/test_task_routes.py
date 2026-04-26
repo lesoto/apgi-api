@@ -5,13 +5,13 @@ Tests task submission, status checking, listing, and cancellation endpoints
 by calling route functions directly with mocked dependencies.
 """
 
-import pytest
 import uuid
 from datetime import datetime, timezone
 from unittest.mock import AsyncMock, MagicMock, patch
-from fastapi import HTTPException, Request
+
+import pytest
+from fastapi import HTTPException, Request, status
 from sqlalchemy.orm import Session
-from fastapi import status
 
 
 @pytest.fixture
@@ -385,7 +385,7 @@ class TestTaskRoutes:
     def test_get_task_executor_initialized(self) -> None:
         """Test get_task_executor when initialized."""
         with patch("app.routes.tasks.TaskExecutor"):
-            from app.routes.tasks import init_task_routes, get_task_executor
+            from app.routes.tasks import get_task_executor, init_task_routes
 
             init_task_routes()
             executor = get_task_executor()
@@ -719,7 +719,10 @@ class TestCreateTaskDependency:
 
         db.refresh.side_effect = refresh_side_effect
 
-        from app.routes.tasks import create_task_dependency, TaskDependencyCreateRequest  # type: ignore[attr-defined]
+        from app.routes.tasks import (  # type: ignore[attr-defined]
+            TaskDependencyCreateRequest,
+            create_task_dependency,
+        )
 
         request = TaskDependencyCreateRequest(
             prerequisite_task_id=self.PREREQ_ID, dependency_type="completion"
@@ -754,7 +757,10 @@ class TestCreateTaskDependency:
             cycle_deps=cycle_deps,
         )
 
-        from app.routes.tasks import create_task_dependency, TaskDependencyCreateRequest  # type: ignore[attr-defined]
+        from app.routes.tasks import (  # type: ignore[attr-defined]
+            TaskDependencyCreateRequest,
+            create_task_dependency,
+        )
 
         request = TaskDependencyCreateRequest(
             prerequisite_task_id=self.PREREQ_ID, dependency_type="completion"
@@ -837,7 +843,10 @@ class TestCreateTaskDependency:
 
         db.refresh.side_effect = refresh_side_effect
 
-        from app.routes.tasks import create_task_dependency, TaskDependencyCreateRequest  # type: ignore[attr-defined]
+        from app.routes.tasks import (  # type: ignore[attr-defined]
+            TaskDependencyCreateRequest,
+            create_task_dependency,
+        )
 
         request = TaskDependencyCreateRequest(
             prerequisite_task_id=self.PREREQ_ID, dependency_type="completion"
@@ -856,7 +865,10 @@ class TestCreateTaskDependency:
             None
         )
 
-        from app.routes.tasks import create_task_dependency, TaskDependencyCreateRequest  # type: ignore[attr-defined]
+        from app.routes.tasks import (  # type: ignore[attr-defined]
+            TaskDependencyCreateRequest,
+            create_task_dependency,
+        )
 
         request = TaskDependencyCreateRequest(
             prerequisite_task_id=self.PREREQ_ID, dependency_type="completion"
@@ -883,7 +895,10 @@ class TestCreateTaskDependency:
 
         db.query.side_effect = [dep_task_query, prereq_task_query]
 
-        from app.routes.tasks import create_task_dependency, TaskDependencyCreateRequest  # type: ignore[attr-defined]
+        from app.routes.tasks import (  # type: ignore[attr-defined]
+            TaskDependencyCreateRequest,
+            create_task_dependency,
+        )
 
         request = TaskDependencyCreateRequest(
             prerequisite_task_id=self.PREREQ_ID, dependency_type="completion"
@@ -918,7 +933,10 @@ class TestCreateTaskDependency:
 
         db.query.side_effect = [dep_task_query, prereq_task_query]
 
-        from app.routes.tasks import create_task_dependency, TaskDependencyCreateRequest  # type: ignore[attr-defined]
+        from app.routes.tasks import (  # type: ignore[attr-defined]
+            TaskDependencyCreateRequest,
+            create_task_dependency,
+        )
 
         request = TaskDependencyCreateRequest(
             prerequisite_task_id=self.PREREQ_ID, dependency_type="completion"
@@ -954,7 +972,10 @@ class TestCreateTaskDependency:
 
         db.query.side_effect = [dep_task_query, prereq_task_query]
 
-        from app.routes.tasks import create_task_dependency, TaskDependencyCreateRequest  # type: ignore[attr-defined]
+        from app.routes.tasks import (  # type: ignore[attr-defined]
+            TaskDependencyCreateRequest,
+            create_task_dependency,
+        )
 
         # Self-dependency: same task_id as prerequisite_task_id
         request = TaskDependencyCreateRequest(
@@ -984,7 +1005,10 @@ class TestCreateTaskDependency:
             existing_dep=MagicMock(),  # Existing dependency found
         )
 
-        from app.routes.tasks import create_task_dependency, TaskDependencyCreateRequest  # type: ignore[attr-defined]
+        from app.routes.tasks import (  # type: ignore[attr-defined]
+            TaskDependencyCreateRequest,
+            create_task_dependency,
+        )
 
         request = TaskDependencyCreateRequest(
             prerequisite_task_id=self.PREREQ_ID, dependency_type="completion"
@@ -1002,7 +1026,10 @@ class TestCreateTaskDependency:
         """Test create_task_dependency with internal error."""
         mock_db_session.query.side_effect = Exception("Database error")
 
-        from app.routes.tasks import create_task_dependency, TaskDependencyCreateRequest  # type: ignore[attr-defined]
+        from app.routes.tasks import (  # type: ignore[attr-defined]
+            TaskDependencyCreateRequest,
+            create_task_dependency,
+        )
 
         request = TaskDependencyCreateRequest(
             prerequisite_task_id=self.PREREQ_ID, dependency_type="completion"

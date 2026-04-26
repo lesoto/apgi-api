@@ -4,19 +4,18 @@ Structured Logging Middleware
 Provides structured JSON logging for all API requests and errors.
 """
 
+import contextvars
 import json
 import logging
 import time
 import traceback
 import uuid
-import contextvars
 from datetime import datetime, timezone
 from typing import Any, Awaitable, Callable, Optional
 
-from starlette.responses import Response
-
 from fastapi import Request
 from starlette.middleware.base import BaseHTTPMiddleware
+from starlette.responses import Response
 from starlette.types import ASGIApp
 
 # Context variable for request ID propagation

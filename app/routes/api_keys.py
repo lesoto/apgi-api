@@ -4,28 +4,28 @@ API Key Management Routes
 API endpoints for managing API keys including creation, listing, updating, and deletion.
 """
 
-import secrets
 import logging
+import secrets
+from datetime import datetime, timedelta, timezone
 from typing import cast
-from datetime import datetime, timezone, timedelta
 
-from fastapi import APIRouter, Depends, status, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
+from app.config import settings
 from app.database.connection import get_db
 from app.database.models import APIKey
-from app.config import settings
 from app.models.schemas import (
-    ErrorResponse,
     APIKeyCreateRequest,
     APIKeyCreateResponse,
-    APIKeyResponse,
     APIKeyListResponse,
+    APIKeyResponse,
     APIKeyUpdateRequest,
+    ErrorResponse,
     PaginationInfo,
 )
-from app.services.authorization import get_current_user, TokenPayload
 from app.services.auth_manager import AuthManager
+from app.services.authorization import TokenPayload, get_current_user
 
 router = APIRouter(
     prefix="/v1/api-keys",
@@ -71,8 +71,8 @@ async def create_api_key(
     expires_at = request.expires_at or (datetime.now(timezone.utc) + timedelta(days=365))
 
     # Compute HMAC prefix for fast lookup
-    import hmac
     import hashlib
+    import hmac
 
     prefix = hmac.new(
         cast(str, settings.jwt_secret_key).encode(),
@@ -337,8 +337,8 @@ async def rotate_api_key(
     api_key_plain = f"apgi_{secrets.token_urlsafe(32)}"
 
     # Compute HMAC prefix for fast lookup
-    import hmac
     import hashlib
+    import hmac
 
     prefix = hmac.new(
         cast(str, settings.jwt_secret_key).encode(),

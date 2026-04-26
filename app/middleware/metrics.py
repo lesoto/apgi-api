@@ -5,9 +5,9 @@ Provides Prometheus metrics for monitoring API performance and health.
 """
 
 import time
-import psutil
 from typing import Any, Awaitable, Callable
 
+import psutil
 from fastapi import Request
 from prometheus_client import CONTENT_TYPE_LATEST, Counter, Gauge, Histogram, generate_latest
 from starlette.middleware.base import BaseHTTPMiddleware

@@ -7,21 +7,21 @@ endpoint configuration. Validates Requirements 3.14.
 
 import os
 from typing import Generator
+from unittest.mock import patch
 
 import pytest
-from unittest.mock import patch
 from starlette.testclient import TestClient
 
 try:
     from app.main import create_app
     from app.routes.version import (
-        get_version_info,
-        get_client_documentation,
-        configure_deprecated_endpoints,
-        is_endpoint_deprecated,
-        get_deprecated_endpoints,
-        CURRENT_VERSION,
         API_VERSION,
+        CURRENT_VERSION,
+        configure_deprecated_endpoints,
+        get_client_documentation,
+        get_deprecated_endpoints,
+        get_version_info,
+        is_endpoint_deprecated,
     )
 except ImportError:
     pytest.skip(
@@ -100,6 +100,7 @@ class TestGetVersionInfo:
         with patch.dict(os.environ, {"API_VERSION": "2.0.0", "API_VERSION_PREFIX": "v2"}):
             # Re-import to get new env values
             import importlib
+
             import app.routes.version as version_module
 
             importlib.reload(version_module)

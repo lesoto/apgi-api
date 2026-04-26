@@ -11,23 +11,24 @@ This module tests:
 - configure_alerting function
 """
 
-import pytest
 from datetime import timedelta
-from typing import Generator, Any
+from typing import Any, Generator
 from unittest.mock import AsyncMock, MagicMock, patch
+
+import pytest
 
 from app.middleware.alerting import (
     Alert,
+    AlertEscalationPolicy,
+    AlertManager,
+    AlertRule,
     AlertSeverity,
     AlertTemplate,
-    AlertEscalationPolicy,
-    AlertRule,
-    AlertManager,
-    SlackNotificationChannel,
     EmailNotificationChannel,
     LogNotificationChannel,
-    configure_alerting,
+    SlackNotificationChannel,
     alert_manager,
+    configure_alerting,
 )
 
 

@@ -8,17 +8,16 @@ individually, running all scripts sequentially, or running the complete test
 suite using pytest with real-time output display and error handling.
 """
 
+import os
+import re
 import subprocess
 import sys
 import threading
 import tkinter as tk
-import os
 from collections import deque
 from pathlib import Path
 from tkinter import scrolledtext, ttk
 from typing import Any, Dict, List, Optional, Tuple, cast
-
-import re
 
 
 def strip_ansi_codes(text: str) -> str:
@@ -47,11 +46,11 @@ class ToolTip:
         self.widget.bind("<Leave>", self.on_leave)
         self.widget.bind("<ButtonPress>", self.on_leave)
 
-    def on_enter(self, event: Optional[tk.Event] = None) -> None:
+    def on_enter(self, event: Optional[tk.Event[Any]] = None) -> None:
         """Show tooltip when mouse enters widget"""
         self.schedule()
 
-    def on_leave(self, event: Optional[tk.Event] = None) -> None:
+    def on_leave(self, event: Optional[tk.Event[Any]] = None) -> None:
         """Hide tooltip when mouse leaves widget"""
         self.unschedule()
         self.hidetip()
@@ -125,7 +124,7 @@ class TestsRunnerGUI:
         self.theme_manager: Optional[Any] = None
         self.theme_manager_available = False
         try:
-            from apgi_gui.theme_manager import ThemeManager  # type: ignore[import-not-found]
+            from apgi_gui.theme_manager import ThemeManager
 
             # Detect system dark mode preference
             initial_theme = self._detect_system_theme()

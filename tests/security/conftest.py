@@ -3,8 +3,9 @@ Fixtures for security tests.
 """
 
 from typing import Generator
-import pytest
 from unittest.mock import MagicMock
+
+import pytest
 
 
 @pytest.fixture

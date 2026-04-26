@@ -2,11 +2,12 @@
 
 from __future__ import annotations
 
-import pytest
-from unittest.mock import MagicMock, patch, AsyncMock
 import asyncio
+from unittest.mock import AsyncMock, MagicMock, patch
 
-from app.tasks.webhook_tasks import process_pending_webhooks, _process_webhooks
+import pytest
+
+from app.tasks.webhook_tasks import _process_webhooks, process_pending_webhooks
 
 
 class TestWebhookTasks:

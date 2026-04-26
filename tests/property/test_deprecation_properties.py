@@ -7,19 +7,22 @@ and deprecated endpoint logging.
 """
 
 import json
-from hypothesis import given, strategies as st, settings
-from contextlib import contextmanager
-import sys
-from pathlib import Path
-from io import StringIO
 import logging
+import sys
+from contextlib import contextmanager
+from io import StringIO
+from pathlib import Path
 from typing import Any, Dict
+
+from hypothesis import given, settings
+from hypothesis import strategies as st
 
 # Add app directory to path for imports
 sys.path.insert(0, str(Path(__file__).parent.parent.parent / "app"))
 
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
+
 from app.middleware.deprecation import DeprecationMiddleware
 
 # ============================================================================

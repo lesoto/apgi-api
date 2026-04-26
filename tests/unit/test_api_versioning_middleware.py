@@ -5,11 +5,11 @@ Tests the APIVersioningMiddleware that adds semantic versioning headers to respo
 """
 
 from typing import Any
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
-from unittest.mock import AsyncMock, MagicMock, patch
-from starlette.responses import Response, JSONResponse
 from starlette.requests import Request
+from starlette.responses import JSONResponse, Response
 
 
 @pytest.fixture

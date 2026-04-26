@@ -13,11 +13,12 @@ Usage:
 """
 
 import asyncio
-import time
 import statistics
+import time
+from typing import AsyncGenerator, List, Tuple
+
 import pytest
-from httpx import AsyncClient, ASGITransport
-from typing import List, Tuple, AsyncGenerator
+from httpx import ASGITransport, AsyncClient
 
 # Performance thresholds
 MAX_RESPONSE_TIME_P95_MS = 1500  # p95 should be under 1.5 seconds (includes middleware overhead)

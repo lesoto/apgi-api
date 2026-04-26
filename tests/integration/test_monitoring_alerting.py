@@ -11,19 +11,20 @@ end-to-end, including:
 **Validates: Requirements related to monitoring and alerting**
 """
 
-import pytest
-from unittest.mock import AsyncMock, patch, MagicMock
-from httpx import AsyncClient, ASGITransport
 from typing import AsyncGenerator
+from unittest.mock import AsyncMock, MagicMock, patch
+
+import pytest
+from httpx import ASGITransport, AsyncClient
 
 from app.middleware.alerting import (
-    AlertManager,
     Alert,
+    AlertManager,
     AlertSeverity,
-    WebhookNotificationChannel,
+    LogNotificationChannel,
     PagerDutyNotificationChannel,
     TeamsNotificationChannel,
-    LogNotificationChannel,
+    WebhookNotificationChannel,
 )
 
 
@@ -47,8 +48,9 @@ async def client(
     test_environment: None, mock_database_connection: None
 ) -> AsyncGenerator[AsyncClient, None]:
     """Create test client for monitoring/alerting tests."""
-    from app.main import create_app
     from unittest.mock import AsyncMock, patch
+
+    from app.main import create_app
 
     # Mock Redis for the lifespan
     mock_redis_client = AsyncMock()

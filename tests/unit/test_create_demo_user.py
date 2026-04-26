@@ -1,7 +1,8 @@
 """Unit tests for create_demo_user.py utility module."""
 
+from unittest.mock import MagicMock, patch
+
 import pytest
-from unittest.mock import patch, MagicMock
 
 
 class TestCreateDemoUser:

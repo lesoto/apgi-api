@@ -4,15 +4,16 @@ Unit tests for task execution.
 Tests task submission, status checking, result retrieval, and timeout handling.
 """
 
-import pytest
 import uuid
 from datetime import datetime, timedelta, timezone
 from typing import Any
 from unittest.mock import MagicMock, patch
+
+import pytest
 from celery import states
 
-from app.services.task_executor import TaskExecutor, async_retry_with_backoff
 from app.database.models import Task, TaskStatus
+from app.services.task_executor import TaskExecutor, async_retry_with_backoff
 
 # ============================================================================
 # Test Retry Functions

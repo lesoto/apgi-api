@@ -4,9 +4,10 @@ Tests for metrics routes.
 Tests for metrics endpoints and dashboard functionality.
 """
 
-import pytest
 from typing import Any
-from unittest.mock import MagicMock, AsyncMock, patch
+from unittest.mock import AsyncMock, MagicMock, patch
+
+import pytest
 from fastapi import HTTPException, status
 from fastapi.responses import HTMLResponse
 
@@ -490,10 +491,9 @@ class TestMetricsDependencies:
 
     def test_get_business_metrics_service_singleton(self) -> None:
         """Test business metrics service is singleton."""
-        from app.routes.metrics import get_business_metrics_service
-
         # Reset global to None to test initialization
         import app.routes.metrics as metrics_module
+        from app.routes.metrics import get_business_metrics_service
 
         metrics_module._business_metrics_service = None
 
@@ -505,10 +505,9 @@ class TestMetricsDependencies:
 
     def test_get_profiling_service_singleton(self) -> None:
         """Test profiling service is singleton."""
-        from app.routes.metrics import get_profiling_service
-
         # Reset global to None to test initialization
         import app.routes.metrics as metrics_module
+        from app.routes.metrics import get_profiling_service
 
         metrics_module._profiling_service = None
 

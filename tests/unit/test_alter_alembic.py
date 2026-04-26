@@ -2,8 +2,10 @@
 Unit tests for alter_alembic.py utility module.
 """
 
+from unittest.mock import MagicMock, patch
+
 import pytest
-from unittest.mock import patch, MagicMock
+
 from app.alter_alembic import alter_alembic_version
 
 
@@ -200,6 +202,7 @@ class TestAlterAlembicMain:
         """Test that importing as module does NOT execute main block."""
         # Reload the module to ensure fresh import
         import importlib
+
         import app.alter_alembic
 
         with patch("app.alter_alembic.engine") as mock_engine:

@@ -5,12 +5,12 @@ API endpoints for user management including registration,
 password reset, and user administration.
 """
 
-import secrets
 import logging
+import secrets
 from datetime import datetime, timezone
 from typing import List, cast
 
-from fastapi import APIRouter, Depends, status, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
 from app.database.connection import get_db
@@ -18,36 +18,36 @@ from app.database.models import User
 from app.exceptions import UserNotFoundError, ValidationError
 from app.models.schemas import (
     ErrorResponse,
+    MFABackupCodeRegenerateResponse,
+    MFABackupCodeVerifyRequest,
+    MFABackupCodeVerifyResponse,
+    MFADisableRequest,
+    MFADisableResponse,
+    MFAEnableRequest,
+    MFAEnableResponse,
+    MFAEnrollResponse,
+    PaginationInfo,
+    PasswordResetConfirmRequest,
+    PasswordResetConfirmResponse,
+    PasswordResetEmailRequest,
+    PasswordResetEmailResponse,
+    PasswordResetRequest,
+    PasswordResetResponse,
+    TokenPayload,
     UserCreateRequest,
     UserCreateResponse,
     UserResponse,
-    UserUpdateRequest,
     UsersListResponse,
-    PaginationInfo,
-    TokenPayload,
     UserStatsResponse,
-    PasswordResetRequest,
-    PasswordResetResponse,
-    PasswordResetEmailRequest,
-    PasswordResetEmailResponse,
-    PasswordResetConfirmRequest,
-    PasswordResetConfirmResponse,
-    MFAEnrollResponse,
-    MFAEnableRequest,
-    MFAEnableResponse,
-    MFADisableRequest,
-    MFADisableResponse,
-    MFABackupCodeVerifyRequest,
-    MFABackupCodeVerifyResponse,
-    MFABackupCodeRegenerateResponse,
-)
-from app.services.authorization import (
-    Permission,
-    require_permission,
-    get_current_user,
-    has_permission,
+    UserUpdateRequest,
 )
 from app.services.auth_manager import AuthManager
+from app.services.authorization import (
+    Permission,
+    get_current_user,
+    has_permission,
+    require_permission,
+)
 from app.services.user_management import get_user_management_service
 
 logger = logging.getLogger(__name__)
@@ -712,8 +712,8 @@ async def enroll_mfa(
         qr_url = auth_manager.get_mfa_qr_url(current_user.username, secret)
 
         # Generate backup codes (10 codes, 32 hex characters each = 128-bit entropy)
-        import secrets
         import hashlib
+        import secrets
 
         backup_codes = [secrets.token_hex(16).upper() for _ in range(10)]
         # Hash backup codes before storing (never store plaintext)
@@ -981,8 +981,8 @@ async def regenerate_mfa_backup_codes(
             )
 
         # Generate new backup codes (10 codes, 32 hex characters each = 128-bit entropy)
-        import secrets
         import hashlib
+        import secrets
 
         new_backup_codes = [secrets.token_hex(16).upper() for _ in range(10)]
         # Hash backup codes before storing (never store plaintext)

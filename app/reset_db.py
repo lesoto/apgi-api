@@ -1,9 +1,10 @@
 #!/usr/bin/env python3
 
-import psycopg2
-from psycopg2.extensions import ISOLATION_LEVEL_AUTOCOMMIT
 import os
+
+import psycopg2
 from dotenv import load_dotenv
+from psycopg2.extensions import ISOLATION_LEVEL_AUTOCOMMIT
 
 # Load environment variables
 load_dotenv()

@@ -4,19 +4,21 @@ Metrics Routes
 Endpoints for exposing Prometheus metrics and business dashboard metrics.
 """
 
+import html
+import json
+import logging
+import os
+from typing import Any, Optional
+
 from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.responses import HTMLResponse
 from starlette.responses import Response as StarletteResponse
-from typing import Any, Optional
-import json
-import logging
-import html
 
 from app.middleware.metrics import get_metrics_response
+from app.services.authorization import Permission, require_permission
 from app.services.business_metrics import BusinessMetricsService
-from app.services.authorization import require_permission, Permission
-from app.services.profiling_service import ProfilingService
 from app.services.cache_service import get_cache_service
+from app.services.profiling_service import ProfilingService
 
 router = APIRouter(prefix="/v1", tags=["Metrics"])
 
@@ -269,6 +271,41 @@ async def get_complete_dashboard(
         )
 
 
+def _load_dashboard_template() -> str:
+    """Load the dashboard HTML template from file."""
+    template_path = os.path.join(
+        os.path.dirname(os.path.dirname(__file__)), "templates", "dashboard.html"
+    )
+    try:
+        with open(template_path, "r", encoding="utf-8") as f:
+            return f.read()
+    except FileNotFoundError:
+        logger.error(f"Dashboard template not found at {template_path}")
+        raise
+
+
+def _render_dashboard_template(template: str, days: int, dashboard_data: dict[str, Any]) -> str:
+    """Render the dashboard template with data."""
+    overview = dashboard_data.get("overview", {})
+    system = dashboard_data.get("system", {})
+
+    # Safely escape all values for HTML insertion
+    return (
+        template.replace("{{days}}", html.escape(str(days)))
+        .replace("{{total_requests}}", html.escape(str(overview.get("total_requests", 0))))
+        .replace("{{active_users}}", html.escape(str(overview.get("active_users", 0))))
+        .replace(
+            "{{avg_response_time}}",
+            html.escape(f"{overview.get('avg_response_time', 0):.2f}"),
+        )
+        .replace("{{error_rate}}", html.escape(f"{overview.get('error_rate', 0):.2f}"))
+        .replace("{{uptime_hours}}", html.escape(f"{system.get('uptime_hours', 0):.1f}"))
+        .replace("{{cpu_usage}}", html.escape(f"{system.get('cpu_usage', 0):.1f}"))
+        .replace("{{memory_usage}}", html.escape(f"{system.get('memory_usage', 0):.1f}"))
+        .replace("{{dashboard_data_json}}", json.dumps(dashboard_data))
+    )
+
+
 @router.get(
     "/dashboard/html",
     summary="Dashboard HTML Interface",
@@ -297,149 +334,9 @@ async def get_dashboard_html(
         # Get dashboard data
         dashboard_data = await service.get_dashboard_data(days)
 
-        # Create simple HTML dashboard
-        html_content = f"""
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>APGI API Analytics Dashboard</title>
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    <style>
-        body {{ font-family: Arial, sans-serif; margin: 20px; background-color: #f5f5f5; }}
-        .dashboard {{ max-width: 1200px; margin: 0 auto; }}
-        .header {{ background: #2c3e50; color: white; padding: 20px; border-radius: 8px; margin-bottom: 20px; }}
-        .metric-card {{ background: white; padding: 20px; margin: 10px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); display: inline-block; width: 300px; vertical-align: top; }}
-        .metric-value {{ font-size: 2em; font-weight: bold; color: #3498db; }}
-        .metric-label {{ color: #7f8c8d; margin-top: 5px; }}
-        .chart-container {{ background: white; height: 300px; margin-top: 10px; }}
-        .grid {{ display: flex; flex-wrap: wrap; }}
-        .section {{ background: white; padding: 20px; margin: 10px 0; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }}
-        .section h2 {{ color: #2c3e50; border-bottom: 2px solid #3498db; padding-bottom: 10px; }}
-    </style>
-</head>
-<body>
-    <div class="dashboard">
-        <div class="header">
-            <h1>APGI API Analytics Dashboard</h1>
-            <p>Real-time API usage and performance metrics</p>
-            <p>Showing data for the last {days} days</p>
-        </div>
-
-        <div class="section">
-            <h2>Overview</h2>
-            <div class="grid">
-                <div class="metric-card">
-                    <div class="metric-value">{html.escape(str(dashboard_data.get('overview', {}).get('total_requests', 0)))}</div>
-                    <div class="metric-label">Total Requests</div>
-                </div>
-                <div class="metric-card">
-                    <div class="metric-value">{html.escape(str(dashboard_data.get('overview', {}).get('active_users', 0)))}</div>
-                    <div class="metric-label">Active Users</div>
-                </div>
-                <div class="metric-card">
-                    <div class="metric-value">{html.escape(f"{dashboard_data.get('overview', {}).get('avg_response_time', 0):.2f}")}ms</div>
-                    <div class="metric-label">Avg Response Time</div>
-                </div>
-                <div class="metric-card">
-                    <div class="metric-value">{html.escape(f"{dashboard_data.get('overview', {}).get('error_rate', 0):.2f}")}%</div>
-                    <div class="metric-label">Error Rate</div>
-                </div>
-            </div>
-        </div>
-
-        <div class="section">
-            <h2>Performance Trends</h2>
-            <div class="chart-container">
-                <canvas id="performanceChart"></canvas>
-            </div>
-            <p>Response time trends and throughput metrics over the last {days} days.</p>
-        </div>
-
-        <div class="section">
-            <h2>API Usage by Endpoint</h2>
-            <div class="chart-container">
-                <canvas id="endpointChart"></canvas>
-            </div>
-            <p>Most frequently used API endpoints and their usage patterns.</p>
-        </div>
-
-        <div class="section">
-            <h2>System Health</h2>
-            <div class="grid">
-                <div class="metric-card">
-                    <div class="metric-value">{html.escape(f"{dashboard_data.get('system', {}).get('uptime_hours', 0):.1f}")}h</div>
-                    <div class="metric-label">System Uptime</div>
-                </div>
-                <div class="metric-card">
-                    <div class="metric-value">{html.escape(f"{dashboard_data.get('system', {}).get('cpu_usage', 0):.1f}")}%</div>
-                    <div class="metric-label">CPU Usage</div>
-                </div>
-                <div class="metric-card">
-                    <div class="metric-value">{html.escape(f"{dashboard_data.get('system', {}).get('memory_usage', 0):.1f}")}%</div>
-                    <div class="metric-label">Memory Usage</div>
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <script>
-        // Dashboard data
-        const dashboardData = {json.dumps(dashboard_data)};
-
-        // Performance Trends Chart
-        const performanceCtx = document.getElementById('performanceChart').getContext('2d');
-        const performanceChart = new Chart(performanceCtx, {{
-            type: 'line',
-            data: {{
-                labels: dashboardData.trends ? dashboardData.trends.dates : [],
-                datasets: [{{
-                    label: 'Response Time (ms)',
-                    data: dashboardData.trends ? dashboardData.trends.response_times : [],
-                    borderColor: 'rgb(75, 192, 192)',
-                    tension: 0.1
-                }}, {{
-                    label: 'Requests per Hour',
-                    data: dashboardData.trends ? dashboardData.trends.requests : [],
-                    borderColor: 'rgb(255, 99, 132)',
-                    tension: 0.1
-                }}]
-            }},
-            options: {{
-                responsive: true,
-                maintainAspectRatio: false
-            }}
-        }});
-
-        // Endpoint Usage Chart
-        const endpointCtx = document.getElementById('endpointChart').getContext('2d');
-        const endpointChart = new Chart(endpointCtx, {{
-            type: 'bar',
-            data: {{
-                labels: dashboardData.endpoints ? dashboardData.endpoints.labels : [],
-                datasets: [{{
-                    label: 'Request Count',
-                    data: dashboardData.endpoints ? dashboardData.endpoints.counts : [],
-                    backgroundColor: 'rgba(54, 162, 235, 0.5)',
-                    borderColor: 'rgb(54, 162, 235)',
-                    borderWidth: 1
-                }}]
-            }},
-            options: {{
-                responsive: true,
-                maintainAspectRatio: false,
-                scales: {{
-                    y: {{
-                        beginAtZero: true
-                    }}
-                }}
-            }}
-        }});
-    </script>
-</body>
-</html>
-"""
+        # Load and render template
+        template = _load_dashboard_template()
+        html_content = _render_dashboard_template(template, days, dashboard_data)
 
         return HTMLResponse(content=html_content)
 

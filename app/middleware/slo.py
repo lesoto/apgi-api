@@ -5,9 +5,9 @@ Defines Service Level Objectives (SLOs) for the APGI API and provides
 monitoring utilities to track compliance.
 """
 
+import logging
 from dataclasses import dataclass
 from typing import Dict
-import logging
 
 logger = logging.getLogger(__name__)
 

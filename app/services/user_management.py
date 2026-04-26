@@ -12,7 +12,8 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.config import settings
-from app.database.models import Session as SessionModel, User
+from app.database.models import Session as SessionModel
+from app.database.models import User
 from app.exceptions import UserNotFoundError, ValidationError
 from app.services.auth_manager import AuthManager
 
@@ -283,8 +284,8 @@ class UserManagementService:
             raise UserNotFoundError(f"User with email {email} not found")
 
         # Generate reset token
-        import secrets
         import hashlib
+        import secrets
 
         reset_token = secrets.token_urlsafe(32)
         reset_token_hash = hashlib.sha256(reset_token.encode()).hexdigest()
@@ -368,8 +369,8 @@ class UserManagementService:
             reset_token: Password reset token
         """
         import smtplib
-        from email.mime.text import MIMEText
         from email.mime.multipart import MIMEMultipart
+        from email.mime.text import MIMEText
 
         if not settings.smtp_server:
             logger.error("SMTP server not configured, cannot send password reset email")
@@ -493,8 +494,8 @@ APGI API Team
             verification_token: Verification token
         """
         import smtplib
-        from email.mime.text import MIMEText
         from email.mime.multipart import MIMEMultipart
+        from email.mime.text import MIMEText
 
         if not settings.smtp_server:
             logger.error("SMTP server not configured, cannot send verification email")

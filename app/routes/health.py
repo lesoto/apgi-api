@@ -4,13 +4,14 @@ Health Check Routes
 Endpoints for API health monitoring.
 """
 
-from fastapi import APIRouter, HTTPException, Depends
-from fastapi.responses import JSONResponse
-from typing import Optional
 import asyncio
+from typing import Optional
+
+from fastapi import APIRouter, Depends, HTTPException
+from fastapi.responses import JSONResponse
+from redis.asyncio import Redis
 
 from app.services.health_check import HealthCheckService
-from redis.asyncio import Redis
 
 router = APIRouter(tags=["Health"])
 
@@ -22,7 +23,7 @@ async def get_health_service() -> HealthCheckService:
     """Get health service dependency."""
     if health_service is None:
         # Trigger alert for uninitialized service
-        from app.middleware.alerting import alert_manager, AlertSeverity
+        from app.middleware.alerting import AlertSeverity, alert_manager
 
         # Create alert for uninitialized health service (fire and forget)
         asyncio.create_task(

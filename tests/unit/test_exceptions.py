@@ -10,27 +10,29 @@ Tests cover:
 - to_dict() method with and without request_id
 """
 
-import pytest
 from datetime import datetime
+
+import pytest
+
 from app.exceptions import (
     APIError,
+    AuthenticationError,
+    AuthorizationError,
+    DatabaseError,
+    ExpiredTokenError,
+    ExportFormatError,
+    InternalServerError,
+    InvalidConfigurationError,
+    InvalidTaskTypeError,
+    InvalidTokenError,
+    NoDataAvailableError,
+    RateLimitExceededError,
+    ServiceUnavailableError,
     SessionNotFoundError,
     SessionStateConflictError,
     TaskNotFoundError,
-    InvalidTaskTypeError,
-    ValidationError,
-    InvalidConfigurationError,
-    AuthenticationError,
-    InvalidTokenError,
-    ExpiredTokenError,
-    AuthorizationError,
     UserNotFoundError,
-    RateLimitExceededError,
-    ServiceUnavailableError,
-    DatabaseError,
-    ExportFormatError,
-    NoDataAvailableError,
-    InternalServerError,
+    ValidationError,
 )
 
 

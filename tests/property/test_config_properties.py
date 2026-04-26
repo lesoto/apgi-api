@@ -6,14 +6,16 @@ Tests universal properties of the configuration system.
 """
 
 import os
-from typing import Any
-import pytest
-from hypothesis import given, strategies as st, assume, settings
-from unittest.mock import patch, MagicMock
 
 # Import after setting up environment to avoid loading real config
 import sys
 from pathlib import Path
+from typing import Any
+from unittest.mock import MagicMock, patch
+
+import pytest
+from hypothesis import assume, given, settings
+from hypothesis import strategies as st
 
 # Add app directory to path for imports
 sys.path.insert(0, str(Path(__file__).parent.parent.parent / "app"))
@@ -38,7 +40,6 @@ def reload_config_with_env(env_vars: dict[str, str]) -> Any:
 
             # Import config - this will use our patched load_dotenv
             import app.config  # noqa: F401
-
             from app.config import Settings
 
             # Create a fresh settings instance

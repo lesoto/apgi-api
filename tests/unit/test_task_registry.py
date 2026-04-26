@@ -4,9 +4,10 @@ Unit tests for task registry functionality.
 
 from __future__ import annotations
 
-import pytest
 from typing import Any, Callable, Generator
 from unittest.mock import patch
+
+import pytest
 
 
 # Make Celery mock return actual decorated function

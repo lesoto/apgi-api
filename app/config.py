@@ -6,7 +6,7 @@ Configuration settings for the standalone APGI REST API.
 
 import os
 import warnings
-from typing import List, Optional, Dict
+from typing import Dict, List, Optional
 from urllib.parse import urlparse
 
 from dotenv import load_dotenv

@@ -14,9 +14,10 @@ to validate that all components are working together correctly.
 **Validates: Requirements 9.1, 9.2, 9.3**
 """
 
-import pytest
-from httpx import AsyncClient, ASGITransport
 from typing import AsyncGenerator
+
+import pytest
+from httpx import ASGITransport, AsyncClient
 
 
 @pytest.fixture
@@ -24,8 +25,9 @@ async def client(
     test_environment: None, mock_database_connection: None
 ) -> AsyncGenerator[AsyncClient, None]:
     """Create test client for smoke tests."""
-    from app.main import create_app
     from unittest.mock import AsyncMock, patch
+
+    from app.main import create_app
 
     # Mock Redis for the lifespan
     mock_redis_client = AsyncMock()
@@ -36,8 +38,8 @@ async def client(
         app = create_app(test_mode=True)
 
         # Manually initialize routes that require Redis (since lifespan may not run with ASGITransport)
-        import app.routes.sessions as sessions
         import app.routes.health as health
+        import app.routes.sessions as sessions
 
         sessions.init_session_routes(mock_redis_client)
         health.init_health_routes(mock_redis_client)
@@ -135,7 +137,7 @@ class TestHealthEndpoints:
 
         Validates: Unhealthy status handling
         """
-        from unittest.mock import patch, AsyncMock
+        from unittest.mock import AsyncMock, patch
 
         # Mock perform_health_check to return unhealthy
         mock_health_check = AsyncMock(
@@ -182,7 +184,7 @@ class TestHealthEndpoints:
 
         Validates: Celery optional dependency handling
         """
-        from unittest.mock import patch, AsyncMock
+        from unittest.mock import AsyncMock, patch
 
         # Mock perform_health_check to return healthy overall but Celery unhealthy
         mock_health_check = AsyncMock(
