@@ -276,15 +276,25 @@ class SecurityValidationMiddleware(BaseHTTPMiddleware):
                         # Check for nested structures that could be abused
                         if isinstance(data, dict) and len(data) > 50:
                             score += 10  # Suspiciously large payload
-                    except Exception:
-                        data = {}
+                    except Exception as e:
+                        logger.warning(f"JSON parse error: {e}")
+                        return {
+                            "is_valid": False,
+                            "error_message": "Security validation failed: JSON parse error",
+                            "score": 25,
+                        }
                 else:
                     # Form data
                     try:
                         form_data = await request.form()
                         data = dict(form_data) if form_data else {}
-                    except Exception:
-                        data = {}
+                    except Exception as e:
+                        logger.warning(f"Form parse error: {e}")
+                        return {
+                            "is_valid": False,
+                            "error_message": "Security validation failed: Form parse error",
+                            "score": 25,
+                        }
             else:
                 # GET requests - query parameters
                 query_params = request.query_params

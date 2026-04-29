@@ -17,7 +17,7 @@ import logging
 import re
 from collections import defaultdict
 from dataclasses import dataclass
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from enum import Enum
 from typing import Any, Dict, List, Set
 
@@ -146,7 +146,7 @@ class AbuseDetectionService:
 
         # Get recent request count for this user/IP
         key = f"{user_id}:{ip_address}"
-        now = datetime.utcnow()
+        now = datetime.now(timezone.utc)
 
         # Clean old timestamps
         if key not in self.request_timestamps:
@@ -194,7 +194,7 @@ class AbuseDetectionService:
             success: Whether login was successful
         """
         attempt = LoginAttempt(
-            timestamp=datetime.utcnow(),
+            timestamp=datetime.now(timezone.utc),
             user_id=user_id,
             ip_address=ip_address,
             user_agent=user_agent,
@@ -235,7 +235,7 @@ class AbuseDetectionService:
         payload_hash = self._hash_payload(payload)
 
         # Check for recent duplicate deliveries
-        now = datetime.utcnow()
+        now = datetime.now(timezone.utc)
         recent_deliveries = [
             d
             for d in self.webhook_deliveries[webhook_id]
@@ -324,7 +324,7 @@ class AbuseDetectionService:
             username=username,
             risk_score=risk_score,
             risk_factors=risk_factors,
-            last_seen=datetime.utcnow(),
+            last_seen=datetime.now(timezone.utc),
         )
 
         self.credential_risks[username] = credential_risk
@@ -404,7 +404,7 @@ class AbuseDetectionService:
         if user_id not in self.login_attempts:
             return []
 
-        cutoff = datetime.utcnow() - timedelta(minutes=minutes)
+        cutoff = datetime.now(timezone.utc) - timedelta(minutes=minutes)
         return [
             attempt
             for attempt in self.login_attempts[user_id]

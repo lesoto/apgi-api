@@ -38,35 +38,41 @@ class DependencyManager:
         Returns:
             True if all dependencies are satisfied, False otherwise
         """
-        with get_db_context() as db:
-            # Get all dependencies for this task
-            dependencies = (
-                db.query(TaskDependency).filter(TaskDependency.dependent_task_id == task_id).all()
-            )
-
-            for dep in dependencies:
-                prerequisite_task = (
-                    db.query(Task).filter(Task.task_id == dep.prerequisite_task_id).first()
+        try:
+            with get_db_context() as db:
+                # Get all dependencies for this task
+                dependencies = (
+                    db.query(TaskDependency)
+                    .filter(TaskDependency.dependent_task_id == task_id)
+                    .all()
                 )
 
-                if not prerequisite_task:
-                    logger.error(
-                        f"Prerequisite task {dep.prerequisite_task_id} not found for task {task_id}"
+                for dep in dependencies:
+                    prerequisite_task = (
+                        db.query(Task).filter(Task.task_id == dep.prerequisite_task_id).first()
                     )
-                    return False
 
-                # Check if prerequisite is completed (or failed for failure dependencies)
-                if dep.dependency_type == "completion":
-                    if prerequisite_task.status != TaskStatus.COMPLETED.value:
-                        return False
-                elif dep.dependency_type == "success":
-                    if prerequisite_task.status != TaskStatus.COMPLETED.value:
-                        return False
-                elif dep.dependency_type == "failure":
-                    if prerequisite_task.status != TaskStatus.FAILED.value:
+                    if not prerequisite_task:
+                        logger.error(
+                            f"Prerequisite task {dep.prerequisite_task_id} not found for task {task_id}"
+                        )
                         return False
 
-            return True
+                    # Check if prerequisite is completed (or failed for failure dependencies)
+                    if dep.dependency_type == "completion":
+                        if prerequisite_task.status != TaskStatus.COMPLETED.value:
+                            return False
+                    elif dep.dependency_type == "success":
+                        if prerequisite_task.status != TaskStatus.COMPLETED.value:
+                            return False
+                    elif dep.dependency_type == "failure":
+                        if prerequisite_task.status != TaskStatus.FAILED.value:
+                            return False
+
+                return True
+        except Exception as e:
+            logger.error(f"Error checking if task {task_id} can start: {e}")
+            return False
 
     def has_cycle(
         self,
@@ -85,29 +91,35 @@ class DependencyManager:
         Returns:
             True if cycle detected, False otherwise
         """
-        if visited is None:
-            visited = set()
-        if rec_stack is None:
-            rec_stack = set()
+        try:
+            if visited is None:
+                visited = set()
+            if rec_stack is None:
+                rec_stack = set()
 
-        visited.add(task_id)
-        rec_stack.add(task_id)
+            visited.add(task_id)
+            rec_stack.add(task_id)
 
-        with get_db_context() as db:
-            dependencies = (
-                db.query(TaskDependency).filter(TaskDependency.dependent_task_id == task_id).all()
-            )
+            with get_db_context() as db:
+                dependencies = (
+                    db.query(TaskDependency)
+                    .filter(TaskDependency.dependent_task_id == task_id)
+                    .all()
+                )
 
-            for dep in dependencies:
-                prereq_id = str(dep.prerequisite_task_id)
-                if prereq_id not in visited:
-                    if self.has_cycle(prereq_id, visited, rec_stack):
+                for dep in dependencies:
+                    prereq_id = str(dep.prerequisite_task_id)
+                    if prereq_id not in visited:
+                        if self.has_cycle(prereq_id, visited, rec_stack):
+                            return True
+                    elif prereq_id in rec_stack:
                         return True
-                elif prereq_id in rec_stack:
-                    return True
 
-        rec_stack.remove(task_id)
-        return False
+            rec_stack.remove(task_id)
+            return False
+        except Exception as e:
+            logger.error(f"Error checking for cycle at task {task_id}: {e}")
+            return True
 
     def get_dependency_chain(self, task_id: str) -> List[str]:
         """
@@ -119,28 +131,36 @@ class DependencyManager:
         Returns:
             List of prerequisite task IDs in dependency order
         """
-        chain = []
-        visited = set()
+        chain: List[str] = []
+        visited: Set[str] = set()
 
         def traverse(current_task_id: str) -> None:
             if current_task_id in visited:
                 return
             visited.add(current_task_id)
 
-            with get_db_context() as db:
-                dependencies = (
-                    db.query(TaskDependency)
-                    .filter(TaskDependency.dependent_task_id == current_task_id)
-                    .all()
-                )
+            try:
+                with get_db_context() as db:
+                    dependencies = (
+                        db.query(TaskDependency)
+                        .filter(TaskDependency.dependent_task_id == current_task_id)
+                        .all()
+                    )
 
-                for dep in dependencies:
-                    prereq_id = str(dep.prerequisite_task_id)
-                    traverse(prereq_id)
-                    if prereq_id not in chain:
-                        chain.append(prereq_id)
+                    for dep in dependencies:
+                        prereq_id = str(dep.prerequisite_task_id)
+                        traverse(prereq_id)
+                        if prereq_id not in chain:
+                            chain.append(prereq_id)
+            except Exception as e:
+                logger.error(f"Error traversing dependency chain for task {current_task_id}: {e}")
 
-        traverse(task_id)
+        try:
+            traverse(task_id)
+        except Exception as e:
+            logger.error(f"Error getting dependency chain for task {task_id}: {e}")
+            return []
+
         return chain
 
     def get_dependent_tasks(self, task_id: str) -> List[str]:
@@ -153,13 +173,17 @@ class DependencyManager:
         Returns:
             List of dependent task IDs
         """
-        with get_db_context() as db:
-            dependents = (
-                db.query(TaskDependency)
-                .filter(TaskDependency.prerequisite_task_id == task_id)
-                .all()
-            )
-            return [str(dep.dependent_task_id) for dep in dependents]
+        try:
+            with get_db_context() as db:
+                dependents = (
+                    db.query(TaskDependency)
+                    .filter(TaskDependency.prerequisite_task_id == task_id)
+                    .all()
+                )
+                return [str(dep.dependent_task_id) for dep in dependents]
+        except Exception as e:
+            logger.error(f"Error getting dependent tasks for task {task_id}: {e}")
+            return []
 
     def validate_new_dependency(self, dependent_task_id: str, prerequisite_task_id: str) -> bool:
         """
@@ -175,8 +199,7 @@ class DependencyManager:
         Raises:
             ValueError: If the dependency would create a cycle
         """
-        # Temporarily simulate adding the dependency and check for cycles
-        with get_db_context() as db:
+        try:
             # Check if prerequisite would create a cycle
             # by checking if dependent is in prerequisite's chain
             chain = self.get_dependency_chain(prerequisite_task_id)
@@ -186,7 +209,14 @@ class DependencyManager:
                     f"would create a cycle"
                 )
 
-        return True
+            return True
+        except ValueError:
+            raise
+        except Exception as e:
+            logger.error(
+                f"Error validating dependency from {dependent_task_id} to {prerequisite_task_id}: {e}"
+            )
+            raise ValueError(f"Failed to validate dependency: {e}")
 
     def get_ready_tasks(self, session_id: str) -> List[Task]:
         """
@@ -198,17 +228,25 @@ class DependencyManager:
         Returns:
             List of tasks ready to start (ordered by priority)
         """
-        with get_db_context() as db:
-            pending_tasks = (
-                db.query(Task)
-                .filter(Task.session_id == session_id, Task.status == TaskStatus.PENDING.value)
-                .order_by(Task.priority)
-                .all()
-            )
+        try:
+            with get_db_context() as db:
+                pending_tasks = (
+                    db.query(Task)
+                    .filter(Task.session_id == session_id, Task.status == TaskStatus.PENDING.value)
+                    .order_by(Task.priority)
+                    .all()
+                )
 
-            ready_tasks = []
-            for task in pending_tasks:
-                if self.can_start_task(str(task.task_id)):
-                    ready_tasks.append(task)
+                ready_tasks = []
+                for task in pending_tasks:
+                    try:
+                        if self.can_start_task(str(task.task_id)):
+                            ready_tasks.append(task)
+                    except Exception as e:
+                        logger.error(f"Error checking if task {task.task_id} can start: {e}")
+                        continue
 
-            return ready_tasks
+                return ready_tasks
+        except Exception as e:
+            logger.error(f"Error getting ready tasks for session {session_id}: {e}")
+            return []

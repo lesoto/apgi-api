@@ -273,8 +273,9 @@ async def get_complete_dashboard(
 
 def _load_dashboard_template() -> str:
     """Load the dashboard HTML template from file."""
+    # Template decoupled to web/ directory for frontend separation
     template_path = os.path.join(
-        os.path.dirname(os.path.dirname(__file__)), "templates", "dashboard.html"
+        os.path.dirname(os.path.dirname(os.path.dirname(__file__))), "web", "dashboard.html"
     )
     try:
         with open(template_path, "r", encoding="utf-8") as f:

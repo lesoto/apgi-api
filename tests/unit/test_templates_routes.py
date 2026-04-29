@@ -4,8 +4,9 @@ Comprehensive test suite for templates routes (100% coverage target)
 Tests all CRUD operations, error handling, pagination, and access control.
 """
 
+from contextlib import asynccontextmanager
 from datetime import datetime, timedelta, timezone
-from typing import Any
+from typing import Any, AsyncGenerator
 from unittest.mock import AsyncMock, MagicMock, PropertyMock, patch
 from uuid import uuid4
 
@@ -928,6 +929,12 @@ class TestDeleteTemplate:
         assert "Only template owner" in exc_info.value.detail
 
 
+@asynccontextmanager
+async def noop_lifespan(app: Any) -> AsyncGenerator[None, None]:
+    """No-op lifespan context manager for testing."""
+    yield
+
+
 class TestIntegrationWithFastAPI:
     """Integration tests using TestClient."""
 
@@ -935,10 +942,13 @@ class TestIntegrationWithFastAPI:
         """Test list templates via HTTP endpoint."""
         from app.main import create_app
         from app.services.authorization import get_current_user, require_permission
+        from app.services.cache_service import get_cache_service
 
         app = create_app(test_mode=True)
+        app.router.lifespan_context = noop_lifespan  # Skip Redis initialization
         app.dependency_overrides[get_current_user] = lambda: FAKE_USER
         app.dependency_overrides[require_permission] = lambda permission: lambda func: func
+        app.dependency_overrides[get_cache_service] = lambda: None  # Disable cache in tests
 
         with TestClient(app, raise_server_exceptions=False) as client:
             resp = client.get("/v1/templates?page=1&per_page=10")
@@ -948,10 +958,13 @@ class TestIntegrationWithFastAPI:
         """Test create template via HTTP endpoint."""
         from app.main import create_app
         from app.services.authorization import get_current_user, require_permission
+        from app.services.cache_service import get_cache_service
 
         app = create_app(test_mode=True)
+        app.router.lifespan_context = noop_lifespan  # Skip Redis initialization
         app.dependency_overrides[get_current_user] = lambda: FAKE_USER
         app.dependency_overrides[require_permission] = lambda permission: lambda func: func
+        app.dependency_overrides[get_cache_service] = lambda: None  # Disable cache in tests
 
         template_data = {
             "name": "Integration Test Template",
@@ -968,10 +981,13 @@ class TestIntegrationWithFastAPI:
         """Test get template via HTTP endpoint."""
         from app.main import create_app
         from app.services.authorization import get_current_user, require_permission
+        from app.services.cache_service import get_cache_service
 
         app = create_app(test_mode=True)
+        app.router.lifespan_context = noop_lifespan  # Skip Redis initialization
         app.dependency_overrides[get_current_user] = lambda: FAKE_USER
         app.dependency_overrides[require_permission] = lambda permission: lambda func: func
+        app.dependency_overrides[get_cache_service] = lambda: None  # Disable cache in tests
 
         with TestClient(app, raise_server_exceptions=False) as client:
             resp = client.get("/v1/templates/test-template-id")
@@ -981,10 +997,13 @@ class TestIntegrationWithFastAPI:
         """Test update template via HTTP endpoint."""
         from app.main import create_app
         from app.services.authorization import get_current_user, require_permission
+        from app.services.cache_service import get_cache_service
 
         app = create_app(test_mode=True)
+        app.router.lifespan_context = noop_lifespan  # Skip Redis initialization
         app.dependency_overrides[get_current_user] = lambda: FAKE_USER
         app.dependency_overrides[require_permission] = lambda permission: lambda func: func
+        app.dependency_overrides[get_cache_service] = lambda: None  # Disable cache in tests
 
         update_data = {"name": "Updated Template"}
 
@@ -996,10 +1015,13 @@ class TestIntegrationWithFastAPI:
         """Test delete template via HTTP endpoint."""
         from app.main import create_app
         from app.services.authorization import get_current_user, require_permission
+        from app.services.cache_service import get_cache_service
 
         app = create_app(test_mode=True)
+        app.router.lifespan_context = noop_lifespan  # Skip Redis initialization
         app.dependency_overrides[get_current_user] = lambda: FAKE_USER
         app.dependency_overrides[require_permission] = lambda permission: lambda func: func
+        app.dependency_overrides[get_cache_service] = lambda: None  # Disable cache in tests
 
         with TestClient(app, raise_server_exceptions=False) as client:
             resp = client.delete("/v1/templates/test-template-id")

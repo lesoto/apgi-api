@@ -50,6 +50,7 @@ class ProfilingService:
         self.max_snapshots = 1000
         self.is_tracing_memory = False
         self.memory_trace_started = False
+        self.memory_tracing_active = False  # Alias for backwards compatibility
 
     def start_memory_tracing(self) -> None:
         """Start memory tracing."""
@@ -57,6 +58,7 @@ class ProfilingService:
             tracemalloc.start()
             self.memory_trace_started = True
             self.is_tracing_memory = True
+            self.memory_tracing_active = True
             logger.info("Memory tracing started")
 
     def stop_memory_tracing(self) -> None:
@@ -64,6 +66,7 @@ class ProfilingService:
         if self.is_tracing_memory:
             tracemalloc.stop()
             self.is_tracing_memory = False
+            self.memory_tracing_active = False
             logger.info("Memory tracing stopped")
 
     def get_memory_snapshot(self) -> Dict[str, Any]:
@@ -211,7 +214,10 @@ class ProfilingService:
                     parts = line.split()
                     if len(parts) >= 6:
                         # Format: ncalls tottime percall cumtime percall filename:lineno(function)
-                        ncalls = parts[0]
+                        # ncalls can be "100" or "100/50" for recursive functions (total/primitive)
+                        ncalls_str = parts[0]
+                        # Take the first part before '/' if present (total calls)
+                        ncalls = int(ncalls_str.split("/")[0])
                         tottime = float(parts[1])
                         percall_tottime = float(parts[2])
                         cumtime = float(parts[3])

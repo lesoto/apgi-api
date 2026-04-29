@@ -3,7 +3,7 @@ Unit tests for AbuseDetectionService covering risk assessment, rate limiting, an
 Requirements: 4.7, 5.1
 """
 
-from datetime import datetime
+from datetime import datetime, timezone
 
 from app.services.abuse_detection import (
     AbuseDetectionService,
@@ -30,7 +30,7 @@ class TestLoginAttempt:
     def test_login_attempt_creation(self) -> None:
         """Test creating LoginAttempt instance."""
         attempt = LoginAttempt(
-            timestamp=datetime.utcnow(),
+            timestamp=datetime.now(timezone.utc),
             user_id="user123",
             ip_address="192.168.1.1",
             user_agent="Mozilla/5.0",
@@ -53,7 +53,7 @@ class TestCredentialRisk:
             username="testuser",
             risk_score=50.0,
             risk_factors=["suspicious pattern"],
-            last_seen=datetime.utcnow(),
+            last_seen=datetime.now(timezone.utc),
         )
 
         assert risk.username == "testuser"
@@ -125,7 +125,7 @@ class TestGetRiskLevel:
             username="user123",
             risk_score=60.0,
             risk_factors=["suspicious"],
-            last_seen=datetime.utcnow(),
+            last_seen=datetime.now(timezone.utc),
         )
         risk = service.get_risk_level("user123", "192.168.1.1")
         # Risk score = 60 * 0.5 = 30, which is MEDIUM (25-49)

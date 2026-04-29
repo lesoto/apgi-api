@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 
 import os
+import re
 
 import psycopg2
 from dotenv import load_dotenv
@@ -9,21 +10,24 @@ from psycopg2.extensions import ISOLATION_LEVEL_AUTOCOMMIT
 # Load environment variables
 load_dotenv()
 
-# Parse DATABASE_URL to get connection parameters
-DATABASE_URL = os.getenv("DATABASE_URL")
-if not DATABASE_URL:
-    raise ValueError("DATABASE_URL environment variable not set")
 
-# Parse postgresql://user:password@host:port/database
-import re
+def _parse_database_url() -> tuple[str, str, str, str, str]:
+    """Parse DATABASE_URL to get connection parameters."""
+    DATABASE_URL = os.getenv("DATABASE_URL")
+    if not DATABASE_URL:
+        raise ValueError("DATABASE_URL environment variable not set")
 
-match = re.match(r"postgresql://([^:]+):([^@]+)@([^:]+):(\d+)/(.+)", DATABASE_URL)
-if not match:
-    raise ValueError("Invalid DATABASE_URL format")
+    # Parse postgresql://user:password@host:port/database
+    match = re.match(r"postgresql://([^:]+):([^@]+)@([^:]+):(\d+)/(.+)", DATABASE_URL)
+    if not match:
+        raise ValueError("Invalid DATABASE_URL format")
 
-DB_USER, DB_PASSWORD, DB_HOST, DB_PORT, DB_NAME = match.groups()
+    return match.groups()
 
-print(f"Connecting to PostgreSQL at {DB_HOST}:{DB_PORT} as user {DB_USER}")
+
+def get_db_params() -> tuple[str, str, str, str, str]:
+    """Get database connection parameters."""
+    return _parse_database_url()
 
 
 def recreate_database() -> None:
@@ -34,19 +38,24 @@ def recreate_database() -> None:
     If the user doesn't have sufficient privileges, it will attempt to
     clear all tables instead as a fallback.
     """
+    DB_USER, DB_PASSWORD, DB_HOST, DB_PORT, DB_NAME = get_db_params()
+    print(f"Connecting to PostgreSQL at {DB_HOST}:{DB_PORT} as user {DB_USER}")
+
     try:
         # Try the full database recreation first
-        _drop_and_create_database()
+        _drop_and_create_database(DB_USER, DB_PASSWORD, DB_HOST, DB_PORT, DB_NAME)
     except psycopg2.errors.InsufficientPrivilege:
         print("Insufficient privileges to drop database. Attempting to clear all tables instead...")
-        _clear_all_tables()
+        _clear_all_tables(DB_USER, DB_PASSWORD, DB_HOST, DB_PORT, DB_NAME)
     except Exception as e:
         print(f"Error during database recreation: {e}")
         print("Attempting to clear all tables instead...")
-        _clear_all_tables()
+        _clear_all_tables(DB_USER, DB_PASSWORD, DB_HOST, DB_PORT, DB_NAME)
 
 
-def _drop_and_create_database() -> None:
+def _drop_and_create_database(
+    DB_USER: str, DB_PASSWORD: str, DB_HOST: str, DB_PORT: str, DB_NAME: str
+) -> None:
     """Drop and recreate the database (requires superuser privileges)."""
     # Connect to default postgres database
     conn = psycopg2.connect(
@@ -74,7 +83,9 @@ def _drop_and_create_database() -> None:
     conn.close()
 
 
-def _clear_all_tables() -> None:
+def _clear_all_tables(
+    DB_USER: str, DB_PASSWORD: str, DB_HOST: str, DB_PORT: str, DB_NAME: str
+) -> None:
     """Clear all tables in the database (fallback method)."""
     # Connect to the target database
     conn = psycopg2.connect(

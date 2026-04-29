@@ -261,6 +261,7 @@ class TaskExecutor:
                     task_record.error_message = str(error_msg)  # type: ignore
                     task_record.completed_at = datetime.now(timezone.utc)  # type: ignore
                     db.commit()
+                status_info["status"] = TaskStatus.FAILED.value
                 if not status_info["error"]:
                     status_info["error"] = task_record.error_message
 

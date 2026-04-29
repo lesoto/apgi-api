@@ -24,7 +24,7 @@ class TokenPayload:
         user_id: str,
         username: str,
         roles: List[str],
-        exp: datetime,
+        exp: datetime | int,
         token_type: str = "access",
         jti: Optional[str] = None,
         permissions: Optional[List[str]] = None,
@@ -32,7 +32,11 @@ class TokenPayload:
         self.user_id = user_id
         self.username = username
         self.roles = roles
-        self.exp = exp
+        # Accept both datetime and integer timestamp for backwards compatibility
+        if isinstance(exp, int):
+            self.exp = datetime.fromtimestamp(exp, tz=timezone.utc)
+        else:
+            self.exp = exp
         self.token_type = token_type
         self.jti = jti
         self.permissions = permissions

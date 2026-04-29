@@ -247,7 +247,7 @@ class DBProfilingMiddleware(BaseHTTPMiddleware):
         """
         timings = self.query_histograms.get(endpoint, [])
         if not timings:
-            return {"count": 0, "buckets": {}, "p50": 0, "p95": 0, "p99": 0}
+            return {"count": 0, "buckets": {}, "p50": 0, "p95": 0, "p99": 0, "avg": 0}
 
         # Define histogram buckets (ms)
         buckets = [1, 5, 10, 25, 50, 100, 250, 500, 1000, 2500, 5000]

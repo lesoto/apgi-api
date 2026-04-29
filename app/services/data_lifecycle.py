@@ -318,8 +318,11 @@ class DataLifecycleManager:
                     logger.error(f"Failed to delete record: {e}")
 
             if deleted_count > 0:
-                db.commit()
-                logger.info(f"Deleted {deleted_count} expired {data_type} records")
+                try:
+                    db.commit()
+                    logger.info(f"Deleted {deleted_count} expired {data_type} records")
+                except Exception as e:
+                    logger.error(f"Failed to commit deletions: {e}")
 
         return {
             "data_type": data_type,
@@ -340,67 +343,76 @@ class DataLifecycleManager:
         """
         deletion_summary: Dict[str, int] = {}
 
-        with get_db_context() as db:
-            # Get user's sessions
-            sessions = db.query(Session).filter(Session.user_id == user_id).all()
-            session_ids = [s.session_id for s in sessions]
+        try:
+            with get_db_context() as db:
+                try:
+                    # Get user's sessions
+                    sessions = db.query(Session).filter(Session.user_id == user_id).all()
+                    session_ids = [s.session_id for s in sessions]
 
-            # Delete session data
-            if session_ids:
-                session_data_count = (
-                    db.query(SessionData)
-                    .filter(SessionData.session_id.in_(session_ids))
-                    .delete(synchronize_session=False)
-                )
-                deletion_summary["session_data"] = session_data_count
+                    # Delete session data
+                    if session_ids:
+                        session_data_count = (
+                            db.query(SessionData)
+                            .filter(SessionData.session_id.in_(session_ids))
+                            .delete(synchronize_session=False)
+                        )
+                        deletion_summary["session_data"] = session_data_count
 
-            # Delete tasks
-            if session_ids:
-                tasks_count = (
-                    db.query(Task)
-                    .filter(Task.session_id.in_(session_ids))
-                    .delete(synchronize_session=False)
-                )
-                deletion_summary["tasks"] = tasks_count
+                    # Delete tasks
+                    if session_ids:
+                        tasks_count = (
+                            db.query(Task)
+                            .filter(Task.session_id.in_(session_ids))
+                            .delete(synchronize_session=False)
+                        )
+                        deletion_summary["tasks"] = tasks_count
 
-            # Delete sessions
-            sessions_count = (
-                db.query(Session)
-                .filter(Session.user_id == user_id)
-                .delete(synchronize_session=False)
-            )
-            deletion_summary["sessions"] = sessions_count
+                    # Delete sessions
+                    sessions_count = (
+                        db.query(Session)
+                        .filter(Session.user_id == user_id)
+                        .delete(synchronize_session=False)
+                    )
+                    deletion_summary["sessions"] = sessions_count
 
-            # Delete refresh tokens
-            tokens_count = (
-                db.query(RefreshToken)
-                .filter(RefreshToken.user_id == user_id)
-                .delete(synchronize_session=False)
-            )
-            deletion_summary["refresh_tokens"] = tokens_count
+                    # Delete refresh tokens
+                    tokens_count = (
+                        db.query(RefreshToken)
+                        .filter(RefreshToken.user_id == user_id)
+                        .delete(synchronize_session=False)
+                    )
+                    deletion_summary["refresh_tokens"] = tokens_count
 
-            # Delete API keys
-            api_keys_count = (
-                db.query(APIKey).filter(APIKey.user_id == user_id).delete(synchronize_session=False)
-            )
-            deletion_summary["api_keys"] = api_keys_count
+                    # Delete API keys
+                    api_keys_count = (
+                        db.query(APIKey)
+                        .filter(APIKey.user_id == user_id)
+                        .delete(synchronize_session=False)
+                    )
+                    deletion_summary["api_keys"] = api_keys_count
 
-            # Soft delete user (keep record with anonymized data)
-            user = db.query(User).filter(User.user_id == user_id).first()
-            if user:
-                user.is_deleted = True  # type: ignore[assignment]
-                user.is_active = False  # type: ignore[assignment]
-                user.username = f"deleted_{user_id[:8]}"  # type: ignore[assignment]
-                user.email = f"deleted_{user_id[:8]}@deleted.local"  # type: ignore[assignment]
-                user.password_hash = "deleted"  # type: ignore[assignment]
-                user.mfa_secret = None  # type: ignore[assignment]
-                user.mfa_backup_codes = None  # type: ignore[assignment]
-                deletion_summary["user_soft_deleted"] = 1
+                    # Soft delete user (keep record with anonymized data)
+                    user = db.query(User).filter(User.user_id == user_id).first()
+                    if user:
+                        user.is_deleted = True  # type: ignore[assignment]
+                        user.is_active = False  # type: ignore[assignment]
+                        user.username = f"deleted_{user_id[:8]}"  # type: ignore[assignment]
+                        user.email = f"deleted_{user_id[:8]}@deleted.local"  # type: ignore[assignment]
+                        user.password_hash = "deleted"  # type: ignore[assignment]
+                        user.mfa_secret = None  # type: ignore[assignment]
+                        user.mfa_backup_codes = None  # type: ignore[assignment]
+                        deletion_summary["user_soft_deleted"] = 1
 
-            db.commit()
+                    db.commit()
 
-        # Log the deletion
-        logger.info(f"User data deletion completed for {user_id}: {deletion_summary}")
+                    # Log the deletion
+                    logger.info(f"User data deletion completed for {user_id}: {deletion_summary}")
+                except Exception as e:
+                    logger.error(f"Error during user data deletion for {user_id}: {e}")
+                    db.rollback()
+        except Exception as e:
+            logger.error(f"Database error during user data deletion for {user_id}: {e}")
 
         return {
             "user_id": user_id,
@@ -441,40 +453,55 @@ class DataLifecycleManager:
             "data_types": {},
         }
 
-        with get_db_context() as db:
-            for data_type in self._retention_policies.keys():
-                retention_days = self.get_retention_days(data_type)
-                classification = self.get_data_classification(data_type)
+        try:
+            with get_db_context() as db:
+                for data_type in self._retention_policies.keys():
+                    try:
+                        retention_days = self.get_retention_days(data_type)
+                        classification = self.get_data_classification(data_type)
 
-                # Count total records
-                if data_type == "session_data":
-                    total = db.query(SessionData).count()
-                elif data_type == "tasks":
-                    total = db.query(Task).count()
-                elif data_type == "sessions":
-                    total = db.query(Session).count()
-                elif data_type == "audit_logs":
-                    total = db.query(AuditLog).count()
-                elif data_type == "refresh_tokens":
-                    total = db.query(RefreshToken).count()
-                elif data_type == "api_keys":
-                    total = db.query(APIKey).count()
-                elif data_type == "webhook_deliveries":
-                    total = db.query(WebhookDelivery).count()
-                else:
-                    total = 0
+                        # Count total records
+                        if data_type == "session_data":
+                            total = db.query(SessionData).count()
+                        elif data_type == "tasks":
+                            total = db.query(Task).count()
+                        elif data_type == "sessions":
+                            total = db.query(Session).count()
+                        elif data_type == "audit_logs":
+                            total = db.query(AuditLog).count()
+                        elif data_type == "refresh_tokens":
+                            total = db.query(RefreshToken).count()
+                        elif data_type == "api_keys":
+                            total = db.query(APIKey).count()
+                        elif data_type == "webhook_deliveries":
+                            total = db.query(WebhookDelivery).count()
+                        else:
+                            total = 0
 
-                # Count expired records
-                expired = len(self.find_expired_data(data_type, batch_size=10000))
+                        # Count expired records
+                        expired = len(self.find_expired_data(data_type, batch_size=10000))
 
-                report["data_types"][data_type] = {
-                    "total_records": total,
-                    "expired_records": expired,
-                    "retention_days": retention_days,
-                    "retention_category": self.get_retention_policy(data_type).value,
-                    "classification": classification.value,
-                    "pii_fields": list(self.get_pii_fields(data_type)),
-                }
+                        report["data_types"][data_type] = {
+                            "total_records": total,
+                            "expired_records": expired,
+                            "retention_days": retention_days,
+                            "retention_category": self.get_retention_policy(data_type).value,
+                            "classification": classification.value,
+                            "pii_fields": list(self.get_pii_fields(data_type)),
+                        }
+                    except Exception as e:
+                        logger.error(f"Error generating report for {data_type}: {e}")
+                        report["data_types"][data_type] = {
+                            "total_records": 0,
+                            "expired_records": 0,
+                            "retention_days": self.get_retention_days(data_type),
+                            "retention_category": self.get_retention_policy(data_type).value,
+                            "classification": self.get_data_classification(data_type).value,
+                            "pii_fields": list(self.get_pii_fields(data_type)),
+                            "error": str(e),
+                        }
+        except Exception as e:
+            logger.error(f"Error generating data retention report: {e}")
 
         return report
 
@@ -491,8 +518,19 @@ class DataLifecycleManager:
         results = []
 
         for data_type in self._retention_policies.keys():
-            result = self.delete_expired_data(data_type, dry_run=dry_run)
-            results.append(result)
+            try:
+                result = self.delete_expired_data(data_type, dry_run=dry_run)
+                results.append(result)
+            except Exception as e:
+                logger.error(f"Error enforcing retention policy for {data_type}: {e}")
+                results.append(
+                    {
+                        "data_type": data_type,
+                        "deleted": 0,
+                        "dry_run": dry_run,
+                        "error": str(e),
+                    }
+                )
 
         return results
 

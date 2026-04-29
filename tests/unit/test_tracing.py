@@ -576,7 +576,7 @@ class TestGetTracer:
                 result = tracing_module.get_tracer("")
 
         assert result is tracer
-        mock_trace.get_tracer.assert_called_once_with("")
+        mock_trace.get_tracer.assert_called_once_with("apgi-api")
 
 
 # ---------------------------------------------------------------------------

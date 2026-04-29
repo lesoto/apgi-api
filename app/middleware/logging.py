@@ -61,27 +61,43 @@ class StructuredLogger:
 
     def info(self, message: str, **kwargs: Any) -> None:
         """Log info message with structured data."""
-        # Don't pass kwargs to underlying logger - they're embedded in JSON message
-        json_message = self._format_log_entry("INFO", message, **kwargs)
-        self.logger.info(json_message)
+        try:
+            # Don't pass kwargs to underlying logger - they're embedded in JSON message
+            json_message = self._format_log_entry("INFO", message, **kwargs)
+            self.logger.info(json_message)
+        except Exception:
+            # Silently fail if logging fails - don't crash the application
+            pass
 
     def warning(self, message: str, **kwargs: Any) -> None:
         """Log warning message with structured data."""
-        # Don't pass kwargs to underlying logger - they're embedded in JSON message
-        json_message = self._format_log_entry("WARNING", message, **kwargs)
-        self.logger.warning(json_message)
+        try:
+            # Don't pass kwargs to underlying logger - they're embedded in JSON message
+            json_message = self._format_log_entry("WARNING", message, **kwargs)
+            self.logger.warning(json_message)
+        except Exception:
+            # Silently fail if logging fails - don't crash the application
+            pass
 
     def error(self, message: str, **kwargs: Any) -> None:
         """Log error message with structured data."""
-        # Don't pass kwargs to underlying logger - they're embedded in JSON message
-        json_message = self._format_log_entry("ERROR", message, **kwargs)
-        self.logger.error(json_message)
+        try:
+            # Don't pass kwargs to underlying logger - they're embedded in JSON message
+            json_message = self._format_log_entry("ERROR", message, **kwargs)
+            self.logger.error(json_message)
+        except Exception:
+            # Silently fail if logging fails - don't crash the application
+            pass
 
     def debug(self, message: str, **kwargs: Any) -> None:
         """Log debug message with structured data."""
-        # Don't pass kwargs to underlying logger - they're embedded in JSON message
-        json_message = self._format_log_entry("DEBUG", message, **kwargs)
-        self.logger.debug(json_message)
+        try:
+            # Don't pass kwargs to underlying logger - they're embedded in JSON message
+            json_message = self._format_log_entry("DEBUG", message, **kwargs)
+            self.logger.debug(json_message)
+        except Exception:
+            # Silently fail if logging fails - don't crash the application
+            pass
 
 
 class RequestLoggingMiddleware(BaseHTTPMiddleware):
@@ -198,30 +214,34 @@ class ErrorLoggingHandler:
             error_code: Application error code
             **context: Additional context fields
         """
-        log_data = {
-            "error_type": type(error).__name__,
-            "error_message": str(error),
-            "stack_trace": traceback.format_exc(),
-            **context,
-        }
+        try:
+            log_data = {
+                "error_type": type(error).__name__,
+                "error_message": str(error),
+                "stack_trace": traceback.format_exc(),
+                **context,
+            }
 
-        # Add request context if available
-        if request:
-            log_data.update(
-                {
-                    "request_id": getattr(request.state, "request_id", "unknown"),
-                    "method": request.method,
-                    "path": request.url.path,
-                    "client_id": request.client.host if request.client else "unknown",
-                }
-            )
+            # Add request context if available
+            if request:
+                log_data.update(
+                    {
+                        "request_id": getattr(request.state, "request_id", "unknown"),
+                        "method": request.method,
+                        "path": request.url.path,
+                        "client_id": request.client.host if request.client else "unknown",
+                    }
+                )
 
-        # Add error code if provided
-        if error_code:
-            log_data["error_code"] = error_code
+            # Add error code if provided
+            if error_code:
+                log_data["error_code"] = error_code
 
-        # Log the error with all context data as the structured message
-        self.logger.error("Error occurred", **log_data)
+            # Log the error with all context data as the structured message
+            self.logger.error("Error occurred", **log_data)
+        except Exception:
+            # Silently fail if error logging fails - don't crash the application
+            pass
 
 
 # Global error logging handler instance

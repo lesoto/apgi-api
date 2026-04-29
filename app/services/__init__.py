@@ -5,8 +5,9 @@ Business logic and service layer components for the standalone API.
 """
 
 from app.models.schemas import TokenPayload
-from app.services.auth_manager import AuthManager
-from app.services.authorization import (
+
+from .auth_manager import AuthManager
+from .authorization import (
     Permission,
     Role,
     check_permission,
@@ -19,7 +20,7 @@ from app.services.authorization import (
     require_permission,
     require_role,
 )
-from app.services.session_manager import (
+from .session_manager import (
     SessionLifecycleState,
     SessionManager,
     SimulationSession,

@@ -120,6 +120,23 @@ class CacheService:
         key = f"{self.prefixes['session']}{session_id}:metadata"
         return await self._get_json(key)
 
+    async def delete_session_state(self, session_id: str) -> bool:
+        """
+        Delete cached session state.
+
+        Args:
+            session_id: Unique session identifier
+
+        Returns:
+            True if successful, False otherwise
+        """
+        key = f"{self.prefixes['session']}{session_id}:state"
+        try:
+            result = await self.redis.delete(key)
+            return result > 0
+        except Exception:
+            return False
+
     async def set_user_data(
         self, user_id: str, user_data: Dict[str, Any], ttl: Optional[int] = None
     ) -> bool:

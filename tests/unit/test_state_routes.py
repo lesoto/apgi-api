@@ -12,7 +12,7 @@ Tests cover all 5 endpoints with success and error paths:
 from contextlib import asynccontextmanager
 from datetime import datetime, timedelta, timezone
 from typing import Any, AsyncIterator
-from unittest.mock import AsyncMock, MagicMock
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 from fastapi.testclient import TestClient
@@ -424,10 +424,20 @@ class TestGetIgnitionHistory:
         # Verify pagination info exists (next_cursor should be generated)
         # The response should have pagination info if there are more events
 
+    @patch("app.routes.state.settings")
     def test_get_ignition_history_cursor_with_valid_signature(
-        self, client: TestClient, mock_manager: AsyncMock, mock_db: MagicMock
+        self, mock_settings, client: TestClient, mock_manager: AsyncMock, mock_db: MagicMock
     ) -> None:
         """Test pagination with valid cursor signature."""
+        import base64
+        import hashlib
+        import hmac
+        import json
+
+        # Set a valid test key on the mock settings
+        test_key = "test_signing_key_for_cursor_validation_32chars_min"
+        mock_settings.cursor_signing_key = test_key
+
         self._setup_db(mock_db)
         sim_session = _make_sim_session()
         # Create 10 events
@@ -452,18 +462,10 @@ class TestGetIgnitionHistory:
         assert len(data["events"]) == 3
 
         # Now test with a valid cursor by generating one
-        import base64
-        import hashlib
-        import hmac
-        import json
-
-        from app.config import settings
-
         cursor_data = {"offset": 3}
         json_str = json.dumps(cursor_data)
-        assert settings.cursor_signing_key is not None
         signature = hmac.new(
-            settings.cursor_signing_key.encode(), json_str.encode(), hashlib.sha256
+            test_key.encode(), json_str.encode(), hashlib.sha256
         ).hexdigest()
         signed_cursor = json_str + "." + signature
         cursor = base64.b64encode(signed_cursor.encode()).decode()
