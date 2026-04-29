@@ -27,28 +27,28 @@ class TestParseVersion:
         from app.dependency_checker import parse_version
 
         result = parse_version("1.2")
-        assert result == (1, 2)  # Function returns variable length tuple
+        assert result == (1, 2)
 
     def test_parse_version_one_part(self) -> None:
         """Test parsing version with one part."""
         from app.dependency_checker import parse_version
 
         result = parse_version("1")
-        assert result == (1,)  # Function returns variable length tuple
+        assert result == (1,)
 
     def test_parse_version_with_extra_parts(self) -> None:
         """Test parsing version with extra parts (only first 3 used)."""
         from app.dependency_checker import parse_version
 
         result = parse_version("1.2.3.4.5")
-        assert result == (1, 2, 3)  # First 3 parts used
+        assert result == (1, 2, 3)
 
     def test_parse_version_invalid(self) -> None:
         """Test parsing invalid version string."""
         from app.dependency_checker import parse_version
 
         result = parse_version("invalid")
-        assert result == (0, 0, 0)  # Returns default for invalid
+        assert result == (0, 0, 0)
 
     def test_parse_version_none(self) -> None:
         """Test parsing None version string."""
@@ -57,7 +57,45 @@ class TestParseVersion:
         from app.dependency_checker import parse_version
 
         result = parse_version(cast(Optional[str], None))
-        assert result == (0, 0, 0)  # Returns default for None
+        assert result == (0, 0, 0)
+
+
+class TestPackageImportName:
+    """Tests for package import name resolution."""
+
+    def test_get_package_import_name_default(self) -> None:
+        from app.dependency_checker import get_package_import_name
+
+        assert get_package_import_name("sqlalchemy") == "sqlalchemy"
+        assert get_package_import_name("prometheus-client") == "prometheus_client"
+
+    def test_get_package_import_name_mapping(self) -> None:
+        from app.dependency_checker import get_package_import_name
+
+        assert get_package_import_name("pyjwt") == "jwt"
+        assert get_package_import_name("python-dotenv") == "dotenv"
+
+
+class TestGetModuleVersion:
+    """Tests for module-based version extraction."""
+
+    @patch("app.dependency_checker.importlib.import_module")
+    def test_get_module_version_returns_version(self, mock_import_module: MagicMock) -> None:
+        from app.dependency_checker import get_module_version
+
+        fake_module = MagicMock()
+        fake_module.__version__ = "2.3.4"
+        mock_import_module.return_value = fake_module
+
+        assert get_module_version("pyjwt") == "2.3.4"
+
+    @patch("app.dependency_checker.importlib.import_module")
+    def test_get_module_version_falls_back_on_import_error(self, mock_import_module: MagicMock) -> None:
+        from app.dependency_checker import get_module_version
+
+        mock_import_module.side_effect = ImportError()
+
+        assert get_module_version("nonexistent-package") is None
 
 
 class TestCheckPackageVersion:
@@ -74,6 +112,47 @@ class TestCheckPackageVersion:
         assert is_satisfied is True
         assert installed_version == "1.2.3"
         assert error_msg is None
+
+    @patch("app.dependency_checker.importlib.metadata.version")
+    def test_check_package_version_not_satisfied(self, mock_version: MagicMock) -> None:
+        """Test check when package version does not satisfy requirement."""
+        from app.dependency_checker import check_package_version
+
+        mock_version.return_value = "0.9.0"
+        is_satisfied, installed_version, error_msg = check_package_version("test-package", "1.0.0")
+
+        assert is_satisfied is False
+        assert installed_version == "0.9.0"
+        assert error_msg is not None
+        assert "version 1.0.0 or higher is required" in error_msg
+
+    @patch("app.dependency_checker.importlib.metadata.version")
+    def test_check_package_version_not_found(self, mock_version: MagicMock) -> None:
+        """Test check when package is not installed."""
+        import importlib.metadata
+
+        from app.dependency_checker import check_package_version
+
+        mock_version.side_effect = importlib.metadata.PackageNotFoundError("test-package")
+        is_satisfied, installed_version, error_msg = check_package_version("test-package", "1.0.0")
+
+        assert is_satisfied is False
+        assert installed_version is None
+        assert error_msg is not None
+        assert "is not installed" in error_msg
+
+    @patch("app.dependency_checker.importlib.metadata.version")
+    def test_check_package_version_exception(self, mock_version: MagicMock) -> None:
+        """Test check when exception occurs during version check."""
+        from app.dependency_checker import check_package_version
+
+        mock_version.side_effect = Exception("Test error")
+        is_satisfied, installed_version, error_msg = check_package_version("test-package", "1.0.0")
+
+        assert is_satisfied is False
+        assert installed_version is None
+        assert error_msg is not None
+        assert "Error checking package" in error_msg
 
     @patch("app.dependency_checker.importlib.metadata.version")
     def test_check_package_version_not_satisfied(self, mock_version: MagicMock) -> None:

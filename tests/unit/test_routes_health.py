@@ -2,6 +2,7 @@
 Tests for health check routes.
 """
 
+import asyncio
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
@@ -23,17 +24,20 @@ class TestHealthRoutes:
         assert response.body == b'{"status":"alive","message":"API is running"}'
 
     @pytest.mark.asyncio
-    async def test_get_health_service_uninitialized(self):
+    @patch("app.routes.health.asyncio.create_task")
+    async def test_get_health_service_uninitialized(self, mock_create_task):
         """Test get_health_service raises 503 when uninitialized."""
         # Reset global service
         import app.routes.health as health_module
 
         health_module.health_service = None
+        mock_create_task.side_effect = lambda coro: asyncio.get_running_loop().create_task(coro)
 
         with pytest.raises(HTTPException) as exc_info:
             await get_health_service()
         assert exc_info.value.status_code == 503
         assert "not initialized" in exc_info.value.detail
+        assert mock_create_task.called
 
     @pytest.mark.asyncio
     @patch("app.routes.health.asyncio.create_task")
@@ -42,6 +46,7 @@ class TestHealthRoutes:
         import app.routes.health as health_module
 
         health_module.health_service = None
+        mock_create_task.side_effect = lambda coro: asyncio.get_running_loop().create_task(coro)
 
         with pytest.raises(HTTPException) as exc_info:
             await get_health_service()

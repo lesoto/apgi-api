@@ -13,9 +13,31 @@ from unittest.mock import MagicMock
 
 import pytest
 from fastapi import FastAPI
+from starlette.responses import Response
 from starlette.testclient import TestClient
 
 from app.middleware.request_size_limit import RequestSizeLimitMiddleware
+
+
+def _configure_fastapi_app(app: FastAPI) -> None:
+    if not hasattr(app, "response_class"):
+        app.response_class = Response
+
+    if not hasattr(app, "test_request_context"):
+        class _FastAPITestRequestContext:
+            def push(self) -> None:
+                return None
+
+            def pop(self) -> None:
+                return None
+
+            def __enter__(self) -> "_FastAPITestRequestContext":
+                return self
+
+            def __exit__(self, exc_type, exc, tb) -> bool:
+                return False
+
+        app.test_request_context = lambda *args, **kwargs: _FastAPITestRequestContext()
 
 
 class TestContentLengthEdgeCases:
@@ -25,6 +47,7 @@ class TestContentLengthEdgeCases:
     def app(self) -> FastAPI:
         """Create test app with middleware."""
         app = FastAPI()
+        _configure_fastapi_app(app)
         app.add_middleware(RequestSizeLimitMiddleware, max_size_mb=1)
 
         @app.post("/test")
@@ -81,6 +104,7 @@ class TestDisabledMiddleware:
     def disabled_app(self) -> FastAPI:
         """Create test app with disabled middleware."""
         app = FastAPI()
+        _configure_fastapi_app(app)
         app.add_middleware(RequestSizeLimitMiddleware, max_size_mb=1, enabled=False)
 
         @app.post("/test")
@@ -108,6 +132,7 @@ class TestBodySizeCheck:
     def app(self) -> FastAPI:
         """Create test app with middleware."""
         app = FastAPI()
+        _configure_fastapi_app(app)
         app.add_middleware(RequestSizeLimitMiddleware, max_size_mb=1)
 
         @app.post("/test")
@@ -258,6 +283,7 @@ class TestResponseStructure:
     def app(self) -> FastAPI:
         """Create test app with middleware."""
         app = FastAPI()
+        _configure_fastapi_app(app)
         app.add_middleware(RequestSizeLimitMiddleware, max_size_mb=1)
 
         @app.post("/test")
@@ -340,6 +366,7 @@ class TestHttpMethodsSkipping:
     def app(self) -> FastAPI:
         """Create test app with middleware."""
         app = FastAPI()
+        _configure_fastapi_app(app)
         app.add_middleware(RequestSizeLimitMiddleware, max_size_mb=1)
 
         @app.get("/test")

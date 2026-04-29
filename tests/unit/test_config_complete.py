@@ -378,6 +378,7 @@ class TestSettingsDefaultLogLevel:
             "CELERY_BROKER_URL": "redis://prod-redis:6379/1",
             "CELERY_RESULT_BACKEND": "redis://prod-redis:6379/2",
             "BASE_URL": "https://api.example.com",
+            "CORS_ORIGINS": "https://api.example.com",
             "STRIPE_SECRET_KEY": "sk_live_valid_key",
             "STRIPE_PUBLISHABLE_KEY": "pk_live_valid_key",
             "STRIPE_WEBHOOK_SECRET": "whsec_valid_secret",

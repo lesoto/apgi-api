@@ -1,11 +1,36 @@
 """Dependency checker utility for validating required packages on startup."""
 
+import importlib
 import importlib.metadata
 import logging
 import sys
 from typing import Dict, List, Optional, Tuple
 
 logger = logging.getLogger(__name__)
+
+PACKAGE_IMPORT_MAPPING = {
+    "pyjwt": "jwt",
+    "python-dotenv": "dotenv",
+    "prometheus-client": "prometheus_client",
+    "pydantic-settings": "pydantic_settings",
+    "psycopg2-binary": "psycopg2",
+}
+
+
+def get_package_import_name(package_name: str) -> str:
+    """Return the most likely Python module name for a distribution."""
+    return PACKAGE_IMPORT_MAPPING.get(package_name, package_name.replace("-", "_"))
+
+
+def get_module_version(package_name: str) -> Optional[str]:
+    """Try to obtain version from the installed module before using metadata."""
+    module_name = get_package_import_name(package_name)
+    try:
+        module = importlib.import_module(module_name)
+    except Exception:
+        return None
+
+    return getattr(module, "__version__", None)
 
 
 # Critical dependencies required for API operation
@@ -59,26 +84,32 @@ def check_package_version(
     Returns:
         Tuple of (is_satisfied, installed_version, error_message)
     """
-    try:
-        installed_version = importlib.metadata.version(package_name)
-        installed_tuple = parse_version(installed_version)
-        required_tuple = parse_version(minimum_version)
+    installed_version: Optional[str] = None
 
-        if installed_tuple >= required_tuple:
-            return True, installed_version, None
-        else:
-            error_msg = (
-                f"Package '{package_name}' version {installed_version} is installed, "
-                f"but version {minimum_version} or higher is required"
-            )
-            return False, installed_version, error_msg
+    # Prefer reading the package's own version attribute before metadata-based discovery.
+    installed_version = get_module_version(package_name)
 
-    except importlib.metadata.PackageNotFoundError:
-        error_msg = f"Package '{package_name}' is not installed"
-        return False, None, error_msg
-    except Exception as e:
-        error_msg = f"Error checking package '{package_name}': {str(e)}"
-        return False, None, error_msg
+    if installed_version is None:
+        try:
+            installed_version = importlib.metadata.version(package_name)
+        except importlib.metadata.PackageNotFoundError:
+            error_msg = f"Package '{package_name}' is not installed"
+            return False, None, error_msg
+        except Exception as e:
+            error_msg = f"Error checking package '{package_name}': {str(e)}"
+            return False, None, error_msg
+
+    installed_tuple = parse_version(installed_version)
+    required_tuple = parse_version(minimum_version)
+
+    if installed_tuple >= required_tuple:
+        return True, installed_version, None
+
+    error_msg = (
+        f"Package '{package_name}' version {installed_version} is installed, "
+        f"but version {minimum_version} or higher is required"
+    )
+    return False, installed_version, error_msg
 
 
 def check_dependencies(

@@ -11,7 +11,11 @@ black>=24.0.0
 ruff>=0.1.0
 mypy>=1.9.0
 isort>=5.13.0
+types-psutil>=5.9.0
 types-psycopg2>=2.9.0
+
+# Browser automation for screenshots
+playwright>=1.40.0
 
 # Documentation
 sphinx>=9.1.0

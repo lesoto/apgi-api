@@ -4,6 +4,7 @@ APGI REST API Main Application
 FastAPI application providing RESTful access to the APGI System.
 """
 
+import os
 import socket
 import sys
 from contextlib import asynccontextmanager
@@ -13,19 +14,8 @@ import redis.asyncio as redis
 from fastapi import FastAPI
 from fastapi.middleware.gzip import GZipMiddleware
 
-# Check dependencies before starting
-try:
-    from app.dependency_checker import check_dependencies
-
-    if not check_dependencies():
-        print("Dependency check failed. Exiting...")
-        sys.exit(1)
-except ImportError:
-    print("Warning: Dependency checker not available. Continuing anyway...")
-except Exception as e:
-    print(f"Warning: Error during dependency check: {e}. Continuing anyway...")
-
 from app.config import settings
+from app.dependency_checker import check_dependencies
 from app.database.connection import close_db, init_db
 from app.exception_handlers import register_exception_handlers
 from app.middleware.alerting import configure_alerting
@@ -100,6 +90,15 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
 
     # Startup
     logger.info("Application starting up", component="lifecycle")
+
+    # Skip dependency validation in test mode or when TEST_MODE is enabled.
+    if getattr(app.state, "test_mode", False) or os.environ.get("TEST_MODE") == "true":
+        logger.info("Skipping dependency check in test mode", component="lifecycle")
+    else:
+        # Validate required dependencies before performing runtime initialization.
+        if not check_dependencies(fail_fast=False):
+            logger.error("Dependency check failed during startup", component="lifecycle")
+            raise RuntimeError("Dependency check failed. See logs for details.")
 
     # Configure alerting system
     configure_alerting(
@@ -230,6 +229,7 @@ All endpoints except `/health`, `/docs`, and `/openapi.json` require authenticat
         openapi_url="/openapi.json" if settings.environment in ["development", "staging"] else None,
         lifespan=lifespan,
     )
+    app.state.test_mode = test_mode
 
     # Add request size limiting middleware (first, to catch large requests early)
     app.add_middleware(

@@ -3,10 +3,12 @@ Comprehensive tests for tasks module to achieve 100% coverage.
 Covers: experimental_tasks, webhook_tasks, task_registry, tasks.__init__
 """
 
-from unittest.mock import MagicMock, patch
+import asyncio
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
+from importlib import import_module
 from app.tasks import experimental_tasks, task_registry, webhook_tasks
 
 
@@ -21,14 +23,10 @@ class TestExperimentalTasks:
         self, mock_executor_class, mock_webhook_manager_class, mock_get_db
     ) -> None:
         """Test trigger webhook on completion."""
-        from unittest.mock import AsyncMock
 
-        # Setup mock db generator
+        # Setup mock db generator that properly supports next()
         mock_db = MagicMock()
-        mock_db_gen = MagicMock()
-        mock_db_gen.__next__ = MagicMock(return_value=mock_db)
-        mock_db_gen.__iter__ = MagicMock(return_value=iter([mock_db]))
-        mock_get_db.return_value = mock_db_gen
+        mock_get_db.return_value = iter([mock_db])
 
         # Setup mock task with webhook URL
         mock_task = MagicMock()
@@ -47,7 +45,8 @@ class TestExperimentalTasks:
         mock_executor = mock_executor_class.return_value
         mock_executor.check_and_start_pending_tasks = AsyncMock()
 
-        await experimental_tasks.trigger_webhook_on_completion("task-1", {"status": "completed"})
+        experimental_tasks_reloaded = import_module("app.tasks.experimental_tasks")
+        await experimental_tasks_reloaded.trigger_webhook_on_completion("task-1", {"status": "completed"})
 
         # Verify the expected calls were made
         assert mock_db.commit.called, "db.commit() was not called"
@@ -71,11 +70,26 @@ class TestExperimentalTasks:
 class TestWebhookTasks:
     """Test webhook tasks module."""
 
+    @patch("app.tasks.webhook_tasks._process_webhooks", new_callable=AsyncMock)
     @patch("app.tasks.webhook_tasks.asyncio.run")
-    def test_process_pending_webhooks_task(self, mock_run):
+    def test_process_pending_webhooks_task(self, mock_run, mock_process):
         """Test process_pending_webhooks task."""
+
+        mock_process.return_value = 1
+
+        def fake_run(coro):
+            loop = asyncio.new_event_loop()
+            try:
+                return loop.run_until_complete(coro)
+            finally:
+                loop.close()
+
+        mock_run.side_effect = fake_run
+
         webhook_tasks.process_pending_webhooks()
+
         assert mock_run.called
+        mock_process.assert_called_once()
 
 
 class TestTaskRegistry:

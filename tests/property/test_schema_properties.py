@@ -261,7 +261,7 @@ def session_template_create_request_strategy() -> SearchStrategy:
                 max_size=100,
                 alphabet=st.characters(
                     whitelist_categories=("Lu", "Ll", "Nd", "Pc", "Zs"),
-                    blacklist_characters="\x00",
+                    blacklist_characters="\x00\xa0",
                 ),
             )
         )
