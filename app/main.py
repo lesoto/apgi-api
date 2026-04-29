@@ -6,17 +6,17 @@ FastAPI application providing RESTful access to the APGI System.
 
 import os
 import socket
-import sys
 from contextlib import asynccontextmanager
 from typing import AsyncGenerator, Dict, Optional
 
 import redis.asyncio as redis
 from fastapi import FastAPI
 from fastapi.middleware.gzip import GZipMiddleware
+from fastapi.staticfiles import StaticFiles  # noqa: F401
 
 from app.config import settings
-from app.dependency_checker import check_dependencies
 from app.database.connection import close_db, init_db
+from app.dependency_checker import check_dependencies
 from app.exception_handlers import register_exception_handlers
 from app.middleware.alerting import configure_alerting
 from app.middleware.api_versioning import APIVersioningMiddleware
@@ -342,6 +342,11 @@ All endpoints except `/health`, `/docs`, and `/openapi.json` require authenticat
 
     # Configure deprecated endpoints
     version.configure_deprecated_endpoints({})
+
+    # Mount static files for web UI
+    web_dir = os.path.join(os.path.dirname(__file__), "..", "web")
+    if os.path.exists(web_dir):
+        app.mount("/web", StaticFiles(directory=web_dir), name="web")
 
     logger.info("APGI API application created successfully", version="1.0.0")
 

@@ -4,11 +4,11 @@ Covers: experimental_tasks, webhook_tasks, task_registry, tasks.__init__
 """
 
 import asyncio
+from importlib import import_module
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from importlib import import_module
 from app.tasks import experimental_tasks, task_registry, webhook_tasks
 
 
@@ -46,11 +46,15 @@ class TestExperimentalTasks:
         mock_executor.check_and_start_pending_tasks = AsyncMock()
 
         experimental_tasks_reloaded = import_module("app.tasks.experimental_tasks")
-        await experimental_tasks_reloaded.trigger_webhook_on_completion("task-1", {"status": "completed"})
+        await experimental_tasks_reloaded.trigger_webhook_on_completion(
+            "task-1", {"status": "completed"}
+        )
 
         # Verify the expected calls were made
         assert mock_db.commit.called, "db.commit() was not called"
-        assert mock_webhook_manager.create_webhook_delivery.called, "create_webhook_delivery was not called"
+        assert (
+            mock_webhook_manager.create_webhook_delivery.called
+        ), "create_webhook_delivery was not called"
         assert mock_webhook_manager.deliver_webhook.called, "deliver_webhook was not called"
 
     def test_experimental_tasks_availability(self):

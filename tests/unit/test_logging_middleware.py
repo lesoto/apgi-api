@@ -94,6 +94,22 @@ class TestStructuredLogger:
         finally:
             request_id_context.reset(token)
 
+    def test_error_handles_logging_exception_gracefully(self) -> None:
+        """Test that error() method handles logging exceptions gracefully."""
+        with patch.object(self.logger.logger, "error", side_effect=Exception("logging failed")):
+            # Should not raise exception
+            self.logger.error("test error", key="val")
+            # If we get here without exception, the test passes
+            assert True
+
+    def test_debug_handles_logging_exception_gracefully(self) -> None:
+        """Test that debug() method handles logging exceptions gracefully."""
+        with patch.object(self.logger.logger, "debug", side_effect=Exception("logging failed")):
+            # Should not raise exception
+            self.logger.debug("test debug")
+            # If we get here without exception, the test passes
+            assert True
+
 
 class TestRequestLoggingMiddleware:
     """Test RequestLoggingMiddleware.dispatch via TestClient."""
@@ -240,3 +256,29 @@ class TestConfigureStructuredLogging:
             configure_structured_logging("ERROR")
             # If we get here without exception, the test passes
             assert True
+
+    def test_configures_logging_when_not_in_test_mode(self) -> None:
+        """Test that function configures logging when not in test mode."""
+        with patch.dict("os.environ", {}, clear=True):
+            # Should not raise exception
+            configure_structured_logging("INFO")
+            # If we get here without exception, the test passes
+            assert True
+
+    def test_configures_logging_disables_uvicorn_access_logs(self) -> None:
+        """Test that function disables uvicorn access logs."""
+        with patch.dict("os.environ", {}, clear=True):
+            with patch("logging.basicConfig"):
+                # Should not raise exception
+                configure_structured_logging("INFO")
+                # If we get here without exception, the test passes
+                assert True
+
+    def test_handles_logging_configuration_exception_gracefully(self) -> None:
+        """Test that function handles logging configuration exceptions gracefully."""
+        with patch.dict("os.environ", {}, clear=True):
+            with patch("logging.basicConfig", side_effect=Exception("config error")):
+                # Should not raise exception
+                configure_structured_logging("INFO")
+                # If we get here without exception, the test passes
+                assert True

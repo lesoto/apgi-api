@@ -27,14 +27,14 @@ class TestParseVersion:
         from app.dependency_checker import parse_version
 
         result = parse_version("1.2")
-        assert result == (1, 2)
+        assert result == (1, 2, 0)
 
     def test_parse_version_one_part(self) -> None:
         """Test parsing version with one part."""
         from app.dependency_checker import parse_version
 
         result = parse_version("1")
-        assert result == (1,)
+        assert result == (1, 0, 0)
 
     def test_parse_version_with_extra_parts(self) -> None:
         """Test parsing version with extra parts (only first 3 used)."""
@@ -90,7 +90,9 @@ class TestGetModuleVersion:
         assert get_module_version("pyjwt") == "2.3.4"
 
     @patch("app.dependency_checker.importlib.import_module")
-    def test_get_module_version_falls_back_on_import_error(self, mock_import_module: MagicMock) -> None:
+    def test_get_module_version_falls_back_on_import_error(
+        self, mock_import_module: MagicMock
+    ) -> None:
         from app.dependency_checker import get_module_version
 
         mock_import_module.side_effect = ImportError()

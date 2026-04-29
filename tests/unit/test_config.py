@@ -689,3 +689,232 @@ class TestConfigParsingAndDefaults:
             assert settings.rate_limit_enabled is False
             assert settings.schema_validation_enabled is True
             assert settings.profiling_enabled is True
+
+
+class TestConfigCursorSigningKeyValidation:
+    """Test cursor signing key validation."""
+
+    def test_cursor_signing_key_insecure_default_in_production_raises_error(self) -> None:
+        """Test that known insecure CURSOR_SIGNING_KEY values in production raise ValueError."""
+        with patch.dict(
+            os.environ,
+            {
+                "ENVIRONMENT": "production",
+                "JWT_SECRET_KEY": "valid-secret-key-that-is-long-enough-32chars!",
+                "CURSOR_SIGNING_KEY": "secret",
+                "WEBHOOK_SECRET_KEY": "valid-webhook-key-that-is-long-enough-32c!",
+                "DATABASE_URL": "postgresql://prod-db.example.com/apgi_api",
+                "REDIS_URL": "redis://prod-redis.example.com:6379/0",
+                "CORS_ORIGINS": "https://example.com",
+                "BASE_URL": "https://api.example.com",
+                "STRIPE_SECRET_KEY": "sk_live_test123",
+                "STRIPE_PUBLISHABLE_KEY": "pk_live_test123",
+                "STRIPE_WEBHOOK_SECRET": "whsec_test123",
+                "SMTP_SERVER": "smtp.example.com",
+            },
+        ):
+            with pytest.raises(
+                ValueError, match="CURSOR_SIGNING_KEY is set to a known insecure default value"
+            ):
+                Settings()
+
+    def test_cursor_signing_key_too_short_in_production_raises_error(self) -> None:
+        """Test that CURSOR_SIGNING_KEY shorter than 32 characters in production raises ValueError."""
+        with patch.dict(
+            os.environ,
+            {
+                "ENVIRONMENT": "production",
+                "JWT_SECRET_KEY": "valid-secret-key-that-is-long-enough-32chars!",
+                "CURSOR_SIGNING_KEY": "short-key",
+                "WEBHOOK_SECRET_KEY": "valid-webhook-key-that-is-long-enough-32c!",
+                "DATABASE_URL": "postgresql://prod-db.example.com/apgi_api",
+                "REDIS_URL": "redis://prod-redis.example.com:6379/0",
+                "CORS_ORIGINS": "https://example.com",
+                "BASE_URL": "https://api.example.com",
+                "STRIPE_SECRET_KEY": "sk_live_test123",
+                "STRIPE_PUBLISHABLE_KEY": "pk_live_test123",
+                "STRIPE_WEBHOOK_SECRET": "whsec_test123",
+                "SMTP_SERVER": "smtp.example.com",
+            },
+        ):
+            with pytest.raises(
+                ValueError, match="CURSOR_SIGNING_KEY is shorter than 32 characters"
+            ):
+                Settings()
+
+
+class TestConfigWebhookSecretKeyValidation:
+    """Test webhook secret key validation."""
+
+    def test_webhook_secret_key_insecure_default_in_production_raises_error(self) -> None:
+        """Test that known insecure WEBHOOK_SECRET_KEY values in production raise ValueError."""
+        with patch.dict(
+            os.environ,
+            {
+                "ENVIRONMENT": "production",
+                "JWT_SECRET_KEY": "valid-secret-key-that-is-long-enough-32chars!",
+                "CURSOR_SIGNING_KEY": "valid-cursor-key-that-is-long-enough-32chars!",
+                "WEBHOOK_SECRET_KEY": "secret",
+                "DATABASE_URL": "postgresql://prod-db.example.com/apgi_api",
+                "REDIS_URL": "redis://prod-redis.example.com:6379/0",
+                "CORS_ORIGINS": "https://example.com",
+                "BASE_URL": "https://api.example.com",
+                "STRIPE_SECRET_KEY": "sk_live_test123",
+                "STRIPE_PUBLISHABLE_KEY": "pk_live_test123",
+                "STRIPE_WEBHOOK_SECRET": "whsec_test123",
+                "SMTP_SERVER": "smtp.example.com",
+            },
+        ):
+            with pytest.raises(
+                ValueError, match="WEBHOOK_SECRET_KEY is set to a known insecure default value"
+            ):
+                Settings()
+
+    def test_webhook_secret_key_too_short_in_production_raises_error(self) -> None:
+        """Test that WEBHOOK_SECRET_KEY shorter than 32 characters in production raises ValueError."""
+        with patch.dict(
+            os.environ,
+            {
+                "ENVIRONMENT": "production",
+                "JWT_SECRET_KEY": "valid-secret-key-that-is-long-enough-32chars!",
+                "CURSOR_SIGNING_KEY": "valid-cursor-key-that-is-long-enough-32chars!",
+                "WEBHOOK_SECRET_KEY": "short-key",
+                "DATABASE_URL": "postgresql://prod-db.example.com/apgi_api",
+                "REDIS_URL": "redis://prod-redis.example.com:6379/0",
+                "CORS_ORIGINS": "https://example.com",
+                "BASE_URL": "https://api.example.com",
+                "STRIPE_SECRET_KEY": "sk_live_test123",
+                "STRIPE_PUBLISHABLE_KEY": "pk_live_test123",
+                "STRIPE_WEBHOOK_SECRET": "whsec_test123",
+                "SMTP_SERVER": "smtp.example.com",
+            },
+        ):
+            with pytest.raises(
+                ValueError, match="WEBHOOK_SECRET_KEY is shorter than 32 characters"
+            ):
+                Settings()
+
+
+class TestConfigURLValidation:
+    """Test URL validation for database, Redis, and Celery broker."""
+
+    def test_invalid_database_url_format_raises_error(self) -> None:
+        """Test that invalid DATABASE_URL format raises ValueError in production."""
+        with patch.dict(
+            os.environ,
+            {
+                "ENVIRONMENT": "production",
+                "JWT_SECRET_KEY": "valid-secret-key-that-is-long-enough-32chars!",
+                "CURSOR_SIGNING_KEY": "valid-cursor-key-that-is-long-enough-32chars!",
+                "WEBHOOK_SECRET_KEY": "valid-webhook-key-that-is-long-enough-32c!",
+                "DATABASE_URL": "not-a-valid-url",
+                "REDIS_URL": "redis://prod-redis.example.com:6379/0",
+                "CORS_ORIGINS": "https://example.com",
+                "BASE_URL": "https://api.example.com",
+                "STRIPE_SECRET_KEY": "sk_live_test123",
+                "STRIPE_PUBLISHABLE_KEY": "pk_live_test123",
+                "STRIPE_WEBHOOK_SECRET": "whsec_test123",
+                "SMTP_SERVER": "smtp.example.com",
+            },
+        ):
+            with warnings.catch_warnings():
+                warnings.simplefilter("ignore")
+                with pytest.raises(ValueError, match="DATABASE_URL is not a valid URL"):
+                    Settings()
+
+    def test_invalid_redis_url_format_raises_error(self) -> None:
+        """Test that invalid REDIS_URL format raises ValueError in production."""
+        with patch.dict(
+            os.environ,
+            {
+                "ENVIRONMENT": "production",
+                "JWT_SECRET_KEY": "valid-secret-key-that-is-long-enough-32chars!",
+                "CURSOR_SIGNING_KEY": "valid-cursor-key-that-is-long-enough-32chars!",
+                "WEBHOOK_SECRET_KEY": "valid-webhook-key-that-is-long-enough-32c!",
+                "DATABASE_URL": "postgresql://prod-db.example.com/apgi_api",
+                "REDIS_URL": "not-a-valid-url",
+                "CORS_ORIGINS": "https://example.com",
+                "BASE_URL": "https://api.example.com",
+                "STRIPE_SECRET_KEY": "sk_live_test123",
+                "STRIPE_PUBLISHABLE_KEY": "pk_live_test123",
+                "STRIPE_WEBHOOK_SECRET": "whsec_test123",
+                "SMTP_SERVER": "smtp.example.com",
+            },
+        ):
+            with pytest.raises(ValueError, match="REDIS_URL is not a valid URL"):
+                Settings()
+
+    def test_invalid_celery_broker_url_format_raises_error(self) -> None:
+        """Test that invalid CELERY_BROKER_URL format raises ValueError in production."""
+        with patch.dict(
+            os.environ,
+            {
+                "ENVIRONMENT": "production",
+                "JWT_SECRET_KEY": "valid-secret-key-that-is-long-enough-32chars!",
+                "CURSOR_SIGNING_KEY": "valid-cursor-key-that-is-long-enough-32chars!",
+                "WEBHOOK_SECRET_KEY": "valid-webhook-key-that-is-long-enough-32c!",
+                "DATABASE_URL": "postgresql://prod-db.example.com/apgi_api",
+                "REDIS_URL": "redis://prod-redis.example.com:6379/0",
+                "CELERY_BROKER_URL": "not-a-valid-url",
+                "CORS_ORIGINS": "https://example.com",
+                "BASE_URL": "https://api.example.com",
+                "STRIPE_SECRET_KEY": "sk_live_test123",
+                "STRIPE_PUBLISHABLE_KEY": "pk_live_test123",
+                "STRIPE_WEBHOOK_SECRET": "whsec_test123",
+                "SMTP_SERVER": "smtp.example.com",
+            },
+        ):
+            with pytest.raises(ValueError, match="CELERY_BROKER_URL is not a valid URL"):
+                Settings()
+
+    def test_non_postgresql_database_url_warns_in_production(self) -> None:
+        """Test that non-PostgreSQL DATABASE_URL warns in production."""
+        with patch.dict(
+            os.environ,
+            {
+                "ENVIRONMENT": "production",
+                "JWT_SECRET_KEY": "valid-secret-key-that-is-long-enough-32chars!",
+                "CURSOR_SIGNING_KEY": "valid-cursor-key-that-is-long-enough-32chars!",
+                "WEBHOOK_SECRET_KEY": "valid-webhook-key-that-is-long-enough-32c!",
+                "DATABASE_URL": "mysql://prod-db.example.com/apgi_api",
+                "REDIS_URL": "redis://prod-redis.example.com:6379/0",
+                "CORS_ORIGINS": "https://example.com",
+                "BASE_URL": "https://api.example.com",
+                "STRIPE_SECRET_KEY": "sk_live_test123",
+                "STRIPE_PUBLISHABLE_KEY": "pk_live_test123",
+                "STRIPE_WEBHOOK_SECRET": "whsec_test123",
+                "SMTP_SERVER": "smtp.example.com",
+            },
+        ):
+            with warnings.catch_warnings(record=True) as w:
+                warnings.simplefilter("always")
+                settings = Settings()
+                assert any(
+                    "DATABASE_URL does not appear to be a PostgreSQL connection string"
+                    in str(warning.message)
+                    for warning in w
+                )
+
+
+class TestConfigDatabaseSharding:
+    """Test database sharding configuration."""
+
+    def test_database_shard_urls_populated_from_env(self) -> None:
+        """Test that database shard URLs are populated from environment variables."""
+        with patch.dict(
+            os.environ,
+            {
+                "ENVIRONMENT": "development",
+                "JWT_SECRET_KEY": "valid-secret-key-that-is-long-enough-32chars!",
+                "CURSOR_SIGNING_KEY": "valid-cursor-key-that-is-long-enough-32chars!",
+                "WEBHOOK_SECRET_KEY": "valid-webhook-key-that-is-long-enough-32c!",
+                "DATABASE_SHARDS_ENABLED": "true",
+                "DATABASE_SHARD_0_URL": "postgresql://shard0.example.com/apgi_api",
+                "DATABASE_SHARD_1_URL": "postgresql://shard1.example.com/apgi_api",
+            },
+        ):
+            settings = Settings()
+            assert 0 in settings.database_shard_urls
+            assert 1 in settings.database_shard_urls
+            assert settings.database_shard_urls[0] == "postgresql://shard0.example.com/apgi_api"
+            assert settings.database_shard_urls[1] == "postgresql://shard1.example.com/apgi_api"

@@ -24,6 +24,7 @@ def _configure_fastapi_app(app: FastAPI) -> None:
         app.response_class = Response
 
     if not hasattr(app, "test_request_context"):
+
         class _FastAPITestRequestContext:
             def push(self) -> None:
                 return None

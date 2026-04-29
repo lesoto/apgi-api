@@ -549,6 +549,73 @@ class TestUnhandledExceptionHandler:
 
         assert response.status_code == 500
 
+    @pytest.mark.asyncio
+    async def test_unhandled_exception_handler_nested_dict_redaction(self) -> None:
+        """Test redaction in nested dictionaries."""
+        mock_request = MagicMock(spec=Request)
+        mock_request.state.request_id = "req_test123"
+        mock_request.url = MagicMock()
+        mock_request.url.path = "/test"
+        mock_request.method = "POST"
+        mock_request.headers = {"content-type": "application/json", "content-length": "100"}
+        mock_request.body = AsyncMock(
+            return_value=b'{"user": {"credentials": {"password": "secret123"}}}'
+        )
+
+        exc = Exception("Unexpected error")
+
+        with patch("app.exception_handlers.error_logger"):
+            with patch("app.exception_handlers.alert_manager") as mock_alert_mgr:
+                mock_alert_mgr.channels = []
+                response = await unhandled_exception_handler(mock_request, exc)
+
+        assert response.status_code == 500
+
+    @pytest.mark.asyncio
+    async def test_unhandled_exception_handler_nested_list_redaction(self) -> None:
+        """Test redaction in nested lists."""
+        mock_request = MagicMock(spec=Request)
+        mock_request.state.request_id = "req_test123"
+        mock_request.url = MagicMock()
+        mock_request.url.path = "/test"
+        mock_request.method = "POST"
+        mock_request.headers = {
+            "content-type": "application/json",
+            "content-length": "100",
+        }
+        mock_request.body = AsyncMock(return_value=b'{"tokens": ["secret1", "secret2", "secret3"]}')
+
+        exc = Exception("Unexpected error")
+
+        with patch("app.exception_handlers.error_logger"):
+            with patch("app.exception_handlers.alert_manager") as mock_alert_mgr:
+                mock_alert_mgr.channels = []
+                response = await unhandled_exception_handler(mock_request, exc)
+
+        assert response.status_code == 500
+
+    @pytest.mark.asyncio
+    async def test_unhandled_exception_handler_mixed_nested_redaction(self) -> None:
+        """Test redaction in mixed nested structures."""
+        mock_request = MagicMock(spec=Request)
+        mock_request.state.request_id = "req_test123"
+        mock_request.url = MagicMock()
+        mock_request.url.path = "/test"
+        mock_request.method = "POST"
+        mock_request.headers = {"content-type": "application/json", "content-length": "150"}
+        mock_request.body = AsyncMock(
+            return_value=b'{"data": [{"auth": {"token": "abc"}}, {"public": "info"}]}'
+        )
+
+        exc = Exception("Unexpected error")
+
+        with patch("app.exception_handlers.error_logger"):
+            with patch("app.exception_handlers.alert_manager") as mock_alert_mgr:
+                mock_alert_mgr.channels = []
+                response = await unhandled_exception_handler(mock_request, exc)
+
+        assert response.status_code == 500
+
 
 class TestRegisterExceptionHandlers:
     """Test exception handler registration."""

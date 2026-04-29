@@ -66,7 +66,23 @@ def parse_version(version_str: Optional[str]) -> Tuple[int, ...]:
         return (0, 0, 0)
 
     try:
-        return tuple(int(x) for x in version_str.split(".")[:3])
+        # Extract version numbers, handling strings like "2.9.11 (dt dec pq3 ext lo64)"
+        parts = version_str.split(".")[:3]
+        # Extract only the numeric part from each component
+        cleaned_parts = []
+        for part in parts:
+            # Extract digits from the beginning of the string
+            numeric_part = ""
+            for char in part:
+                if char.isdigit():
+                    numeric_part += char
+                else:
+                    break
+            cleaned_parts.append(numeric_part if numeric_part else "0")
+        # Ensure we always have 3 parts by padding with zeros
+        while len(cleaned_parts) < 3:
+            cleaned_parts.append("0")
+        return tuple(int(x) for x in cleaned_parts[:3])
     except (ValueError, AttributeError):
         return (0, 0, 0)
 

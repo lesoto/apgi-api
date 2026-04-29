@@ -288,6 +288,41 @@ class TestDeleteUserData:
         assert "reason" in result
         assert "deleted_counts" in result
 
+    @patch("app.services.data_lifecycle.get_db_context")
+    def test_delete_user_data_empty_session_ids(self, mock_db_context: MagicMock) -> None:
+        """Handle empty session_ids gracefully."""
+        mock_db = MagicMock()
+        mock_db.query.return_value.filter.return_value.all.return_value = []
+        mock_db.query.return_value.filter.return_value.first.return_value = None
+        mock_db_context.return_value.__enter__.return_value = mock_db
+        manager = DataLifecycleManager()
+        result = manager.delete_user_data("user123", "test")
+        assert "user_id" in result
+        assert "deleted_counts" in result
+
+    @patch("app.services.data_lifecycle.get_db_context")
+    def test_delete_user_data_user_not_found(self, mock_db_context: MagicMock) -> None:
+        """Handle user not found gracefully."""
+        mock_db = MagicMock()
+        mock_db.query.return_value.filter.return_value.first.return_value = None
+        mock_db_context.return_value.__enter__.return_value = mock_db
+        manager = DataLifecycleManager()
+        result = manager.delete_user_data("nonexistent", "test")
+        assert "user_id" in result
+        assert "deleted_counts" in result
+
+    @patch("app.services.data_lifecycle.get_db_context")
+    def test_delete_user_data_exception_handling(self, mock_db_context: MagicMock) -> None:
+        """Handle database exceptions gracefully."""
+        mock_db = MagicMock()
+        mock_db.query.side_effect = Exception("Database error")
+        mock_db_context.return_value.__enter__.return_value = mock_db
+        manager = DataLifecycleManager()
+        result = manager.delete_user_data("user123", "test")
+        assert "user_id" in result
+        assert "deleted_counts" in result
+        # Error is logged but not added to return dict
+
 
 class TestAnonymizePII:
     """Test PII anonymization."""
@@ -324,6 +359,17 @@ class TestGetDataRetentionReport:
         assert "generated_at" in report
         assert "data_types" in report
 
+    @patch("app.services.data_lifecycle.get_db_context")
+    def test_get_data_retention_report_exception_handling(self, mock_db_context: MagicMock) -> None:
+        """Handle database exceptions gracefully."""
+        mock_db = MagicMock()
+        mock_db.query.side_effect = Exception("Database error")
+        mock_db_context.return_value.__enter__.return_value = mock_db
+        manager = DataLifecycleManager()
+        report = manager.get_data_retention_report()
+        # Error is added to each data_type entry, not top-level report
+        assert any("error" in report["data_types"].get(dt, {}) for dt in report["data_types"])
+
 
 class TestEnforceAllRetentionPolicies:
     """Test enforcing all retention policies."""
@@ -347,6 +393,20 @@ class TestEnforceAllRetentionPolicies:
         results = manager.enforce_all_retention_policies(dry_run=False)
         assert len(results) > 0
         assert all(r["dry_run"] is False for r in results)
+
+    @patch("app.services.data_lifecycle.get_db_context")
+    def test_enforce_all_retention_policies_exception_handling(
+        self, mock_db_context: MagicMock
+    ) -> None:
+        """Handle exceptions during policy enforcement gracefully."""
+        mock_db = MagicMock()
+        mock_db.query.side_effect = Exception("Database error")
+        mock_db_context.return_value.__enter__.return_value = mock_db
+        manager = DataLifecycleManager()
+        results = manager.enforce_all_retention_policies(dry_run=True)
+        assert len(results) > 0
+        # Results should still be returned even if some fail
+        assert any("error" in r for r in results)
 
 
 class TestGlobalInstance:

@@ -20,7 +20,7 @@ async def take_screenshots() -> None:
         try:
             # 0. API Documentation
             print("Navigating to API documentation page...")
-            await page.goto("http://127.0.0.1:8080/web/API.html")
+            await page.goto("http://127.0.0.1:8000/web/API.html")
             await page.wait_for_timeout(2000)  # Wait for page load
             print("Taking screenshot of API Documentation...")
             # Take a full page screenshot of the documentation
@@ -33,7 +33,7 @@ async def take_screenshots() -> None:
             )
 
             print("Navigating to registration page...")
-            await page.goto("http://127.0.0.1:8080/web/register.html")
+            await page.goto("http://127.0.0.1:8000/web/register.html")
             await page.wait_for_timeout(2000)  # Wait for animations
 
             # 1. Registration Form

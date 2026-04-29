@@ -22,7 +22,8 @@ def _parse_database_url() -> tuple[str, str, str, str, str]:
     if not match:
         raise ValueError("Invalid DATABASE_URL format")
 
-    return match.groups()
+    user, password, host, port, database = match.groups()
+    return user, password, host, port, database
 
 
 def get_db_params() -> tuple[str, str, str, str, str]:

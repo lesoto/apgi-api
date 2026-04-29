@@ -464,9 +464,7 @@ class TestGetIgnitionHistory:
         # Now test with a valid cursor by generating one
         cursor_data = {"offset": 3}
         json_str = json.dumps(cursor_data)
-        signature = hmac.new(
-            test_key.encode(), json_str.encode(), hashlib.sha256
-        ).hexdigest()
+        signature = hmac.new(test_key.encode(), json_str.encode(), hashlib.sha256).hexdigest()
         signed_cursor = json_str + "." + signature
         cursor = base64.b64encode(signed_cursor.encode()).decode()
 

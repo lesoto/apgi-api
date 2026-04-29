@@ -745,6 +745,39 @@ class TestEdgeCasesAndErrorHandling:
                     session_1 = manager.get_session_for_user("user_2")
                     assert session_1 == mock_session_1
 
+    def test_engine_creation_failure_handles_gracefully(
+        self, mock_sharding_service: MagicMock, mock_settings: MagicMock
+    ) -> None:
+        """Engine creation failure is handled gracefully."""
+        from app.database.sharded_connection import ShardedDatabaseManager
+
+        mock_sharding_service.get_all_shards.return_value = [
+            MagicMock(shard_id="shard_0", database_url="sqlite:///test.db", is_active=True)
+        ]
+
+        with patch("app.database.sharded_connection.sharding_service", mock_sharding_service):
+            with patch("app.database.sharded_connection.create_engine") as mock_create_engine:
+                mock_create_engine.side_effect = Exception("Engine creation failed")
+
+                # Should raise exception
+                with pytest.raises(Exception, match="Engine creation failed"):
+                    ShardedDatabaseManager()
+
+    def test_get_shard_for_user_with_none_shard_id(
+        self, mock_sharding_service: MagicMock, mock_settings: MagicMock
+    ) -> None:
+        """Handle when sharding service returns None."""
+        from app.database.sharded_connection import ShardedDatabaseManager
+
+        with patch("app.database.sharded_connection.sharding_service", mock_sharding_service):
+            with patch("app.database.sharded_connection.create_engine"):
+                manager = ShardedDatabaseManager()
+                mock_sharding_service.get_shard_for_user.return_value = None
+
+                shard_id = manager.get_shard_for_user("user_123")
+
+                assert shard_id is None
+
     def test_execute_cross_shard_query_with_empty_results(
         self, mock_sharding_service: MagicMock, mock_settings: MagicMock
     ) -> None:

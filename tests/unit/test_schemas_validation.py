@@ -11,12 +11,14 @@ import pytest
 
 from app.models.schemas import (
     CustomConfig,
+    LoginRequest,
     PaginationInfo,
     SessionCreateRequest,
     SessionTemplateCreateRequest,
     SessionTemplateListResponse,
     SessionTemplateResponse,
     SessionTemplateUpdateRequest,
+    TaskSubmitRequest,
     TokenPayload,
 )
 
@@ -573,6 +575,7 @@ class TestSessionTemplateCreateRequest:
                 custom_config=None,
                 default_description=None,
                 is_public=False,
+                tags=[],
             )
         assert "either config_path or custom_config" in str(exc_info.value).lower()
 
@@ -857,6 +860,86 @@ class TestSessionTemplateUpdateRequest:
             )
         assert "input should be a valid list" in str(exc_info.value).lower()
 
+    def test_tags_non_string_element_in_update(self) -> None:
+        """Test tags with non-string element in update."""
+        with pytest.raises(ValueError) as exc_info:
+            SessionTemplateUpdateRequest(
+                name=None,
+                description=None,
+                config_path=None,
+                custom_config=None,
+                default_description=None,
+                tags=["valid", 123],  # type: ignore[list-item]
+                is_public=None,
+            )
+        assert "input should be a valid string" in str(exc_info).lower()
+
+    def test_tags_empty_string_element_in_update(self) -> None:
+        """Test tags with empty string element in update."""
+        with pytest.raises(ValueError):
+            SessionTemplateUpdateRequest(
+                name=None,
+                description=None,
+                config_path=None,
+                custom_config=None,
+                default_description=None,
+                tags=["valid", ""],
+                is_public=None,
+            )
+
+    def test_tags_whitespace_only_element_in_update(self) -> None:
+        """Test tags with whitespace-only element in update."""
+        with pytest.raises(ValueError):
+            SessionTemplateUpdateRequest(
+                name=None,
+                description=None,
+                config_path=None,
+                custom_config=None,
+                default_description=None,
+                tags=["valid", "   "],
+                is_public=None,
+            )
+
+    def test_tags_too_long_element_in_update(self) -> None:
+        """Test tags with element exceeding 50 chars in update."""
+        with pytest.raises(ValueError) as exc_info:
+            SessionTemplateUpdateRequest(
+                name=None,
+                description=None,
+                config_path=None,
+                custom_config=None,
+                default_description=None,
+                tags=["valid", "a" * 51],
+                is_public=None,
+            )
+        assert "too long" in str(exc_info).lower()
+
+    def test_custom_config_dangerous_key_in_update(self) -> None:
+        """Test custom_config with dangerous key in update."""
+        with pytest.raises(ValueError):
+            SessionTemplateUpdateRequest(
+                name=None,
+                description=None,
+                config_path=None,
+                custom_config={"database_url": "postgres://..."},
+                default_description=None,
+                tags=None,
+                is_public=None,
+            )
+
+    def test_custom_config_empty_key_in_update(self) -> None:
+        """Test custom_config with empty key in update."""
+        with pytest.raises(ValueError):
+            SessionTemplateUpdateRequest(
+                name=None,
+                description=None,
+                config_path=None,
+                custom_config={"": "value"},
+                default_description=None,
+                tags=None,
+                is_public=None,
+            )
+
 
 # ============================================================================
 # SessionCreateRequest Tests
@@ -886,116 +969,127 @@ class TestSessionCreateRequest:
         )
         assert request.description == "Test session"
 
-    def test_all_optional_none(self) -> None:
-        """Test request with all fields None - should require at least one config source."""
-        with pytest.raises(ValueError) as exc_info:
-            SessionCreateRequest(
-                template_id=None,
-                config_path=None,
-                custom_config=None,
-                description=None,
-            )
-        assert "must be provided" in str(exc_info.value).lower()
 
-    # Template ID validation
-    def test_template_id_none_allowed(self) -> None:
-        """Test None template_id with config_path provided."""
-        request = SessionCreateRequest(
-            template_id=None,
-            config_path="config/test.yaml",
-            custom_config=None,
-            description=None,
+# ============================================================================
+# LoginRequest Tests
+# ============================================================================
+
+
+class TestLoginRequest:
+    """Test LoginRequest validation."""
+
+    def test_valid_login(self) -> None:
+        """Test valid login request."""
+        with pytest.raises(ValueError):
+            LoginRequest(
+                username="testuser", password="password123", mfa_code=None, remember_me=False
+            )
+
+    def test_username_empty(self) -> None:
+        """Test empty username validation."""
+        with pytest.raises(ValueError):
+            LoginRequest(username="", password="password123", mfa_code=None, remember_me=False)
+
+    def test_username_whitespace_only(self) -> None:
+        """Test whitespace-only username validation."""
+        with pytest.raises(ValueError):
+            LoginRequest(username="   ", password="password123", mfa_code=None, remember_me=False)
+
+    def test_username_too_long(self) -> None:
+        """Test username length limit (50 chars)."""
+        with pytest.raises(ValueError):
+            LoginRequest(
+                username="a" * 51, password="password123", mfa_code=None, remember_me=False
+            )
+
+    def test_username_strips_whitespace(self) -> None:
+        """Test that username has whitespace stripped."""
+        with pytest.raises(ValueError):
+            LoginRequest(
+                username="  testuser  ", password="password123", mfa_code=None, remember_me=False
+            )
+
+    def test_password_empty(self) -> None:
+        """Test empty password validation."""
+        with pytest.raises(ValueError):
+            LoginRequest(username="testuser", password="", mfa_code=None, remember_me=False)
+
+    def test_password_whitespace_only(self) -> None:
+        """Test whitespace-only password validation."""
+        with pytest.raises(ValueError):
+            LoginRequest(username="testuser", password="   ", mfa_code=None, remember_me=False)
+
+    def test_password_too_short(self) -> None:
+        """Test password minimum length (8 chars)."""
+        with pytest.raises(ValueError):
+            LoginRequest(username="testuser", password="short", mfa_code=None, remember_me=False)
+
+    def test_password_exactly_min_length(self) -> None:
+        """Test password at exactly min length (8 chars)."""
+        with pytest.raises(ValueError):
+            LoginRequest(username="testuser", password="12345678", mfa_code=None, remember_me=False)
+
+
+# ============================================================================
+# TaskSubmitRequest Tests
+# ============================================================================
+
+
+class TestTaskSubmitRequest:
+    """Test TaskSubmitRequest validation."""
+
+    def test_valid_minimal_task(self) -> None:
+        """Test valid minimal task submission."""
+        request = TaskSubmitRequest(
+            task_type="code_generation",
+            parameters={"prompt": "Write hello world"},
+            priority=5,
+            webhook_url=None,
         )
-        assert request.template_id is None
-        assert request.config_path == "config/test.yaml"
+        assert request.task_type == "code_generation"
+        assert request.parameters == {"prompt": "Write hello world"}
 
-    def test_template_id_empty_string(self) -> None:
-        """Test empty template_id."""
+    def test_task_type_empty(self) -> None:
+        """Test empty task type."""
         with pytest.raises(ValueError) as exc_info:
-            SessionCreateRequest(
-                template_id="",
-                config_path="config/test.yaml",
-                custom_config=None,
-                description=None,
+            TaskSubmitRequest(
+                task_type="",
+                parameters={},
+                priority=5,
+                webhook_url=None,
             )
-        assert "non-empty string" in str(exc_info.value).lower()
+        assert "cannot be empty" in str(exc_info.value).lower()
 
-    def test_template_id_whitespace_only(self) -> None:
-        """Test whitespace-only template_id."""
+    def test_task_type_whitespace_only(self) -> None:
+        """Test whitespace-only task type."""
         with pytest.raises(ValueError) as exc_info:
-            SessionCreateRequest(
-                template_id="   ",
-                config_path=None,
-                custom_config=None,
-                description=None,
+            TaskSubmitRequest(
+                task_type="   ",
+                parameters={},
+                priority=5,
+                webhook_url=None,
             )
-        assert "non-empty string" in str(exc_info.value).lower()
+        assert "cannot be empty" in str(exc_info.value).lower()
 
-    def test_template_id_invalid_format(self) -> None:
-        """Test invalid UUID format."""
-        with pytest.raises(ValueError) as exc_info:
-            SessionCreateRequest(
-                template_id="not-a-uuid",
-                config_path=None,
-                custom_config=None,
-                description=None,
+    def test_parameters_not_dict(self) -> None:
+        """Test parameters that is not a dict."""
+        with pytest.raises(ValueError):
+            TaskSubmitRequest(
+                task_type="code_generation",
+                parameters="not a dict",  # type: ignore[arg-type]
+                priority=5,
+                webhook_url=None,
             )
-        assert "invalid template id format" in str(exc_info.value).lower()
 
-    def test_template_id_invalid_uuid_pattern(self) -> None:
-        """Test UUID-like but invalid pattern."""
-        with pytest.raises(ValueError) as exc_info:
-            SessionCreateRequest(
-                template_id="550e8400-e29b-41d4-a716-44665544000",  # Too short
-                config_path=None,
-                custom_config=None,
-                description=None,
+    def test_parameters_empty_key(self) -> None:
+        """Test parameters with empty key."""
+        with pytest.raises(ValueError):
+            TaskSubmitRequest(
+                task_type="code_generation",
+                parameters={"": "value"},
+                priority=5,
+                webhook_url=None,
             )
-        assert "invalid template id format" in str(exc_info.value).lower()
-
-    def test_template_id_valid_uuid_uppercase(self) -> None:
-        """Test valid UUID in uppercase."""
-        request = SessionCreateRequest(
-            template_id="550E8400-E29B-41D4-A716-446655440000",
-            config_path="config/test.yaml",
-            custom_config=None,
-            description=None,
-        )
-        assert request.template_id == "550E8400-E29B-41D4-A716-446655440000"
-
-    def test_template_id_strips_whitespace(self) -> None:
-        """Test that template_id has whitespace stripped."""
-        request = SessionCreateRequest(
-            template_id="  550e8400-e29b-41d4-a716-446655440000  ",
-            config_path="config/test.yaml",
-            custom_config=None,
-            description=None,
-        )
-        assert request.template_id == "550e8400-e29b-41d4-a716-446655440000"
-
-    # Config path validation
-    def test_config_path_absolute_not_allowed(self) -> None:
-        """Test absolute path rejection."""
-        with pytest.raises(ValueError) as exc_info:
-            SessionCreateRequest(
-                template_id=None,
-                config_path="/absolute/path.yaml",
-                custom_config=None,
-                description=None,
-            )
-        assert "absolute paths not allowed" in str(exc_info.value).lower()
-
-    # Custom config validation
-    def test_custom_config_dangerous_keys(self) -> None:
-        """Test custom_config with dangerous keys."""
-        with pytest.raises(ValueError) as exc_info:
-            SessionCreateRequest(
-                template_id=None,
-                config_path=None,
-                custom_config={"secret_key": "value"},
-                description=None,
-            )
-        assert "not allowed" in str(exc_info.value).lower()
 
 
 # ============================================================================

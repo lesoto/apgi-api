@@ -6,7 +6,7 @@ Comprehensive caching implementation for session states, user data, and frequent
 
 import base64
 import json
-from typing import Any, Dict, Optional
+from typing import Any, Dict, Optional, cast
 
 import redis.asyncio as redis
 from cryptography.fernet import Fernet
@@ -132,7 +132,7 @@ class CacheService:
         """
         key = f"{self.prefixes['session']}{session_id}:state"
         try:
-            result = await self.redis.delete(key)
+            result = cast(int, await self.redis.delete(key))
             return result > 0
         except Exception:
             return False
