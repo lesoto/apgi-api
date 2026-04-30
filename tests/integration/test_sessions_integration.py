@@ -472,12 +472,7 @@ class TestSessionMaintenance:
         self, mock_db: MagicMock, mock_current_user: MagicMock, mock_manager: MagicMock
     ) -> None:
         """Test session state update operations."""
-        from app.routes.sessions import (
-            pause_session,
-            reset_session,
-            start_session,
-            stop_session,
-        )
+        from app.routes.sessions import pause_session, reset_session, start_session, stop_session
 
         mock_session = MagicMock()
         mock_session.session_id = "session123"

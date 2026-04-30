@@ -40,9 +40,11 @@ This document maps APGI API implementation to industry security frameworks and c
 | 2.4.1 | JWT signature | RS256/HS256 with strong keys | `app/middleware/authentication.py` |
 | 2.4.2 | JWT validation | Signature + claims validation | `app/middleware/authentication.py` |
 | 2.4.3 | JWT content | Minimal claims, no sensitive data | `app/middleware/authentication.py` |
-| 2.5.1 | API key generation | Cryptographically random keys | `app/services/auth_manager.py` |
-| 2.5.2 | API key storage | HMAC-SHA256 hashed | `app/database/models.py` |
-| 2.5.3 | API key revocation | Soft delete with immediate effect | `app/routers/auth.py` |
+| 2.5.1 | API key generation | Cryptographically random keys with HMAC prefix | `app/routes/api_keys.py` |
+| 2.5.2 | API key storage | HMAC-SHA256 hashed with prefix for fast lookup | `app/database/models.py` |
+| 2.5.3 | API key revocation | Soft delete with immediate effect | `app/routes/api_keys.py` |
+| 2.5.4 | API key rotation | Key rotation with new secret generation | `app/routes/api_keys.py` |
+| 2.5.5 | API key usage tracking | Last used timestamp tracking | `app/database/models.py` |
 
 ### V3: Session Management
 
@@ -183,8 +185,11 @@ This document maps APGI API implementation to industry security frameworks and c
 | 13.2.3 | CSRF protection | State-changing POST validation | `app/middleware/csrf.py` |
 | 13.2.4 | CORS | Strict CORS policy | `app/middleware/cors_config.py` |
 | 13.2.5 | API versioning | Versioned API endpoints | `app/middleware/api_versioning.py` |
-| 13.3.1 | API authentication | Token-based auth | `app/middleware/authentication.py` |
-| 13.3.2 | API authorization | RBAC enforcement | `app/services/authorization.py` |
+| 13.3.1 | API authentication | Token-based auth (JWT + API keys) | `app/middleware/authentication.py` |
+| 13.3.2 | API authorization | RBAC enforcement with permissions | `app/services/authorization.py` |
+| 13.4.1 | Webhook security | Webhook delivery validation | `app/routes/webhooks.py` |
+| 13.4.2 | Webhook retries | Dead-letter queue for failed deliveries | `app/routes/webhooks.py` |
+| 13.4.3 | Webhook authentication | Signature verification | `app/routes/webhooks.py` |
 
 ### V14: Configuration
 
@@ -275,6 +280,10 @@ This document maps APGI API implementation to industry security frameworks and c
 | Password Hashing | `app/services/auth_manager.py` | 1-650 |
 | Session Management | `app/database/models.py` | 190-275 |
 | API Key Storage | `app/database/models.py` | 488-540 |
+| API Key Management | `app/routes/api_keys.py` | 1-432 |
+| Webhook Delivery Management | `app/routes/webhooks.py` | 1-470 |
+| Session Template Management | `app/routes/templates.py` | 1-480 |
+| Data Export | `app/routes/export.py` | 1-402 |
 | Audit Logging | `app/database/models.py` | 599-647 |
 | Rate Limiting | `app/middleware/rate_limiting.py` | 1-350 |
 | Input Validation | `app/middleware/schema_validation.py` | 1-450 |
@@ -286,6 +295,7 @@ This document maps APGI API implementation to industry security frameworks and c
 | Error Handling | `app/middleware/error_handler.py` | 1-300 |
 | Metrics Collection | `app/middleware/metrics.py` | 1-618 |
 | Alerting | `app/middleware/alerting.py` | 1-950 |
+| Distributed Tracing | `app/middleware/tracing.py` | 1-300 |
 
 ### Test Evidence
 

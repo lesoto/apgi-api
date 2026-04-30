@@ -38,14 +38,41 @@ These are the core endpoints you'll use in APGI simulations:
 ### Authentication
 
 ```python
-POST /v1/auth/register
-  - Register new user account
-
 POST /v1/auth/login
   - Get JWT access token
 
 POST /v1/auth/refresh
   - Refresh expired token
+
+POST /v1/auth/logout
+  - Logout and invalidate tokens
+```
+
+### API Keys
+
+```python
+POST /v1/api-keys
+  - Create new API key
+  - Returns: key_id, key_prefix, full_key (one-time display)
+
+GET /v1/api-keys
+  - List user's API keys
+  - Returns: array of key objects (key_id, key_prefix, created_at, last_used)
+
+GET /v1/api-keys/{key_id}
+  - Get API key details
+  - Returns: key metadata
+
+PUT /v1/api-keys/{key_id}
+  - Update API key metadata
+  - Payload: name, description
+
+POST /v1/api-keys/{key_id}/rotate
+  - Rotate API key (generate new secret)
+  - Returns: new full_key (one-time display)
+
+DELETE /v1/api-keys/{key_id}
+  - Delete API key
 ```
 
 ### Sessions (Core APGI Simulation)
@@ -71,6 +98,42 @@ POST /v1/sessions/{session_id}/start
 GET /v1/sessions
   - List all your sessions
   - Returns: array of session objects
+
+POST /v1/sessions/{session_id}/pause
+  - Pause session
+
+POST /v1/sessions/{session_id}/stop
+  - Stop session
+
+POST /v1/sessions/{session_id}/reset
+  - Reset session to initial state
+
+DELETE /v1/sessions/{session_id}
+  - Delete session
+```
+
+### Session Templates
+
+```python
+GET /v1/templates
+  - List session templates (public and user's own)
+  - Returns: array of template objects
+
+POST /v1/templates
+  - Create new session template
+  - Payload: name, description, config, is_public
+  - Returns: template_id
+
+GET /v1/templates/{template_id}
+  - Get template details
+  - Returns: template configuration
+
+PUT /v1/templates/{template_id}
+  - Update template
+  - Payload: name, description, config, is_public
+
+DELETE /v1/templates/{template_id}
+  - Delete template
 ```
 
 ### Tasks (Experiments within Session)
@@ -93,14 +156,86 @@ GET /v1/sessions/{session_id}/tasks
 ### Export & Results
 
 ```http
-POST /v1/sessions/{session_id}/export
-  - Export session data
-  - Payload: format="json"|"csv"
-  - Returns: download URL or file contents
+GET /v1/sessions/{session_id}/export/json
+  - Export session as JSON
+  - Returns: complete session data
 
-GET /v1/sessions/{session_id}/results
-  - Get analysis results
-  - Returns: consciousness metrics, synchrony, state history
+GET /v1/sessions/{session_id}/export/csv
+  - Export session as CSV
+  - Returns: tabular session data
+
+GET /v1/sessions/{session_id}/export/summary
+  - Get summary statistics
+  - Returns: aggregated metrics
+
+GET /v1/sessions/{session_id}/export/timeseries
+  - Get time series data
+  - Returns: time-indexed state data
+
+GET /v1/sessions/{session_id}/export/events
+  - Get event analysis data
+  - Returns: ignition events and analysis
+```
+
+### Webhook Deliveries
+
+```python
+GET /v1/webhooks/deliveries
+  - List webhook deliveries
+  - Query params: session_id, status, limit, offset
+  - Returns: array of delivery objects
+
+GET /v1/webhooks/deliveries/{delivery_id}
+  - Get delivery details
+  - Returns: delivery status, attempts, response
+
+POST /v1/webhooks/deliveries/{delivery_id}/retry
+  - Retry failed delivery
+  - Returns: new delivery attempt
+
+DELETE /v1/webhooks/deliveries/{delivery_id}
+  - Delete delivery
+
+GET /v1/webhooks/dead-letter
+  - List dead-letter webhook deliveries
+  - Returns: failed deliveries that need attention
+
+GET /v1/webhooks/dead-letter/{delivery_id}
+  - Get dead-letter delivery details
+
+POST /v1/webhooks/dead-letter/{delivery_id}/retry
+  - Retry dead-letter delivery
+
+DELETE /v1/webhooks/dead-letter/{delivery_id}
+  - Delete dead-letter delivery
+```
+
+### Business Metrics
+
+```python
+GET /v1/metrics/dashboard
+  - Complete dashboard data
+  - Returns: all metrics aggregated
+
+GET /v1/metrics/overview
+  - High-level overview metrics
+  - Returns: summary statistics
+
+GET /v1/metrics/sessions
+  - Session-related metrics
+  - Returns: session counts, completion rates
+
+GET /v1/metrics/tasks
+  - Task-related metrics
+  - Returns: task completion rates, performance
+
+GET /v1/metrics/users
+  - User-related metrics
+  - Returns: user counts, activity
+
+GET /v1/metrics/templates
+  - Template-related metrics
+  - Returns: template usage statistics
 ```
 
 ## Configuration Object Structure
@@ -258,6 +393,54 @@ Authorization: Bearer eyJhbGciOi...
   "status": "completed",
   "result": { /* computation results */ },
   "created_at": "2024-03-26T10:02:00Z"
+}
+```
+
+### API Key
+
+```python
+{
+  "key_id": "550e8400-e29b-41d4-a716-446655440003",
+  "user_id": "550e8400-e29b-41d4-a716-446655440000",
+  "key_prefix": "apgi_abc123",
+  "key_hash": "hashed_secret_key",
+  "name": "Production API Key",
+  "description": "Key for production services",
+  "is_active": true,
+  "last_used_at": "2024-03-26T10:30:00Z",
+  "created_at": "2024-03-26T10:00:00Z"
+}
+```
+
+### Session Template
+
+```python
+{
+  "template_id": "550e8400-e29b-41d4-a716-446655440004",
+  "user_id": "550e8400-e29b-41d4-a716-446655440000",
+  "name": "Default Visual Experiment",
+  "description": "Standard configuration for visual stimulus experiments",
+  "config": { /* configuration object */ },
+  "is_public": true,
+  "created_at": "2024-03-26T10:00:00Z",
+  "updated_at": "2024-03-26T10:05:00Z"
+}
+```
+
+### Webhook Delivery
+
+```python
+{
+  "delivery_id": "550e8400-e29b-41d4-a716-446655440005",
+  "session_id": "550e8400-e29b-41d4-a716-446655440001",
+  "webhook_url": "https://example.com/webhook",
+  "payload": { /* webhook payload */ },
+  "status": "delivered",
+  "http_status_code": 200,
+  "response_body": "OK",
+  "attempts": 1,
+  "created_at": "2024-03-26T10:02:00Z",
+  "delivered_at": "2024-03-26T10:02:01Z"
 }
 ```
 

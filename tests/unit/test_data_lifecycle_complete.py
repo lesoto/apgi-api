@@ -11,11 +11,7 @@ Covers:
 from datetime import datetime, timedelta, timezone
 from unittest.mock import MagicMock, patch
 
-from app.services.data_lifecycle import (
-    DataClassification,
-    DataLifecycleManager,
-    RetentionCategory,
-)
+from app.services.data_lifecycle import DataClassification, DataLifecycleManager, RetentionCategory
 
 
 class TestDeleteExpiredDataExceptionHandling:

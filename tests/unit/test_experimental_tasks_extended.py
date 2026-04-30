@@ -92,10 +92,7 @@ class TestIowaGamblingTaskExecution:
 
     def test_iowa_gambling_task_success(self, mock_apgi_modules: Any) -> None:
         """Test Iowa Gambling task returns unavailable response when APGI not available."""
-        from app.tasks.experimental_tasks import (
-            APGI_SYSTEM_AVAILABLE,
-            execute_iowa_gambling_task,
-        )
+        from app.tasks.experimental_tasks import APGI_SYSTEM_AVAILABLE, execute_iowa_gambling_task
 
         # When APGI is not available, task should return unavailable response
         if not APGI_SYSTEM_AVAILABLE:

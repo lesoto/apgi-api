@@ -99,10 +99,7 @@ class TestVersionRoutes:
 
     def test_configure_deprecated_endpoints(self):
         """Test configuring deprecated endpoints."""
-        from app.routes.version import (
-            DEPRECATED_ENDPOINTS,
-            configure_deprecated_endpoints,
-        )
+        from app.routes.version import DEPRECATED_ENDPOINTS, configure_deprecated_endpoints
 
         # Save original state
         original = DEPRECATED_ENDPOINTS.copy()
@@ -127,10 +124,7 @@ class TestVersionRoutes:
 
     def test_is_endpoint_deprecated(self):
         """Test checking if endpoint is deprecated."""
-        from app.routes.version import (
-            DEPRECATED_ENDPOINTS,
-            is_endpoint_deprecated,
-        )
+        from app.routes.version import DEPRECATED_ENDPOINTS, is_endpoint_deprecated
 
         # Save original state
         original = DEPRECATED_ENDPOINTS.copy()
@@ -152,10 +146,7 @@ class TestVersionRoutes:
 
     def test_get_deprecated_endpoints(self):
         """Test getting all deprecated endpoints."""
-        from app.routes.version import (
-            DEPRECATED_ENDPOINTS,
-            get_deprecated_endpoints,
-        )
+        from app.routes.version import DEPRECATED_ENDPOINTS, get_deprecated_endpoints
 
         # Save original state
         original = DEPRECATED_ENDPOINTS.copy()

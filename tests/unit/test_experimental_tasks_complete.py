@@ -7,10 +7,7 @@ from unittest.mock import AsyncMock, MagicMock, PropertyMock, patch
 
 import pytest
 
-from app.tasks.experimental_tasks import (
-    APGITask,
-    trigger_webhook_on_completion,
-)
+from app.tasks.experimental_tasks import APGITask, trigger_webhook_on_completion
 
 # ============================================================================
 # Fixtures

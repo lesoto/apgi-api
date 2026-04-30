@@ -33,8 +33,8 @@ def get_module_version(package_name: str) -> Optional[str]:
     return getattr(module, "__version__", None)
 
 
-# Critical dependencies required for API operation
-REQUIRED_DEPENDENCIES = {
+# Hard dependencies - application cannot start without these
+HARD_DEPENDENCIES = {
     "fastapi": "0.110.0",
     "uvicorn": "0.28.0",
     "starlette": "0.37.0",
@@ -43,13 +43,20 @@ REQUIRED_DEPENDENCIES = {
     "sqlalchemy": "2.0.30",
     "alembic": "1.13.0",
     "psycopg2-binary": "2.9.9",
+    "python-dotenv": "1.0.0",
+}
+
+# Soft dependencies - application can start in degraded mode without these
+SOFT_DEPENDENCIES = {
     "redis": "5.0.1",
     "celery": "5.3.4",
     "pyjwt": "2.8.0",
     "bcrypt": "4.0.0",
     "prometheus-client": "0.19.0",
-    "python-dotenv": "1.0.0",
 }
+
+# Keep for backward compatibility
+REQUIRED_DEPENDENCIES = {**HARD_DEPENDENCIES, **SOFT_DEPENDENCIES}
 
 
 def parse_version(version_str: Optional[str]) -> Tuple[int, ...]:

@@ -4,9 +4,7 @@ from unittest.mock import patch
 
 import pytest
 
-from app.services.task_execution.task_executor import (
-    TaskExecutor,
-)
+from app.services.task_execution.task_executor import TaskExecutor
 
 
 class TestTaskExecutor:

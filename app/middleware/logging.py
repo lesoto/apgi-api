@@ -257,6 +257,10 @@ def configure_structured_logging(log_level: str = "INFO") -> None:
     """
     import os
 
+    # Disable uvicorn access logs (we handle them in middleware)
+    # Do this before TEST_MODE check to ensure it's always executed
+    logging.getLogger("uvicorn.access").disabled = True
+
     # Skip logging configuration in test mode to prevent LogRecord conflicts
     if os.environ.get("TEST_MODE") == "true":
         return
@@ -274,6 +278,3 @@ def configure_structured_logging(log_level: str = "INFO") -> None:
         except Exception:
             # If logging configuration fails, continue without it
             pass
-
-    # Disable uvicorn access logs (we handle them in middleware)
-    logging.getLogger("uvicorn.access").disabled = True

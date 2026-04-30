@@ -1,8 +1,6 @@
 # Utility Scripts
 
-## Available Scripts
-
-### start.sh / start.ps1
+## start.sh / start.ps1
 
 Development environment startup script that:
 
@@ -114,6 +112,159 @@ Health check script for monitoring that:
 - `TIMEOUT` - Request timeout in seconds
 - `VERBOSE` - Enable verbose output (`true`/`false`)
 - `QUIET` - Suppress output (`true`/`false`)
+
+### seed.sh / seed.ps1
+
+Database seeding script that:
+
+- Seeds the database with test data for development and testing
+- Supports different data types (users, sessions, tasks)
+- Auto-detects whether to run locally or in Docker
+- Provides force reseeding option
+
+**Usage:**
+
+```bash
+# Linux/macOS/Git Bash
+./scripts/seed.sh [COMMAND] [OPTIONS]
+
+# Windows PowerShell
+.\scripts\seed.ps1 [COMMAND] [OPTIONS]
+
+# Examples:
+./scripts/seed.sh users                    # Seed users in development
+./scripts/seed.sh all --env test           # Seed all data for test environment
+./scripts/seed.sh sessions --mode docker   # Seed sessions using Docker
+./scripts/seed.sh all --force              # Force reseed all data
+```
+
+**Commands:**
+
+- `users` - Seed user accounts
+- `sessions` - Seed session data
+- `tasks` - Seed task data
+- `all` - Seed all data types (default)
+
+**Options:**
+
+- `-e, --env ENV` / `-Env ENV`: Environment (development, staging, test) [default: development]
+- `-m, --mode MODE` / `-Mode MODE`: Execution mode (docker, local) [default: auto]
+- `-f, --force` / `-Force`: Force reseeding (drop existing data)
+- `-h, --help` / `-Help`: Show help message
+
+**Environment Variables:**
+
+- `SEED_USERS_COUNT` - Number of users to create [default: 10]
+- `SEED_SESSIONS_COUNT` - Number of sessions per user [default: 5]
+- `SEED_TASKS_COUNT` - Number of tasks per session [default: 3]
+
+### ci_cd.sh / ci_cd.ps1
+
+CI/CD pipeline script that:
+
+- Runs tests, linting, and builds
+- Handles deployment to staging and production
+- Supports promotion and rollback operations
+- Provides health checks and cleanup utilities
+
+**Usage:**
+
+```bash
+# Linux/macOS/Git Bash
+./scripts/ci_cd.sh [COMMAND] [OPTIONS]
+
+# Windows PowerShell
+.\scripts\ci_cd.ps1 [COMMAND] [OPTIONS]
+
+# Examples:
+./scripts/ci_cd.sh test                    # Run all tests
+./scripts/ci_cd.sh lint                    # Run linting checks
+./scripts/ci_cd.sh build                   # Build Docker images
+./scripts/ci_cd.sh deploy --env staging    # Deploy to staging
+./scripts/ci_cd.sh promote                 # Promote staging to production
+./scripts/ci_cd.sh rollback --env production # Rollback production
+./scripts/ci_cd.sh health --env staging    # Check staging health
+```
+
+**Commands:**
+
+- `test` - Run all tests (unit, integration, property-based)
+- `lint` - Run code linting and formatting checks
+- `build` - Build Docker images
+- `deploy` - Deploy to staging environment
+- `promote` - Promote staging to production
+- `rollback` - Rollback to previous version
+- `health` - Run health checks on deployed service
+- `cleanup` - Clean up old Docker images and containers
+
+**Options:**
+
+- `-e, --env ENV` / `-Env ENV`: Target environment (staging, production) [default: staging]
+- `-v, --version VER` / `-Version VER`: Version tag for deployment
+- `-f, --force` / `-Force`: Force operation without confirmation
+- `-d, --dry-run` / `-DryRun`: Show what would be done without executing
+- `-h, --help` / `-Help`: Show help message
+
+**Environment Variables:**
+
+- `CI_ENVIRONMENT` - Target environment (staging/production)
+- `DOCKER_REGISTRY` - Docker registry URL
+- `DOCKER_USERNAME` - Docker registry username
+- `DOCKER_PASSWORD` - Docker registry password
+- `DEPLOY_VERSION` - Version tag for deployment
+
+### perf_test.sh / perf_test.ps1
+
+Performance testing script that:
+
+- Runs load, stress, spike, and soak tests
+- Measures response times and throughput
+- Generates JSON results with statistics
+- Supports custom concurrency and duration
+
+**Usage:**
+
+```bash
+# Linux/macOS/Git Bash
+./scripts/perf_test.sh [TEST_TYPE] [OPTIONS]
+
+# Windows PowerShell
+.\scripts\perf_test.ps1 [TEST_TYPE] [OPTIONS]
+
+# Examples:
+./scripts/perf_test.sh load                           # Run load test for 60 seconds
+./scripts/perf_test.sh stress --concurrency 50        # Run stress test with 50 concurrent users
+./scripts/perf_test.sh spike --duration 30            # Run spike test for 30 seconds
+./scripts/perf_test.sh all --url http://api.example.com --output results.json
+```
+
+**Test Types:**
+
+- `load` - Run load testing with concurrent requests
+- `stress` - Run stress testing to find breaking points
+- `spike` - Run spike testing with sudden traffic bursts
+- `soak` - Run soak testing for extended periods
+- `all` - Run all test types (default)
+
+**Options:**
+
+- `-u, --url URL` / `-Url URL`: API base URL [default: http://localhost:8000]
+- `-d, --duration SEC` / `-Duration SEC`: Test duration in seconds [default: 60]
+- `-c, --concurrency N` / `-Concurrency N`: Number of concurrent users [default: 10]
+- `-r, --rate N` / `-Rate N`: Request rate per second [default: 20]
+- `-t, --timeout SEC` / `-Timeout SEC`: Request timeout [default: 10]
+- `-o, --output FILE` / `-Output FILE`: Output file for results [default: perf_results.json]
+- `-v, --verbose` / `-Verbose`: Enable verbose output
+- `-h, --help` / `-Help`: Show help message
+
+**Environment Variables:**
+
+- `API_URL` - API base URL
+- `TEST_DURATION` - Test duration in seconds
+- `CONCURRENCY` - Number of concurrent users
+- `REQUEST_RATE` - Request rate per second
+- `REQUEST_TIMEOUT` - Request timeout in seconds
+- `OUTPUT_FILE` - Output file for results
 
 ## Script Permissions
 
@@ -239,5 +390,5 @@ Common issues:
 
 - [Deployment Guide](../docs/DEPLOYMENT.md)
 - [Configuration Guide](../docs/CONFIGURATION.md)
-- [API Documentation](../docs/API.md)
+- [API Documentation](../docs/REST-API.md)
 - [Main README](../README.md)

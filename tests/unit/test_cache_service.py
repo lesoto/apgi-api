@@ -11,11 +11,7 @@ from unittest.mock import AsyncMock, patch
 
 import pytest
 
-from app.services.cache_service import (
-    CacheService,
-    get_cache_service,
-    init_cache_service,
-)
+from app.services.cache_service import CacheService, get_cache_service, init_cache_service
 
 
 @pytest.fixture

@@ -354,10 +354,7 @@ class TestProfilingService:
 from datetime import datetime, timedelta, timezone
 from unittest.mock import patch
 
-from app.services.profiling_service import (
-    PerformanceSnapshot,
-    ProfilingResult,
-)
+from app.services.profiling_service import PerformanceSnapshot, ProfilingResult
 
 
 class TestProfilingServiceCore:

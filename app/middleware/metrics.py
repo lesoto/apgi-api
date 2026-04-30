@@ -21,12 +21,12 @@ request_counter = Counter(
     "apgi_api_requests_total", "Total number of API requests", ["method", "endpoint", "status_code"]
 )
 
-# Request duration histogram
+# Request duration histogram with DB/Redis timing tags
 request_duration = Histogram(
     "apgi_api_request_duration_seconds",
     "Request duration in seconds",
-    ["method", "endpoint"],
-    buckets=(0.01, 0.025, 0.05, 0.075, 0.1, 0.25, 0.5, 0.75, 1.0, 2.5, 5.0, 7.5, 10.0),
+    ["method", "endpoint", "has_db", "has_redis"],
+    buckets=(0.005, 0.01, 0.025, 0.05, 0.075, 0.1, 0.25, 0.5, 0.75, 1.0, 2.5, 5.0, 7.5, 10.0),
 )
 
 # Active sessions gauge
@@ -224,7 +224,17 @@ class PrometheusMetricsMiddleware(BaseHTTPMiddleware):
 
             request_counter.labels(method=method, endpoint=endpoint, status_code=status_code).inc()
 
-            request_duration.labels(method=method, endpoint=endpoint).observe(duration)
+            # Determine if DB/Redis were used (based on context vars if available)
+            from app.middleware.db_profiling import cache_stats_var, query_timings_var
+
+            has_db = "true" if len(query_timings_var.get([])) > 0 else "false"
+
+            cache_stats = cache_stats_var.get({"hits": 0, "misses": 0})
+            has_redis = "true" if (cache_stats["hits"] + cache_stats["misses"]) > 0 else "false"
+
+            request_duration.labels(
+                method=method, endpoint=endpoint, has_db=has_db, has_redis=has_redis
+            ).observe(duration)
 
             # Track response size
             if hasattr(response, "headers") and "content-length" in response.headers:

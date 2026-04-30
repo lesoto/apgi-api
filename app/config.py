@@ -106,6 +106,14 @@ class Settings:
         self.rate_limit_per_minute: int = int(os.getenv("RATE_LIMIT_PER_MINUTE", "60"))
         self.max_sessions_per_user: int = int(os.getenv("MAX_SESSIONS_PER_USER", "50"))
 
+        # Trusted Proxy CIDRs for forwarded headers
+        self.trusted_proxies: List[str] = [
+            s.strip()
+            for s in os.getenv(
+                "TRUSTED_PROXIES", "127.0.0.1/32,10.0.0.0/8,172.16.0.0/12,192.168.0.0/16,::1/128"
+            ).split(",")
+        ]
+
         # CORS Settings
         self.cors_origins: List[str] = self._parse_cors_origins()
         self.cors_allow_credentials: bool = (
@@ -299,7 +307,16 @@ class Settings:
                 "change-me",
                 "insecure-key",
                 "development-secret-key-change-in-production-32-chars-min",
+                "sk_test_placeholder",
+                "pk_test_placeholder",
             ]
+
+            def check_entropy(key: str) -> bool:
+                """Simple entropy check: unique chars / total length."""
+                if not key:
+                    return False
+                unique_chars = len(set(key))
+                return (unique_chars / len(key)) > 0.3
 
             jwt_key_lower = self.jwt_secret_key.lower()
             is_insecure = jwt_key_lower in [d.lower() for d in insecure_defaults] or any(
@@ -307,8 +324,14 @@ class Settings:
             )
             if is_insecure:
                 errors.append(
-                    "JWT_SECRET_KEY is set to a known insecure default value. "
+                    "JWT_SECRET_KEY is set to a known insecure default value or placeholder. "
                     "This allows attackers to forge JWT tokens and bypass authentication."
+                )
+
+            if not check_entropy(self.jwt_secret_key):
+                errors.append(
+                    "JWT_SECRET_KEY has low entropy (too many repeating characters). "
+                    "Use a truly random key for production security."
                 )
 
             # Validate minimum key length
@@ -329,9 +352,12 @@ class Settings:
             # Check for known insecure default values
             if self.cursor_signing_key.lower() in [d.lower() for d in insecure_defaults]:
                 errors.append(
-                    "CURSOR_SIGNING_KEY is set to a known insecure default value. "
+                    "CURSOR_SIGNING_KEY is set to a known insecure default value or placeholder. "
                     "This allows attackers to forge pagination cursors."
                 )
+
+            if not check_entropy(self.cursor_signing_key):
+                errors.append("CURSOR_SIGNING_KEY has low entropy. Use a random key.")
 
             # Validate minimum key length
             if len(self.cursor_signing_key) < 32:
@@ -358,9 +384,12 @@ class Settings:
             # Check for known insecure default values
             if self.webhook_secret_key.lower() in [d.lower() for d in insecure_defaults]:
                 errors.append(
-                    "WEBHOOK_SECRET_KEY is set to a known insecure default value. "
+                    "WEBHOOK_SECRET_KEY is set to a known insecure default value or placeholder. "
                     "This allows attackers to forge webhook signatures."
                 )
+
+            if not check_entropy(self.webhook_secret_key):
+                errors.append("WEBHOOK_SECRET_KEY has low entropy. Use a random key.")
 
             # Validate minimum key length
             if len(self.webhook_secret_key) < 32:

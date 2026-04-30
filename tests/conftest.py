@@ -151,6 +151,7 @@ class MockCelery:
         self.tasks: dict[str, Any] = {}  # Add tasks registry
         self.send_task = MagicMock()
         self.control = MagicMock()  # Add control for revoke, etc.
+        self.pool = MagicMock()  # Add pool for acquire, etc.
 
     def task(
         self,

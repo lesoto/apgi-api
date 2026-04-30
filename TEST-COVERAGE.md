@@ -1,31 +1,63 @@
 # Test Coverage Report
 
-**Generated**: 2026-04-06 (Updated)  
-**Test Suite**: APGI API  
-**Framework**: pytest 9.0.2 with coverage.py 7.13.0  
-**Total Tests**: 2,794 tests  
-**Execution Time**: ~198 seconds  
-
----
+**Last Updated**: April 30, 2026  
+**Objective**: Achieve 100% test coverage for APGI API codebase
 
 ## Executive Summary
 
 | Metric | Value | Status |
-| -------- | ------- | -------- |
-| **Total Line Coverage** | **95.73%** | ✅ EXCELLENT |
-| **Lines Covered** | 7,979 / 8,231 | Production Ready |
-| **Branch Coverage** | **89.02%** (1,880/2,038) | Excellent |
-| **Files with 100% Coverage** | 44 files | Outstanding |
-| **Test Status** | 2,794 passed, 1 skipped | Stable |
-| **Coverage Grade** | **A+** | Exceeds Standards |
+|--------|-------|--------|
+| **Total Line Coverage** | **96.15%** | ✅ NEAR COMPLETE |
+| **Lines Covered** | 9,637 / 10,022 | 257 lines remaining |
+| **Branch Coverage** | **93.27%** (2,341/2,510) | Excellent |
+| **Files with 100% Coverage** | 50+ files | Outstanding |
+| **Test Status** | 2,794+ passed, 11 failed, 12 skipped | Stabilizing |
+| **Coverage Grade** | **A+** | Near 100% Target |
 
-**Status**: ✅ **EXCEEDS PRODUCTION STANDARDS** (Target: 90%, Achieved: 95.73%)
+**Status**: 🎯 **96.15% → 100% IN PROGRESS** (Gap: 3.85%, ~257 lines)
 
 ---
 
-## Coverage by Component
+## 1. Critical Coverage Gaps (Priority Order)
 
-### Perfect Coverage (100%) - 44 Files
+### 🔴 High Priority - Core Infrastructure
+
+| File | Current % | Missing Lines | Action Required |
+|------|-----------|---------------|-----------------|
+| `app/tracing.py` | **66%** | 148 lines (201-298) | Test OpenTelemetry integration paths |
+| `app/middleware/alerting.py` | **83%** | 231 lines | Test alert throttling and PagerDuty integration |
+| `app/config.py` | **85%** | 23 lines | Test production validation and env parsing |
+| `app/tasks/experimental_tasks.py` | **90%** | 19 lines | Test apgi_system unavailable fallback paths |
+| `app/models/schemas.py` | **90%** | 56 lines | Test Pydantic validators and edge cases |
+
+### 🟡 Medium Priority - Services
+
+| File | Current % | Missing Lines | Action Required |
+|------|-----------|---------------|-----------------|
+| `app/services/task_executor.py` | **93%** | 15 lines | Test task cancellation and timeout handling |
+| `app/services/seeding_service.py` | **94%** | 7 lines | Test error recovery during seeding |
+| `app/services/session_manager.py` | **95%** | 17 lines | Test session state edge cases |
+| `app/services/profiling_service.py` | **94%** | 10 lines | Test performance history aggregation |
+| `app/services/error_recovery.py` | **95%** | 8 lines | Test recovery strategy execution |
+| `app/services/health_check.py` | **97%** | 3 lines | Test unhealthy service detection |
+| `app/services/sharding_service.py` | **91%** | 3 lines | Test invalid shard key scenarios |
+| `app/exception_handlers.py` | **94%** | 5 lines | Test generic error handling paths |
+| `app/cli.py` | **95%** | 6 lines | Test error exit paths (lines 84-86, 98, 183) |
+| `app/reset_db.py` | **93%** | 2 lines | Test reset failure handling |
+
+### 🟢 Lower Priority - Task Execution
+
+| File | Current % | Missing Lines | Action Required |
+|------|-----------|---------------|-----------------|
+| `app/services/task_execution/dependency_manager.py` | **95%** | 4 lines | Test circular dependency detection |
+| `app/services/task_execution/task_executor.py` | **96%** | 3 lines | Test retry exhausted scenarios |
+| `app/services/task_execution/task_strategies.py` | **97%** | 1 line | Test strategy edge case |
+| `app/services/task_execution/task_submitter.py` | **98%** | 1 line | Test submit error handling |
+
+---
+
+## 2. Perfect Coverage Files (100%) - 44 Files
+
 
 | File | Lines | Branches | Assessment |
 | -------- | ------- | ---------- | ------------ |
@@ -1422,74 +1454,217 @@ def test_isolation():
 
 ```
 
-#### Detailed Remediation Actions
+---
 
-Based on current coverage analysis, implement the following to achieve 100% coverage:
+## 3. Detailed Gap Analysis & Test Plans
 
-| Priority | Component | Current | Target | Action Required |
-| ---------- | ----------- | --------- | -------- | ----------------- |
-| **P0** | `app/routes/templates.py` | 24% | 100% | Add template rendering tests with all engine paths |
-| **P0** | `app/tasks/experimental_tasks.py` | 18% | 100% | Add experimental feature flag and execution tests |
-| **P1** | `app/alter_alembic.py` | 77% | 100% | Add migration alteration and rollback tests |
-| **P1** | `app/celery_app.py` | 76% | 100% | Add Celery configuration and broker failure tests |
-| **P1** | `app/models/schemas.py` | 79% | 95% | Add edge case validation tests |
-| **P2** | `app/middleware/tracing.py` | 92% | 100% | Add span creation and sampling tests |
-| **P2** | `app/middleware/request_size_limit.py` | 82% | 95% | Add chunked upload and limit boundary tests |
-| **P2** | `app/services/task_executor.py` | 92% | 98% | Add timeout and cancellation path tests |
-| **P2** | `app/services/sharding_service.py` | 92% | 98% | Add shard rebalancing failure tests |
+### 3.1 Tracing Module (`app/tracing.py` - 66% → 100%)
 
-### Implementation Checklist
+**Current Gap**: 148 missing lines (OpenTelemetry integration)
 
-#### Phase 1: Critical Coverage (Week 1)
+**Missing Coverage Areas**:
+- Lines 201-208: `configure_tracing()` when OpenTelemetry is unavailable
+- Lines 213-216: `instrument_application()` error handling
+- Lines 222-246: Span helper functions with OTel disabled
+- Lines 259-298: Context propagation helpers
 
-- [ ] Create adversarial test suite for template routes
-- [ ] Implement experimental task execution tests
-- [ ] Add Alembic migration rollback scenarios
-- [ ] Complete Celery configuration path coverage
+**Test Plan**:
+```python
+# tests/unit/test_tracing_coverage.py additions:
+- test_configure_tracing_otel_unavailable()
+- test_instrument_application_otel_unavailable()
+- test_create_span_otel_unavailable()
+- test_get_current_span_otel_unavailable()
+- test_span_context_manager_otel_unavailable()
+- test_propagate_context_in_headers()
+- test_extract_context_from_headers()
+```
 
-#### Phase 2: Comprehensive Testing (Week 2)
+### 3.2 Alerting Middleware (`app/middleware/alerting.py` - 83% → 100%)
 
-- [ ] Implement parameterized test matrix for all routes
-- [ ] Add concurrency and race condition tests for services
-- [ ] Create mutation testing configuration
-- [ ] Implement resource constraint tests
+**Current Gap**: 231 missing lines (Alert throttling, PagerDuty, deduplication)
 
-#### Phase 3: Advanced Verification (Week 3)
+**Missing Coverage Areas**:
+- Alert rate limiting and throttling logic
+- PagerDuty integration error paths
+- Alert deduplication hash collision handling
+- Metrics emission on alert send
 
-- [ ] Set up snapshot testing for API responses
-- [ ] Implement performance regression detection
-- [ ] Add security penetration test scenarios
-- [ ] Create coverage reporting automation
+**Test Plan**:
+```python
+# tests/unit/test_alerting_middleware_coverage.py:
+- test_alert_throttling_exceeded()
+- test_pagerduty_send_failure()
+- test_alert_deduplication_ttl()
+- test_alert_hash_collision_handling()
+```
 
-#### Phase 4: Continuous Validation (Ongoing)
+### 3.3 Configuration (`app/config.py` - 85% → 100%)
 
-- [ ] Integrate coverage gates in CI/CD
-- [ ] Implement automated mutation testing runs
-- [ ] Add flaky test detection and quarantine
-- [ ] Set up coverage trend dashboards
+**Current Gap**: 23 missing lines (Production validation)
 
-### Quality Gates
+**Missing Coverage Areas**:
+- Production environment validation (lines vary by mode)
+- Secret key validation failures
+- Database URL validation edge cases
 
-```yaml
-pre_merge_requirements:
-  line_coverage_minimum: 95
-  branch_coverage_minimum: 90
-  mutation_score_minimum: 85
-  test_execution_time_maximum: 600s
-  flaky_test_threshold: 0
+**Test Plan**:
+```python
+# tests/unit/test_config_complete.py additions:
+- test_production_validation_missing_secret()
+- test_production_validation_invalid_db_url()
+- test_config_reload_edge_cases()
+```
 
-production_release_requirements:
-  line_coverage_minimum: 98
-  branch_coverage_minimum: 95
-  path_coverage_minimum: 90
-  mutation_score_minimum: 90
-  security_test_coverage: 100
-  performance_regression_detected: false
+### 3.4 Experimental Tasks (`app/tasks/experimental_tasks.py` - 90% → 100%)
 
+**Current Gap**: 19 missing lines (apgi_system unavailable paths)
+
+**Missing Coverage Areas**:
+- Lines 25-32: apgi_system import failure handling
+- Lines 156-159, 240-241: Task execution with missing system
+- Lines 325-326, 407-408: Webhook trigger error paths
+- Lines 482-483, 559-560: Resource cleanup on failure
+
+**Test Plan**:
+```python
+# tests/unit/test_experimental_tasks_coverage.py:
+- test_execute_iowa_gambling_apgi_unavailable()
+- test_execute_masking_paradigm_apgi_unavailable()
+- test_execute_attentional_blink_apgi_unavailable()
+- test_webhook_trigger_task_not_found()
+- test_webhook_trigger_no_webhook_url()
+```
+
+### 3.5 Pydantic Schemas (`app/models/schemas.py` - 90% → 100%)
+
+**Current Gap**: 56 missing lines (Validator edge cases)
+
+**Missing Coverage Areas**:
+- CustomConfig validator recursion limit
+- SessionTemplateCreateRequest path traversal edge cases
+- Field validator error messages
+- TokenPayload edge cases (int exp, missing fields)
+
+**Test Plan**:
+```python
+# tests/unit/test_schemas_coverage.py additions:
+- test_custom_config_nesting_depth_exceeded()
+- test_custom_config_dangerous_keys_case_insensitive()
+- test_token_payload_int_timestamp()
+- test_token_payload_missing_optional_fields()
+- test_all_field_validator_error_paths()
 ```
 
 ---
 
-**Test Framework Status**: Specification Complete
-**Last Updated**: 2026-04-06
-**Next Review**: Post-implementation verification
+## 4. Implementation Roadmap to 100%
+
+### Phase 1: Fix Failing Tests (Week 1)
+
+| Test File | Failures | Action |
+|-----------|----------|--------|
+| `test_main_coverage_extended.py` | 3 | Fix lifespan DB init and web dir tests |
+| `test_tracing_coverage.py` | 7 | Fix OTel unavailable path tests |
+| `test_scripts_coverage.py` | 1 | Fix create_db script test |
+| `test_routes_auth_coverage.py` | 1 | Fix TokenRefreshResponse validation |
+
+**Impact**: Enables reliable CI pipeline
+
+### Phase 2: Critical Gaps (Week 1-2)
+
+| File | Missing Lines | Tests Needed | Est. Coverage Gain |
+|------|---------------|--------------|-------------------|
+| `app/tracing.py` | 148 | 15 tests | +34% (66% → 100%) |
+| `app/middleware/alerting.py` | 231 | 20 tests | +17% (83% → 100%) |
+| `app/config.py` | 23 | 10 tests | +15% (85% → 100%) |
+
+**Impact**: ~130 lines covered, moves to 97%+ total
+
+### Phase 3: Service Gaps (Week 2)
+
+| File | Missing Lines | Tests Needed | Est. Coverage Gain |
+|------|---------------|--------------|-------------------|
+| `app/services/task_executor.py` | 15 | 8 tests | +7% (93% → 100%) |
+| `app/services/seeding_service.py` | 7 | 5 tests | +6% (94% → 100%) |
+| `app/services/session_manager.py` | 17 | 10 tests | +5% (95% → 100%) |
+| `app/services/profiling_service.py` | 10 | 6 tests | +6% (94% → 100%) |
+| `app/services/error_recovery.py` | 8 | 5 tests | +5% (95% → 100%) |
+| `app/services/health_check.py` | 3 | 3 tests | +3% (97% → 100%) |
+| `app/services/sharding_service.py` | 3 | 3 tests | +9% (91% → 100%) |
+
+**Impact**: ~63 lines covered, moves to 98%+ total
+
+### Phase 4: Remaining Gaps (Week 3)
+
+| File | Missing Lines | Tests Needed | Est. Coverage Gain |
+|------|---------------|--------------|-------------------|
+| `app/models/schemas.py` | 56 | 25 tests | +10% (90% → 100%) |
+| `app/tasks/experimental_tasks.py` | 19 | 10 tests | +10% (90% → 100%) |
+| `app/cli.py` | 6 | 6 tests | +5% (95% → 100%) |
+| `app/exception_handlers.py` | 5 | 5 tests | +6% (94% → 100%) |
+| `app/reset_db.py` | 2 | 2 tests | +7% (93% → 100%) |
+| Task Execution Services | ~10 | 10 tests | +2-5% each |
+
+**Impact**: ~98 lines covered, achieves 100% total
+
+### Phase 5: Verification (Week 4)
+
+- [ ] Run full test suite with `--cov-fail-under=100`
+- [ ] Verify all branch coverage ≥ 95%
+- [ ] Document justified exclusions with `# pragma: no cover`
+- [ ] Generate final coverage report
+- [ ] Update CI pipeline to enforce 100% coverage
+
+---
+
+## 5. Coverage Exclusion Guidelines
+
+The following may be excluded with `# pragma: no cover`:
+
+| Category | Example | Justification |
+|----------|---------|---------------|
+| Abstract methods | `@abstractmethod` | Interface definition only |
+| Type checking blocks | `if TYPE_CHECKING:` | Not executed at runtime |
+| `__repr__` methods | Debug representation | For debugging only |
+| `NotImplementedError` | Intentional stubs | Planned but unimplemented |
+| `AssertionError` | Defensive programming | Should never be reached |
+| Main entry points | `if __name__ == "__main__":` | CLI/script usage |
+| External library compatibility | Optional dependencies | Tested separately |
+
+**Current Valid Exclusions**:
+```python
+# In app/tracing.py - OpenTelemetry optional dependency
+except ImportError:  # pragma: no cover
+    pass
+
+# In app/tasks/experimental_tasks.py - apgi_system optional
+except ImportError:  # pragma: no cover (tested separately)
+    pass
+```
+
+---
+
+## 6. Quality Gates
+
+```yaml
+pre_merge_requirements:
+  line_coverage_minimum: 100
+  branch_coverage_minimum: 95
+  test_execution_time_maximum: 300s
+  failed_tests_threshold: 0
+
+production_release_requirements:
+  line_coverage_minimum: 100
+  branch_coverage_minimum: 95
+  path_coverage_minimum: 90
+  security_test_coverage: 100
+  performance_regression_detected: false
+```
+
+---
+
+**Test Framework Status**: 96.15% Coverage Achieved  
+**Target**: 100% Coverage  
+**Last Updated**: April 30, 2026  
+**Next Review**: Post Phase 1 completion

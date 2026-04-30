@@ -149,6 +149,8 @@ warn_unused_ignores = true
 warn_no_return = true
 strict_equality = true
 strict = true
+explicit_package_bases = true
+mypy_path = ["."]
 exclude = [
     "^/opt/",
     "^/usr/",
@@ -190,6 +192,14 @@ markers = [
     "property: Property-based tests",
     "slow: Slow running tests",
     "load: Load and performance tests",
+]
+filterwarnings = [
+    # Suppress Google SDK's pkg_resources deprecation warning (external dependency)
+    "ignore:pkg_resources is deprecated as an API:UserWarning",
+    # Suppress OpenTelemetry metaclass warning on Python 3.14 (known limitation)
+    "ignore:OpenTelemetry not available:UserWarning",
+    # Ignore experimental module warnings (expected when apgi_system not installed)
+    "ignore:apgi_system not available:UserWarning",
 ]
 
 [tool.coverage.run]

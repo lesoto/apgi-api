@@ -16,7 +16,6 @@ from fastapi.staticfiles import StaticFiles  # noqa: F401
 
 from app.config import settings
 from app.database.connection import close_db, init_db
-from app.dependency_checker import check_dependencies
 from app.exception_handlers import register_exception_handlers
 from app.middleware.alerting import configure_alerting
 from app.middleware.api_versioning import APIVersioningMiddleware
@@ -95,10 +94,23 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     if getattr(app.state, "test_mode", False) or os.environ.get("TEST_MODE") == "true":
         logger.info("Skipping dependency check in test mode", component="lifecycle")
     else:
-        # Validate required dependencies before performing runtime initialization.
-        if not check_dependencies(fail_fast=False):
-            logger.error("Dependency check failed during startup", component="lifecycle")
-            raise RuntimeError("Dependency check failed. See logs for details.")
+        # Validate hard dependencies first - these are non-negotiable
+        from app.dependency_checker import HARD_DEPENDENCIES, check_dependencies
+
+        if not check_dependencies(required_deps=HARD_DEPENDENCIES, fail_fast=False):
+            logger.error("Hard dependency check failed. Cannot start.", component="lifecycle")
+            raise RuntimeError("Hard dependency check failed. See logs for details.")
+
+        # Check soft dependencies - log warnings but don't fail
+        from app.dependency_checker import SOFT_DEPENDENCIES
+
+        if not check_dependencies(required_deps=SOFT_DEPENDENCIES, fail_fast=False):
+            logger.warning(
+                "Soft dependencies missing. Starting in degraded mode.", component="lifecycle"
+            )
+            app.state.degraded_mode = True
+        else:
+            app.state.degraded_mode = False
 
     # Configure alerting system
     configure_alerting(
@@ -123,9 +135,14 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     try:
         init_db()
         logger.info("Database initialized", component="database")
+        app.state.db_available = True
     except Exception as e:
         logger.error("Failed to initialize database", component="database", error=str(e))
-        raise
+        if settings.environment == "production":
+            raise
+        logger.warning("Continuing in degraded mode without database", component="database")
+        app.state.db_available = False
+        app.state.degraded_mode = True
 
     # Initialize Redis client
     try:
@@ -133,6 +150,7 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
         if redis_client:
             await redis_client.ping()  # type: ignore
             logger.info("Redis client initialized", component="redis", url=settings.redis_url)
+            app.state.redis_available = True
 
             # Initialize cache service
             init_cache_service(redis_client)
@@ -145,15 +163,21 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
             )
         else:
             logger.error("Failed to initialize Redis client", component="redis")
-            raise RuntimeError("Redis client initialization failed")
+            app.state.redis_available = False
+            app.state.degraded_mode = True
 
     except Exception as e:
         logger.error("Failed to initialize Redis", component="redis", error=str(e))
-        raise
+        app.state.redis_available = False
+        app.state.degraded_mode = True
+        logger.warning("Continuing in degraded mode without Redis", component="redis")
 
     # Initialize session routes with Redis client
-    sessions.init_session_routes(redis_client)
-    logger.info("Session routes initialized", component="routes")
+    if redis_client:
+        sessions.init_session_routes(redis_client)
+        logger.info("Session routes initialized", component="routes")
+    else:
+        logger.warning("Session routes started without Redis (degraded)", component="routes")
 
     # Initialize task routes
     tasks.init_task_routes()
@@ -165,8 +189,11 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     logger.info("Export routes initialized", component="routes")
 
     # Initialize health routes with Redis client
-    health.init_health_routes(redis_client)
-    logger.info("Health routes initialized", component="routes")
+    if redis_client:
+        health.init_health_routes(redis_client)
+        logger.info("Health routes initialized", component="routes")
+    else:
+        logger.warning("Health routes started without Redis (degraded)", component="routes")
 
     yield
 
@@ -281,27 +308,25 @@ All endpoints except `/health`, `/docs`, and `/openapi.json` require authenticat
             token_expiry_minutes=60,
         )
 
-    # Add rate limiting middleware BEFORE authentication to protect against brute-force attacks
-    # This ensures unauthenticated requests (e.g., login attempts) are rate-limited before auth processing
-    # Skip in test mode to prevent HTTP 429 errors during testing
+    # Add authentication middleware (extracts and verifies JWT tokens) - skip in test mode
+    if not test_mode:
+        app.add_middleware(AuthenticationMiddleware)
+
+    # Add rate limiting middleware AFTER authentication in code (meaning it wraps it)
+    # This ensures unauthenticated requests (e.g., login attempts) are rate-limited BEFORE auth processing
     if not test_mode:
         app.add_middleware(
             RateLimitingMiddleware, redis_client=None, enabled=settings.rate_limit_enabled
         )
 
-    # Add authentication middleware (extracts and verifies JWT tokens) - skip in test mode
-    if not test_mode:
-        app.add_middleware(AuthenticationMiddleware)
-
     # Add security input validation middleware - skip in test mode
     if not test_mode:
         app.add_middleware(SecurityValidationMiddleware, enabled=True)
 
-    # Add security headers middleware
+    # Add security headers middleware (Outer)
     app.add_middleware(SecurityHeadersMiddleware)
 
-    # Add deprecation middleware (adds warning headers to deprecated endpoints)
-    version.configure_deprecated_endpoints(version.get_deprecated_endpoints())
+    # Add deprecation middleware (Outermost)
     app.add_middleware(
         DeprecationMiddleware, deprecated_endpoints=version.get_deprecated_endpoints()
     )
@@ -339,9 +364,6 @@ All endpoints except `/health`, `/docs`, and `/openapi.json` require authenticat
     app.include_router(payments.router)
     app.include_router(api_keys.router)
     app.include_router(webhooks.router)
-
-    # Configure deprecated endpoints
-    version.configure_deprecated_endpoints({})
 
     # Mount static files for web UI
     web_dir = os.path.join(os.path.dirname(__file__), "..", "web")

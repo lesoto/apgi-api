@@ -236,23 +236,40 @@ class TestResetDB:
             mock_cursor.close.assert_called_once()
             mock_conn.close.assert_called_once()
 
-    @pytest.mark.skip(reason="DATABASE_URL validation test - environment dependent")
     def test_reset_db_missing_database_url(self) -> None:
         """Test reset_db with missing DATABASE_URL."""
         from app.reset_db import _parse_database_url
 
-        with patch.dict(os.environ, {}, clear=True):
+        # Save original DATABASE_URL
+        original_url = os.environ.get("DATABASE_URL")
+
+        try:
+            # Clear DATABASE_URL temporarily
+            if "DATABASE_URL" in os.environ:
+                del os.environ["DATABASE_URL"]
+
             with pytest.raises(ValueError, match="DATABASE_URL environment variable not set"):
                 _parse_database_url()
+        finally:
+            # Restore original DATABASE_URL
+            if original_url is not None:
+                os.environ["DATABASE_URL"] = original_url
 
-    @pytest.mark.skip(reason="DATABASE_URL validation test - environment dependent")
     def test_reset_db_invalid_database_url(self) -> None:
         """Test reset_db with invalid DATABASE_URL format."""
         from app.reset_db import _parse_database_url
 
-        with patch.dict(os.environ, {"DATABASE_URL": "invalid-url"}):
-            with pytest.raises(ValueError, match="Invalid DATABASE_URL format"):
-                _parse_database_url()
+        # Save original DATABASE_URL
+        original_url = os.environ.get("DATABASE_URL")
+
+        try:
+            with patch.dict(os.environ, {"DATABASE_URL": "invalid-url"}, clear=False):
+                with pytest.raises(ValueError, match="Invalid DATABASE_URL format"):
+                    _parse_database_url()
+        finally:
+            # Restore original DATABASE_URL
+            if original_url is not None:
+                os.environ["DATABASE_URL"] = original_url
 
     def test_get_db_params(self) -> None:
         """Test get_db_params function."""

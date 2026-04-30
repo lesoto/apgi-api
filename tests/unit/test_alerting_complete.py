@@ -308,26 +308,26 @@ class TestAlertEscalationPolicy:
 
     def test_escalation_policy_with_rules(self) -> None:
         """Test escalation policy with escalation rules."""
-        # Note: AlertSeverity uses string values, so comparison is alphabetical
-        # "critical" (99) < "error" (101) < "info" (105) < "warning" (119)
-        # Escalation only works when new_severity.value > current_severity.value
+        # Note: AlertSeverity uses numeric weights for comparison
+        # INFO=1, WARNING=2, ERROR=3, CRITICAL=4
+        # Escalation only works when new weight > current weight
         policy = AlertEscalationPolicy(
-            initial_severity=AlertSeverity.CRITICAL,
+            initial_severity=AlertSeverity.INFO,
             escalation_rules=[
                 {
                     "after_seconds": 300,
-                    "severity": AlertSeverity.ERROR,
-                },  # 'e' > 'c' - will escalate
-                {"after_seconds": 600, "severity": AlertSeverity.INFO},  # 'i' > 'e' - will escalate
+                    "severity": AlertSeverity.WARNING,
+                },  # 2 > 1 - will escalate
+                {"after_seconds": 600, "severity": AlertSeverity.ERROR},  # 3 > 2 - will escalate
             ],
         )
 
         # Before first threshold
-        assert policy.get_severity_at_time(alert_age_seconds=100) == AlertSeverity.CRITICAL
-        # At first threshold - ERROR ('e') > CRITICAL ('c') alphabetically
-        assert policy.get_severity_at_time(alert_age_seconds=300) == AlertSeverity.ERROR
-        # At second threshold - INFO ('i') > ERROR ('e') alphabetically
-        assert policy.get_severity_at_time(alert_age_seconds=600) == AlertSeverity.INFO
+        assert policy.get_severity_at_time(alert_age_seconds=100) == AlertSeverity.INFO
+        # At first threshold - WARNING (2) > INFO (1)
+        assert policy.get_severity_at_time(alert_age_seconds=300) == AlertSeverity.WARNING
+        # At second threshold - ERROR (3) > WARNING (2)
+        assert policy.get_severity_at_time(alert_age_seconds=600) == AlertSeverity.ERROR
 
     def test_escalation_policy_string_severity(self) -> None:
         """Test escalation policy with string severity values."""
@@ -560,21 +560,21 @@ class TestAlertManagerAdvanced:
         fresh_alert_manager.add_channel(mock_channel)
 
         # Create an alert with escalation policy
-        # Use CRITICAL as initial since ERROR ('e') > CRITICAL ('c') alphabetically
+        # Use INFO as initial since WARNING (2) > INFO (1) by weight
         alert = Alert(
             title="Test Alert",
             message="Test message",
-            severity=AlertSeverity.CRITICAL,
+            severity=AlertSeverity.INFO,
         )
 
-        # Add escalation policy to alert - CRITICAL -> ERROR escalation path
+        # Add escalation policy to alert - INFO -> WARNING escalation path
         policy = AlertEscalationPolicy(
-            initial_severity=AlertSeverity.CRITICAL,
+            initial_severity=AlertSeverity.INFO,
             escalation_rules=[
                 {
                     "after_seconds": 0,
-                    "severity": AlertSeverity.ERROR,
-                },  # Immediate escalation, 'e' > 'c'
+                    "severity": AlertSeverity.WARNING,
+                },  # Immediate escalation, 2 > 1
             ],
         )
         alert.escalation_policy = policy  # type: ignore

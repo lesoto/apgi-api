@@ -14,6 +14,7 @@ from fastapi import Request
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.responses import JSONResponse
 
+from app.config import settings
 from app.middleware.logging import StructuredLogger
 from app.services.rate_limiter import RateLimiter
 
@@ -100,18 +101,12 @@ class RateLimitingMiddleware(BaseHTTPMiddleware):
         direct_ip = request.client.host if request.client else "unknown"
 
         # Only trust X-Forwarded-For if request comes from trusted proxy
-        TRUSTED_PROXY_NETS = [
-            ipaddress.ip_network("127.0.0.1/32"),
-            ipaddress.ip_network("10.0.0.0/8"),
-            ipaddress.ip_network("172.16.0.0/12"),
-            ipaddress.ip_network("192.168.0.0/16"),
-            ipaddress.ip_network("::1/128"),
-        ]
+        trusted_proxy_nets = [ipaddress.ip_network(net) for net in settings.trusted_proxies]
 
         def is_trusted_proxy(ip: str) -> bool:
             try:
                 addr = ipaddress.ip_address(ip)
-                return any(addr in net for net in TRUSTED_PROXY_NETS)
+                return any(addr in net for net in trusted_proxy_nets)
             except ValueError:
                 return False
 

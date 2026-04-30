@@ -1,16 +1,5 @@
 # Configuration Guide
 
-This guide provides comprehensive documentation for all configuration options in the APGI Standalone API.
-
-## Table of Contents
-
-- [Configuration Overview](#configuration-overview)
-- [Environment Variables](#environment-variables)
-- [Environment-Specific Settings](#environment-specific-settings)
-- [Configuration Validation](#configuration-validation)
-- [Security Best Practices](#security-best-practices)
-- [Advanced Configuration](#advanced-configuration)
-
 ## Configuration Overview
 
 The API uses environment variables for all configuration. Configuration is loaded from:
@@ -594,6 +583,288 @@ MAX_REQUEST_SIZE=104857600  # 100 MB
 - API endpoints: 10 MB
 - File uploads: 50-100 MB
 - Adjust based on use case
+
+---
+
+## Alerting Configuration
+
+### Alerting Environment Variables
+
+#### ALERT_WEBHOOK_URLS
+
+**Description:** Comma-separated list of webhook URLs for alert notifications
+
+**Type:** String (comma-separated URLs)
+
+**Default:** None
+
+**Required:** No
+
+**Example:**
+
+```bash
+ALERT_WEBHOOK_URLS=https://hooks.slack.com/services/XXX/YYY/ZZZ,https://example.com/webhook
+```
+
+---
+
+#### ALERT_SLACK_WEBHOOK_URLS
+
+**Description:** Slack webhook URLs for alert notifications
+
+**Type:** String (comma-separated URLs)
+
+**Default:** None
+
+**Required:** No
+
+**Example:**
+
+```bash
+ALERT_SLACK_WEBHOOK_URLS=https://hooks.slack.com/services/XXX/YYY/ZZZ
+```
+
+---
+
+#### ALERT_PAGERDUTY_INTEGRATION_KEYS
+
+**Description:** PagerDuty integration keys for alert notifications
+
+**Type:** String (comma-separated keys)
+
+**Default:** None
+
+**Required:** No
+
+**Example:**
+
+```bash
+ALERT_PAGERDUTY_INTEGRATION_KEYS=abc123def456,xyz789ghi012
+```
+
+---
+
+#### ALERT_TEAMS_WEBHOOK_URLS
+
+**Description:** Microsoft Teams webhook URLs for alert notifications
+
+**Type:** String (comma-separated URLs)
+
+**Default:** None
+
+**Required:** No
+
+**Example:**
+
+```bash
+ALERT_TEAMS_WEBHOOK_URLS=https://outlook.office.com/webhook/XXX/YYY/ZZZ
+```
+
+---
+
+#### ALERT_EMAIL_CONFIG
+
+**Description:** SMTP configuration for email alerts (JSON string)
+
+**Type:** String (JSON)
+
+**Default:** None
+
+**Required:** No
+
+**Example:**
+
+```bash
+ALERT_EMAIL_CONFIG='{"smtp_server":"smtp.example.com","smtp_port":587,"username":"alerts@example.com","password":"password","from":"alerts@example.com","to":["admin@example.com"]}'
+```
+
+---
+
+#### ALERT_ERROR_RATE_THRESHOLD
+
+**Description:** Error rate threshold for triggering alerts (errors per minute)
+
+**Type:** Integer
+
+**Default:** `10`
+
+**Required:** No
+
+**Example:**
+
+```bash
+ALERT_ERROR_RATE_THRESHOLD=10
+```
+
+---
+
+#### ALERT_ERROR_RATE_WINDOW_MINUTES
+
+**Description:** Time window for error rate calculation (minutes)
+
+**Type:** Integer
+
+**Default:** `1`
+
+**Required:** No
+
+**Example:**
+
+```bash
+ALERT_ERROR_RATE_WINDOW_MINUTES=1
+```
+
+---
+
+## Monitoring Configuration
+
+### Metrics Environment Variables
+
+#### METRICS_ENABLED
+
+**Description:** Enable Prometheus metrics collection
+
+**Type:** Boolean
+
+**Default:** `true`
+
+**Required:** No
+
+**Example:**
+
+```bash
+METRICS_ENABLED=true
+```
+
+---
+
+#### METRICS_PATH
+
+**Description:** Path for metrics endpoint
+
+**Type:** String
+
+**Default:** `/metrics`
+
+**Required:** No
+
+**Example:**
+
+```bash
+METRICS_PATH=/metrics
+```
+
+---
+
+## Distributed Tracing Configuration
+
+### Tracing Environment Variables
+
+#### TRACING_ENABLED
+
+**Description:** Enable OpenTelemetry distributed tracing
+
+**Type:** Boolean
+
+**Default:** `false`
+
+**Required:** No
+
+**Example:**
+
+```bash
+TRACING_ENABLED=true
+```
+
+---
+
+#### TRACING_SERVICE_NAME
+
+**Description:** Service name for tracing
+
+**Type:** String
+
+**Default:** `apgi-api`
+
+**Required:** No
+
+**Example:**
+
+```bash
+TRACING_SERVICE_NAME=apgi-api
+```
+
+---
+
+#### TRACING_JAEGER_ENDPOINT
+
+**Description:** Jaeger collector endpoint
+
+**Type:** String (URL)
+
+**Default:** None
+
+**Required:** No
+
+**Example:**
+
+```bash
+TRACING_JAEGER_ENDPOINT=http://jaeger:14268/api/traces
+```
+
+---
+
+#### TRACING_OTLP_ENDPOINT
+
+**Description:** OTLP gRPC endpoint
+
+**Type:** String (URL)
+
+**Default:** None
+
+**Required:** No
+
+**Example:**
+
+```bash
+TRACING_OTLP_ENDPOINT=grpc://jaeger:4317
+```
+
+---
+
+#### TRACING_SAMPLING_RATE
+
+**Description:** Trace sampling rate (0.0 to 1.0)
+
+**Type:** Float
+
+**Default:** `1.0`
+
+**Required:** No
+
+**Example:**
+
+```bash
+TRACING_SAMPLING_RATE=1.0
+```
+
+---
+
+#### TRACING_CONSOLE_EXPORTER
+
+**Description:** Enable console trace export (development)
+
+**Type:** Boolean
+
+**Default:** `false`
+
+**Required:** No
+
+**Example:**
+
+```bash
+TRACING_CONSOLE_EXPORTER=true
+```
 
 ---
 

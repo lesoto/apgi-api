@@ -26,9 +26,7 @@ from fastapi import FastAPI, Request
 from fastapi.testclient import TestClient
 from pydantic import BaseModel
 
-from app.exception_handlers import (
-    unhandled_exception_handler,
-)
+from app.exception_handlers import unhandled_exception_handler
 from app.exceptions import (
     AuthenticationError,
     AuthorizationError,

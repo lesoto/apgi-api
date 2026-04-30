@@ -12,10 +12,7 @@ import pytest
 if "app.services.task_executor" in sys.modules:
     importlib.reload(sys.modules["app.services.task_executor"])
 
-from app.services.task_executor import (
-    TaskExecutor,
-    async_retry_with_backoff,
-)
+from app.services.task_executor import TaskExecutor, async_retry_with_backoff
 
 
 class TestAsyncRetryWithBackoff:

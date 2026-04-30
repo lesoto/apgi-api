@@ -1,14 +1,17 @@
+import os
+
 import psycopg2
 from psycopg2 import sql
 
 
 def create_database() -> None:
     try:
-        # Connect to PostgreSQL as superuser (postgres)
+        # Connect to PostgreSQL as superuser
+        # Use PGUSER env var, fallback to USER (macOS Homebrew), then postgres
         conn = psycopg2.connect(
             host="localhost",
             port=5432,
-            user="postgres",  # Use postgres superuser
+            user=os.getenv("PGUSER", os.getenv("USER", "postgres")),
             database="postgres",  # Connect to default database first
         )
         conn.autocommit = True  # Required for CREATE DATABASE

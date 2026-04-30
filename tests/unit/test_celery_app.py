@@ -162,3 +162,29 @@ class TestModuleLevel:
         from app.celery_app import _validate_celery_urls
 
         assert callable(_validate_celery_urls)
+
+
+class TestGetQueueDepth:
+    """Test get_queue_depth function."""
+
+    def test_get_queue_depth_success(self, clear_celery_mock: Any) -> None:
+        """Test get_queue_depth successfully returns count."""
+        from app.celery_app import get_queue_depth
+
+        mock_conn = MagicMock()
+        mock_conn.default_channel.client.llen.return_value = 5
+
+        with patch("app.celery_app.celery_app.pool.acquire") as mock_acquire:
+            mock_acquire.return_value.__enter__.return_value = mock_conn
+
+            assert get_queue_depth("celery") == 5
+            mock_conn.default_channel.client.llen.assert_called_once_with("celery")
+
+    def test_get_queue_depth_exception(self, clear_celery_mock: Any) -> None:
+        """Test get_queue_depth returns 0 on exception."""
+        from app.celery_app import get_queue_depth
+
+        with patch("app.celery_app.celery_app.pool.acquire") as mock_acquire:
+            mock_acquire.side_effect = Exception("Redis connection error")
+
+            assert get_queue_depth("celery") == 0

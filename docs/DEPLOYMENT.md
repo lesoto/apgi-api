@@ -355,6 +355,26 @@ RATE_LIMIT_PER_MINUTE=60
 
 # Logging
 LOG_LEVEL=INFO  # DEBUG, INFO, WARNING, ERROR, CRITICAL
+
+# Alerting Configuration (Optional)
+ALERT_WEBHOOK_URLS=https://hooks.slack.com/services/XXX/YYY/ZZZ
+ALERT_SLACK_WEBHOOK_URLS=https://hooks.slack.com/services/XXX/YYY/ZZZ
+ALERT_PAGERDUTY_INTEGRATION_KEYS=abc123def456
+ALERT_TEAMS_WEBHOOK_URLS=https://outlook.office.com/webhook/XXX/YYY/ZZZ
+ALERT_ERROR_RATE_THRESHOLD=10
+ALERT_ERROR_RATE_WINDOW_MINUTES=1
+
+# Monitoring Configuration
+METRICS_ENABLED=true
+METRICS_PATH=/metrics
+
+# Distributed Tracing Configuration (Optional)
+TRACING_ENABLED=false
+TRACING_SERVICE_NAME=apgi-api
+TRACING_JAEGER_ENDPOINT=http://jaeger:14268/api/traces
+TRACING_OTLP_ENDPOINT=grpc://jaeger:4317
+TRACING_SAMPLING_RATE=1.0
+TRACING_CONSOLE_EXPORTER=false
 ```
 
 ### Security Considerations
@@ -1072,7 +1092,28 @@ Logs are written to stdout in JSON format. Configure log aggregation:
 
 ### Alerting
 
-Configure alerts for:
+The API includes a sophisticated alerting system that monitors critical errors and sends notifications through multiple channels:
+
+**Supported Notification Channels:**
+
+- **Webhook**: HTTP POST to custom endpoints
+- **Slack**: Messages to Slack channels via webhooks
+- **Microsoft Teams**: Adaptive cards to Teams channels
+- **PagerDuty**: Incident creation for critical alerts
+- **Email**: SMTP-based email notifications
+- **Log**: Structured logging for audit trails
+
+**Alert Types:**
+
+- **Error Rate Alerts**: Triggered when error rates exceed thresholds
+- **Custom Alerts**: Manually triggered alerts from application code
+- **Escalation Policies**: Automatic severity escalation based on alert age
+
+**Configuration:**
+
+Alerting is configured via environment variables (see Environment Configuration section above).
+
+**Configure alerts for:**
 
 - Error rate > 10 errors/minute for 5 minutes
 - Response time p95 > 1000ms for 5 minutes
@@ -1082,6 +1123,49 @@ Configure alerts for:
 - Celery worker failures
 - Disk space < 10%
 - Memory usage > 90%
+
+### Business Metrics Dashboard
+
+The API provides business intelligence metrics for operational dashboards:
+
+**Available Metrics:**
+
+- **User Metrics**: Total users, active users, registration trends
+- **Session Metrics**: Session creation, completion rates, template usage
+- **Task Metrics**: Task completion rates, performance by type
+- **Template Metrics**: Most used templates, template creation trends
+
+**API Endpoints:**
+
+- `GET /v1/metrics/dashboard` - Complete dashboard data
+- `GET /v1/metrics/overview` - High-level overview metrics
+- `GET /v1/metrics/sessions` - Session-related metrics
+- `GET /v1/metrics/tasks` - Task-related metrics
+- `GET /v1/metrics/users` - User-related metrics
+- `GET /v1/metrics/templates` - Template-related metrics
+
+### Distributed Tracing
+
+The API integrates OpenTelemetry for distributed tracing:
+
+**Tracing Configuration:**
+
+See the Distributed Tracing Configuration section in Environment Variables above.
+
+**Instrumented Components:**
+
+- FastAPI request/response cycles
+- SQLAlchemy database queries
+- Redis cache operations
+- HTTP client requests
+- Async task execution
+
+**Viewing Traces:**
+
+- Jaeger UI: Navigate to your Jaeger instance
+- Select service: `apgi-api`
+- Search by trace ID or operation name
+- View trace timeline and spans
 
 ## Scaling
 

@@ -190,3 +190,27 @@ class TestClearAllTables:
         _clear_all_tables("user", "pass", "localhost", "5432", "dbname")
         mock_cursor.close.assert_called()
         mock_conn.close.assert_called()
+
+
+class TestParseDatabaseUrlErrors:
+    """Test errors in parsing DATABASE_URL."""
+
+    @patch.dict(os.environ, {}, clear=True)
+    def test_missing_database_url_raises_error(self) -> None:
+        """Test that missing DATABASE_URL raises ValueError."""
+        # Ensure it's really gone from the dict
+        if "DATABASE_URL" in os.environ:
+            del os.environ["DATABASE_URL"]
+
+        from app.reset_db import _parse_database_url
+
+        with pytest.raises(ValueError, match="DATABASE_URL environment variable not set"):
+            _parse_database_url()
+
+    @patch.dict(os.environ, {"DATABASE_URL": "invalid_url"}, clear=True)
+    def test_invalid_database_url_format_raises_error(self) -> None:
+        """Test that invalid DATABASE_URL format raises ValueError."""
+        from app.reset_db import _parse_database_url
+
+        with pytest.raises(ValueError, match="Invalid DATABASE_URL format"):
+            _parse_database_url()

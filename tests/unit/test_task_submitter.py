@@ -7,10 +7,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from app.services.task_execution.task_submitter import (
-    TaskSubmitter,
-    async_retry_with_backoff,
-)
+from app.services.task_execution.task_submitter import TaskSubmitter, async_retry_with_backoff
 
 
 class TestAsyncRetryWithBackoff:

@@ -10,11 +10,7 @@ from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.requests import Request
 from starlette.responses import Response
 
-from app.routes.version import (
-    API_VERSION,
-    CURRENT_VERSION,
-    is_endpoint_deprecated,
-)
+from app.routes.version import API_VERSION, CURRENT_VERSION, is_endpoint_deprecated
 
 
 class APIVersioningMiddleware(BaseHTTPMiddleware):

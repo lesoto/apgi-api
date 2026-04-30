@@ -12,10 +12,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from app.middleware.logging import (
-    configure_structured_logging,
-    request_id_context,
-)
+from app.middleware.logging import configure_structured_logging, request_id_context
 
 
 class TestConfigureStructuredLogging:
@@ -37,6 +34,13 @@ class TestConfigureStructuredLogging:
 
         configure_structured_logging("INFO")
         # Should handle gracefully
+
+    def test_configure_structured_logging_exception_handling(self) -> None:
+        """Test that logging configuration handles exceptions gracefully."""
+        with patch("logging.basicConfig", side_effect=Exception("Config failed")):
+            # Should not raise despite basicConfig failing
+            configure_structured_logging("INFO")
+            # If we get here without error, the test passed
 
 
 class TestRequestIdContext:

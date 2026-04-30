@@ -10,6 +10,13 @@ and operating the APGI Standalone API.
 - [Database Issues](#database-issues)
 - [Redis Issues](#redis-issues)
 - [Authentication Issues](#authentication-issues)
+- [API Key Issues](#api-key-issues)
+- [Session Template Issues](#session-template-issues)
+- [Webhook Delivery Issues](#webhook-delivery-issues)
+- [Data Export Issues](#data-export-issues)
+- [Business Metrics Issues](#business-metrics-issues)
+- [Alerting Issues](#alerting-issues)
+- [Distributed Tracing Issues](#distributed-tracing-issues)
 - [Performance Issues](#performance-issues)
 - [Celery Worker Issues](#celery-worker-issues)
 - [CORS Issues](#cors-issues)
@@ -574,6 +581,419 @@ ntpdate -s time.nist.gov
 # Or use NTP service
 systemctl start ntpd
 ```
+
+## API Key Issues
+
+### API Key Creation Failed
+
+**Symptom:** Unable to create new API key
+
+**Error Message:**
+
+```json
+{
+  "error": {
+    "code": "API_KEY_CREATION_FAILED",
+    "message": "Failed to create API key"
+  }
+}
+```
+
+**Diagnosis:**
+
+```bash
+# Check user permissions
+curl -H "Authorization: Bearer <token>" http://localhost:8000/v1/users/me
+
+# Check API key limits
+# Some users may have a maximum number of API keys
+```
+
+**Solutions:**
+
+- **Check user permissions:**
+  - Ensure user has `api_key:create` permission
+  - Contact admin if permission is missing
+
+- **Check API key limits:**
+  - Delete unused API keys before creating new ones
+  - Contact admin to increase limit
+
+### API Key Not Working
+
+**Symptom:** API requests with API key return 401 Unauthorized
+
+**Error Message:**
+
+```json
+{
+  "error": {
+    "code": "INVALID_API_KEY",
+    "message": "Invalid or expired API key"
+  }
+}
+```
+
+**Diagnosis:**
+
+```bash
+# Check if key is active
+curl -H "Authorization: Bearer <api_key>" http://localhost:8000/v1/api-keys
+
+# Check key expiration
+# API keys don't expire, but can be deactivated
+```
+
+**Solutions:**
+
+- **Verify key is correct:**
+  - Copy the full key (not just the prefix)
+  - Ensure no extra spaces or characters
+
+- **Check key status:**
+  - API key may have been deactivated
+  - Contact admin to reactivate
+
+- **Rotate key:**
+
+  ```bash
+  curl -X POST http://localhost:8000/v1/api-keys/{key_id}/rotate \
+    -H "Authorization: Bearer <token>"
+  ```
+
+### API Key Rotation Failed
+
+**Symptom:** Unable to rotate API key
+
+**Error Message:**
+
+```json
+{
+  "error": {
+    "code": "KEY_ROTATION_FAILED",
+    "message": "Failed to rotate API key"
+  }
+}
+```
+
+**Solutions:**
+
+- **Check permissions:**
+  - Ensure user has `api_key:rotate` permission
+  - Contact admin if permission is missing
+
+- **Check key status:**
+  - Key must be active to rotate
+  - Reactivate key if deactivated
+
+## Session Template Issues
+
+### Template Not Found
+
+**Symptom:** Template ID returns 404 Not Found
+
+**Error Message:**
+
+```json
+{
+  "error": {
+    "code": "TEMPLATE_NOT_FOUND",
+    "message": "Template not found or unauthorized"
+  }
+}
+```
+
+**Diagnosis:**
+
+```bash
+# Check if template exists
+curl -H "Authorization: Bearer <token>" http://localhost:8000/v1/templates/{template_id}
+
+# Check if template is public or owned by user
+curl -H "Authorization: Bearer <token>" http://localhost:8000/v1/templates
+```
+
+**Solutions:**
+
+- **Check template ownership:**
+  - Public templates are accessible to all users
+  - Private templates only accessible to owner
+  - Verify you own the template or it's public
+
+- **Check template ID:**
+  - Verify template ID is correct
+  - List all templates to find correct ID
+
+### Template Creation Failed
+
+**Symptom:** Unable to create new session template
+
+**Error Message:**
+
+```json
+{
+  "error": {
+    "code": "TEMPLATE_CREATION_FAILED",
+    "message": "Failed to create template"
+  }
+}
+```
+
+**Diagnosis:**
+
+```bash
+# Check template name conflicts
+# Template names must be unique per user
+```
+
+**Solutions:**
+
+- **Use unique name:**
+  - Template names must be unique per user
+  - Use descriptive names to avoid conflicts
+
+- **Check permissions:**
+  - Ensure user has `template:create` permission
+  - Contact admin if permission is missing
+
+## Webhook Delivery Issues
+
+### Webhook Delivery Failed
+
+**Symptom:** Webhook delivery status shows "failed"
+
+**Diagnosis:**
+
+```bash
+# Check delivery details
+curl -H "Authorization: Bearer <token>" \
+  http://localhost:8000/v1/webhooks/deliveries/{delivery_id}
+
+# Check delivery attempts
+# Look at http_status_code and response_body
+```
+
+**Solutions:**
+
+- **Check webhook URL:**
+  - Verify webhook URL is accessible
+  - Check for SSL certificate issues
+  - Test URL manually with curl
+
+- **Retry delivery:**
+
+  ```bash
+  curl -X POST http://localhost:8000/v1/webhooks/deliveries/{delivery_id}/retry \
+    -H "Authorization: Bearer <token>"
+  ```
+
+- **Check webhook payload:**
+  - Verify payload is valid JSON
+  - Check payload size limits
+
+### Dead-Letter Queue Issues
+
+**Symptom:** Webhooks accumulating in dead-letter queue
+
+**Diagnosis:**
+
+```bash
+# Check dead-letter deliveries
+curl -H "Authorization: Bearer <token>" \
+  http://localhost:8000/v1/webhooks/dead-letter
+```
+
+**Solutions:**
+
+- **Retry dead-letter deliveries:**
+
+  ```bash
+  curl -X POST http://localhost:8000/v1/webhooks/dead-letter/{delivery_id}/retry \
+    -H "Authorization: Bearer <token>"
+  ```
+
+- **Fix webhook endpoint:**
+  - Fix issues with webhook URL
+  - Update webhook configuration
+
+- **Delete failed deliveries:**
+
+  ```bash
+  curl -X DELETE http://localhost:8000/v1/webhooks/dead-letter/{delivery_id} \
+    -H "Authorization: Bearer <token>"
+  ```
+
+## Data Export Issues
+
+### Export Timeout
+
+**Symptom:** Data export request times out
+
+**Diagnosis:**
+
+```bash
+# Check session size
+# Large sessions may take longer to export
+
+# Check export format
+# CSV export may be slower than JSON
+```
+
+**Solutions:**
+
+- **Use summary export instead:**
+
+  ```bash
+  curl -H "Authorization: Bearer <token>" \
+    http://localhost:8000/v1/sessions/{session_id}/export/summary
+  ```
+
+- **Export in chunks:**
+  - Use pagination for large datasets
+  - Export specific time ranges
+
+- **Increase timeout:**
+  - Adjust server timeout configuration
+
+### Export Returns Empty Data
+
+**Symptom:** Export endpoint returns empty data
+
+**Diagnosis:**
+
+```bash
+# Check session has data
+curl -H "Authorization: Bearer <token>" \
+  http://localhost:8000/v1/sessions/{session_id}
+
+# Check session state
+# Session must have data to export
+```
+
+**Solutions:**
+
+- **Start session:**
+  - Session must be running or completed to have data
+  - Start session before exporting
+
+- **Check session ownership:**
+  - Verify you own the session
+  - Check session permissions
+
+## Business Metrics Issues
+
+### Metrics Not Available
+
+**Symptom:** Business metrics endpoints return empty data
+
+**Diagnosis:**
+
+```bash
+# Check metrics endpoint
+curl -H "Authorization: Bearer <token>" \
+  http://localhost:8000/v1/metrics/dashboard
+
+# Check user permissions
+# Some metrics require admin permissions
+```
+
+**Solutions:**
+
+- **Check permissions:**
+  - Ensure user has `metrics:view` permission
+  - Contact admin if permission is missing
+
+- **Check data availability:**
+  - Metrics require data to calculate
+  - Ensure system has been running for some time
+
+## Alerting Issues
+
+### Alerts Not Triggering
+
+**Symptom:** Expected alerts not being sent
+
+**Diagnosis:**
+
+```bash
+# Check alert configuration
+echo $ALERT_ERROR_RATE_THRESHOLD
+echo $ALERT_WEBHOOK_URLS
+
+# Check error rate
+curl http://localhost:8000/metrics | grep error
+```
+
+**Solutions:**
+
+- **Check alert configuration:**
+  - Verify alert thresholds are set correctly
+  - Verify webhook URLs are correct
+
+- **Check error rate:**
+  - Error rate must exceed threshold to trigger
+  - Check monitoring window configuration
+
+- **Test alert manually:**
+  - Trigger test alert to verify configuration
+
+### Alert Delivery Failed
+
+**Symptom:** Alert webhook returns error
+
+**Diagnosis:**
+
+```bash
+# Check webhook response
+# Look at alert logs for delivery status
+```
+
+**Solutions:**
+
+- **Fix webhook URL:**
+  - Verify webhook URL is accessible
+  - Check for SSL certificate issues
+
+- **Check webhook payload:**
+  - Verify payload is valid JSON
+  - Check payload size limits
+
+## Distributed Tracing Issues
+
+### Traces Not Appearing
+
+**Symptom:** Traces not visible in Jaeger
+
+**Diagnosis:**
+
+```bash
+# Check tracing is enabled
+echo $TRACING_ENABLED
+
+# Check tracing endpoint
+echo $TRACING_JAEGER_ENDPOINT
+
+# Check sampling rate
+echo $TRACING_SAMPLING_RATE
+```
+
+**Solutions:**
+
+- **Enable tracing:**
+
+  ```bash
+  export TRACING_ENABLED=true
+  ```
+
+- **Check endpoint:**
+  - Verify Jaeger endpoint is correct
+  - Test connectivity to Jaeger
+
+- **Increase sampling rate:**
+
+  ```bash
+  export TRACING_SAMPLING_RATE=1.0  # Sample all traces
+  ```
 
 ## CSRF Issues
 

@@ -20,10 +20,7 @@ from hypothesis import strategies as st
 # Add app directory to path for imports
 sys.path.insert(0, str(Path(__file__).parent.parent.parent / "app"))
 
-from app.services.session_manager import (
-    SessionLifecycleState,
-    SimulationSession,
-)
+from app.services.session_manager import SessionLifecycleState, SimulationSession
 
 
 # Type definitions

@@ -110,10 +110,7 @@ class TestDataLifecycleManager:
 
     def test_get_retention_policy(self) -> None:
         """Test getting retention policy for category."""
-        from app.services.data_lifecycle import (
-            DataLifecycleManager,
-            RetentionCategory,
-        )
+        from app.services.data_lifecycle import DataLifecycleManager, RetentionCategory
 
         manager = DataLifecycleManager()
         policy = manager.get_retention_policy("sessions")
@@ -141,10 +138,7 @@ class TestDataLifecycleManager:
 
     def test_get_data_classification(self) -> None:
         """Test getting data classification for model."""
-        from app.services.data_lifecycle import (
-            DataClassification,
-            DataLifecycleManager,
-        )
+        from app.services.data_lifecycle import DataClassification, DataLifecycleManager
 
         manager = DataLifecycleManager()
         classification = manager.get_data_classification("users")
@@ -532,9 +526,6 @@ class TestProfilingService:
         assert len(service.snapshots) == 1
         assert service.snapshots[0].cpu_percent == 50.0
 
-    @pytest.mark.skip(
-        reason="Known code bug in profiling service - get_performance_history filtering issue"
-    )
     def test_get_performance_history(self) -> None:
         """Test getting performance history."""
         from app.services.profiling_service import ProfilingService
@@ -551,7 +542,8 @@ class TestProfilingService:
             response_time_avg=0.1,
         )
 
-        history = service.get_performance_history(hours=1)
+        # Query with a large time window to ensure snapshot is included
+        history = service.get_performance_history(hours=24)
 
         assert len(history) == 1
         assert history[0]["cpu_percent"] == 50.0

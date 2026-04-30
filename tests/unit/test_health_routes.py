@@ -15,10 +15,7 @@ from starlette.testclient import TestClient
 
 try:
     # Ensure app modules can be imported
-    from app.routes.health import (
-        get_health_service,
-        init_health_routes,
-    )
+    from app.routes.health import get_health_service, init_health_routes
 except ImportError:
     pytest.skip(
         "Required app modules not available - skipping health routes tests",

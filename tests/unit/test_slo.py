@@ -5,12 +5,7 @@ Requirements: 4.7, 5.1
 
 from unittest.mock import patch
 
-from app.middleware.slo import (
-    API_SLOS,
-    SLO,
-    SLOMonitor,
-    get_slo_for_request,
-)
+from app.middleware.slo import API_SLOS, SLO, SLOMonitor, get_slo_for_request
 
 
 class TestSLODataclass:

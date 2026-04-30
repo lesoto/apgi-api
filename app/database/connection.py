@@ -7,15 +7,19 @@ SQLAlchemy engine and session configuration.
 import logging
 import secrets
 import string
+import time
 import uuid
 from contextlib import asynccontextmanager, contextmanager
 from typing import Any, AsyncGenerator, Generator
 
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, event
+from sqlalchemy.engine import Engine
 from sqlalchemy.orm import Session, sessionmaker
 
 from app.config import settings
 from app.database.models import Base, User
+
+# record_query_timing removed to avoid circular import
 
 logger = logging.getLogger(__name__)
 
@@ -331,3 +335,35 @@ def log_pool_status() -> None:
         f"checked_in={status['checked_in']}, overflow={status['overflow']}, "
         f"utilization={status['utilization']:.1%}"
     )
+
+
+# SQLAlchemy event listeners for query profiling
+@event.listens_for(Engine, "before_cursor_execute")
+def before_cursor_execute(
+    conn: Any, cursor: Any, statement: str, parameters: Any, context: Any, executemany: bool
+) -> None:
+    context._query_start_time = time.time()
+
+
+@event.listens_for(Engine, "after_cursor_execute")
+def after_cursor_execute(
+    conn: Any, cursor: Any, statement: str, parameters: Any, context: Any, executemany: bool
+) -> None:
+    total_time = time.time() - context._query_start_time
+    # Use a hash of the statement as the query_hash
+    import hashlib
+
+    query_hash = hashlib.md5(statement.encode()).hexdigest()
+
+    # Record timing
+    try:
+        from app.middleware.db_profiling import record_query_timing
+
+        record_query_timing(
+            query_hash=query_hash,
+            query_text=statement,
+            duration_ms=total_time * 1000,
+            rows=cursor.rowcount,
+        )
+    except (ImportError, AttributeError):
+        pass

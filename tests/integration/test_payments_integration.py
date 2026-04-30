@@ -79,10 +79,7 @@ class TestPaymentsIntegration:
         mock_payment_intent.currency = "usd"
         mock_stripe.PaymentIntent.create.return_value = mock_payment_intent
 
-        from app.routes.payments import (
-            PaymentIntentCreateRequest,
-            create_payment_intent,
-        )
+        from app.routes.payments import PaymentIntentCreateRequest, create_payment_intent
 
         request_data = PaymentIntentCreateRequest(
             items=[{"id": "cognitive-engine-v2"}],
@@ -100,10 +97,7 @@ class TestPaymentsIntegration:
         mock_stripe: MagicMock,
     ) -> None:
         """Test payment intent creation with invalid product."""
-        from app.routes.payments import (
-            PaymentIntentCreateRequest,
-            create_payment_intent,
-        )
+        from app.routes.payments import PaymentIntentCreateRequest, create_payment_intent
 
         request_data = PaymentIntentCreateRequest(
             items=[{"id": "invalid-product"}],
@@ -124,10 +118,7 @@ class TestPaymentsIntegration:
         """Test payment intent creation with Stripe error."""
         mock_stripe.PaymentIntent.create.side_effect = Exception("Stripe API error")
 
-        from app.routes.payments import (
-            PaymentIntentCreateRequest,
-            create_payment_intent,
-        )
+        from app.routes.payments import PaymentIntentCreateRequest, create_payment_intent
 
         request_data = PaymentIntentCreateRequest(
             items=[{"id": "cognitive-engine-v2"}],

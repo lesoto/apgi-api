@@ -68,3 +68,20 @@ celery_app.conf.beat_schedule = {
         "schedule": 60.0,  # Run every minute
     },
 }
+
+
+def get_queue_depth(queue_name: str = "celery") -> int:
+    """
+    Get the number of pending tasks in a specific queue.
+
+    Args:
+        queue_name: Name of the queue to check
+
+    Returns:
+        Number of pending tasks
+    """
+    try:
+        with celery_app.pool.acquire(block=True) as conn:
+            return int(conn.default_channel.client.llen(queue_name))
+    except Exception:
+        return 0

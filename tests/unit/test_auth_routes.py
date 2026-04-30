@@ -15,15 +15,9 @@ from starlette.testclient import TestClient
 
 try:
     from app.database.connection import get_db
-    from app.exceptions import (
-        AuthenticationError,
-        ExpiredTokenError,
-        InvalidTokenError,
-    )
+    from app.exceptions import AuthenticationError, ExpiredTokenError, InvalidTokenError
     from app.main import create_app
-    from app.models.schemas import (
-        TokenPayload,
-    )
+    from app.models.schemas import TokenPayload
 except ImportError:
     pytest.skip(
         "Required app modules not available - skipping auth routes tests",

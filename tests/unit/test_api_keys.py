@@ -12,10 +12,7 @@ import pytest
 from fastapi import HTTPException
 
 try:
-    from app.models.schemas import (
-        APIKeyCreateRequest,
-        APIKeyUpdateRequest,
-    )
+    from app.models.schemas import APIKeyCreateRequest, APIKeyUpdateRequest
     from app.routes.api_keys import (
         create_api_key,
         delete_api_key,

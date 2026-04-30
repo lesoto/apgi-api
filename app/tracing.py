@@ -152,9 +152,7 @@ def instrument_application() -> None:
     try:
         # Try to import and instrument Celery if available
         try:
-            from opentelemetry.instrumentation.celery import (
-                CeleryInstrumentor,
-            )
+            from opentelemetry.instrumentation.celery import CeleryInstrumentor
 
             CeleryInstrumentor().instrument()
             print("Celery tracing instrumentation enabled")
@@ -167,9 +165,7 @@ def instrument_application() -> None:
     try:
         # Try to import and instrument HTTPX if available
         try:
-            from opentelemetry.instrumentation.httpx import (
-                HTTPXClientInstrumentor,
-            )
+            from opentelemetry.instrumentation.httpx import HTTPXClientInstrumentor
 
             HTTPXClientInstrumentor().instrument()
             print("HTTPX client tracing instrumentation enabled")

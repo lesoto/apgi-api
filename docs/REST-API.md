@@ -5,10 +5,16 @@ This is the REST API for the APGI consciousness modeling system. The API provide
 ## Features
 
 - **Session Management**: Create, control, and monitor simulation sessions
+- **Session Templates**: Create, manage, and reuse session configuration templates
+- **API Key Management**: Create, rotate, and manage API keys for programmatic access
+- **Webhook Delivery Management**: Monitor, retry, and manage webhook deliveries including dead-letter queues
 - **Asynchronous Task Execution**: Run long-running experiments via Celery task queue
 - **JWT Authentication**: Secure API access with role-based permissions
-- **Data Export**: Export session data in JSON and CSV formats
+- **Data Export**: Export session data in JSON and CSV formats, retrieve summary statistics, time series data, and event analysis
 - **Health Monitoring**: Comprehensive health checks and Prometheus metrics
+- **Business Metrics Dashboard**: Real-time operational metrics for users, sessions, tasks, and templates
+- **Alerting System**: Multi-channel alerting (webhook, Slack, Teams, PagerDuty, email) for critical errors
+- **Distributed Tracing**: OpenTelemetry integration for request tracing
 - **Horizontal Scaling**: Stateless design supports multiple API instances
 - **Production Ready**: Docker deployment, database migrations, graceful shutdown
 
@@ -107,6 +113,15 @@ If you prefer to run services manually:
 - `POST /v1/auth/refresh` - Refresh access token
 - `POST /v1/auth/logout` - Logout and invalidate tokens
 
+### API Keys
+
+- `POST /v1/api-keys` - Create new API key
+- `GET /v1/api-keys` - List user's API keys
+- `GET /v1/api-keys/{key_id}` - Get API key details
+- `PUT /v1/api-keys/{key_id}` - Update API key metadata
+- `POST /v1/api-keys/{key_id}/rotate` - Rotate API key (generate new secret)
+- `DELETE /v1/api-keys/{key_id}` - Delete API key
+
 ### Sessions
 
 - `POST /v1/sessions` - Create new simulation session
@@ -116,6 +131,14 @@ If you prefer to run services manually:
 - `POST /v1/sessions/{id}/stop` - Stop session
 - `POST /v1/sessions/{id}/reset` - Reset session to initial state
 - `DELETE /v1/sessions/{id}` - Delete session
+
+### Session Templates
+
+- `GET /v1/templates` - List session templates (public and user's own)
+- `POST /v1/templates` - Create new session template
+- `GET /v1/templates/{template_id}` - Get template details
+- `PUT /v1/templates/{template_id}` - Update template
+- `DELETE /v1/templates/{template_id}` - Delete template
 
 ### State Queries
 
@@ -133,6 +156,29 @@ If you prefer to run services manually:
 
 - `GET /v1/sessions/{id}/export/json` - Export session as JSON
 - `GET /v1/sessions/{id}/export/csv` - Export session as CSV
+- `GET /v1/sessions/{id}/export/summary` - Get summary statistics
+- `GET /v1/sessions/{id}/export/timeseries` - Get time series data
+- `GET /v1/sessions/{id}/export/events` - Get event analysis data
+
+### Webhook Deliveries
+
+- `GET /v1/webhooks/deliveries` - List webhook deliveries
+- `GET /v1/webhooks/deliveries/{delivery_id}` - Get delivery details
+- `POST /v1/webhooks/deliveries/{delivery_id}/retry` - Retry failed delivery
+- `DELETE /v1/webhooks/deliveries/{delivery_id}` - Delete delivery
+- `GET /v1/webhooks/dead-letter` - List dead-letter webhook deliveries
+- `GET /v1/webhooks/dead-letter/{delivery_id}` - Get dead-letter delivery details
+- `POST /v1/webhooks/dead-letter/{delivery_id}/retry` - Retry dead-letter delivery
+- `DELETE /v1/webhooks/dead-letter/{delivery_id}` - Delete dead-letter delivery
+
+### Business Metrics
+
+- `GET /v1/metrics/dashboard` - Complete dashboard data
+- `GET /v1/metrics/overview` - High-level overview metrics
+- `GET /v1/metrics/sessions` - Session-related metrics
+- `GET /v1/metrics/tasks` - Task-related metrics
+- `GET /v1/metrics/users` - User-related metrics
+- `GET /v1/metrics/templates` - Template-related metrics
 
 ### Health & Monitoring
 

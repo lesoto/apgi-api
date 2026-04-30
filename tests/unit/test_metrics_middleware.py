@@ -55,9 +55,7 @@ class TestPrometheusMetricsMiddlewareDispatch:
     @pytest.mark.asyncio
     async def test_dispatch_successful_request(self) -> None:
         """Dispatch records metrics for successful request."""
-        from app.middleware.metrics import (
-            PrometheusMetricsMiddleware,
-        )
+        from app.middleware.metrics import PrometheusMetricsMiddleware
 
         mock_app = MagicMock()
         middleware = PrometheusMetricsMiddleware(mock_app)

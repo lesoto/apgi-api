@@ -325,7 +325,107 @@ Find **POST /v1/sessions/{session_id}/export** endpoint:
 4. Click "Execute"
 5. You get a download URL or the data itself
 
-## Part 5: Explore Locally (Optional)
+## Part 5: Advanced Features (Optional, 20 minutes)
+
+### Step 5a: Create an API Key
+
+Find **POST /v1/api-keys** endpoint:
+
+1. Click "Try it out"
+2. Fill in the request body:
+
+```json
+{
+  "name": "My Development Key",
+  "description": "Key for local development"
+}
+```
+
+1. Click "Execute"
+2. You'll get back a `key_id`, `key_prefix`, and the full key (shown only once)
+3. **Copy the full key** — you'll need it for programmatic access
+
+### Step 5b: List Your API Keys
+
+Find **GET /v1/api-keys** endpoint:
+
+1. Click "Try it out"
+2. Click "Execute"
+3. You'll see all your API keys with their prefixes and metadata
+
+### Step 5c: Create a Session Template
+
+Find **POST /v1/templates** endpoint:
+
+1. Click "Try it out"
+2. Fill in the request body:
+
+```json
+{
+  "name": "Visual Experiment Template",
+  "description": "Standard configuration for visual stimulus experiments",
+  "config": {
+    "simulation_parameters": {
+      "time_steps": 100,
+      "initial_precision_gate": 0.3,
+      "noise_level": 0.2
+    }
+  },
+  "is_public": false
+}
+```
+
+1. Click "Execute"
+2. You'll get back a `template_id`
+
+### Step 5d: List Available Templates
+
+Find **GET /v1/templates** endpoint:
+
+1. Click "Try it out"
+2. Click "Execute"
+3. You'll see all public templates and your own templates
+
+### Step 5e: Export Summary Statistics
+
+Find **GET /v1/sessions/{session_id}/export/summary** endpoint:
+
+1. Click "Try it out"
+2. Paste your `session_id` from step 4d
+3. Click "Execute"
+4. You'll get aggregated statistics about your session
+
+### Step 5f: Export Time Series Data
+
+Find **GET /v1/sessions/{session_id}/export/timeseries** endpoint:
+
+1. Click "Try it out"
+2. Paste your `session_id`
+3. Click "Execute"
+4. You'll get time-indexed state data for analysis
+
+### Step 5g: Export Event Analysis
+
+Find **GET /v1/sessions/{session_id}/export/events** endpoint:
+
+1. Click "Try it out"
+2. Paste your `session_id`
+3. Click "Execute"
+4. You'll get ignition events and analysis data
+
+### Step 5h: View Business Metrics Dashboard
+
+Find **GET /v1/metrics/dashboard** endpoint:
+
+1. Click "Try it out"
+2. Click "Execute"
+3. You'll get comprehensive metrics about:
+   - User statistics
+   - Session activity
+   - Task completion rates
+   - Template usage
+
+## Part 6: Explore Locally (Optional)
 
 ### View the Database
 
@@ -369,7 +469,7 @@ You'll see Prometheus metrics about:
 curl http://localhost:8000/openapi.json | python -m json.tool | head -100
 ```
 
-## Part 6: Understanding What You Just Did
+## Part 7: Understanding What You Just Did
 
 You just:
 
@@ -380,6 +480,10 @@ You just:
 5. **Submitted an experimental task** (a stimulus applied to the APGI system)
 6. **Monitored progress** (checked task status)
 7. **Exported results** (downloaded the simulation data)
+8. **Created an API key** for programmatic access
+9. **Created a session template** for reusable configurations
+10. **Explored advanced export options** (summary, timeseries, events)
+11. **Viewed business metrics** for operational insights
 
 This entire flow is what APGI researchers would do to:
 
@@ -477,9 +581,12 @@ See the main COURSE.md for what's next.
 
 - **Sessions**: Long-running simulations with configurations
 - **Authentication**: JWT tokens for secure API access
+- **API Keys**: Programmatic access with secure key management
+- **Session Templates**: Reusable configuration presets
 - **Tasks**: Asynchronous operations (stimuli, measurements)
 - **State Persistence**: Full APGI state saved in database
-- **Metrics**: Real-time monitoring of system performance
+- **Data Export**: Multiple export formats (JSON, CSV, summary, timeseries, events)
+- **Metrics**: Real-time monitoring of system performance and business intelligence
 
 These are all concepts we'll dive deep into in upcoming modules.
 

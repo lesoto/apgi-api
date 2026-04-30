@@ -12,6 +12,7 @@ from sqlalchemy.orm import Session
 from starlette.responses import JSONResponse
 from starlette.responses import Response as StarletteResponse
 
+from app.celery_app import get_queue_depth
 from app.database.connection import get_db
 from app.database.models import Session as SessionModel
 from app.database.models import Task as TaskModel
@@ -129,6 +130,14 @@ async def execute_task(
         HTTPException: If task submission fails
     """
     try:
+        # Admission control: check queue depth
+        if get_queue_depth() > 1000:
+            logger.warning("Task rejected: queue depth limit exceeded")
+            raise HTTPException(
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                detail="System under heavy load. Please try again later.",
+            )
+
         # Submit task for async execution
         task_id = await executor.submit_task(
             session_id=session_id,

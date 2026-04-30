@@ -1,12 +1,14 @@
 """Unit tests for create_db.py utility module."""
 
 import importlib
-from unittest.mock import MagicMock
+import os
+from unittest.mock import MagicMock, patch
 
 
 class TestCreateDatabase:
     """Test create_db.py functionality."""
 
+    @patch.dict(os.environ, {"USER": "postgres", "PGUSER": "postgres"})
     def test_create_database_success(self, mock_psycopg2: MagicMock) -> None:
         """Test successful database creation."""
         import app.create_db as create_db_mod

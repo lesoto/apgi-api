@@ -24,11 +24,7 @@ sys.path.insert(0, str(Path(__file__).parent.parent.parent / "app"))
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.testclient import TestClient
 
-from app.middleware.logging import (
-    ErrorLoggingHandler,
-    RequestLoggingMiddleware,
-    StructuredLogger,
-)
+from app.middleware.logging import ErrorLoggingHandler, RequestLoggingMiddleware, StructuredLogger
 
 # ============================================================================
 # Helper Functions

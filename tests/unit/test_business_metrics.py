@@ -11,11 +11,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from app.services.business_metrics import (
-    BusinessMetricsService,
-    MetricValue,
-    TimeSeriesPoint,
-)
+from app.services.business_metrics import BusinessMetricsService, MetricValue, TimeSeriesPoint
 
 
 @pytest.fixture

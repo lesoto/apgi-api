@@ -626,11 +626,15 @@ class AlertEscalationPolicy:
                     except ValueError:
                         continue  # Skip invalid severity values
 
-                if (
-                    new_severity is not None
-                    and hasattr(new_severity, "value")
-                    and new_severity.value > current_severity.value
-                ):
+                SEVERITY_WEIGHTS = {
+                    AlertSeverity.INFO: 1,
+                    AlertSeverity.WARNING: 2,
+                    AlertSeverity.ERROR: 3,
+                    AlertSeverity.CRITICAL: 4,
+                }
+                if new_severity is not None and SEVERITY_WEIGHTS.get(
+                    new_severity, 0
+                ) > SEVERITY_WEIGHTS.get(current_severity, 0):
                     current_severity = new_severity
 
         return current_severity

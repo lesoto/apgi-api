@@ -37,6 +37,12 @@ class RequestSizeLimitMiddleware(BaseHTTPMiddleware):
         self.enabled = enabled
         self.max_size_mb = max_size_mb
 
+        # Per-endpoint size limits in MB
+        self.endpoint_limits = {
+            "/v1/sessions/upload": 50,  # Example: allow larger uploads for sessions
+            "/v1/admin/import": 100,  # Example: allow even larger for admin import
+        }
+
     def _should_check_size(self, request: Request) -> bool:
         """
         Determine if request size should be checked.
@@ -80,6 +86,16 @@ class RequestSizeLimitMiddleware(BaseHTTPMiddleware):
         if not self.enabled:
             return await call_next(request)
 
+        # Get applicable limit for this endpoint
+        path = request.url.path
+        limit_mb = self.max_size_mb
+        for ep, ep_limit in self.endpoint_limits.items():
+            if path.startswith(ep):
+                limit_mb = ep_limit
+                break
+
+        limit_bytes = limit_mb * 1024 * 1024
+
         # Check if we should validate size for this request
         if not self._should_check_size(request):
             return await call_next(request)
@@ -89,13 +105,13 @@ class RequestSizeLimitMiddleware(BaseHTTPMiddleware):
         if content_length:
             try:
                 size = int(content_length)
-                if size > self.max_size_bytes:
+                if size > limit_bytes:
                     logger.warning(
                         "Request rejected due to content-length",
                         method=request.method,
                         path=request.url.path,
                         content_length=size,
-                        max_size=self.max_size_bytes,
+                        max_size=limit_bytes,
                     )
 
                     return JSONResponse(
@@ -103,10 +119,10 @@ class RequestSizeLimitMiddleware(BaseHTTPMiddleware):
                         content={
                             "error": {
                                 "code": "REQUEST_TOO_LARGE",
-                                "message": f"Request body too large. Maximum size is {self.max_size_mb}MB",
+                                "message": f"Request body too large. Maximum size is {limit_mb}MB",
                                 "timestamp": datetime.now(timezone.utc).isoformat() + "Z",
                                 "details": {
-                                    "max_size_mb": self.max_size_mb,
+                                    "max_size_mb": limit_mb,
                                     "actual_size_bytes": size,
                                 },
                             }
@@ -121,13 +137,13 @@ class RequestSizeLimitMiddleware(BaseHTTPMiddleware):
             # Get the request body stream
             body = await request.body()
 
-            if len(body) > self.max_size_bytes:
+            if len(body) > limit_bytes:
                 logger.warning(
                     "Request rejected due to body size",
                     method=request.method,
                     path=request.url.path,
                     body_size=len(body),
-                    max_size=self.max_size_bytes,
+                    max_size=limit_bytes,
                 )
 
                 return JSONResponse(
@@ -135,10 +151,10 @@ class RequestSizeLimitMiddleware(BaseHTTPMiddleware):
                     content={
                         "error": {
                             "code": "REQUEST_TOO_LARGE",
-                            "message": f"Request body too large. Maximum size is {self.max_size_mb}MB",
+                            "message": f"Request body too large. Maximum size is {limit_mb}MB",
                             "timestamp": datetime.now(timezone.utc).isoformat() + "Z",
                             "details": {
-                                "max_size_mb": self.max_size_mb,
+                                "max_size_mb": limit_mb,
                                 "actual_size_bytes": len(body),
                             },
                         }

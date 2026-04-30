@@ -21,21 +21,11 @@ from app.database.models import Task as TaskModel
 
 # apgi_system is an optional dependency for experimental paradigms
 try:
-    from apgi_system.experiments.tasks.attentional_blink import (
-        AttentionalBlinkTask,
-    )
-    from apgi_system.experiments.tasks.binocular_rivalry import (
-        BinocularRivalryTask,
-    )
-    from apgi_system.experiments.tasks.change_blindness import (
-        ChangeBlindnessTask,
-    )
-    from apgi_system.experiments.tasks.iowa_gambling import (
-        IowaGamblingTask,
-    )
-    from apgi_system.experiments.tasks.masking_paradigm import (
-        MaskingParadigmTask,
-    )
+    from apgi_system.experiments.tasks.attentional_blink import AttentionalBlinkTask
+    from apgi_system.experiments.tasks.binocular_rivalry import BinocularRivalryTask
+    from apgi_system.experiments.tasks.change_blindness import ChangeBlindnessTask
+    from apgi_system.experiments.tasks.iowa_gambling import IowaGamblingTask
+    from apgi_system.experiments.tasks.masking_paradigm import MaskingParadigmTask
     from apgi_system.platform_utils import get_resource_path
     from apgi_system.system import APGISystem
 
