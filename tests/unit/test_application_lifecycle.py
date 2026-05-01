@@ -285,46 +285,62 @@ class TestGracefulShutdown:
 class TestStartupFailureHandling:
     """Test application handles startup failures correctly."""
 
-    @pytest.mark.skip(reason="Cannot test production failure behavior in test mode environment")
     @pytest.mark.asyncio
     @patch("redis.asyncio.from_url")
     @patch("app.database.connection.init_db")
-    @patch("app.main.settings")
+    @patch("app.main.sessions.get_session_manager")
+    @patch("app.main.sessions.init_session_routes")
     async def test_startup_fails_if_database_unavailable(
         self,
-        mock_settings: MagicMock,
+        mock_init_session: MagicMock,
+        mock_get_session: MagicMock,
         mock_init_db: MagicMock,
         mock_redis: AsyncMock,
         mock_database_connection: tuple[MagicMock, MagicMock, MagicMock],
     ) -> None:
         """Test that startup fails if database is unavailable in production."""
-        from app.main import lifespan
+        import sys
 
-        # Set production environment
-        mock_settings.environment = "production"
+        # Remove cached main module to force reimport
+        if "app.main" in sys.modules:
+            del sys.modules["app.main"]
 
-        # Make init_db raise an exception
-        mock_init_db.side_effect = Exception("Database connection failed")
+        # Patch settings.environment to "production" for this test
+        from app.config import settings
 
-        # Mock Redis client
-        mock_redis_client = AsyncMock()
-        mock_redis.return_value = mock_redis_client
+        original_env = settings.environment
+        settings.environment = "production"
+        try:
+            from app.main import lifespan
 
-        with patch("app.main.configure_alerting"):
-            mock_app = MagicMock()
-            mock_app.state.test_mode = False  # Ensure not in test mode
+            # Make init_db raise an exception
+            mock_init_db.side_effect = Exception("Database connection failed")
 
-            # Startup should raise an exception in production
-            with pytest.raises(Exception, match="Database connection failed"):
-                async with lifespan(mock_app):
-                    pass
+            # Mock Redis client
+            mock_redis_client = AsyncMock()
+            mock_redis.return_value = mock_redis_client
+
+            with patch("app.main.configure_alerting"):
+                mock_app = MagicMock()
+                mock_app.state.test_mode = False  # Ensure not in test mode
+
+                # Startup should raise an exception in production
+                with pytest.raises(Exception, match="Database connection failed"):
+                    async with lifespan(mock_app):
+                        pass
+        finally:
+            settings.environment = original_env
 
     @pytest.mark.asyncio
     @patch("redis.asyncio.from_url")
     @patch("app.database.connection.init_db")
+    @patch("app.main.sessions.get_session_manager")
+    @patch("app.main.sessions.init_session_routes")
     @patch.dict(os.environ, {"ENVIRONMENT": "production"})
     async def test_startup_continues_if_redis_unavailable(
         self,
+        mock_init_session: MagicMock,
+        mock_get_session: MagicMock,
         mock_init_db: MagicMock,
         mock_redis: AsyncMock,
         mock_database_connection: tuple[MagicMock, MagicMock, MagicMock],
@@ -343,7 +359,7 @@ class TestStartupFailureHandling:
                 pass
 
             # Verify app state reflects degraded mode
-            assert getattr(mock_app.state, "redis_available", False) is False
+            assert mock_app.state.degraded_mode is True
 
 
 class TestInFlightRequestHandling:

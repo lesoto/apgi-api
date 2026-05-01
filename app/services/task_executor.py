@@ -698,3 +698,51 @@ class TaskExecutor:
         task_id = str(uuid.uuid4())
         logger.info(f"Task {task_id} scheduled for {scheduled_time}")
         return task_id
+
+
+async def execute_with_retry(
+    func: Callable[..., Awaitable[T]],
+    max_retries: int = 3,
+    base_delay: float = 1.0,
+    max_delay: float = 30.0,
+    backoff_factor: float = 2.0,
+    *args: Any,
+    **kwargs: Any,
+) -> T:
+    """
+    Execute an async function with retry logic.
+
+    Args:
+        func: Async function to execute
+        max_retries: Maximum number of retry attempts
+        base_delay: Initial delay in seconds
+        max_delay: Maximum delay between retries
+        backoff_factor: Factor to multiply delay by each retry
+        *args: Positional arguments for the function
+        **kwargs: Keyword arguments for the function
+
+    Returns:
+        Result of the function call
+
+    Raises:
+        Exception: The last exception if all retries fail
+    """
+    last_exception: Optional[Exception] = None
+    delay = base_delay
+
+    for attempt in range(max_retries + 1):
+        try:
+            return await func(*args, **kwargs)
+        except Exception as e:
+            last_exception = e
+            if attempt < max_retries:
+                logger.warning(f"Attempt {attempt + 1} failed, retrying in {delay:.1f}s: {str(e)}")
+                await asyncio.sleep(delay)
+                delay = min(delay * backoff_factor, max_delay)
+            else:
+                logger.error(f"All {max_retries + 1} attempts failed: {str(e)}")
+
+    if last_exception is not None:
+        raise last_exception
+
+    raise RuntimeError("All retries failed but no exception was captured")

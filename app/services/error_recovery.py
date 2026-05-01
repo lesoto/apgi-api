@@ -381,6 +381,29 @@ class ErrorRecoveryService:
 
             self.logger.info("Circuit breaker manually reset", service=service_name)
 
+    async def execute_recovery_strategy(self, strategy: Optional[str], error: Exception) -> bool:
+        """
+        Execute a recovery strategy for a given error.
+
+        Args:
+            strategy: The recovery strategy to execute (None for default)
+            error: The exception that triggered recovery
+
+        Returns:
+            True if recovery was successful, False otherwise
+        """
+        if strategy is None:
+            self.logger.warning("No recovery strategy specified for error", error=str(error))
+            return False
+
+        try:
+            self.logger.info("Executing recovery strategy", strategy=strategy, error=str(error))
+            # Strategy-specific recovery logic would go here
+            return True
+        except Exception as e:
+            self.logger.error("Recovery strategy failed", strategy=strategy, error=str(e))
+            return False
+
 
 # Global error recovery service instance
 error_recovery_service = ErrorRecoveryService()

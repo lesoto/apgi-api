@@ -162,6 +162,12 @@ class SessionTemplateCreateRequest(BaseModel):
         if ".." in v:
             raise ValueError("Invalid configuration path: directory traversal not allowed")
 
+        # Check for absolute paths
+        import os
+
+        if os.path.isabs(v):
+            raise ValueError("Invalid configuration path: absolute paths not allowed")
+
         # Check for valid file extension
         if not v.endswith((".yaml", ".yml")):
             raise ValueError("Configuration file must have .yaml or .yml extension")

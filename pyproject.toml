@@ -150,7 +150,6 @@ warn_no_return = true
 strict_equality = true
 strict = true
 explicit_package_bases = true
-mypy_path = ["."]
 exclude = [
     "^/opt/",
     "^/usr/",

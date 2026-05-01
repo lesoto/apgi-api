@@ -76,7 +76,7 @@ def mock_template() -> MagicMock:
     template.user_id = FAKE_USER.user_id
     template.name = "Test Template"
     template.description = "Test Description"
-    template.config_path = "/config/test.yaml"
+    template.config_path = "config/test.yaml"
     template.custom_config = {"key": "value"}
     template.default_description = "Default description"
     template.tags = ["tag1", "tag2"]
@@ -98,7 +98,7 @@ def mock_public_template() -> MagicMock:
     template.user_id = "user-789"  # Different user
     template.name = "Public Template"
     template.description = "Public Description"
-    template.config_path = "/config/public.yaml"
+    template.config_path = "config/public.yaml"
     template.custom_config = {"public": True}
     template.default_description = "Public default"
     template.tags = ["public"]
@@ -307,7 +307,7 @@ class TestCreateTemplate:
             request = SessionTemplateCreateRequest(
                 name="New Template",
                 description="New Description",
-                config_path="/config/new.yaml",
+                config_path="config/new.yaml",
                 custom_config={"key": "value"},
                 default_description="Default",
                 tags=["tag1"],
@@ -340,7 +340,7 @@ class TestCreateTemplate:
             request = SessionTemplateCreateRequest(
                 name="Test Template",
                 description="Description",
-                config_path="/config/test.yaml",
+                config_path="config/test.yaml",
                 custom_config=None,
                 default_description=None,
                 tags=[],
@@ -380,7 +380,7 @@ class TestCreateTemplate:
             request = SessionTemplateCreateRequest(
                 name="Test Template",
                 description="Description",
-                config_path="/config/test.yaml",
+                config_path="config/test.yaml",
                 custom_config=None,
                 default_description=None,
                 tags=[],
@@ -417,7 +417,7 @@ class TestCreateTemplate:
             request = SessionTemplateCreateRequest(
                 name="Test Template",
                 description="Description",
-                config_path="/config/test.yaml",
+                config_path="config/test.yaml",
                 custom_config=None,
                 default_description=None,
                 tags=[],
@@ -455,7 +455,7 @@ class TestCreateTemplate:
             request = SessionTemplateCreateRequest(
                 name="Test Template",
                 description="Description",
-                config_path="/config/test.yaml",
+                config_path="config/test.yaml",
                 custom_config=None,
                 default_description=None,
                 tags=[],
@@ -493,7 +493,7 @@ class TestCreateTemplate:
             request = SessionTemplateCreateRequest(
                 name="Test Template",
                 description="Description",
-                config_path="/config/test.yaml",
+                config_path="config/test.yaml",
                 custom_config=None,
                 default_description=None,
                 tags=[],
@@ -969,7 +969,7 @@ class TestIntegrationWithFastAPI:
         template_data = {
             "name": "Integration Test Template",
             "description": "Test Description",
-            "config_path": "/config/test.yaml",
+            "config_path": "config/test.yaml",
             "is_public": False,
         }
 
@@ -1076,7 +1076,7 @@ class TestExceptionHandlingAndEdgeCases:
             request = SessionTemplateCreateRequest(
                 name="Test Template",
                 description="Description",
-                config_path="/config/test.yaml",
+                config_path="config/test.yaml",
                 custom_config=None,
                 default_description=None,
                 tags=[],
@@ -1259,7 +1259,7 @@ class TestExceptionHandlingAndEdgeCases:
             request = SessionTemplateCreateRequest(
                 name="Test Template",
                 description="Description",
-                config_path="/config/test.yaml",
+                config_path="config/test.yaml",
                 custom_config=None,
                 default_description=None,
                 tags=[],

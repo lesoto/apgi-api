@@ -18,10 +18,9 @@ import pytest
 class TestSettingsInvalidEnvironment:
     """Test invalid environment handling."""
 
-    @pytest.mark.skip(reason="Cannot test production validation in test mode environment")
     @patch.dict(os.environ, {"ENVIRONMENT": "invalid_env"}, clear=False)
     def test_invalid_environment_raises_error(self) -> None:
-        """Test that invalid environment raises ValueError."""
+        """Test that invalid environment raises ValueError at module load time."""
         import importlib
 
         import app.config
@@ -29,11 +28,9 @@ class TestSettingsInvalidEnvironment:
         # Remove TEST_MODE from environment temporarily
         original_test_mode = os.environ.pop("TEST_MODE", None)
         try:
-            importlib.reload(app.config)
-            from app.config import Settings
-
+            # The error should be raised during reload when settings = Settings() executes
             with pytest.raises(ValueError, match="Invalid ENVIRONMENT"):
-                Settings()
+                importlib.reload(app.config)
         finally:
             # Restore TEST_MODE
             if original_test_mode is not None:
@@ -43,19 +40,16 @@ class TestSettingsInvalidEnvironment:
 class TestSettingsLogLevelValidation:
     """Test log level validation."""
 
-    @pytest.mark.skip(reason="Cannot test production validation in test mode environment")
     @patch.dict(os.environ, {"LOG_LEVEL": "INVALID_LEVEL"}, clear=False)
     def test_invalid_log_level_raises_error(self) -> None:
-        """Test that invalid log level raises ValueError."""
+        """Test that invalid log level raises ValueError at module load time."""
         import importlib
 
         import app.config
 
-        importlib.reload(app.config)
-        from app.config import Settings
-
+        # The error should be raised during reload when settings = Settings() executes
         with pytest.raises(ValueError, match="Invalid LOG_LEVEL"):
-            Settings()
+            importlib.reload(app.config)
 
 
 class TestSettingsURLParsing:
@@ -359,14 +353,13 @@ class TestSettingsDevelopment:
 class TestSettingsStaging:
     """Test staging-specific settings."""
 
-    @pytest.mark.skip(reason="Cannot test production validation in test mode environment")
     @patch.dict(
         os.environ,
         {
             "ENVIRONMENT": "staging",
-            "JWT_SECRET_KEY": "a" * 32,
-            "CURSOR_SIGNING_KEY": "b" * 32,
-            "WEBHOOK_SECRET_KEY": "c" * 32,
+            "JWT_SECRET_KEY": "staging_jwt_secret_key_with_random_chars_123!@#xyz",
+            "CURSOR_SIGNING_KEY": "staging_cursor_key_with_randomness_ABC789$%^def",
+            "WEBHOOK_SECRET_KEY": "webhook_staging_secret_random_GHI456&*mno",
             "DATABASE_URL": "postgresql://staging-db:5432/apgi",
             "REDIS_URL": "redis://staging-redis:6379/0",
             "CELERY_BROKER_URL": "redis://staging-redis:6379/1",
@@ -390,13 +383,12 @@ class TestSettingsStaging:
 class TestSettingsDefaultLogLevel:
     """Test default log level determination."""
 
-    @pytest.mark.skip(reason="Cannot test production validation in test mode environment")
     @patch.dict(
         os.environ,
         {
-            "JWT_SECRET_KEY": "a" * 32,
-            "CURSOR_SIGNING_KEY": "b" * 32,
-            "WEBHOOK_SECRET_KEY": "c" * 32,
+            "JWT_SECRET_KEY": "prod_jwt_secret_key_with_random_chars_456!@#abc",
+            "CURSOR_SIGNING_KEY": "prod_cursor_key_with_randomness_XYZ123$%^ghi",
+            "WEBHOOK_SECRET_KEY": "webhook_prod_secret_random_JKL789&*pqr",
             "ENVIRONMENT": "production",
             "DATABASE_URL": "postgresql://prod-db:5432/apgi",
             "REDIS_URL": "redis://prod-redis:6379/0",

@@ -346,6 +346,50 @@ class AbuseDetectionService:
         # In production, you would schedule an unblock task
         # For now, this is a manual block
 
+    async def is_request_blocked(self, request: Any) -> bool:
+        """
+        Check if a request should be blocked based on various risk factors.
+
+        Args:
+            request: The HTTP request to check
+
+        Returns:
+            True if request should be blocked, False otherwise
+        """
+        try:
+            # Extract client information from request
+            client = getattr(request, "client", None)
+            if client is None:
+                # Can't determine client, block for safety
+                return True
+
+            host = getattr(client, "host", None)
+            if host is None:
+                return True
+
+            # Check if IP is blocked
+            if host in self.blocked_ips:
+                return True
+
+            # Get user ID from request state if authenticated
+            user_id = None
+            if hasattr(request, "state") and hasattr(request.state, "user"):
+                user_id = getattr(request.state.user, "user_id", None)
+
+            if user_id and user_id in self.blocked_users:
+                return True
+
+            # Check risk level
+            risk_level = self.get_risk_level(user_id or "anonymous", host)
+            if risk_level == RiskLevel.CRITICAL:
+                return True
+
+            return False
+        except Exception as e:
+            # If we can't determine, block for safety
+            logger.warning(f"Error checking if request blocked: {e}")
+            return True
+
     def block_user(self, user_id: str, reason: str) -> None:
         """
         Block a user account.
