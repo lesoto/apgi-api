@@ -2,6 +2,22 @@
 APGI REST API Main Application
 
 FastAPI application providing RESTful access to the APGI System.
+
+All CLI commands with 1unique options:
+
+--revision TEXT / -r TEXT
+--verbose / -v
+--queues TEXT / -Q TEXT
+--concurrency INTEGER / -c INTEGER
+--loglevel TEXT / -l TEXT
+--hostname TEXT / -n TEXT
+--users INTEGER / -u INTEGER
+--templates INTEGER / -t INTEGER
+--sessions INTEGER / -s INTEGER
+--tasks INTEGER / -T INTEGER
+--clear / -c
+--confirm
+
 """
 
 import os
