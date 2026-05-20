@@ -507,3 +507,30 @@ def test_otel_import_error_warning():
             except Exception:
                 # If import fails completely, that's also acceptable
                 pass
+
+
+def test_otel_import_type_error():
+    """Test that TypeError during import is handled gracefully."""
+    # This test covers the TypeError exception path in lines 51-62
+    # Simulate a TypeError during import by patching the import to raise TypeError
+    import builtins
+    original_import = builtins.__import__
+
+    def mock_import(name, *args, **kwargs):
+        if name.startswith("opentelemetry"):
+            raise TypeError("Python 3.14 compatibility issue")
+        return original_import(name, *args, **kwargs)
+
+    with patch("builtins.__import__", side_effect=mock_import):
+        # Clear tracing module to force reimport
+        if "app.tracing" in sys.modules:
+            del sys.modules["app.tracing"]
+
+        with warnings.catch_warnings(record=True) as w:
+            warnings.simplefilter("always")
+            import app.tracing as tracing
+
+            # Should handle TypeError gracefully
+            assert tracing.OPENTELEMETRY_AVAILABLE is False
+            # Should have issued a warning
+            assert any("OpenTelemetry not available" in str(warning.message) for warning in w)

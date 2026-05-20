@@ -3,7 +3,8 @@ Unit tests for AbuseDetectionService covering risk assessment, rate limiting, an
 Requirements: 4.7, 5.1
 """
 
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
+from unittest.mock import MagicMock
 
 from app.services.abuse_detection import (
     AbuseDetectionService,
@@ -140,6 +141,31 @@ class TestGetRiskLevel:
         # 10 failed attempts = 10 * 5 = 50 risk score, which is HIGH (50-79)
         # But auto-block happens at 10 failures, making it CRITICAL
         assert risk == RiskLevel.CRITICAL
+
+    def test_get_risk_level_critical_threshold(self) -> None:
+        """Test CRITICAL risk threshold (>= 80)."""
+        service = AbuseDetectionService()
+        service.credential_risks["user123"] = CredentialRisk(
+            username="user123",
+            risk_score=170.0,  # 170 * 0.5 = 85 to reach CRITICAL threshold
+            risk_factors=["high risk"],
+            last_seen=datetime.now(timezone.utc),
+        )
+        risk = service.get_risk_level("user123", "192.168.1.1")
+        # Risk score = 170 * 0.5 = 85, which is CRITICAL (>= 80)
+        assert risk == RiskLevel.CRITICAL
+
+    def test_get_risk_level_high_threshold(self) -> None:
+        """Test HIGH risk threshold (>= 50)."""
+        service = AbuseDetectionService()
+        service.credential_risks["user123"] = CredentialRisk(
+            username="user123",
+            risk_score=110.0,  # 110 * 0.5 = 55 to reach HIGH threshold
+            risk_factors=["medium risk"],
+            last_seen=datetime.now(timezone.utc),
+        )
+        risk = service.get_risk_level("user123", "192.168.1.1")
+        assert risk == RiskLevel.HIGH
 
 
 class TestCheckRateLimit:
@@ -379,6 +405,30 @@ class TestCalculateLoginAnomalyScore:
         score = service._calculate_login_anomaly_score("user123", "192.168.1.1")
         assert score >= 20
 
+    def test_anomaly_score_slow_attempts(self) -> None:
+        """Slow attempts don't increase score."""
+        service = AbuseDetectionService()
+        # Record attempts that are not rapid (more than 1 second apart)
+        # First attempt
+        service.record_login_attempt("user123", "192.168.1.1", "Mozilla", True)
+        # Manually set timestamp to be 2 seconds ago
+        service.login_attempts["user123"][0].timestamp = datetime.now(timezone.utc) - timedelta(seconds=2)
+        # Second attempt (current time)
+        service.record_login_attempt("user123", "192.168.1.1", "Mozilla", True)
+
+        score = service._calculate_login_anomaly_score("user123", "192.168.1.1")
+        # Should not trigger the rapid attempt branch
+        assert score < 10
+
+    def test_anomaly_score_empty_recent_attempts(self) -> None:
+        """Test when recent_attempts is empty (line 423)."""
+        service = AbuseDetectionService()
+        # Add user but with no attempts
+        service.login_attempts["user123"] = []
+
+        score = service._calculate_login_anomaly_score("user123", "192.168.1.1")
+        assert score == 0.0
+
 
 class TestGetRecentFailedAttempts:
     """Test retrieving recent failed attempts."""
@@ -503,3 +553,79 @@ class TestGlobalInstance:
 
         assert abuse_detection_service is not None
         assert isinstance(abuse_detection_service, AbuseDetectionService)
+
+
+class TestIsRequestBlocked:
+    """Test is_request_blocked method."""
+
+    async def test_is_request_blocked_no_client(self) -> None:
+        """Block request when client is None."""
+        service = AbuseDetectionService()
+        mock_request = MagicMock()
+        del mock_request.client  # Remove client attribute
+
+        result = await service.is_request_blocked(mock_request)
+        assert result is True
+
+    async def test_is_request_blocked_no_host(self) -> None:
+        """Block request when client.host is None."""
+        service = AbuseDetectionService()
+        mock_request = MagicMock()
+        mock_request.client.host = None
+
+        result = await service.is_request_blocked(mock_request)
+        assert result is True
+
+    async def test_is_request_blocked_exception(self) -> None:
+        """Block request when exception occurs during check."""
+        service = AbuseDetectionService()
+        mock_request = MagicMock()
+        # Make client.host raise an exception
+        type(mock_request.client).host = property(lambda self: (_ for _ in ()).throw(Exception("Test error")))
+
+        result = await service.is_request_blocked(mock_request)
+        assert result is True
+
+    async def test_is_request_blocked_critical_risk(self) -> None:
+        """Block request when risk level is CRITICAL."""
+        service = AbuseDetectionService()
+        mock_request = MagicMock()
+        mock_request.client.host = "192.168.1.1"
+        mock_request.state.user.user_id = "user123"
+        service.blocked_users.add("user123")
+
+        result = await service.is_request_blocked(mock_request)
+        assert result is True
+
+    async def test_is_request_blocked_ip_blocked(self) -> None:
+        """Block request when IP is in blocked_ips (line 372)."""
+        service = AbuseDetectionService()
+        mock_request = MagicMock()
+        mock_request.client.host = "192.168.1.100"
+        service.blocked_ips.add("192.168.1.100")
+
+        result = await service.is_request_blocked(mock_request)
+        assert result is True
+
+    async def test_is_request_blocked_user_from_state(self) -> None:
+        """Test getting user_id from request.state (lines 376-377)."""
+        service = AbuseDetectionService()
+        mock_request = MagicMock()
+        mock_request.client.host = "192.168.1.1"
+        mock_request.state.user.user_id = "user456"
+        service.blocked_users.add("user456")
+
+        result = await service.is_request_blocked(mock_request)
+        assert result is True
+
+    async def test_is_request_blocked_critical_risk_level(self) -> None:
+        """Block request when risk level is CRITICAL (line 384)."""
+        service = AbuseDetectionService()
+        mock_request = MagicMock()
+        mock_request.client.host = "192.168.1.1"
+        mock_request.state.user.user_id = "user789"
+        # Add high risk to trigger CRITICAL level
+        service.credential_risks["user789"] = MagicMock(risk_score=200.0)  # 200 * 0.5 = 100 >= 80
+
+        result = await service.is_request_blocked(mock_request)
+        assert result is True

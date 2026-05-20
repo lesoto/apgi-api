@@ -75,6 +75,71 @@ class TestDeleteUserDataExceptionHandling:
         assert result["reason"] == "test"
         assert "deleted_counts" in result
 
+    @patch("app.services.data_lifecycle.get_db_context")
+    def test_delete_user_data_with_session_data(self, mock_db_context: MagicMock) -> None:
+        """Test deletion of session data (lines 355-360)."""
+        mock_db = MagicMock()
+        mock_session = MagicMock()
+        mock_session.session_id = "session-123"
+        mock_db.query.return_value.filter.return_value.all.return_value = [mock_session]
+        mock_db.query.return_value.filter.return_value.delete.return_value = 5
+        mock_db_context.return_value.__enter__.return_value = mock_db
+
+        manager = DataLifecycleManager()
+        result = manager.delete_user_data("user123", "test")
+
+        assert result["deleted_counts"]["session_data"] == 5
+
+    @patch("app.services.data_lifecycle.get_db_context")
+    def test_delete_user_data_with_tasks(self, mock_db_context: MagicMock) -> None:
+        """Test deletion of tasks (lines 364-369)."""
+        mock_db = MagicMock()
+        mock_session = MagicMock()
+        mock_session.session_id = "session-123"
+        mock_db.query.return_value.filter.return_value.all.return_value = [mock_session]
+        mock_db.query.return_value.filter.return_value.delete.return_value = 3
+        mock_db_context.return_value.__enter__.return_value = mock_db
+
+        manager = DataLifecycleManager()
+        result = manager.delete_user_data("user123", "test")
+
+        assert result["deleted_counts"]["tasks"] == 3
+
+    @patch("app.services.data_lifecycle.get_db_context")
+    def test_delete_user_data_soft_delete_user(self, mock_db_context: MagicMock) -> None:
+        """Test soft delete of user (lines 398-405)."""
+        mock_db = MagicMock()
+        mock_user = MagicMock()
+        mock_user.user_id = "user123"
+        mock_db.query.return_value.filter.return_value.first.return_value = mock_user
+        mock_db.query.return_value.filter.return_value.all.return_value = []
+        mock_db_context.return_value.__enter__.return_value = mock_db
+
+        manager = DataLifecycleManager()
+        result = manager.delete_user_data("user123", "test")
+
+        assert result["deleted_counts"]["user_soft_deleted"] == 1
+        assert mock_user.is_deleted is True
+        assert mock_user.is_active is False
+        assert mock_user.username.startswith("deleted_")
+        assert mock_user.email.startswith("deleted_")
+        assert mock_user.password_hash == "deleted"
+        assert mock_user.mfa_secret is None
+        assert mock_user.mfa_backup_codes is None
+
+    @patch("app.services.data_lifecycle.get_db_context")
+    def test_delete_user_data_outer_exception(self, mock_db_context: MagicMock) -> None:
+        """Test outer exception handling in delete_user_data (lines 414-415)."""
+        mock_db_context.side_effect = Exception("Database connection error")
+
+        manager = DataLifecycleManager()
+
+        # Should not raise exception
+        result = manager.delete_user_data("user123", "test")
+
+        assert result["user_id"] == "user123"
+        assert result["reason"] == "test"
+
 
 class TestFindExpiredDataAllTypes:
     """Test find_expired_data for all data types."""
@@ -125,6 +190,20 @@ class TestGetDataRetentionReportExceptions:
         # Mock find_expired_data to avoid second DB call
         with patch.object(manager, "find_expired_data", return_value=[]):
             result = manager.get_data_retention_report()
+
+        # Should still return report structure
+        assert "generated_at" in result
+        assert "data_types" in result
+
+    @patch("app.services.data_lifecycle.get_db_context")
+    def test_get_data_retention_report_outer_exception(self, mock_db_context: MagicMock) -> None:
+        """Test outer exception handling in get_data_retention_report (lines 503-504)."""
+        mock_db_context.side_effect = Exception("Database connection error")
+
+        manager = DataLifecycleManager()
+
+        # Should not raise exception
+        result = manager.get_data_retention_report()
 
         # Should still return report structure
         assert "generated_at" in result

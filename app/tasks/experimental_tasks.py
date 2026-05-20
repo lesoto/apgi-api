@@ -161,7 +161,7 @@ class APGITask(Task):  # type: ignore[misc]
 
 @celery_app.task(
     bind=True, base=APGITask, name="app.tasks.experimental_tasks.execute_iowa_gambling_task"
-)  # type: ignore[untyped-decorator]
+)  # type: ignore[misc]
 def execute_iowa_gambling_task(
     self: Any, session_id: str, parameters: Dict[str, Any]
 ) -> Dict[str, Any]:
@@ -245,7 +245,7 @@ def execute_iowa_gambling_task(
 
 @celery_app.task(
     bind=True, base=APGITask, name="app.tasks.experimental_tasks.execute_masking_paradigm_task"
-)  # type: ignore[untyped-decorator]
+)  # type: ignore[misc]
 def execute_masking_paradigm_task(
     self: Any, session_id: str, parameters: Dict[str, Any]
 ) -> Dict[str, Any]:
@@ -330,7 +330,7 @@ def execute_masking_paradigm_task(
 
 @celery_app.task(
     bind=True, base=APGITask, name="app.tasks.experimental_tasks.execute_attentional_blink_task"
-)  # type: ignore[untyped-decorator]
+)  # type: ignore[misc]
 def execute_attentional_blink_task(
     self: Any, session_id: str, parameters: Dict[str, Any]
 ) -> Dict[str, Any]:
@@ -412,7 +412,7 @@ def execute_attentional_blink_task(
 
 @celery_app.task(
     bind=True, base=APGITask, name="app.tasks.experimental_tasks.execute_change_blindness_task"
-)  # type: ignore[untyped-decorator]
+)  # type: ignore[misc]
 def execute_change_blindness_task(
     self: Any, session_id: str, parameters: Dict[str, Any]
 ) -> Dict[str, Any]:
@@ -487,7 +487,7 @@ def execute_change_blindness_task(
 
 @celery_app.task(
     bind=True, base=APGITask, name="app.tasks.experimental_tasks.execute_binocular_rivalry_task"
-)  # type: ignore[untyped-decorator]
+)  # type: ignore[misc]
 def execute_binocular_rivalry_task(
     self: Any, session_id: str, parameters: Dict[str, Any]
 ) -> Dict[str, Any]:

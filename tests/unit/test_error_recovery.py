@@ -30,13 +30,18 @@ class TestCircuitBreaker:
         assert cb.state == CircuitState.CLOSED
         assert cb.stats.total_requests == 0
 
-    def test_circuit_breaker_with_custom_logger(self) -> None:
+    def test_circuit_breaker_custom_logger(self) -> None:
         """Test circuit breaker with custom logger."""
         from app.middleware.logging import StructuredLogger
 
         custom_logger = StructuredLogger("custom")
         cb = CircuitBreaker(service_name="test_service", logger=custom_logger)
         assert cb.logger == custom_logger
+
+    def test_circuit_breaker_none_logger(self) -> None:
+        """Test circuit breaker with None logger creates default logger."""
+        cb = CircuitBreaker(service_name="test_service", logger=None)
+        assert cb.logger is not None
 
     @pytest.mark.asyncio
     async def test_call_success(self) -> None:

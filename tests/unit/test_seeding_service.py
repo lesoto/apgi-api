@@ -97,6 +97,42 @@ class TestSeedUsers:
 
         assert all(id_.startswith("user_") for id_ in ids)
 
+    def test_seed_users_username_collision(
+        self, seeding_service: DatabaseSeedingService, mock_db: MagicMock
+    ) -> None:
+        """Test username collision handling (lines 63-64)."""
+        with (
+            patch("app.services.seeding_service.get_db_context") as mock_ctx,
+            patch("app.services.seeding_service.AuthManager.hash_password", return_value="hashed"),
+        ):
+            # Simulate username collision - first query returns existing user, second returns None
+            mock_user = MagicMock()
+            mock_db.query.return_value.filter.return_value.first.side_effect = [mock_user, None, None]
+            mock_ctx.return_value.__enter__.return_value = mock_db
+            ids = seeding_service.seed_users(count=1, include_admin=False)
+
+        assert len(ids) == 1
+        # Should have called query at least twice due to collision
+        assert mock_db.query.return_value.filter.return_value.first.call_count >= 2
+
+    def test_seed_users_email_collision(
+        self, seeding_service: DatabaseSeedingService, mock_db: MagicMock
+    ) -> None:
+        """Test email collision handling (lines 65-66)."""
+        with (
+            patch("app.services.seeding_service.get_db_context") as mock_ctx,
+            patch("app.services.seeding_service.AuthManager.hash_password", return_value="hashed"),
+        ):
+            # Simulate email collision - first query returns existing user for email, second returns None
+            mock_user = MagicMock()
+            mock_db.query.return_value.filter.return_value.first.side_effect = [None, mock_user, None]
+            mock_ctx.return_value.__enter__.return_value = mock_db
+            ids = seeding_service.seed_users(count=1, include_admin=False)
+
+        assert len(ids) == 1
+        # Should have called query at least twice due to collision
+        assert mock_db.query.return_value.filter.return_value.first.call_count >= 2
+
 
 # ---------------------------------------------------------------------------
 # seed_session_templates

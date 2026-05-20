@@ -109,6 +109,37 @@ class TestIowaGamblingTask:
                 assert result["status"] == "failed"
                 assert "task failed" in result["error"].lower()
 
+    def test_execute_iowa_gambling_task_webhook_exception(
+        self, mock_celery_task: MagicMock, mock_apgi_system: MagicMock
+    ) -> None:
+        """Test webhook trigger exception handling."""
+        with patch("app.tasks.experimental_tasks.APGI_SYSTEM_AVAILABLE", True):
+            with patch("app.tasks.experimental_tasks.IowaGamblingTask") as mock_task_class:
+                instance = MagicMock()
+                instance.run_all_trials = MagicMock(
+                    return_value={"trials": [{"deck": "A", "outcome": 100}], "final_balance": 2500}
+                )
+                mock_task_class.return_value = instance
+
+                type(mock_celery_task).apgi_system = PropertyMock(return_value=mock_apgi_system)
+
+                async def mock_run_with_exception(coro):
+                    try:
+                        await coro
+                    except Exception:
+                        pass
+                    raise Exception("Webhook failed")
+
+                with patch("asyncio.run", side_effect=mock_run_with_exception):
+                    from app.tasks.experimental_tasks import execute_iowa_gambling_task
+
+                    result = execute_iowa_gambling_task(
+                        mock_celery_task, session_id="session-123", parameters={}
+                    )
+
+                    # Task should still complete successfully despite webhook failure
+                    assert result["status"] == "completed"
+
 
 # ============================================================================
 # Masking Paradigm Task Tests
@@ -185,6 +216,37 @@ class TestMaskingParadigmTask:
 
                 assert result["status"] == "failed"
                 assert "masking failed" in result["error"].lower()
+
+    def test_execute_masking_paradigm_task_webhook_exception(
+        self, mock_celery_task: MagicMock, mock_apgi_system: MagicMock
+    ) -> None:
+        """Test webhook trigger exception handling."""
+        with patch("app.tasks.experimental_tasks.APGI_SYSTEM_AVAILABLE", True):
+            with patch("app.tasks.experimental_tasks.MaskingParadigmTask") as mock_task_class:
+                instance = MagicMock()
+                instance.run_all_trials = MagicMock(
+                    return_value={"trials": [{"mask": "forward", "response": "correct"}], "accuracy": 0.85}
+                )
+                mock_task_class.return_value = instance
+
+                type(mock_celery_task).apgi_system = PropertyMock(return_value=mock_apgi_system)
+
+                async def mock_run_with_exception(coro):
+                    # Await the coroutine to avoid warnings, then raise exception
+                    try:
+                        await coro
+                    except Exception:
+                        pass
+                    raise Exception("Webhook failed")
+
+                with patch("asyncio.run", side_effect=mock_run_with_exception):
+                    from app.tasks.experimental_tasks import execute_masking_paradigm_task
+
+                    result = execute_masking_paradigm_task(
+                        mock_celery_task, session_id="session-xyz", parameters={}
+                    )
+
+                    assert result["status"] == "completed"
 
 
 # ============================================================================
@@ -265,6 +327,39 @@ class TestAttentionalBlinkTask:
                 assert result["status"] == "failed"
                 assert "blink task failed" in result["error"].lower()
 
+    def test_execute_attentional_blink_task_webhook_exception(
+        self, mock_celery_task: MagicMock, mock_apgi_system: MagicMock
+    ) -> None:
+        """Test webhook trigger exception handling."""
+        with patch("app.tasks.experimental_tasks.APGI_SYSTEM_AVAILABLE", True):
+            with patch("app.tasks.experimental_tasks.AttentionalBlinkTask") as mock_task_class:
+                instance = MagicMock()
+                instance.run_all_trials = MagicMock(
+                    return_value={
+                        "lags": [1, 2, 3, 4, 8],
+                        "detection_rates": [0.9, 0.7, 0.5, 0.3, 0.2],
+                    }
+                )
+                mock_task_class.return_value = instance
+
+                type(mock_celery_task).apgi_system = PropertyMock(return_value=mock_apgi_system)
+
+                async def mock_run_with_exception(coro):
+                    try:
+                        await coro
+                    except Exception:
+                        pass
+                    raise Exception("Webhook failed")
+
+                with patch("asyncio.run", side_effect=mock_run_with_exception):
+                    from app.tasks.experimental_tasks import execute_attentional_blink_task
+
+                    result = execute_attentional_blink_task(
+                        mock_celery_task, session_id="session-789", parameters={}
+                    )
+
+                    assert result["status"] == "completed"
+
 
 # ============================================================================
 # Change Blindness Task Tests
@@ -341,6 +436,36 @@ class TestChangeBlindnessTask:
 
                 assert result["status"] == "failed"
                 assert "change detection failed" in result["error"].lower()
+
+    def test_execute_change_blindness_task_webhook_exception(
+        self, mock_celery_task: MagicMock, mock_apgi_system: MagicMock
+    ) -> None:
+        """Test webhook trigger exception handling."""
+        with patch("app.tasks.experimental_tasks.APGI_SYSTEM_AVAILABLE", True):
+            with patch("app.tasks.experimental_tasks.ChangeBlindnessTask") as mock_task_class:
+                instance = MagicMock()
+                instance.run_all_trials = MagicMock(
+                    return_value={"trials": [{"detected": True, "rt": 500}], "detection_rate": 0.75}
+                )
+                mock_task_class.return_value = instance
+
+                type(mock_celery_task).apgi_system = PropertyMock(return_value=mock_apgi_system)
+
+                async def mock_run_with_exception(coro):
+                    try:
+                        await coro
+                    except Exception:
+                        pass
+                    raise Exception("Webhook failed")
+
+                with patch("asyncio.run", side_effect=mock_run_with_exception):
+                    from app.tasks.experimental_tasks import execute_change_blindness_task
+
+                    result = execute_change_blindness_task(
+                        mock_celery_task, session_id="session-abc", parameters={}
+                    )
+
+                    assert result["status"] == "completed"
 
 
 # ============================================================================
@@ -421,6 +546,39 @@ class TestBinocularRivalryTask:
                 assert result["status"] == "failed"
                 assert "rivalry task failed" in result["error"].lower()
 
+    def test_execute_binocular_rivalry_task_webhook_exception(
+        self, mock_celery_task: MagicMock, mock_apgi_system: MagicMock
+    ) -> None:
+        """Test webhook trigger exception handling."""
+        with patch("app.tasks.experimental_tasks.APGI_SYSTEM_AVAILABLE", True):
+            with patch("app.tasks.experimental_tasks.BinocularRivalryTask") as mock_task_class:
+                instance = MagicMock()
+                instance.run_all_trials = MagicMock(
+                    return_value={
+                        "percepts": [{"left": True, "duration": 1000}],
+                        "alternation_rate": 0.5,
+                    }
+                )
+                mock_task_class.return_value = instance
+
+                type(mock_celery_task).apgi_system = PropertyMock(return_value=mock_apgi_system)
+
+                async def mock_run_with_exception(coro):
+                    try:
+                        await coro
+                    except Exception:
+                        pass
+                    raise Exception("Webhook failed")
+
+                with patch("asyncio.run", side_effect=mock_run_with_exception):
+                    from app.tasks.experimental_tasks import execute_binocular_rivalry_task
+
+                    result = execute_binocular_rivalry_task(
+                        mock_celery_task, session_id="session-xyz", parameters={}
+                    )
+
+                    assert result["status"] == "completed"
+
 
 # ============================================================================
 # Webhook Integration Tests
@@ -499,3 +657,51 @@ class TestAPGITaskBase:
                     _ = task.apgi_system
 
                 assert "not available" in str(exc_info.value).lower()
+
+    def test_apgi_system_lazy_initialization(self) -> None:
+        """Test lazy initialization of apgi_system property."""
+        with patch("app.tasks.experimental_tasks.APGI_SYSTEM_AVAILABLE", True):
+            with patch("app.tasks.experimental_tasks.APGISystem") as mock_system_class:
+                with patch("app.tasks.experimental_tasks.get_resource_path", return_value="/fake/path"):
+                    mock_system = MagicMock()
+                    mock_system_class.return_value = mock_system
+
+                    task = APGITask()
+                    # First access should initialize
+                    result1 = task.apgi_system
+                    # Second access should return cached instance
+                    result2 = task.apgi_system
+
+                    assert result1 is result2
+                    mock_system_class.assert_called_once()
+
+    def test_apgi_system_get_resource_path_none(self) -> None:
+        """Test when get_resource_path is None."""
+        with patch("app.tasks.experimental_tasks.APGI_SYSTEM_AVAILABLE", True):
+            with patch("app.tasks.experimental_tasks.APGISystem", MagicMock()):
+                with patch("app.tasks.experimental_tasks.get_resource_path", None):
+                    task = APGITask()
+
+                    with pytest.raises(ImportError) as exc_info:
+                        _ = task.apgi_system
+
+                    assert "not available" in str(exc_info.value).lower()
+
+    def test_module_import_failure_sets_none(self) -> None:
+        """Test that module-level variables are set to None when import fails."""
+        from app.tasks.experimental_tasks import (
+            APGI_SYSTEM_AVAILABLE,
+            AttentionalBlinkTask,
+            BinocularRivalryTask,
+            ChangeBlindnessTask,
+            IowaGamblingTask,
+            MaskingParadigmTask,
+        )
+
+        # When APGI_SYSTEM_AVAILABLE is False, task classes should be None
+        if not APGI_SYSTEM_AVAILABLE:
+            assert AttentionalBlinkTask is None
+            assert BinocularRivalryTask is None
+            assert ChangeBlindnessTask is None
+            assert IowaGamblingTask is None
+            assert MaskingParadigmTask is None

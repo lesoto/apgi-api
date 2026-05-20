@@ -320,6 +320,23 @@ class TestExportHelpers:
         assert "time,x" in text
         assert "0,1" in text
 
+    def test_export_csv_time_field_removal(self, service: DataExportService) -> None:
+        """Test that 'time' field is removed from header and placed first (lines 226-230)."""
+        data = {
+            "session_id": "s1",
+            "created_at": "2024-01-01T00:00:00Z",
+            "updated_at": "2024-01-01T01:00:00Z",
+            "config": {},
+            "state": "completed",
+            "data": [{"time": 0, "x": 1, "y": 2}, {"time": 1, "x": 3, "y": 4}],
+        }
+        result = service._export_csv(data)
+        text = result.decode("utf-8")
+        # Header should have time first, then other variables
+        lines = text.split("\n")
+        header_line = [line for line in lines if line and not line.startswith("#")][0]
+        assert header_line == "time,x,y"
+
     def test_export_csv_empty_data(self, service: DataExportService) -> None:
         data = {
             "session_id": "s1",

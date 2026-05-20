@@ -59,6 +59,14 @@ class TestParseVersion:
         result = parse_version(cast(Optional[str], None))
         assert result == (0, 0, 0)
 
+    def test_parse_version_attribute_error(self) -> None:
+        """Test parsing version string when AttributeError occurs."""
+        from app.dependency_checker import parse_version
+
+        # Pass an object that doesn't have string methods
+        result = parse_version(123)  # type: ignore
+        assert result == (0, 0, 0)
+
 
 class TestPackageImportName:
     """Tests for package import name resolution."""

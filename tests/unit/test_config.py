@@ -459,6 +459,45 @@ class TestConfigCORSValidation:
             with pytest.raises(ValueError, match="CORS origins are set to wildcard"):
                 Settings()
 
+    def test_cors_allow_methods_and_headers_from_env(self) -> None:
+        """Test that CORS_ALLOW_METHODS and CORS_ALLOW_HEADERS are parsed from env vars."""
+        with patch.dict(
+            os.environ,
+            {
+                "ENVIRONMENT": "development",
+                "JWT_SECRET_KEY": "valid-secret-key-that-is-long-enough-32chars!",
+                "CURSOR_SIGNING_KEY": "valid-cursor-key-that-is-long-enough-32chars!",
+                "WEBHOOK_SECRET_KEY": "valid-webhook-key-that-is-long-enough-32c!",
+                "CORS_ALLOW_METHODS": "GET,POST,PUT,DELETE",
+                "CORS_ALLOW_HEADERS": "Authorization,Content-Type,X-Custom-Header",
+            },
+        ):
+            settings = Settings()
+            assert settings.cors_allow_methods == ["GET", "POST", "PUT", "DELETE"]
+            assert settings.cors_allow_headers == ["Authorization", "Content-Type", "X-Custom-Header"]
+
+    def test_jwt_secret_key_low_entropy_check(self) -> None:
+        """Test that low entropy JWT secret key fails entropy check."""
+        with patch.dict(
+            os.environ,
+            {
+                "ENVIRONMENT": "production",
+                "JWT_SECRET_KEY": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",  # Low entropy (all same chars)
+                "CURSOR_SIGNING_KEY": "valid-cursor-key-that-is-long-enough-32chars!",
+                "WEBHOOK_SECRET_KEY": "valid-webhook-key-that-is-long-enough-32c!",
+                "DATABASE_URL": "postgresql://prod-db.example.com/apgi_api",
+                "REDIS_URL": "redis://prod-redis.example.com:6379/0",
+                "CORS_ORIGINS": "https://example.com",
+                "BASE_URL": "https://api.example.com",
+                "STRIPE_SECRET_KEY": "sk_live_test123",
+                "STRIPE_PUBLISHABLE_KEY": "pk_live_test123",
+                "STRIPE_WEBHOOK_SECRET": "whsec_test123",
+                "SMTP_SERVER": "smtp.example.com",
+            },
+        ):
+            with pytest.raises(ValueError, match="JWT_SECRET_KEY has low entropy"):
+                Settings()
+
     def test_cors_wildcard_in_development_warns(self) -> None:
         """Test that CORS wildcard in development issues a warning."""
         with patch.dict(

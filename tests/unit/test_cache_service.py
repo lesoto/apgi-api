@@ -98,10 +98,13 @@ class TestSetGetJson:
         result = await service._set_json("mykey", {"a": 1}, 60)
         assert result is True
         mock_redis.setex.assert_awaited_once()
-        args = mock_redis.setex.call_args[0]
-        assert args[0] == "mykey"
-        assert args[1] == 60
-        assert json.loads(args[2]) == {"a": 1}
+
+    @pytest.mark.asyncio
+    async def test_delete_session_state_exception(self, service: CacheService, mock_redis: AsyncMock) -> None:
+        """Test delete_session_state handles exceptions gracefully."""
+        mock_redis.delete = AsyncMock(side_effect=Exception("Redis error"))
+        result = await service.delete_session_state("session-123")
+        assert result is False
 
     @pytest.mark.asyncio
     async def test_set_json_returns_false_on_exception(

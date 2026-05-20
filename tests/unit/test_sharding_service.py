@@ -50,6 +50,20 @@ class TestDatabaseShardingService:
             assert all(f"shard_{i}" in service.shards for i in range(3))
             assert service.num_shards == 3
 
+    def test_init_multiple_shards_fallback_to_main_url(self, mock_settings: MagicMock) -> None:
+        """Test initialization with multiple shards but no shard URLs configured (line 67)."""
+        mock_settings.database_shards_count = 2
+        # Make shard URL attributes return None
+        mock_settings.databaseshard0url = None
+        mock_settings.databaseshard1url = None
+
+        with patch("app.services.sharding_service.settings", mock_settings):
+            service = DatabaseShardingService()
+
+            assert len(service.shards) == 2
+            # Both should fallback to main database URL
+            assert all(s.database_url == mock_settings.database_url for s in service.shards.values())
+
     def test_get_shard_for_user_single_shard(
         self, sharding_service: DatabaseShardingService
     ) -> None:
@@ -155,26 +169,29 @@ class TestDatabaseShardingService:
         assert result["shard_count"] == 1
         assert result["configured_shards"] == 1
 
-    def test_validate_sharding_setup_multiple_shards_same_url(
-        self, mock_settings: MagicMock
-    ) -> None:
-        """Test sharding setup validation for multiple shards with same URL."""
-        mock_settings.database_shards_count = 3
-        # Configure mock to return None for shard URLs, so all use same database_url
-        mock_settings.database_shard_0_url = None
-        mock_settings.database_shard_1_url = None
-        mock_settings.database_shard_2_url = None
+    def test_validate_sharding_setup_missing_shard_config(self, mock_settings: MagicMock) -> None:
+        """Test sharding setup validation for missing shard configuration (line 206)."""
+        mock_settings.database_shards_count = 2
 
         with patch("app.services.sharding_service.settings", mock_settings):
             service = DatabaseShardingService()
+            # Manually remove a shard to simulate missing configuration
+            del service.shards["shard_1"]
+
             result = service.validate_sharding_setup()
 
             assert isinstance(result, dict)
-            # The test expects warnings about same database URL, but implementation may not check this
-            # Just verify the result structure is correct
-            assert "valid" in result
-            assert "shard_count" in result
-            assert "configured_shards" in result
+            # Should have issue about missing shard
+            assert any("shard_1" in issue for issue in result["issues"])
+            assert result["valid"] is False
+
+    def test_validate_sharding_setup_no_read_replicas(self, sharding_service: DatabaseShardingService) -> None:
+        """Test sharding setup validation for no read replicas (lines 210-213)."""
+        result = sharding_service.validate_sharding_setup()
+
+        assert isinstance(result, dict)
+        # Should have warning about no read replicas
+        assert any("read replicas" in w for w in result["warnings"])
 
     def test_shard_config_dataclass(self) -> None:
         """Test ShardConfig dataclass."""

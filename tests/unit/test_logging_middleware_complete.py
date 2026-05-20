@@ -25,6 +25,17 @@ class TestConfigureStructuredLogging:
         configure_structured_logging("INFO")
         # If we get here without error, the test passed
 
+    @patch.dict(os.environ, {}, clear=True)
+    def test_configure_structured_logging_normal_case(self) -> None:
+        """Test that logging configuration works in normal case."""
+        # Remove TEST_MODE from environment
+        root_logger = logging.getLogger()
+        # Clear existing handlers to simulate fresh state
+        root_logger.handlers.clear()
+
+        configure_structured_logging("INFO")
+        # Should configure without error
+
     def test_configure_structured_logging_already_configured(self) -> None:
         """Test that logging configuration handles already configured loggers."""
         # First configure a logger
