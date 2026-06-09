@@ -277,8 +277,8 @@ def configure_deprecated_endpoints(deprecated_config: Dict[str, Dict[str, str]])
         deprecated_config: Dictionary mapping endpoint paths to deprecation info
                           Format: {"/v1/endpoint": {"sunset": "2026-01-01", "replacement": "/v2/endpoint"}}
     """
-    global DEPRECATED_ENDPOINTS
-    DEPRECATED_ENDPOINTS = deprecated_config
+    DEPRECATED_ENDPOINTS.clear()
+    DEPRECATED_ENDPOINTS.update(deprecated_config)
 
 
 def is_endpoint_deprecated(path: str) -> Optional[Dict[str, str]]:
