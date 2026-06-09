@@ -4,10 +4,37 @@ Comprehensive tests for experimental_tasks.py covering task execution paths.
 Tests the actual task execution when APGI system is available (mocked).
 """
 
-from typing import Any, Generator
+import sys
+from typing import Any, Callable, Generator
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
+
+
+def _mock_celery_task_decorator(
+    *args: Any, bind: bool = False, base: Any = None, name: str | None = None, **kwargs: Any
+) -> Callable[..., Any]:
+    def decorator(func: Callable[..., Any]) -> Callable[..., Any]:
+        setattr(func, "name", name or func.__name__)
+        setattr(func, "bind", bind)
+        setattr(func, "base", base)
+        return func
+
+    if args and callable(args[0]):
+        return decorator(args[0])
+    return decorator
+
+
+@pytest.fixture(autouse=True)
+def _fix_celery_mock_and_reload_ext() -> Generator[None, None, None]:
+    celery_mod = sys.modules.get("app.celery_app")
+    if celery_mod is not None:
+        celery_mod.celery_app.task.side_effect = _mock_celery_task_decorator
+    sys.modules.pop("app.tasks.experimental_tasks", None)
+    sys.modules.pop("app.tasks", None)
+    yield
+    sys.modules.pop("app.tasks.experimental_tasks", None)
+    sys.modules.pop("app.tasks", None)
 
 
 class MockTask:
@@ -107,28 +134,23 @@ class TestIowaGamblingTaskExecution:
             assert "apgi_system not installed" in result["error"]
             return
 
-        # If APGI is available (mocked), proceed with full test
+        # If APGI is available (mocked), call the raw function directly
         mock_self = MagicMock()
         mock_self.request.id = "celery-task-id-123"
+        mock_self.apgi_system = MagicMock()
 
-        # Create a mock APGI system for the task's apgi_system property
-        mock_apgi = MagicMock()
-        mock_self.apgi_system = mock_apgi
-
-        # Call the task's run method directly (bypassing Celery's task wrapper)
-        # The Celery task decorator wraps the function, so we need to access the underlying function
-        # through __wrapped__ or call run directly
-        task_instance = execute_iowa_gambling_task
-
-        # Bind the mock self to the task and call it
-        with patch.object(execute_iowa_gambling_task, "run") as mock_run:
-            mock_run.return_value = {
-                "task_type": "iowa_gambling",
-                "session_id": "test-session-id",
-                "status": "completed",
-                "results": {"trials": 10, "success_rate": 0.9},
-            }
-            result = mock_run("test-session-id", {"num_trials": 10})
+        with patch("app.tasks.experimental_tasks.IowaGamblingTask") as mock_task_class, \
+                patch("asyncio.run"):
+            mock_instance = MagicMock()
+            mock_instance.run_all_trials = MagicMock(
+                return_value={"trials": 10, "success_rate": 0.9}
+            )
+            mock_task_class.return_value = mock_instance
+            result = execute_iowa_gambling_task(
+                mock_self,
+                session_id="test-session-id",
+                parameters={"num_trials": 10},
+            )
 
         # Verify the result structure
         assert result["task_type"] == "iowa_gambling"

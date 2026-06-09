@@ -3,11 +3,50 @@ Comprehensive Adversarial Test Suite for Experimental Tasks
 Tests Celery bound tasks with proper mocking of self (task instance).
 """
 
+import sys
+from typing import Any, Callable, Generator
 from unittest.mock import AsyncMock, MagicMock, PropertyMock, patch
 
 import pytest
 
-from app.tasks.experimental_tasks import APGITask, trigger_webhook_on_completion
+
+# ---------------------------------------------------------------------------
+# Module-level helpers: ensure the Celery @task decorator returns raw functions
+# ---------------------------------------------------------------------------
+
+def _mock_celery_task_decorator(
+    *args: Any, bind: bool = False, base: Any = None, name: str | None = None, **kwargs: Any
+) -> Callable[..., Any]:
+    """Return the decorated function unchanged."""
+
+    def decorator(func: Callable[..., Any]) -> Callable[..., Any]:
+        setattr(func, "name", name or func.__name__)
+        setattr(func, "bind", bind)
+        setattr(func, "base", base)
+        return func
+
+    if args and callable(args[0]):
+        return decorator(args[0])
+    return decorator
+
+
+@pytest.fixture(autouse=True)
+def _fix_celery_mock_and_reload() -> Generator[None, None, None]:
+    """
+    Runs after conftest's mock_celery_app replaces sys.modules['app.celery_app'] with a
+    bare MagicMock.  We patch that mock's .celery_app.task with our pass-through decorator,
+    then force experimental_tasks to reimport so @celery_app.task returns raw functions.
+    """
+    celery_mod = sys.modules.get("app.celery_app")
+    if celery_mod is not None:
+        celery_mod.celery_app.task.side_effect = _mock_celery_task_decorator
+    # Force fresh import of the task module so the decorator fires again
+    sys.modules.pop("app.tasks.experimental_tasks", None)
+    sys.modules.pop("app.tasks", None)
+    yield
+    sys.modules.pop("app.tasks.experimental_tasks", None)
+    sys.modules.pop("app.tasks", None)
+
 
 # ============================================================================
 # Fixtures
@@ -17,6 +56,7 @@ from app.tasks.experimental_tasks import APGITask, trigger_webhook_on_completion
 @pytest.fixture
 def mock_celery_task() -> MagicMock:
     """Create a mock Celery task instance that mimics APGITask."""
+    from app.tasks.experimental_tasks import APGITask  # fresh import after clear
     task = MagicMock(spec=APGITask)
     task.request = MagicMock()
     task.request.id = "celery-task-id-123"
@@ -613,6 +653,7 @@ class TestWebhookIntegration:
                     mock_executor.check_and_start_pending_tasks = AsyncMock()
                     mock_executor_class.return_value = mock_executor
 
+                    from app.tasks.experimental_tasks import trigger_webhook_on_completion
                     result = {"status": "completed", "data": "test"}
                     await trigger_webhook_on_completion("task-123", result)
 
@@ -622,6 +663,8 @@ class TestWebhookIntegration:
     @pytest.mark.asyncio
     async def test_trigger_webhook_task_record_not_found(self) -> None:
         """Test when task record is not found."""
+        from app.tasks.experimental_tasks import trigger_webhook_on_completion
+
         mock_db = MagicMock()
         mock_db.query.return_value.filter.return_value.first.return_value = None
 
@@ -634,6 +677,8 @@ class TestWebhookIntegration:
     @pytest.mark.asyncio
     async def test_trigger_webhook_exception(self) -> None:
         """Test exception handling in webhook trigger."""
+        from app.tasks.experimental_tasks import trigger_webhook_on_completion
+
         with patch("app.tasks.experimental_tasks.get_db", side_effect=Exception("Database error")):
             result = {"status": "completed"}
             await trigger_webhook_on_completion("task-123", result)
@@ -649,6 +694,8 @@ class TestAPGITaskBase:
 
     def test_apgi_system_import_error(self) -> None:
         """Test import error handling when APGI not available."""
+        from app.tasks.experimental_tasks import APGITask
+
         with patch("app.tasks.experimental_tasks.APGI_SYSTEM_AVAILABLE", False):
             with patch("app.tasks.experimental_tasks.APGISystem", None):
                 task = APGITask()
@@ -660,6 +707,8 @@ class TestAPGITaskBase:
 
     def test_apgi_system_lazy_initialization(self) -> None:
         """Test lazy initialization of apgi_system property."""
+        from app.tasks.experimental_tasks import APGITask
+
         with patch("app.tasks.experimental_tasks.APGI_SYSTEM_AVAILABLE", True):
             with patch("app.tasks.experimental_tasks.APGISystem") as mock_system_class:
                 with patch("app.tasks.experimental_tasks.get_resource_path", return_value="/fake/path"):
@@ -677,6 +726,8 @@ class TestAPGITaskBase:
 
     def test_apgi_system_get_resource_path_none(self) -> None:
         """Test when get_resource_path is None."""
+        from app.tasks.experimental_tasks import APGITask
+
         with patch("app.tasks.experimental_tasks.APGI_SYSTEM_AVAILABLE", True):
             with patch("app.tasks.experimental_tasks.APGISystem", MagicMock()):
                 with patch("app.tasks.experimental_tasks.get_resource_path", None):
