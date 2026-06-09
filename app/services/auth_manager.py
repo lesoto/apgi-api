@@ -169,7 +169,9 @@ class AuthManager:
 
         return token
 
-    def create_refresh_token(self, user_id: str, username: str, roles: List[str]) -> str:
+    def create_refresh_token(
+        self, user_id: str, username: str, roles: List[str], remember_me: bool = False
+    ) -> str:
         """
         Create a JWT refresh token.
 
@@ -177,13 +179,15 @@ class AuthManager:
             user_id: User identifier
             username: Username
             roles: List of user roles
+            remember_me: If True, extend expiry to 30 days
 
         Returns:
             Encoded JWT refresh token string
         """
         from datetime import timezone
 
-        expires_at = datetime.now(timezone.utc) + timedelta(days=self.refresh_token_expire_days)
+        expire_days = 30 if remember_me else self.refresh_token_expire_days
+        expires_at = datetime.now(timezone.utc) + timedelta(days=expire_days)
 
         payload = TokenPayload(
             user_id=user_id, username=username, roles=roles, exp=expires_at, token_type="refresh"

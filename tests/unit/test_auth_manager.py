@@ -176,6 +176,33 @@ class TestCreateAccessToken:
 
 
 # ---------------------------------------------------------------------------
+# create_refresh_token (remember_me)
+# ---------------------------------------------------------------------------
+
+
+class TestCreateRefreshTokenRememberMe:
+    def test_create_refresh_token_with_remember_me(self, auth_manager: AuthManager) -> None:
+        """Refresh token with remember_me=True must have ~30-day expiry."""
+        before = datetime.now(timezone.utc)
+        token = auth_manager.create_refresh_token("uid1", "alice", [], remember_me=True)
+        payload = jwt.decode(token, options={"verify_signature": False})
+        exp = datetime.fromtimestamp(payload["exp"], tz=timezone.utc)
+        expected_min = before + timedelta(days=29)
+        expected_max = before + timedelta(days=31)
+        assert expected_min < exp < expected_max
+
+    def test_create_refresh_token_without_remember_me(self, auth_manager: AuthManager) -> None:
+        """Refresh token with remember_me=False must use the default expiry."""
+        before = datetime.now(timezone.utc)
+        token = auth_manager.create_refresh_token("uid1", "alice", [], remember_me=False)
+        payload = jwt.decode(token, options={"verify_signature": False})
+        exp = datetime.fromtimestamp(payload["exp"], tz=timezone.utc)
+        default_days = auth_manager.refresh_token_expire_days
+        expected = before + timedelta(days=default_days)
+        assert abs((exp - expected).total_seconds()) < 60
+
+
+# ---------------------------------------------------------------------------
 # verify_token
 # ---------------------------------------------------------------------------
 
