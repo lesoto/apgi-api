@@ -399,7 +399,7 @@ class DataLifecycleManager:
                         user.is_active = False  # type: ignore[assignment]
                         user.username = f"deleted_{user_id[:8]}"  # type: ignore[assignment]
                         user.email = f"deleted_{user_id[:8]}@deleted.local"  # type: ignore[assignment]
-                        user.password_hash = "deleted"  # type: ignore[assignment]
+                        user.password_hash = "deleted"  # type: ignore[assignment]  # nosec: B105 - placeholder value, not password
                         user.mfa_secret = None  # type: ignore[assignment]
                         user.mfa_backup_codes = None  # type: ignore[assignment]
                         deletion_summary["user_soft_deleted"] = 1

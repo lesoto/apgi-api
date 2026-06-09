@@ -71,11 +71,11 @@ jobs:
 
       - name: Run mypy strict
         run: |
-          mypy app/ --strict --show-error-codes --pretty
+          mypy app/ --strict --show-error-codes --pretty --explicit-package-bases
 
       - name: Run mypy on selected critical modules
         run: |
-          mypy app/middleware/ app/services/task_execution/ --strict --show-error-codes
+          mypy app/middleware/ app/services/task_execution/ --strict --show-error-codes --explicit-package-bases
 
   # ============================================================================
   # Security Scanning

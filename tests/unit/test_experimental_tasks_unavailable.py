@@ -166,3 +166,31 @@ class TestModuleImports:
         assert hasattr(experimental_tasks, "APGI_SYSTEM_AVAILABLE")
         # The flag value depends on whether apgi_system was available at import time
         assert isinstance(experimental_tasks.APGI_SYSTEM_AVAILABLE, bool)
+
+    def test_module_exports_all_required_symbols(self) -> None:
+        """Test that module exports all required symbols."""
+        from app.tasks import experimental_tasks
+
+        # Check __all__ exports
+        expected_exports = [
+            "APGITask",
+            "execute_iowa_gambling_task",
+            "execute_masking_paradigm_task",
+            "execute_attentional_blink_task",
+            "execute_change_blindness_task",
+            "execute_binocular_rivalry_task",
+            "trigger_webhook_on_completion",
+            "APGI_SYSTEM_AVAILABLE",
+            "AttentionalBlinkTask",
+            "BinocularRivalryTask",
+            "ChangeBlindnessTask",
+            "IowaGamblingTask",
+            "MaskingParadigmTask",
+            "get_resource_path",
+            "APGISystem",
+            "celery_app",
+            "WebhookManager",
+        ]
+
+        for export in expected_exports:
+            assert hasattr(experimental_tasks, export)

@@ -99,7 +99,11 @@ async def validate_session_ownership(
 
     # Admins bypass ownership checks (MF-012 / R-23)
     if is_admin:
-        assert session is not None
+        # Session should already be validated above, but ensure it's not None
+        if session is None:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND, detail=f"Session {session_id} not found"
+            )
         return session
 
     # Check ownership

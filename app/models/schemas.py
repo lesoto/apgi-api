@@ -25,7 +25,7 @@ class TokenPayload:
         username: str,
         roles: List[str],
         exp: datetime | int,
-        token_type: str = "access",
+        token_type: str = "access",  # nosec: B107 - token type, not password
         jti: Optional[str] = None,
         permissions: Optional[List[str]] = None,
     ):
@@ -608,7 +608,7 @@ class LoginRequest(BaseModel):
         json_schema_extra={
             "example": {
                 "username": "user@example.com",
-                "password": "secure_password",
+                "password": "secure_password",  # nosec: B105 - example value, not password
                 "remember_me": False,
             }
         },
@@ -621,7 +621,11 @@ class TokenRefreshRequest(BaseModel):
     refresh_token: str = Field(..., description="Valid refresh token")
 
     model_config = ConfigDict(
-        json_schema_extra={"example": {"refresh_token": "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9..."}}
+        json_schema_extra={
+            "example": {
+                "refresh_token": "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9..."  # nosec: B105 - example JWT token, not password
+            }
+        }
     )
 
 
@@ -639,9 +643,9 @@ class TokenResponse(BaseModel):
     model_config = ConfigDict(
         json_schema_extra={
             "example": {
-                "access_token": "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9...",
-                "refresh_token": "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9...",
-                "token_type": "bearer",
+                "access_token": "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9...",  # nosec: B105 - example JWT token, not password
+                "refresh_token": "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9...",  # nosec: B105 - example JWT token, not password
+                "token_type": "bearer",  # nosec: B105 - token type, not password
                 "expires_in": 3600,
                 "refresh_expires_in": 86400,
             }
@@ -665,9 +669,9 @@ class TokenRefreshResponse(BaseModel):
     model_config = ConfigDict(
         json_schema_extra={
             "example": {
-                "access_token": "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9...",
-                "refresh_token": "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9...",
-                "token_type": "bearer",
+                "access_token": "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9...",  # nosec: B105 - example JWT token, not password
+                "refresh_token": "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9...",  # nosec: B105 - example JWT token, not password
+                "token_type": "bearer",  # nosec: B105 - token type, not password
                 "expires_in": 1800,
                 "refresh_expires_in": 604800,
             }

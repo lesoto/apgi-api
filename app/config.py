@@ -42,7 +42,7 @@ class Settings:
         self.base_url: str = os.getenv("BASE_URL", "https://localhost:8000")
 
         # Server Settings
-        self.host: str = os.getenv("HOST", "0.0.0.0")
+        self.host: str = os.getenv("HOST", "127.0.0.1")  # nosec: B104
         self.port: int = int(os.getenv("PORT", "8000"))
         self.reload: bool = (
             os.getenv("RELOAD", "true").lower() == "true"
@@ -463,7 +463,7 @@ class Settings:
         # Validate Stripe keys for production
         if is_production:
             if (
-                self.stripe_secret_key == "sk_test_placeholder"
+                self.stripe_secret_key == "sk_test_placeholder"  # nosec: B105
                 or not self.stripe_secret_key.startswith("sk_live_")
             ):
                 errors.append(

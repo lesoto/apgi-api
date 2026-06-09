@@ -65,8 +65,7 @@ class StructuredLogger:
             # Don't pass kwargs to underlying logger - they're embedded in JSON message
             json_message = self._format_log_entry("INFO", message, **kwargs)
             self.logger.info(json_message)
-        except Exception:
-            # Silently fail if logging fails - don't crash the application
+        except Exception:  # nosec: B110
             pass
 
     def warning(self, message: str, **kwargs: Any) -> None:
@@ -75,8 +74,7 @@ class StructuredLogger:
             # Don't pass kwargs to underlying logger - they're embedded in JSON message
             json_message = self._format_log_entry("WARNING", message, **kwargs)
             self.logger.warning(json_message)
-        except Exception:
-            # Silently fail if logging fails - don't crash the application
+        except Exception:  # nosec: B110
             pass
 
     def error(self, message: str, **kwargs: Any) -> None:
@@ -85,8 +83,7 @@ class StructuredLogger:
             # Don't pass kwargs to underlying logger - they're embedded in JSON message
             json_message = self._format_log_entry("ERROR", message, **kwargs)
             self.logger.error(json_message)
-        except Exception:
-            # Silently fail if logging fails - don't crash the application
+        except Exception:  # nosec: B110
             pass
 
     def debug(self, message: str, **kwargs: Any) -> None:
@@ -95,8 +92,7 @@ class StructuredLogger:
             # Don't pass kwargs to underlying logger - they're embedded in JSON message
             json_message = self._format_log_entry("DEBUG", message, **kwargs)
             self.logger.debug(json_message)
-        except Exception:
-            # Silently fail if logging fails - don't crash the application
+        except Exception:  # nosec: B110
             pass
 
 
@@ -239,7 +235,7 @@ class ErrorLoggingHandler:
 
             # Log the error with all context data as the structured message
             self.logger.error("Error occurred", **log_data)
-        except Exception:
+        except Exception:  # nosec: B110
             # Silently fail if error logging fails - don't crash the application
             pass
 
@@ -275,6 +271,6 @@ def configure_structured_logging(log_level: str = "INFO") -> None:
                 format="%(message)s",  # Just output the message (already JSON formatted)
                 handlers=[logging.StreamHandler()],
             )
-        except Exception:
+        except Exception:  # nosec: B110
             # If logging configuration fails, continue without it
             pass

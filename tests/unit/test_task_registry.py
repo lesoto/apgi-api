@@ -210,3 +210,28 @@ class TestTaskRegistry:
             name_via_getter = get_task_name(task_type)
             name_via_dict = TASK_REGISTRY[task_type]
             assert name_via_getter == name_via_dict
+
+    def test_validate_task_type_with_none(self) -> None:
+        """Test validate_task_type with None value raises ValueError."""
+        with pytest.raises(ValueError, match="Invalid task type"):
+            validate_task_type(None)  # type: ignore
+
+    def test_validate_task_type_with_empty_string(self) -> None:
+        """Test validate_task_type with empty string raises ValueError."""
+        with pytest.raises(ValueError, match="Invalid task type"):
+            validate_task_type("")
+
+    def test_validate_task_type_case_sensitivity(self) -> None:
+        """Test validate_task_type is case-sensitive."""
+        with pytest.raises(ValueError, match="Invalid task type"):
+            validate_task_type("IOWA_GAMBLING")  # Uppercase should fail
+
+    def test_get_task_function_with_none(self) -> None:
+        """Test get_task_function with None raises ValueError."""
+        with pytest.raises(ValueError, match="Unsupported task type"):
+            get_task_function(None)  # type: ignore
+
+    def test_get_task_name_with_none(self) -> None:
+        """Test get_task_name with None raises ValueError."""
+        with pytest.raises(ValueError, match="Unsupported task type"):
+            get_task_name(None)  # type: ignore

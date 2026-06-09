@@ -58,7 +58,7 @@ class TestGenerateCacheKey:
     def test_returns_string(self, service: BusinessMetricsService) -> None:
         key = service._generate_cache_key("test_method", "arg1", kwarg1="val1")
         assert isinstance(key, str)
-        assert len(key) == 32  # MD5 hex digest
+        assert len(key) == 64  # SHA-256 hex digest
 
     def test_different_args_produce_different_keys(self, service: BusinessMetricsService) -> None:
         k1 = service._generate_cache_key("method", "a")

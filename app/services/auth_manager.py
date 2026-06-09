@@ -152,7 +152,7 @@ class AuthManager:
             username=username,
             roles=roles,
             exp=expires_at,
-            token_type="access",
+            token_type="access",  # nosec: B106 - token type, not password
             jti=jti,
         )
 
@@ -190,7 +190,11 @@ class AuthManager:
         expires_at = datetime.now(timezone.utc) + timedelta(days=expire_days)
 
         payload = TokenPayload(
-            user_id=user_id, username=username, roles=roles, exp=expires_at, token_type="refresh"
+            user_id=user_id,
+            username=username,
+            roles=roles,
+            exp=expires_at,
+            token_type="refresh",  # nosec: B106 - token type, not password
         )
 
         token = jwt.encode(payload.to_dict(), cast(str, self.secret_key), algorithm=self.algorithm)
@@ -450,7 +454,7 @@ class AuthManager:
         return {
             "access_token": access_token,
             "refresh_token": refresh_token,
-            "token_type": "bearer",
+            "token_type": "bearer",  # nosec: B105 - token type, not password
             "expires_in": self.access_token_expire_minutes * 60,
             "refresh_expires_in": refresh_expire_days * 24 * 60 * 60,
         }
@@ -557,7 +561,7 @@ class AuthManager:
         return {
             "access_token": access_token,
             "refresh_token": new_refresh_token,
-            "token_type": "bearer",
+            "token_type": "bearer",  # nosec: B105 - token type, not password
             "expires_in": self.access_token_expire_minutes * 60,
             "refresh_expires_in": self.refresh_token_expire_days * 24 * 60 * 60,
         }

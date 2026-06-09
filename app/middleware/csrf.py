@@ -131,7 +131,7 @@ class CSRFMiddleware(BaseHTTPMiddleware):
             form_token = form.get("csrf_token")
             if form_token and isinstance(form_token, str):
                 return form_token
-        except Exception:
+        except Exception:  # nosec: B110 - CSRF token parse failure, returning None is expected
             pass
 
         return None

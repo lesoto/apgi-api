@@ -399,8 +399,8 @@ def record_query_timing(
             }
         )
         query_timings_var.set(timings)
-    except Exception:
-        pass  # Silently fail if context not available
+    except Exception:  # nosec: B110 - context var failure, silently fail
+        pass
 
 
 def record_cache_hit() -> None:
@@ -409,7 +409,7 @@ def record_cache_hit() -> None:
         stats = cache_stats_var.get({"hits": 0, "misses": 0})
         stats["hits"] = stats.get("hits", 0) + 1
         cache_stats_var.set(stats)
-    except Exception:
+    except Exception:  # nosec: B110 - context var failure, silently fail
         pass
 
 
@@ -419,5 +419,5 @@ def record_cache_miss() -> None:
         stats = cache_stats_var.get({"hits": 0, "misses": 0})
         stats["misses"] = stats.get("misses", 0) + 1
         cache_stats_var.set(stats)
-    except Exception:
+    except Exception:  # nosec: B110 - context var failure, silently fail
         pass

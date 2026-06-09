@@ -6,7 +6,7 @@ for external service calls and operations.
 """
 
 import asyncio
-import random
+import random  # nosec: B311 - used for retry jitter, not cryptographic purposes
 import time
 from dataclasses import dataclass, field
 from enum import Enum
@@ -244,7 +244,9 @@ class RetryService:
         if config.jitter:
             # Add random jitter (+0-25% of delay)
             jitter_range = delay * 0.25
-            delay += random.uniform(0, jitter_range)
+            delay += random.uniform(
+                0, jitter_range
+            )  # nosec: B311 - used for retry jitter, not cryptographic purposes
 
         return max(0.1, delay)  # Minimum 100ms delay
 

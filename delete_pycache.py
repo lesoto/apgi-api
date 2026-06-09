@@ -7,7 +7,7 @@ import sys
 from typing import Any, Dict, Iterable, List, Optional, Set, cast
 
 """
-APGI API Cleaner - Enhanced temporary file and folder cleanup utility
+APGI API Cleaner - Temporary file and folder cleanup utility
 
 This script is specifically configured for the APGI API application to safely remove
 temporary files, cache directories, and build artifacts while preserving essential
@@ -732,7 +732,7 @@ def load_config(config_path: str) -> Dict[str, Any]:
                     json.dump(DEFAULT_CONFIG, f, indent=2)
                 print(f"Created default config at {config_path}")
                 return DEFAULT_CONFIG
-            except Exception:
+            except Exception:  # nosec: B110
                 pass
         return DEFAULT_CONFIG
     except json.JSONDecodeError as e:

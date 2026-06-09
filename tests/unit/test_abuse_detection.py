@@ -132,6 +132,32 @@ class TestGetRiskLevel:
         # Risk score = 60 * 0.5 = 30, which is MEDIUM (25-49)
         assert risk == RiskLevel.MEDIUM
 
+    def test_get_risk_level_high_threshold(self) -> None:
+        """Test HIGH risk threshold (50-79)."""
+        service = AbuseDetectionService()
+        service.credential_risks["user123"] = CredentialRisk(
+            username="user123",
+            risk_score=100.0,
+            risk_factors=["suspicious"],
+            last_seen=datetime.now(timezone.utc),
+        )
+        risk = service.get_risk_level("user123", "192.168.1.1")
+        # Risk score = 100 * 0.5 = 50, which is HIGH (50-79)
+        assert risk == RiskLevel.HIGH
+
+    def test_get_risk_level_critical_threshold(self) -> None:
+        """Test CRITICAL risk threshold (80+)."""
+        service = AbuseDetectionService()
+        service.credential_risks["user123"] = CredentialRisk(
+            username="user123",
+            risk_score=160.0,
+            risk_factors=["suspicious"],
+            last_seen=datetime.now(timezone.utc),
+        )
+        risk = service.get_risk_level("user123", "192.168.1.1")
+        # Risk score = 160 * 0.5 = 80, which is CRITICAL (80+)
+        assert risk == RiskLevel.CRITICAL
+
     def test_get_risk_level_with_failed_attempts(self) -> None:
         """Risk increases with failed attempts."""
         service = AbuseDetectionService()
@@ -476,23 +502,33 @@ class TestContainsSuspiciousPatterns:
         """Detect admin pattern."""
         service = AbuseDetectionService()
         assert service._contains_suspicious_patterns("admin123") is True
+        assert service._contains_suspicious_patterns("admin") is True
 
     def test_contains_suspicious_patterns_test(self) -> None:
         """Detect test pattern."""
         service = AbuseDetectionService()
-        assert service._contains_suspicious_patterns("testuser") is True
+        assert service._contains_suspicious_patterns("test123") is True
+        assert service._contains_suspicious_patterns("test") is True
+
+    def test_contains_suspicious_patterns_root(self) -> None:
+        """Detect root pattern."""
+        service = AbuseDetectionService()
+        assert service._contains_suspicious_patterns("root123") is True
+        assert service._contains_suspicious_patterns("root") is True
 
     def test_contains_suspicious_patterns_sql(self) -> None:
         """Detect SQL injection pattern."""
         service = AbuseDetectionService()
-        # The pattern checks for "sql", "inject", "union", "select" - not the full SQL injection
-        assert service._contains_suspicious_patterns("user' OR 1=1") is False
-        assert service._contains_suspicious_patterns("user_inject") is True
+        assert service._contains_suspicious_patterns("sql") is True
+        assert service._contains_suspicious_patterns("SELECT") is True
 
-    def test_contains_suspicious_patterns_clean(self) -> None:
-        """Clean username passes."""
+    def test_contains_suspicious_patterns_normal(self) -> None:
+        """Normal username passes."""
         service = AbuseDetectionService()
         assert service._contains_suspicious_patterns("johnsmith") is False
+        assert service._contains_suspicious_patterns("alice") is False
+        assert service._contains_suspicious_patterns("user' OR 1=1") is False
+        assert service._contains_suspicious_patterns("user_inject") is True
 
 
 class TestIsSuspiciousIP:
@@ -519,6 +555,11 @@ class TestIsSuspiciousIP:
         service = AbuseDetectionService()
         assert service._is_suspicious_ip("8.8.8.8") is False
 
+    def test_is_suspicious_ip_proxy(self) -> None:
+        """Proxy-related IPs are suspicious."""
+        service = AbuseDetectionService()
+        assert service._is_suspicious_ip("proxy.server.com") is True
+
 
 class TestIsAutomatedUserAgent:
     """Test automated user agent detection."""
@@ -542,6 +583,26 @@ class TestIsAutomatedUserAgent:
         """Browser user agents are not automated."""
         service = AbuseDetectionService()
         assert service._is_automated_user_agent("Mozilla/5.0") is False
+
+    def test_is_automated_user_agent_wget(self) -> None:
+        """Detect wget user agent."""
+        service = AbuseDetectionService()
+        assert service._is_automated_user_agent("Wget/1.20") is True
+
+    def test_is_automated_user_agent_crawler(self) -> None:
+        """Detect crawler user agent."""
+        service = AbuseDetectionService()
+        assert service._is_automated_user_agent("Googlebot/2.1") is True
+
+    def test_is_automated_user_agent_spider(self) -> None:
+        """Detect spider user agent."""
+        service = AbuseDetectionService()
+        assert service._is_automated_user_agent("MySpider/1.0") is True
+
+    def test_is_automated_user_agent_scraper(self) -> None:
+        """Detect scraper user agent."""
+        service = AbuseDetectionService()
+        assert service._is_automated_user_agent("WebScraper/2.0") is True
 
 
 class TestGlobalInstance:

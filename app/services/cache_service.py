@@ -375,7 +375,7 @@ class CacheService:
             if data:
                 decrypted = self.fernet.decrypt(data)
                 return json.loads(decrypted)
-        except Exception:
+        except Exception:  # nosec: B110 - cache decryption failure, returning None is expected
             pass
         return None
 
@@ -393,7 +393,7 @@ class CacheService:
             data = await self.redis.get(key)
             if data:
                 return json.loads(data)
-        except Exception:
+        except Exception:  # nosec: B110 - cache parse failure, returning None is expected
             pass
         return None
 

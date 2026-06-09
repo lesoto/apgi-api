@@ -211,7 +211,7 @@ run_linting() {
 
     # Run mypy with strict mode for type checking
     log_info "Running mypy type checking with strict mode..."
-    execute python -m mypy --strict app/ --ignore-missing-imports
+    execute python -m mypy --strict app/ --ignore-missing-imports --explicit-package-bases
 
     # Check import sorting with Ruff (replaces isort)
     log_info "Checking import sorting with Ruff..."

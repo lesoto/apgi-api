@@ -5,7 +5,7 @@ Service for populating the database with realistic test data for development and
 """
 
 import logging
-import random
+import random  # nosec: B311 - used for test data generation, not cryptographic purposes
 from datetime import datetime, timedelta
 from typing import Any, Dict, List, Optional, cast
 
@@ -70,10 +70,14 @@ class DatabaseSeedingService:
                     username=username,
                     email=email,
                     password_hash=AuthManager.hash_password("password123!"),
-                    roles=["user", "researcher"] if random.random() < 0.3 else ["user"],
+                    roles=(
+                        ["user", "researcher"]
+                        if random.random() < 0.3  # nosec: B311 - test data generation
+                        else ["user"]
+                    ),
                     last_login=(
                         self.faker.date_time_between(start_date="-30d", end_date="now")
-                        if random.random() < 0.7
+                        if random.random() < 0.7  # nosec: B311 - test data generation
                         else None
                     ),
                 )
@@ -164,7 +168,7 @@ class DatabaseSeedingService:
             for i in range(min(count, len(template_configs))):
                 config = template_configs[i]
                 template_id = f"template_{i:03d}"
-                user_id = random.choice(user_ids)
+                user_id = random.choice(user_ids)  # nosec: B311 - test data generation
 
                 template = SessionTemplate(
                     template_id=template_id,
@@ -175,7 +179,8 @@ class DatabaseSeedingService:
                     custom_config=config["custom_config"],
                     default_description=config["default_description"],
                     tags=config["tags"],
-                    is_public=random.random() < 0.4,  # 40% chance of being public
+                    is_public=random.random()
+                    < 0.4,  # 40% chance of being public  # nosec: B311 - test data generation
                 )
                 db.add(template)
                 template_ids.append(template_id)
@@ -205,11 +210,13 @@ class DatabaseSeedingService:
         with get_db_context() as db:
             for i in range(count):
                 session_id = f"session_{i:03d}"
-                user_id = random.choice(user_ids)
+                user_id = random.choice(user_ids)  # nosec: B311 - test data generation
 
                 # Sometimes use a template
                 template_id = (
-                    random.choice(template_ids) if template_ids and random.random() < 0.6 else None
+                    random.choice(template_ids)  # nosec: B311 - test data generation
+                    if template_ids and random.random() < 0.6  # nosec: B311 - test data generation
+                    else None
                 )
 
                 # Generate session config
@@ -220,7 +227,9 @@ class DatabaseSeedingService:
                         "custom_config": {
                             "session_id": session_id,
                             "user_id": user_id,
-                            "trial_count": random.randint(10, 100),
+                            "trial_count": random.randint(
+                                10, 100
+                            ),  # nosec: B311 - test data generation
                         },
                         "description": f"Session created from template {template_id}",
                     }
@@ -229,17 +238,23 @@ class DatabaseSeedingService:
                     config = {
                         "config_path": "config/custom_session.yaml",
                         "custom_config": {
-                            "experiment_type": random.choice(
+                            "experiment_type": random.choice(  # nosec: B311 - test data generation
                                 ["attention", "memory", "decision", "vision"]
                             ),
-                            "trial_count": random.randint(20, 200),
-                            "duration_minutes": random.randint(5, 60),
+                            "trial_count": random.randint(
+                                20, 200
+                            ),  # nosec: B311 - test data generation
+                            "duration_minutes": random.randint(
+                                5, 60
+                            ),  # nosec: B311 - test data generation
                         },
                         "description": self.faker.sentence(),
                     }
 
                 # Random state with bias toward completed
-                state = random.choices(session_states, weights=[0.1, 0.1, 0.1, 0.1, 0.5, 0.1])[0]
+                state = random.choices(session_states, weights=[0.1, 0.1, 0.1, 0.1, 0.5, 0.1])[
+                    0
+                ]  # nosec: B311 - test data generation
 
                 # Generate created_at datetime
                 created_at_dt = self.faker.date_time_between(start_date="-90d", end_date="-1d")
@@ -251,7 +266,8 @@ class DatabaseSeedingService:
                     state=state,
                     description=config["description"],
                     tags=random.sample(
-                        ["experiment", "test", "development", "research"], random.randint(1, 3)
+                        ["experiment", "test", "development", "research"],
+                        random.randint(1, 3),  # nosec: B311 - test data generation
                     ),
                     created_at=created_at_dt,
                 )
@@ -297,10 +313,12 @@ class DatabaseSeedingService:
         with get_db_context() as db:
             for i in range(count):
                 task_id = f"task_{i:03d}"
-                session_id = random.choice(session_ids)
+                session_id = random.choice(session_ids)  # nosec: B311 - test data generation
 
-                task_type = random.choice(task_types)
-                status = random.choices(task_statuses, weights=[0.2, 0.2, 0.5, 0.1])[0]
+                task_type = random.choice(task_types)  # nosec: B311 - test data generation
+                status = random.choices(task_statuses, weights=[0.2, 0.2, 0.5, 0.1])[
+                    0
+                ]  # nosec: B311 - test data generation
 
                 # Generate parameters based on task type
                 parameters = self._generate_task_parameters(task_type)
@@ -311,8 +329,12 @@ class DatabaseSeedingService:
                     task_type=task_type,
                     parameters=parameters,
                     status=status,
-                    priority=random.randint(1, 10),
-                    progress=random.randint(0, 100) if status in ["running", "completed"] else None,
+                    priority=random.randint(1, 10),  # nosec: B311 - test data generation
+                    progress=(
+                        random.randint(0, 100)  # nosec: B311 - test data generation
+                        if status in ["running", "completed"]
+                        else None
+                    ),
                     result_data=(
                         self._generate_task_result(task_type) if status == "completed" else None
                     ),
@@ -365,8 +387,10 @@ class DatabaseSeedingService:
         with get_db_context() as db:
             for i in range(min(count, len(task_ids) - 1)):
                 # Select two different tasks
-                dependent_task = random.choice(task_ids)
-                prerequisite_task = random.choice([t for t in task_ids if t != dependent_task])
+                dependent_task = random.choice(task_ids)  # nosec: B311 - test data generation
+                prerequisite_task = random.choice(
+                    [t for t in task_ids if t != dependent_task]
+                )  # nosec: B311 - test data generation
 
                 # Check if dependency already exists
                 existing = (
@@ -382,7 +406,9 @@ class DatabaseSeedingService:
                     dependency = TaskDependency(
                         dependent_task_id=dependent_task,
                         prerequisite_task_id=prerequisite_task,
-                        dependency_type=random.choice(["completion", "success"]),
+                        dependency_type=random.choice(
+                            ["completion", "success"]
+                        ),  # nosec: B311 - test data generation
                     )
                     db.add(dependency)
                     dependency_ids.append(i)
@@ -396,72 +422,92 @@ class DatabaseSeedingService:
         """Generate realistic parameters for a task type."""
         if task_type == "attentional_blink":
             return {
-                "stream_length": random.randint(10, 20),
-                "target_position": random.randint(3, 8),
-                "distractor_count": random.randint(1, 3),
-                "stimulus_duration_ms": random.randint(50, 150),
+                "stream_length": random.randint(10, 20),  # nosec: B311 - test data generation
+                "target_position": random.randint(3, 8),  # nosec: B311 - test data generation
+                "distractor_count": random.randint(1, 3),  # nosec: B311 - test data generation
+                "stimulus_duration_ms": random.randint(
+                    50, 150
+                ),  # nosec: B311 - test data generation
             }
         elif task_type == "working_memory":
             return {
-                "n_back_level": random.randint(1, 3),
-                "sequence_length": random.randint(20, 50),
-                "stimulus_types": random.choice(["letters", "numbers", "shapes"]),
+                "n_back_level": random.randint(1, 3),  # nosec: B311 - test data generation
+                "sequence_length": random.randint(20, 50),  # nosec: B311 - test data generation
+                "stimulus_types": random.choice(
+                    ["letters", "numbers", "shapes"]
+                ),  # nosec: B311 - test data generation
             }
         elif task_type == "decision_making":
             return {
                 "deck_count": 4,
-                "trials_per_block": random.randint(20, 40),
-                "feedback_delay_ms": random.randint(500, 2000),
+                "trials_per_block": random.randint(20, 40),  # nosec: B311 - test data generation
+                "feedback_delay_ms": random.randint(
+                    500, 2000
+                ),  # nosec: B311 - test data generation
             }
         elif task_type == "visual_search":
             return {
-                "target_type": random.choice(["feature", "conjunction"]),
-                "set_size": random.choice([8, 16, 32]),
-                "target_present": random.choice([True, False]),
+                "target_type": random.choice(
+                    ["feature", "conjunction"]
+                ),  # nosec: B311 - test data generation
+                "set_size": random.choice([8, 16, 32]),  # nosec: B311 - test data generation
+                "target_present": random.choice(
+                    [True, False]
+                ),  # nosec: B311 - test data generation
             }
         elif task_type == "emotion_recognition":
             return {
-                "emotion": random.choice(["happy", "sad", "angry", "fear"]),
-                "intensity": random.choice([0.3, 0.6, 0.9]),
-                "presentation_time_ms": random.randint(500, 2000),
+                "emotion": random.choice(
+                    ["happy", "sad", "angry", "fear"]
+                ),  # nosec: B311 - test data generation
+                "intensity": random.choice([0.3, 0.6, 0.9]),  # nosec: B311 - test data generation
+                "presentation_time_ms": random.randint(
+                    500, 2000
+                ),  # nosec: B311 - test data generation
             }
         else:
-            return {"custom_parameter": random.randint(1, 100)}
+            return {
+                "custom_parameter": random.randint(1, 100)
+            }  # nosec: B311 - test data generation
 
     def _generate_task_result(self, task_type: str) -> Dict[str, Any]:
         """Generate realistic results for a completed task."""
         if task_type == "attentional_blink":
             return {
-                "accuracy": random.uniform(0.6, 0.95),
-                "reaction_time_ms": random.randint(300, 800),
-                "blink_effect_detected": random.choice([True, False]),
+                "accuracy": random.uniform(0.6, 0.95),  # nosec: B311 - test data generation
+                "reaction_time_ms": random.randint(300, 800),  # nosec: B311 - test data generation
+                "blink_effect_detected": random.choice(
+                    [True, False]
+                ),  # nosec: B311 - test data generation
             }
         elif task_type == "working_memory":
             return {
-                "accuracy": random.uniform(0.7, 0.98),
-                "false_positives": random.randint(0, 5),
-                "false_negatives": random.randint(0, 3),
+                "accuracy": random.uniform(0.7, 0.98),  # nosec: B311 - test data generation
+                "false_positives": random.randint(0, 5),  # nosec: B311 - test data generation
+                "false_negatives": random.randint(0, 3),  # nosec: B311 - test data generation
             }
         elif task_type == "decision_making":
             return {
-                "total_score": random.randint(-500, 2000),
-                "good_deck_preference": random.uniform(0.4, 0.9),
-                "learning_rate": random.uniform(0.1, 0.8),
+                "total_score": random.randint(-500, 2000),  # nosec: B311 - test data generation
+                "good_deck_preference": random.uniform(
+                    0.4, 0.9
+                ),  # nosec: B311 - test data generation
+                "learning_rate": random.uniform(0.1, 0.8),  # nosec: B311 - test data generation
             }
         elif task_type == "visual_search":
             return {
-                "search_time_ms": random.randint(200, 2000),
-                "accuracy": random.uniform(0.8, 1.0),
-                "slope_coefficient": random.uniform(10, 50),
+                "search_time_ms": random.randint(200, 2000),  # nosec: B311 - test data generation
+                "accuracy": random.uniform(0.8, 1.0),  # nosec: B311 - test data generation
+                "slope_coefficient": random.uniform(10, 50),  # nosec: B311 - test data generation
             }
         elif task_type == "emotion_recognition":
             return {
-                "accuracy": random.uniform(0.7, 0.95),
-                "reaction_time_ms": random.randint(400, 1200),
-                "confidence_rating": random.uniform(0.5, 1.0),
+                "accuracy": random.uniform(0.7, 0.95),  # nosec: B311 - test data generation
+                "reaction_time_ms": random.randint(400, 1200),  # nosec: B311 - test data generation
+                "confidence_rating": random.uniform(0.5, 1.0),  # nosec: B311 - test data generation
             }
         else:
-            return {"result_value": random.randint(10, 100)}
+            return {"result_value": random.randint(10, 100)}  # nosec: B311 - test data generation
 
     def clear_all_data(self) -> Dict[str, int]:
         """

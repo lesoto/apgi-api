@@ -195,7 +195,7 @@ class AuthenticationMiddleware(BaseHTTPMiddleware):
                     roles=[],  # API keys have no roles, permissions are checked separately
                     exp=datetime.now(timezone.utc)
                     + timedelta(hours=1),  # API keys are session-based
-                    token_type="api_key",
+                    token_type="api_key",  # nosec: B106 - token type, not password
                     permissions=api_key_info.permissions,
                 )
                 return ("api_key", user_payload)
@@ -281,7 +281,7 @@ class AuthenticationMiddleware(BaseHTTPMiddleware):
             payload = TokenPayload.from_dict(payload_dict)
 
             # Verify token type
-            if payload.token_type != "access":
+            if payload.token_type != "access":  # nosec: B105 - token type, not password
                 raise InvalidTokenError(
                     f"Invalid token type: expected access, got {payload.token_type}"
                 )

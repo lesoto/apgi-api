@@ -208,7 +208,7 @@ async def get_task_status(
 
             # Generate stable ETag based on status and result data
             etag_content = f"{status_info['status']}:{json.dumps(status_info.get('result', {}), sort_keys=True)}"
-            etag = f'W/"{hashlib.md5(etag_content.encode()).hexdigest()}"'
+            etag = f'W/"{hashlib.sha256(etag_content.encode()).hexdigest()}"'
 
             # Check If-None-Match header
             if request.headers.get("if-none-match") == etag:

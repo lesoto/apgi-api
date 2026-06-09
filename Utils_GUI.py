@@ -10,7 +10,7 @@ with output display and error handling.
 import json
 import os
 import select
-import subprocess
+import subprocess  # nosec: B404 - used for running trusted system commands
 import sys
 import threading
 import tkinter as tk
@@ -80,7 +80,7 @@ class UtilsRunnerGUI:
         """Detect system theme preference (dark/light)."""
         try:
             # Check macOS system preference
-            result = subprocess.run(
+            result = subprocess.run(  # nosec: B607, B603 - trusted macOS system command
                 ["defaults", "read", "-g", "AppleInterfaceStyle"],
                 capture_output=True,
                 text=True,
@@ -395,7 +395,7 @@ class UtilsRunnerGUI:
             while self.output_buffer:
                 message, tag = self.output_buffer.popleft()
                 self._log_output(message, tag)
-        except Exception:
+        except Exception:  # nosec: B110 - ignore UI update errors to prevent crashes
             pass
         self.root.after(100, self.process_output_queue)
 
@@ -412,7 +412,7 @@ class UtilsRunnerGUI:
         try:
             if hasattr(self, "status_label") and self.status_label:
                 self.status_label.config(text=message)
-        except Exception:
+        except Exception:  # nosec: B110 - ignore UI update errors to prevent crashes
             # Ignore errors when updating UI from threads
             pass
 
@@ -567,7 +567,7 @@ class UtilsRunnerGUI:
             env = os.environ.copy()
             env["PYTHONPATH"] = str(Path(__file__).parent)
 
-            process = subprocess.Popen(
+            process = subprocess.Popen(  # nosec: B603 - trusted command with controlled input
                 cmd,
                 stdout=subprocess.PIPE,
                 stderr=subprocess.STDOUT,

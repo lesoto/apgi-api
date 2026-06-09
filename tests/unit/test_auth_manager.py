@@ -18,10 +18,6 @@ from app.config import settings
 from app.exceptions import AuthenticationError, ExpiredTokenError, InvalidTokenError
 from app.services.auth_manager import AuthManager
 
-# ---------------------------------------------------------------------------
-# Fixtures
-# ---------------------------------------------------------------------------
-
 
 @pytest.fixture
 def db() -> MagicMock:
@@ -792,3 +788,104 @@ class TestRevokeAccessTokenException:
         token = auth_manager_with_redis.create_access_token("uid1", "alice", [])
         result = await auth_manager_with_redis.revoke_access_token(token)
         assert result is False
+
+
+# ---------------------------------------------------------------------------
+# authenticate_user - MFA failure and account locking
+# ---------------------------------------------------------------------------
+
+
+class TestAuthenticateUserMFALocking:
+    """Test MFA failure scenarios and account locking."""
+
+    @pytest.mark.asyncio
+    async def test_mfa_failure_increases_attempts(self, auth_manager: AuthManager) -> None:
+        """When MFA code is invalid, failed login attempts increment."""
+        from app.services.auth_manager import AuthManager
+
+        user = MagicMock()
+        user.username = "testuser"
+        user.password_hash = AuthManager.hash_password("correct_password")
+        user.mfa_enabled = True
+        user.mfa_secret = "JBSWY3DPEHPK3PXP"
+        user.failed_login_attempts = 0
+        user.locked_until = None
+
+        auth_manager.db.query.return_value.filter.return_value.first.return_value = user
+
+        with pytest.raises(AuthenticationError, match="Invalid MFA code"):
+            await auth_manager.authenticate_user("testuser", "correct_password", mfa_code="000000")
+
+        assert user.failed_login_attempts == 1
+
+    @pytest.mark.asyncio
+    async def test_mfa_failure_locks_account_after_5_attempts(
+        self, auth_manager: AuthManager
+    ) -> None:
+        """After 5 failed MFA attempts, account is locked for 15 minutes."""
+        from app.services.auth_manager import AuthManager
+
+        user = MagicMock()
+        user.username = "testuser"
+        user.password_hash = AuthManager.hash_password("correct_password")
+        user.mfa_enabled = True
+        user.mfa_secret = "JBSWY3DPEHPK3PXP"
+        user.failed_login_attempts = 4
+        user.locked_until = None
+
+        auth_manager.db.query.return_value.filter.return_value.first.return_value = user
+
+        with pytest.raises(AuthenticationError, match="Invalid MFA code"):
+            await auth_manager.authenticate_user("testuser", "correct_password", mfa_code="000000")
+
+        assert user.failed_login_attempts == 5
+        assert user.locked_until is not None
+
+    @pytest.mark.asyncio
+    async def test_mfa_failure_db_error_rolls_back(self, auth_manager: AuthManager) -> None:
+        """When DB commit fails during MFA failure, rollback is called."""
+        user = MagicMock()
+        user.username = "testuser"
+        user.password_hash = AuthManager.hash_password("correct_password")
+        user.mfa_enabled = True
+        user.mfa_secret = "JBSWY3DPEHPK3PXP"
+        user.failed_login_attempts = 0
+        user.locked_until = None
+
+        auth_manager.db.query.return_value.filter.return_value.first.return_value = user
+        auth_manager.db.commit.side_effect = Exception("DB error")
+
+        with pytest.raises(AuthenticationError, match="Invalid MFA code"):
+            await auth_manager.authenticate_user("testuser", "correct_password", mfa_code="000000")
+
+        auth_manager.db.rollback.assert_called()
+
+
+# ---------------------------------------------------------------------------
+# create_tokens_for_user - remember_me branch
+# ---------------------------------------------------------------------------
+
+
+class TestCreateTokensForUserRememberMe:
+    """Test create_tokens_for_user with remember_me parameter."""
+
+    @pytest.mark.asyncio
+    async def test_create_tokens_for_user_with_remember_me(self, auth_manager: AuthManager) -> None:
+        """When remember_me is True, refresh token expires in 30 days instead of default."""
+        from datetime import timedelta
+
+        user = MagicMock()
+        user.user_id = "uid1"
+        user.username = "alice"
+        user.roles = ["user"]
+
+        auth_manager.db.query.return_value.filter.return_value.first.return_value = user
+
+        tokens = auth_manager.create_tokens_for_user(user, remember_me=True)
+
+        # Verify the expiry is set to 30 days
+        assert auth_manager.db.add.called
+        added_token = auth_manager.db.add.call_args[0][0]
+        assert added_token.expires_at is not None
+        expected_expiry = datetime.now(timezone.utc) + timedelta(days=30)
+        assert abs((added_token.expires_at - expected_expiry).total_seconds()) < 10

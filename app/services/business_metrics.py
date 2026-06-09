@@ -51,7 +51,7 @@ class BusinessMetricsService:
     def _generate_cache_key(self, method_name: str, *args: Any, **kwargs: Any) -> str:
         """Generate a cache key for a method call."""
         key_data = f"{method_name}:{args}:{sorted(kwargs.items())}"
-        return hashlib.md5(key_data.encode()).hexdigest()
+        return hashlib.sha256(key_data.encode()).hexdigest()
 
     async def _get_cached_or_compute(
         self, cache_key: str, compute_func: Callable[[], Dict[str, Any]]

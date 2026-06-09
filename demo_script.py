@@ -47,11 +47,11 @@ class APIDemo:
 
         try:
             if method.upper() == "GET":
-                response = requests.get(url, headers=headers)
+                response = requests.get(url, headers=headers, timeout=30)
             elif method.upper() == "POST":
-                response = requests.post(url, headers=headers, json=data)
+                response = requests.post(url, headers=headers, json=data, timeout=30)
             elif method.upper() == "DELETE":
-                response = requests.delete(url, headers=headers, json=data)
+                response = requests.delete(url, headers=headers, json=data, timeout=30)
             else:
                 raise ValueError(f"Unsupported HTTP method: {method}")
 
@@ -147,7 +147,7 @@ class APIDemo:
                         "password": password,
                         "remember_me": False,
                     }
-        except Exception:
+        except Exception:  # nosec: B110 - login data fetch failure, will fallback to database
             pass
 
         # Fallback to database query
@@ -160,7 +160,7 @@ class APIDemo:
                     port="5432",
                     database="apgi_api_dev",
                     user="apgi_dev",
-                    password="dev_password",
+                    password="dev_password",  # nosec: B106 - demo script credential
                 )
                 cursor = conn.cursor()
                 cursor.execute(

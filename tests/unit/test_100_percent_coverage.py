@@ -202,7 +202,7 @@ class TestMainCoverageGaps:
         """Test main module imports correctly."""
         from app import main
 
-        assert hasattr(main, 'app')
+        assert hasattr(main, "app")
 
 
 class TestRoutesCoverageGaps:
@@ -314,7 +314,7 @@ class TestUserManagementCoverageGaps:
         """Test user management service module imports correctly."""
         from app.services import user_management
 
-        assert hasattr(user_management, 'UserManagementService')
+        assert hasattr(user_management, "UserManagementService")
 
 
 class TestTracingCoverageGaps:
@@ -324,7 +324,7 @@ class TestTracingCoverageGaps:
         """Test tracing module imports correctly."""
         from app import tracing
 
-        assert hasattr(tracing, 'configure_tracing')
+        assert hasattr(tracing, "configure_tracing")
 
 
 class TestDependencyCheckerCoverageGaps:
@@ -334,7 +334,7 @@ class TestDependencyCheckerCoverageGaps:
         """Test dependency checker module imports correctly."""
         from app import dependency_checker
 
-        assert hasattr(dependency_checker, 'check_dependencies')
+        assert hasattr(dependency_checker, "check_dependencies")
 
 
 class TestTasksRoutesCoverageGaps:
@@ -344,7 +344,7 @@ class TestTasksRoutesCoverageGaps:
         """Test tasks routes module imports correctly."""
         from app.routes import tasks
 
-        assert hasattr(tasks, 'router')
+        assert hasattr(tasks, "router")
 
 
 class TestCacheServiceCoverageGaps:
@@ -354,7 +354,7 @@ class TestCacheServiceCoverageGaps:
         """Test cache service module imports correctly."""
         from app.services import cache_service
 
-        assert hasattr(cache_service, 'CacheService')
+        assert hasattr(cache_service, "CacheService")
 
 
 class TestWebhookManagerCoverageGaps:
@@ -364,7 +364,7 @@ class TestWebhookManagerCoverageGaps:
         """Test webhook manager module imports correctly."""
         from app.services import webhook_manager
 
-        assert hasattr(webhook_manager, 'WebhookManager')
+        assert hasattr(webhook_manager, "WebhookManager")
 
 
 class TestAlertingCoverageGaps:
@@ -385,7 +385,7 @@ class TestStateRoutesCoverageGaps:
         """Test state routes module imports correctly."""
         from app.routes import state
 
-        assert hasattr(state, 'router')
+        assert hasattr(state, "router")
 
 
 class TestSessionsRoutesCoverageGaps:
@@ -395,7 +395,7 @@ class TestSessionsRoutesCoverageGaps:
         """Test sessions routes module imports correctly."""
         from app.routes import sessions
 
-        assert hasattr(sessions, 'router')
+        assert hasattr(sessions, "router")
 
 
 class TestPaymentsRoutesCoverageGaps:
@@ -405,7 +405,7 @@ class TestPaymentsRoutesCoverageGaps:
         """Test payments routes module imports correctly."""
         from app.routes import payments
 
-        assert hasattr(payments, 'router')
+        assert hasattr(payments, "router")
 
 
 class TestTaskExecutionCoverageGaps:
@@ -415,10 +415,10 @@ class TestTaskExecutionCoverageGaps:
         """Test task executor module imports correctly."""
         from app.services.task_execution import task_executor
 
-        assert hasattr(task_executor, 'TaskExecutor')
+        assert hasattr(task_executor, "TaskExecutor")
 
     def test_task_strategies_imports(self) -> None:
         """Test task strategies module imports correctly."""
         from app.services.task_execution import task_strategies
 
-        assert hasattr(task_strategies, 'TaskStrategy')
+        assert hasattr(task_strategies, "TaskStrategy")

@@ -238,7 +238,7 @@ class EmailNotificationChannel(NotificationChannel):
         smtp_server: str,
         smtp_port: int = 587,
         smtp_username: str = "",
-        smtp_password: str = "",
+        smtp_password: str = "",  # nosec: B107 - empty default for optional auth
         from_email: str = "alerts@apgi-api.com",
         to_emails: Optional[List[str]] = None,
     ):

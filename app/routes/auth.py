@@ -44,10 +44,10 @@ router = APIRouter(prefix="/v1/auth", tags=["Authentication"])
             "content": {
                 "application/json": {
                     "example": {
-                        "access_token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
-                        "token_type": "bearer",
+                        "access_token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",  # nosec: B105 - example JWT token, not password
+                        "token_type": "bearer",  # nosec: B105 - token type, not password
                         "expires_in": 1800,
-                        "refresh_token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
+                        "refresh_token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",  # nosec: B105 - example JWT token, not password
                     }
                 }
             },
@@ -137,7 +137,7 @@ async def login(
                 "application/json": {
                     "example": {
                         "access_token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
-                        "token_type": "bearer",
+                        "token_type": "bearer",  # nosec: B105 - token type, not password
                         "expires_in": 1800,
                     }
                 }

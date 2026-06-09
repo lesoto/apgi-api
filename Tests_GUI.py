@@ -10,7 +10,7 @@ suite using pytest with real-time output display and error handling.
 
 import os
 import re
-import subprocess
+import subprocess  # nosec: B404 - used for running trusted system commands
 import sys
 import threading
 import tkinter as tk
@@ -167,7 +167,7 @@ class TestsRunnerGUI:
         result: Optional[subprocess.CompletedProcess[str]] = None
         try:
             # Check macOS system preference
-            result = subprocess.run(
+            result = subprocess.run(  # nosec: B607, B603 - trusted macOS system command
                 ["defaults", "read", "-g", "AppleInterfaceStyle"],
                 capture_output=True,
                 text=True,
@@ -489,14 +489,14 @@ class TestsRunnerGUI:
 
             # Check if pytest is available
             try:
-                subprocess.run(
+                subprocess.run(  # nosec: B603 - trusted command for version check
                     [sys.executable, "-m", "pytest", "--version"],
                     capture_output=True,
                     check=True,
                 )
             except (subprocess.CalledProcessError, FileNotFoundError):
                 self.log_output("pytest not found. Installing pytest...", self.TAG_WARNING)
-                install_process = subprocess.Popen(
+                install_process = subprocess.Popen(  # nosec: B603 - trusted pip install command
                     [sys.executable, "-m", "pip", "install", "pytest"],
                     stdout=subprocess.PIPE,
                     stderr=subprocess.STDOUT,
@@ -512,22 +512,24 @@ class TestsRunnerGUI:
             # Run pytest with coverage and detailed output
             env = os.environ.copy()
             env["PYTHONPATH"] = str(Path(__file__).parent)
-            process = subprocess.Popen(
-                [
-                    sys.executable,
-                    "-m",
-                    "pytest",
-                    "-v",  # verbose output
-                    "--tb=short",  # shorter traceback format
-                    "--color=yes",  # colored output
-                    "tests/",
-                ],  # run tests in the tests directory
-                stdout=subprocess.PIPE,
-                stderr=subprocess.STDOUT,
-                text=True,
-                bufsize=1,
-                cwd=self.tests_dir.parent,
-                env=env,
+            process = (
+                subprocess.Popen(  # nosec: B603 - trusted pytest command with controlled input
+                    [
+                        sys.executable,
+                        "-m",
+                        "pytest",
+                        "-v",  # verbose output
+                        "--tb=short",  # shorter traceback format
+                        "--color=yes",  # colored output
+                        "tests/",
+                    ],  # run tests in the tests directory
+                    stdout=subprocess.PIPE,
+                    stderr=subprocess.STDOUT,
+                    text=True,
+                    bufsize=1,
+                    cwd=self.tests_dir.parent,
+                    env=env,
+                )
             )
 
             self.running_processes["pytest_all"] = process
@@ -606,7 +608,7 @@ class TestsRunnerGUI:
             )
             env = os.environ.copy()
             env["PYTHONPATH"] = str(Path(__file__).parent)
-            process = subprocess.Popen(
+            process = subprocess.Popen(  # nosec: B603 - trusted python module execution
                 [sys.executable, "-m", module_path],
                 stdout=subprocess.PIPE,
                 stderr=subprocess.STDOUT,

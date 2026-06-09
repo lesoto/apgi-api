@@ -211,7 +211,7 @@ def test_property_1_config_default_when_not_set(config_key: str) -> None:
 
     # Map environment variable names to settings attribute names and defaults
     defaults = {
-        "HOST": "0.0.0.0",
+        "HOST": "127.0.0.1",
         "DATABASE_URL": "postgresql://localhost/apgi_api",
         "REDIS_URL": "redis://localhost:6379/0",
         "LOG_LEVEL": "DEBUG",  # Default for development environment

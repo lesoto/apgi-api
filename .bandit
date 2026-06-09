@@ -1,0 +1,6 @@
+[bandit]
+# Skip B311 (random module) for files that use random for non-cryptographic purposes
+# seeding_service.py: test data generation
+# error_recovery.py: retry jitter
+skips = ['B311']
+exclude_dirs = ['/tests', '/alembic']

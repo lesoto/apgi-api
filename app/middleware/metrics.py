@@ -324,7 +324,7 @@ class PrometheusMetricsMiddleware(BaseHTTPMiddleware):
             # CPU usage
             cpu_percent = psutil.cpu_percent(interval=None)
             cpu_usage_percent.set(cpu_percent)
-        except Exception:
+        except Exception:  # nosec: B110
             # Silently fail if psutil is not available or other errors occur
             pass
 

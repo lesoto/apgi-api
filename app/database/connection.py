@@ -353,7 +353,7 @@ def after_cursor_execute(
     # Use a hash of the statement as the query_hash
     import hashlib
 
-    query_hash = hashlib.md5(statement.encode()).hexdigest()
+    query_hash = hashlib.sha256(statement.encode()).hexdigest()
 
     # Record timing
     try:

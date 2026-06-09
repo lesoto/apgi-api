@@ -66,11 +66,14 @@ def _drop_and_create_database(
     cursor = conn.cursor()
 
     # Terminate active connections to the database
-    cursor.execute(f"""
+    cursor.execute(
+        """
         SELECT pg_terminate_backend(pid)
         FROM pg_stat_activity
-        WHERE datname = '{DB_NAME}';
-    """)
+        WHERE datname = %s;
+    """,
+        (DB_NAME,),
+    )
 
     # Drop the database if it exists
     cursor.execute(f"DROP DATABASE IF EXISTS {DB_NAME};")

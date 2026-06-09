@@ -44,7 +44,7 @@ async def take_screenshots() -> None:
             unique_id = int(time.time())
             username = f"flow_user_{unique_id}"
             email = f"flow_{unique_id}@example.com"
-            password = "TestPassword123!"
+            password = "TestPassword123!"  # nosec: B105 - demo script credential
 
             print(f"Filling form with username: {username}, email: {email}")
             await page.fill("#username", username)

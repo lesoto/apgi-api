@@ -150,7 +150,11 @@ warn_no_return = true
 strict_equality = true
 strict = true
 explicit_package_bases = true
+<<<<<<< HEAD
 mypy_path = ["."]
+=======
+files = ["app"]
+>>>>>>> e0d362a (increased coverage)
 exclude = [
     "^/opt/",
     "^/usr/",
