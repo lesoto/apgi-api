@@ -1,6 +1,5 @@
 [bandit]
-# Skip B311 (random module) for files that use random for non-cryptographic purposes
+# B311 (random module) is handled via inline # nosec comments in code
 # seeding_service.py: test data generation
 # error_recovery.py: retry jitter
-skips = ['B311']
 exclude_dirs = ['/tests', '/alembic']

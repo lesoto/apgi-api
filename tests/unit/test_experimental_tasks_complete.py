@@ -9,10 +9,10 @@ from unittest.mock import AsyncMock, MagicMock, PropertyMock, patch
 
 import pytest
 
-
 # ---------------------------------------------------------------------------
 # Module-level helpers: ensure the Celery @task decorator returns raw functions
 # ---------------------------------------------------------------------------
+
 
 def _mock_celery_task_decorator(
     *args: Any, bind: bool = False, base: Any = None, name: str | None = None, **kwargs: Any
@@ -57,6 +57,7 @@ def _fix_celery_mock_and_reload() -> Generator[None, None, None]:
 def mock_celery_task() -> MagicMock:
     """Create a mock Celery task instance that mimics APGITask."""
     from app.tasks.experimental_tasks import APGITask  # fresh import after clear
+
     task = MagicMock(spec=APGITask)
     task.request = MagicMock()
     task.request.id = "celery-task-id-123"
@@ -163,14 +164,10 @@ class TestIowaGamblingTask:
 
                 type(mock_celery_task).apgi_system = PropertyMock(return_value=mock_apgi_system)
 
-                async def mock_run_with_exception(coro):
-                    try:
-                        await coro
-                    except Exception:
-                        pass
-                    raise Exception("Webhook failed")
-
-                with patch("asyncio.run", side_effect=mock_run_with_exception):
+                with patch(
+                    "app.tasks.experimental_tasks.trigger_webhook_on_completion",
+                    side_effect=Exception("Webhook failed"),
+                ):
                     from app.tasks.experimental_tasks import execute_iowa_gambling_task
 
                     result = execute_iowa_gambling_task(
@@ -265,21 +262,19 @@ class TestMaskingParadigmTask:
             with patch("app.tasks.experimental_tasks.MaskingParadigmTask") as mock_task_class:
                 instance = MagicMock()
                 instance.run_all_trials = MagicMock(
-                    return_value={"trials": [{"mask": "forward", "response": "correct"}], "accuracy": 0.85}
+                    return_value={
+                        "trials": [{"mask": "forward", "response": "correct"}],
+                        "accuracy": 0.85,
+                    }
                 )
                 mock_task_class.return_value = instance
 
                 type(mock_celery_task).apgi_system = PropertyMock(return_value=mock_apgi_system)
 
-                async def mock_run_with_exception(coro):
-                    # Await the coroutine to avoid warnings, then raise exception
-                    try:
-                        await coro
-                    except Exception:
-                        pass
-                    raise Exception("Webhook failed")
-
-                with patch("asyncio.run", side_effect=mock_run_with_exception):
+                with patch(
+                    "app.tasks.experimental_tasks.trigger_webhook_on_completion",
+                    side_effect=Exception("Webhook failed"),
+                ):
                     from app.tasks.experimental_tasks import execute_masking_paradigm_task
 
                     result = execute_masking_paradigm_task(
@@ -384,14 +379,10 @@ class TestAttentionalBlinkTask:
 
                 type(mock_celery_task).apgi_system = PropertyMock(return_value=mock_apgi_system)
 
-                async def mock_run_with_exception(coro):
-                    try:
-                        await coro
-                    except Exception:
-                        pass
-                    raise Exception("Webhook failed")
-
-                with patch("asyncio.run", side_effect=mock_run_with_exception):
+                with patch(
+                    "app.tasks.experimental_tasks.trigger_webhook_on_completion",
+                    side_effect=Exception("Webhook failed"),
+                ):
                     from app.tasks.experimental_tasks import execute_attentional_blink_task
 
                     result = execute_attentional_blink_task(
@@ -491,14 +482,10 @@ class TestChangeBlindnessTask:
 
                 type(mock_celery_task).apgi_system = PropertyMock(return_value=mock_apgi_system)
 
-                async def mock_run_with_exception(coro):
-                    try:
-                        await coro
-                    except Exception:
-                        pass
-                    raise Exception("Webhook failed")
-
-                with patch("asyncio.run", side_effect=mock_run_with_exception):
+                with patch(
+                    "app.tasks.experimental_tasks.trigger_webhook_on_completion",
+                    side_effect=Exception("Webhook failed"),
+                ):
                     from app.tasks.experimental_tasks import execute_change_blindness_task
 
                     result = execute_change_blindness_task(
@@ -603,14 +590,10 @@ class TestBinocularRivalryTask:
 
                 type(mock_celery_task).apgi_system = PropertyMock(return_value=mock_apgi_system)
 
-                async def mock_run_with_exception(coro):
-                    try:
-                        await coro
-                    except Exception:
-                        pass
-                    raise Exception("Webhook failed")
-
-                with patch("asyncio.run", side_effect=mock_run_with_exception):
+                with patch(
+                    "app.tasks.experimental_tasks.trigger_webhook_on_completion",
+                    side_effect=Exception("Webhook failed"),
+                ):
                     from app.tasks.experimental_tasks import execute_binocular_rivalry_task
 
                     result = execute_binocular_rivalry_task(
@@ -654,6 +637,7 @@ class TestWebhookIntegration:
                     mock_executor_class.return_value = mock_executor
 
                     from app.tasks.experimental_tasks import trigger_webhook_on_completion
+
                     result = {"status": "completed", "data": "test"}
                     await trigger_webhook_on_completion("task-123", result)
 
@@ -711,7 +695,9 @@ class TestAPGITaskBase:
 
         with patch("app.tasks.experimental_tasks.APGI_SYSTEM_AVAILABLE", True):
             with patch("app.tasks.experimental_tasks.APGISystem") as mock_system_class:
-                with patch("app.tasks.experimental_tasks.get_resource_path", return_value="/fake/path"):
+                with patch(
+                    "app.tasks.experimental_tasks.get_resource_path", return_value="/fake/path"
+                ):
                     mock_system = MagicMock()
                     mock_system_class.return_value = mock_system
 

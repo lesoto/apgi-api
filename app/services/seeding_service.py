@@ -179,8 +179,7 @@ class DatabaseSeedingService:
                     custom_config=config["custom_config"],
                     default_description=config["default_description"],
                     tags=config["tags"],
-                    is_public=random.random()
-                    < 0.4,  # 40% chance of being public  # nosec: B311 - test data generation
+                    is_public=random.random() < 0.4,  # nosec: B311 - test data generation
                 )
                 db.add(template)
                 template_ids.append(template_id)
@@ -252,9 +251,9 @@ class DatabaseSeedingService:
                     }
 
                 # Random state with bias toward completed
-                state = random.choices(session_states, weights=[0.1, 0.1, 0.1, 0.1, 0.5, 0.1])[
-                    0
-                ]  # nosec: B311 - test data generation
+                state = random.choices(  # nosec: B311 - test data generation
+                    session_states, weights=[0.1, 0.1, 0.1, 0.1, 0.5, 0.1]
+                )[0]
 
                 # Generate created_at datetime
                 created_at_dt = self.faker.date_time_between(start_date="-90d", end_date="-1d")
@@ -316,9 +315,9 @@ class DatabaseSeedingService:
                 session_id = random.choice(session_ids)  # nosec: B311 - test data generation
 
                 task_type = random.choice(task_types)  # nosec: B311 - test data generation
-                status = random.choices(task_statuses, weights=[0.2, 0.2, 0.5, 0.1])[
-                    0
-                ]  # nosec: B311 - test data generation
+                status = random.choices(  # nosec: B311 - test data generation
+                    task_statuses, weights=[0.2, 0.2, 0.5, 0.1]
+                )[0]
 
                 # Generate parameters based on task type
                 parameters = self._generate_task_parameters(task_type)
@@ -467,8 +466,8 @@ class DatabaseSeedingService:
             }
         else:
             return {
-                "custom_parameter": random.randint(1, 100)
-            }  # nosec: B311 - test data generation
+                "custom_parameter": random.randint(1, 100)  # nosec: B311 - test data generation
+            }
 
     def _generate_task_result(self, task_type: str) -> Dict[str, Any]:
         """Generate realistic results for a completed task."""

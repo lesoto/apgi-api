@@ -164,7 +164,7 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     try:
         redis_client = redis.from_url(settings.redis_url, encoding="utf-8", decode_responses=True)  # type: ignore[no-untyped-call]
         if redis_client:
-            await redis_client.ping()
+            await redis_client.ping()  # type: ignore[misc]
             logger.info("Redis client initialized", component="redis", url=settings.redis_url)
             app.state.redis_available = True
 

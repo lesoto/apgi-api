@@ -139,8 +139,10 @@ class TestIowaGamblingTaskExecution:
         mock_self.request.id = "celery-task-id-123"
         mock_self.apgi_system = MagicMock()
 
-        with patch("app.tasks.experimental_tasks.IowaGamblingTask") as mock_task_class, \
-                patch("asyncio.run"):
+        with (
+            patch("app.tasks.experimental_tasks.IowaGamblingTask") as mock_task_class,
+            patch("asyncio.run"),
+        ):
             mock_instance = MagicMock()
             mock_instance.run_all_trials = MagicMock(
                 return_value={"trials": 10, "success_rate": 0.9}

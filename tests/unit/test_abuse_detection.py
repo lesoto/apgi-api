@@ -438,7 +438,9 @@ class TestCalculateLoginAnomalyScore:
         # First attempt
         service.record_login_attempt("user123", "192.168.1.1", "Mozilla", True)
         # Manually set timestamp to be 2 seconds ago
-        service.login_attempts["user123"][0].timestamp = datetime.now(timezone.utc) - timedelta(seconds=2)
+        service.login_attempts["user123"][0].timestamp = datetime.now(timezone.utc) - timedelta(
+            seconds=2
+        )
         # Second attempt (current time)
         service.record_login_attempt("user123", "192.168.1.1", "Mozilla", True)
 
@@ -642,7 +644,9 @@ class TestIsRequestBlocked:
         service = AbuseDetectionService()
         mock_request = MagicMock()
         # Make client.host raise an exception
-        type(mock_request.client).host = property(lambda self: (_ for _ in ()).throw(Exception("Test error")))
+        type(mock_request.client).host = property(
+            lambda self: (_ for _ in ()).throw(Exception("Test error"))
+        )
 
         result = await service.is_request_blocked(mock_request)
         assert result is True

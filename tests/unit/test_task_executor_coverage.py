@@ -146,7 +146,9 @@ class TestTaskExecutorSubmitTaskWithCycle:
         mock_db = MagicMock()
         mock_session = MagicMock()
         mock_session.user_id = "user123"
-        mock_db.query.return_value.filter.return_value.filter.return_value.first.return_value = mock_session
+        mock_db.query.return_value.filter.return_value.filter.return_value.first.return_value = (
+            mock_session
+        )
         mock_db_context.return_value.__enter__.return_value = mock_db
 
         task_executor = TaskExecutor()
@@ -176,7 +178,9 @@ class TestTaskExecutorSubmitTaskCeleryFailure:
         mock_task_record.task_id = "task123"
         mock_task_record.status = TaskStatus.PENDING.value
 
-        mock_db.query.return_value.filter.return_value.filter.return_value.first.return_value = mock_session
+        mock_db.query.return_value.filter.return_value.filter.return_value.first.return_value = (
+            mock_session
+        )
         mock_db.query.return_value.filter.return_value.first.return_value = mock_task_record
         mock_db_context.return_value.__enter__.return_value = mock_db
 
@@ -209,7 +213,9 @@ class TestTaskExecutorSubmitTaskQueued:
         mock_db = MagicMock()
         mock_session = MagicMock()
         mock_session.user_id = "user123"
-        mock_db.query.return_value.filter.return_value.filter.return_value.first.return_value = mock_session
+        mock_db.query.return_value.filter.return_value.filter.return_value.first.return_value = (
+            mock_session
+        )
         mock_db_context.return_value.__enter__.return_value = mock_db
 
         task_executor = TaskExecutor()
@@ -241,7 +247,9 @@ class TestTaskExecutorCheckPendingTasks:
         mock_task.session_id = "session123"
         mock_task.parameters = {"num_trials": 50}
 
-        mock_db.query.return_value.filter.return_value.order_by.return_value.all.return_value = [mock_task]
+        mock_db.query.return_value.filter.return_value.order_by.return_value.all.return_value = [
+            mock_task
+        ]
         mock_db_context.return_value.__enter__.return_value = mock_db
 
         task_executor = TaskExecutor()

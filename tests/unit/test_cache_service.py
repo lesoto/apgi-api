@@ -100,7 +100,9 @@ class TestSetGetJson:
         mock_redis.setex.assert_awaited_once()
 
     @pytest.mark.asyncio
-    async def test_delete_session_state_exception(self, service: CacheService, mock_redis: AsyncMock) -> None:
+    async def test_delete_session_state_exception(
+        self, service: CacheService, mock_redis: AsyncMock
+    ) -> None:
         """Test delete_session_state handles exceptions gracefully."""
         mock_redis.delete = AsyncMock(side_effect=Exception("Redis error"))
         result = await service.delete_session_state("session-123")

@@ -514,6 +514,7 @@ def test_otel_import_type_error():
     # This test covers the TypeError exception path in lines 51-62
     # Simulate a TypeError during import by patching the import to raise TypeError
     import builtins
+
     original_import = builtins.__import__
 
     def mock_import(name, *args, **kwargs):

@@ -474,7 +474,11 @@ class TestConfigCORSValidation:
         ):
             settings = Settings()
             assert settings.cors_allow_methods == ["GET", "POST", "PUT", "DELETE"]
-            assert settings.cors_allow_headers == ["Authorization", "Content-Type", "X-Custom-Header"]
+            assert settings.cors_allow_headers == [
+                "Authorization",
+                "Content-Type",
+                "X-Custom-Header",
+            ]
 
     def test_jwt_secret_key_low_entropy_check(self) -> None:
         """Test that low entropy JWT secret key fails entropy check."""

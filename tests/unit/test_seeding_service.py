@@ -107,7 +107,11 @@ class TestSeedUsers:
         ):
             # Simulate username collision - first query returns existing user, second returns None
             mock_user = MagicMock()
-            mock_db.query.return_value.filter.return_value.first.side_effect = [mock_user, None, None]
+            mock_db.query.return_value.filter.return_value.first.side_effect = [
+                mock_user,
+                None,
+                None,
+            ]
             mock_ctx.return_value.__enter__.return_value = mock_db
             ids = seeding_service.seed_users(count=1, include_admin=False)
 
@@ -125,7 +129,11 @@ class TestSeedUsers:
         ):
             # Simulate email collision - first query returns existing user for email, second returns None
             mock_user = MagicMock()
-            mock_db.query.return_value.filter.return_value.first.side_effect = [None, mock_user, None]
+            mock_db.query.return_value.filter.return_value.first.side_effect = [
+                None,
+                mock_user,
+                None,
+            ]
             mock_ctx.return_value.__enter__.return_value = mock_db
             ids = seeding_service.seed_users(count=1, include_admin=False)
 

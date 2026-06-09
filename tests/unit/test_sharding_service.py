@@ -62,7 +62,9 @@ class TestDatabaseShardingService:
 
             assert len(service.shards) == 2
             # Both should fallback to main database URL
-            assert all(s.database_url == mock_settings.database_url for s in service.shards.values())
+            assert all(
+                s.database_url == mock_settings.database_url for s in service.shards.values()
+            )
 
     def test_get_shard_for_user_single_shard(
         self, sharding_service: DatabaseShardingService
@@ -185,7 +187,9 @@ class TestDatabaseShardingService:
             assert any("shard_1" in issue for issue in result["issues"])
             assert result["valid"] is False
 
-    def test_validate_sharding_setup_no_read_replicas(self, sharding_service: DatabaseShardingService) -> None:
+    def test_validate_sharding_setup_no_read_replicas(
+        self, sharding_service: DatabaseShardingService
+    ) -> None:
         """Test sharding setup validation for no read replicas (lines 210-213)."""
         result = sharding_service.validate_sharding_setup()
 

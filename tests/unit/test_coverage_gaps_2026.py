@@ -16,17 +16,15 @@ Covers:
 
 from __future__ import annotations
 
-import asyncio
 import logging
 import os
 import sys
 from datetime import datetime, timedelta, timezone
-from typing import Any, Generator
+from typing import Any
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 from pydantic import ValidationError
-
 
 # ============================================================================
 # app/models/schemas.py — validator edge cases (reachable paths only)
@@ -282,7 +280,9 @@ class TestSchemaValidatorEdgeCases:
         """TaskDependencyCreateRequest prerequisite_task_id empty (line 824)."""
         from app.models.schemas import TaskDependencyCreateRequest
 
-        with pytest.raises(ValidationError, match="Prerequisite task ID must be a non-empty string"):
+        with pytest.raises(
+            ValidationError, match="Prerequisite task ID must be a non-empty string"
+        ):
             TaskDependencyCreateRequest(
                 prerequisite_task_id="",
             )
@@ -742,7 +742,7 @@ class TestAuthManagerCoverage:
 
     async def test_verify_token_expired_after_decode(self) -> None:
         """Token is past expiry after jwt.decode succeeds (line 240, 253)."""
-        from app.services.auth_manager import AuthManager, ExpiredTokenError
+        from app.services.auth_manager import ExpiredTokenError
 
         manager = self._make_manager()
         import jwt
@@ -771,7 +771,7 @@ class TestAuthManagerCoverage:
 
     async def test_verify_token_revoked(self) -> None:
         """Token revoked via Redis check (line 244->247)."""
-        from app.services.auth_manager import AuthManager, InvalidTokenError
+        from app.services.auth_manager import InvalidTokenError
 
         manager = self._make_manager()
         import jwt
@@ -801,7 +801,6 @@ class TestAuthManagerCoverage:
 
     async def test_revoke_access_token_no_expiry(self) -> None:
         """revoke_access_token with no exp (line 299->304)."""
-        from app.services.auth_manager import AuthManager
 
         manager = self._make_manager()
         import jwt
@@ -828,7 +827,6 @@ class TestAuthManagerCoverage:
 
     async def test_revoke_access_token_past_expiry(self) -> None:
         """revoke_access_token with past expiry — ttl=None, uses default (line 301->304)."""
-        from app.services.auth_manager import AuthManager
 
         manager = self._make_manager()
         import jwt
@@ -1019,7 +1017,9 @@ class TestExperimentalTasksWebhookErrors:
         """Iowa gambling task APGI unavailable path (lines 181-185)."""
         self._clear_module()
 
-        with patch("app.celery_app.celery_app.task", side_effect=self._make_celery_task_decorator()):
+        with patch(
+            "app.celery_app.celery_app.task", side_effect=self._make_celery_task_decorator()
+        ):
             from app.tasks.experimental_tasks import (
                 APGI_SYSTEM_AVAILABLE,
                 execute_iowa_gambling_task,
@@ -1036,7 +1036,9 @@ class TestExperimentalTasksWebhookErrors:
         """Masking paradigm task APGI unavailable path."""
         self._clear_module()
 
-        with patch("app.celery_app.celery_app.task", side_effect=self._make_celery_task_decorator()):
+        with patch(
+            "app.celery_app.celery_app.task", side_effect=self._make_celery_task_decorator()
+        ):
             from app.tasks.experimental_tasks import (
                 APGI_SYSTEM_AVAILABLE,
                 execute_masking_paradigm_task,
@@ -1052,7 +1054,9 @@ class TestExperimentalTasksWebhookErrors:
         """Attentional blink task APGI unavailable path."""
         self._clear_module()
 
-        with patch("app.celery_app.celery_app.task", side_effect=self._make_celery_task_decorator()):
+        with patch(
+            "app.celery_app.celery_app.task", side_effect=self._make_celery_task_decorator()
+        ):
             from app.tasks.experimental_tasks import (
                 APGI_SYSTEM_AVAILABLE,
                 execute_attentional_blink_task,
@@ -1068,7 +1072,9 @@ class TestExperimentalTasksWebhookErrors:
         """Change blindness task APGI unavailable path."""
         self._clear_module()
 
-        with patch("app.celery_app.celery_app.task", side_effect=self._make_celery_task_decorator()):
+        with patch(
+            "app.celery_app.celery_app.task", side_effect=self._make_celery_task_decorator()
+        ):
             from app.tasks.experimental_tasks import (
                 APGI_SYSTEM_AVAILABLE,
                 execute_change_blindness_task,
@@ -1084,7 +1090,9 @@ class TestExperimentalTasksWebhookErrors:
         """Binocular rivalry task APGI unavailable path."""
         self._clear_module()
 
-        with patch("app.celery_app.celery_app.task", side_effect=self._make_celery_task_decorator()):
+        with patch(
+            "app.celery_app.celery_app.task", side_effect=self._make_celery_task_decorator()
+        ):
             from app.tasks.experimental_tasks import (
                 APGI_SYSTEM_AVAILABLE,
                 execute_binocular_rivalry_task,
@@ -1100,7 +1108,9 @@ class TestExperimentalTasksWebhookErrors:
         """Iowa gambling webhook trigger exception (lines 240-241)."""
         self._clear_module()
 
-        with patch("app.celery_app.celery_app.task", side_effect=self._make_celery_task_decorator()):
+        with patch(
+            "app.celery_app.celery_app.task", side_effect=self._make_celery_task_decorator()
+        ):
             from app.tasks.experimental_tasks import (
                 APGI_SYSTEM_AVAILABLE,
                 execute_iowa_gambling_task,
@@ -1123,7 +1133,9 @@ class TestExperimentalTasksWebhookErrors:
         mock_apgi_class = MagicMock(return_value=mock_apgi_instance)
         mock_get_resource_path = MagicMock(return_value="/mock/path/config.yaml")
 
-        with patch("app.celery_app.celery_app.task", side_effect=self._make_celery_task_decorator()):
+        with patch(
+            "app.celery_app.celery_app.task", side_effect=self._make_celery_task_decorator()
+        ):
             with patch.dict(
                 "sys.modules",
                 {
@@ -1421,6 +1433,7 @@ class TestSessionManagerCoverage:
 
     def test_deep_merge_non_dict_override(self) -> None:
         """Deep merge when base[key] is dict but override is not (line 144-145)."""
+
         # Test the deep_merge logic directly
         def deep_merge(base: dict, override: dict) -> None:
             for key, value in override.items():
