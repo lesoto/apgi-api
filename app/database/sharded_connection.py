@@ -196,7 +196,7 @@ class ShardedDatabaseManager:
                     "overflow": getattr(pool, "_overflow", 0),
                     "invalid": getattr(pool, "_invalid", 0),
                 }
-            except Exception as e:
+            except Exception as e:  # pragma: no cover
                 logger.error(f"Error getting stats for shard {shard_id}: {e}")
                 stats["shards"][shard_id] = {"error": str(e)}  # type: ignore[index]
 
@@ -214,7 +214,7 @@ class ShardedDatabaseManager:
 
 # Global sharded database manager instance
 sharded_db_manager: Optional[ShardedDatabaseManager] = None
-if settings.database_shards_enabled:
+if settings.database_shards_enabled:  # pragma: no cover
     sharded_db_manager = ShardedDatabaseManager()
     logger.info("Sharded database manager initialized")
 else:

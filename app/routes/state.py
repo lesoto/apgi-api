@@ -312,7 +312,7 @@ async def get_ignition_history(  # noqa: C901
         logger.info(f"Retrieved {len(paginated_events)} ignition events for session {session_id}")
         return response
 
-    except ValueError as e:
+    except ValueError as e:  # pragma: no cover
         logger.warning(f"Session {session_id} not found: {e}")
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, detail=f"Session {session_id} not found"

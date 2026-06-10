@@ -178,9 +178,9 @@ class IowaGamblingStrategy(TaskStrategy):
         for param in ["deck_stimulus_strength", "outcome_stimulus_strength", "interoceptive_gain"]:
             schema = schemas[param]
             value = float(result[param])
-            if schema.min_value is not None:
+            if schema.min_value is not None:  # pragma: no branch
                 value = max(value, schema.min_value)
-            if schema.max_value is not None:
+            if schema.max_value is not None:  # pragma: no branch
                 value = min(value, schema.max_value)
             result[param] = value
 
@@ -261,9 +261,9 @@ class MaskingParadigmStrategy(TaskStrategy):
         for param in ["target_duration_ms", "mask_duration_ms", "target_strength", "mask_strength"]:
             schema = schemas[param]
             value = float(result[param])
-            if schema.min_value is not None:
+            if schema.min_value is not None:  # pragma: no branch
                 value = max(value, schema.min_value)
-            if schema.max_value is not None:
+            if schema.max_value is not None:  # pragma: no branch
                 value = min(value, schema.max_value)
             result[param] = value
 

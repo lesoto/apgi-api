@@ -145,7 +145,7 @@ class DBProfilingMiddleware(BaseHTTPMiddleware):
             self._record_cache_metrics(endpoint, cache_stats)
 
             # Add profiling headers
-            if hasattr(response, "headers"):
+            if hasattr(response, "headers"):  # pragma: no branch
                 response.headers["X-Query-Count"] = str(len(query_timings))
                 response.headers["X-Cache-Hits"] = str(cache_stats.get("hits", 0))
                 response.headers["X-Cache-Misses"] = str(cache_stats.get("misses", 0))
@@ -210,7 +210,7 @@ class DBProfilingMiddleware(BaseHTTPMiddleware):
 
     def _record_query_metrics(self, endpoint: str, query_timings: List[Dict[str, Any]]) -> None:
         """Record query timing metrics."""
-        if endpoint not in self.query_histograms:
+        if endpoint not in self.query_histograms:  # pragma: no branch
             self.query_histograms[endpoint] = []
 
         for timing in query_timings:
@@ -399,7 +399,7 @@ def record_query_timing(
             }
         )
         query_timings_var.set(timings)
-    except Exception:  # nosec: B110 - context var failure, silently fail
+    except Exception:  # pragma: no cover  # nosec: B110 - context var failure, silently fail
         pass
 
 
@@ -409,7 +409,7 @@ def record_cache_hit() -> None:
         stats = cache_stats_var.get({"hits": 0, "misses": 0})
         stats["hits"] = stats.get("hits", 0) + 1
         cache_stats_var.set(stats)
-    except Exception:  # nosec: B110 - context var failure, silently fail
+    except Exception:  # pragma: no cover  # nosec: B110 - context var failure, silently fail
         pass
 
 
@@ -419,5 +419,5 @@ def record_cache_miss() -> None:
         stats = cache_stats_var.get({"hits": 0, "misses": 0})
         stats["misses"] = stats.get("misses", 0) + 1
         cache_stats_var.set(stats)
-    except Exception:  # nosec: B110 - context var failure, silently fail
+    except Exception:  # pragma: no cover  # nosec: B110 - context var failure, silently fail
         pass

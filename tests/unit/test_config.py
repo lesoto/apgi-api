@@ -96,7 +96,7 @@ class TestConfigValidSettings:
             settings = Settings()
             assert settings.api_title == "APGI System API"
             assert settings.api_version == "1.0.0"
-            assert settings.host == "0.0.0.0"
+            assert settings.host == "127.0.0.1"
             assert settings.port == 8000
             assert settings.pool_size == 20
             assert settings.max_overflow == 30

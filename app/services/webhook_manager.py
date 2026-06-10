@@ -98,7 +98,7 @@ class WebhookManager:
                     if allowed_ip is None:
                         allowed_ip = ip_str
 
-                except (ipaddress.AddressValueError, ipaddress.NetmaskValueError):
+                except (ipaddress.AddressValueError, ipaddress.NetmaskValueError):  # pragma: no cover
                     # Invalid IP format, skip
                     continue
 

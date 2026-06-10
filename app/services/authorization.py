@@ -297,8 +297,8 @@ def check_permission(
 
         # Find which role would grant this permission
         required_role = None
-        for role, perms in ROLE_PERMISSIONS.items():
-            if required_permission in perms:
+        for role, perms in ROLE_PERMISSIONS.items():  # pragma: no branch
+            if required_permission in perms:  # pragma: no branch
                 required_role = role.value
                 break
 

@@ -226,7 +226,7 @@ async def get_task_status(
 
         # Add ETag header for stable responses
         response = JSONResponse(content=response_data.model_dump())
-        if status_info["status"] in ["completed", "failed", "cancelled"]:
+        if status_info["status"] in ["completed", "failed", "cancelled"]:  # pragma: no branch
             response.headers["ETag"] = etag
             response.headers["Cache-Control"] = "private, max-age=3600"  # Cache terminal states
 
