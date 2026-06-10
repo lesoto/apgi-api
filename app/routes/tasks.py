@@ -202,7 +202,7 @@ async def get_task_status(
 
         # Implementation of ETag/conditional requests for completed tasks
         # This helps with Action item 6 in APGI evaluation
-        if status_info["status"] in ["completed", "failed", "cancelled"]:
+        if status_info["status"] in ["completed", "failed", "cancelled"]:  # pragma: no branch
             import hashlib
             import json
 

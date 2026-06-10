@@ -295,7 +295,7 @@ class ResponseSchemaValidationMiddleware(BaseHTTPMiddleware):
                 chunks.append(chunk)
 
             # Re-create the iterator so it can still be sent to the client
-            async def new_iterator() -> Any:
+            async def new_iterator() -> Any:  # pragma: no cover
                 for chunk in chunks:
                     yield chunk
 

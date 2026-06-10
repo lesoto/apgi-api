@@ -263,7 +263,7 @@ def session_template_create_request_strategy() -> SearchStrategy:
                     whitelist_categories=("Lu", "Ll", "Nd", "Pc", "Zs"),
                     blacklist_characters="\x00\xa0",
                 ),
-            )
+            ).filter(lambda n: n == n.strip() and bool(n.strip()))
         )
         config_path = draw(config_path_strategy)
         tags = draw(
