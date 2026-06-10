@@ -111,3 +111,35 @@ class TestTaskExecutor:
 
         assert result["task_id"] == task_id
         assert result["status"] == "retrying"
+
+    async def test_submit_task_with_cycle_detection(self) -> None:
+        """Test task submission with cycle detection (lines 137-140)."""
+        session_id = "session123"
+        task_type = "iowa_gambling"
+        parameters = {"num_trials": 50}
+        user_id = "user123"
+        task_executor = TaskExecutor()
+
+        with patch.object(task_executor.dependency_manager, "has_cycle", return_value=True):
+            with patch("app.database.connection.get_db_context"):
+                with pytest.raises(ValueError, match="Task dependency cycle detected"):
+                    await task_executor.submit_task(session_id, task_type, parameters, user_id)
+
+    async def test_submit_task_without_strategy(self) -> None:
+        """Test task submission when strategy is not available (line 149)."""
+        session_id = "session123"
+        task_type = "iowa_gambling"
+        parameters = {"num_trials": 50}
+        user_id = "user123"
+        task_executor = TaskExecutor()
+
+        with patch.object(task_executor.strategy_registry, "get", return_value=None):
+            with patch("app.database.connection.get_db_context"):
+                # Should use parameters as-is when no strategy
+                with patch.object(
+                    task_executor.task_submitter, "start_task_immediately"
+                ) as mock_start:
+                    await task_executor.submit_task(session_id, task_type, parameters, user_id)
+                    # Verify parameters were passed without validation
+                    call_args = mock_start.call_args
+                    assert call_args[1]["parameters"] == parameters

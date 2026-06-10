@@ -3,7 +3,6 @@ Comprehensive tests for tasks module to achieve 100% coverage.
 Covers: experimental_tasks, webhook_tasks, task_registry, tasks.__init__
 """
 
-import asyncio
 from importlib import import_module
 from unittest.mock import AsyncMock, MagicMock, patch
 
@@ -75,20 +74,11 @@ class TestWebhookTasks:
     """Test webhook tasks module."""
 
     @patch("app.tasks.webhook_tasks._process_webhooks", new_callable=AsyncMock)
-    @patch("app.tasks.webhook_tasks.asyncio.run")
+    @patch("app.tasks.webhook_tasks.asyncio.run", side_effect=lambda coro: None)
     def test_process_pending_webhooks_task(self, mock_run, mock_process):
         """Test process_pending_webhooks task."""
 
         mock_process.return_value = 1
-
-        def fake_run(coro):
-            loop = asyncio.new_event_loop()
-            try:
-                return loop.run_until_complete(coro)
-            finally:
-                loop.close()
-
-        mock_run.side_effect = fake_run
 
         webhook_tasks.process_pending_webhooks()
 
@@ -116,8 +106,11 @@ class TestTaskRegistry:
 
     def test_list_available_tasks(self):
         """Test list_available_tasks."""
+        # Use synchronous call to avoid AsyncMock warning
+        from app.tasks.task_registry import TaskType
+
         tasks = task_registry.list_available_tasks()
-        assert task_registry.TaskType.IOWA_GAMBLING in tasks
+        assert TaskType.IOWA_GAMBLING in tasks
 
     def test_validate_task_type(self):
         """Test validate_task_type."""

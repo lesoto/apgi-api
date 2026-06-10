@@ -74,3 +74,26 @@ class TestConfigureStructuredLogging:
         # Restore handlers
         root_logger.handlers.clear()
         root_logger.handlers.extend(original_handlers)
+
+    def test_disables_uvicorn_access_logs(self) -> None:
+        """Test that uvicorn access logs are disabled (line 258)."""
+        # Reset uvicorn access logger
+        uvicorn_logger = logging.getLogger("uvicorn.access")
+        original_disabled = uvicorn_logger.disabled
+        uvicorn_logger.disabled = False  # Enable it first to test the function
+
+        # Import the real function temporarily (bypassing the global mock)
+        import importlib
+
+        import app.middleware.logging as logging_module
+
+        importlib.reload(logging_module)
+
+        # Call the real function
+        logging_module.configure_structured_logging()
+
+        # uvicorn access logger should be disabled
+        assert uvicorn_logger.disabled is True
+
+        # Restore original state
+        uvicorn_logger.disabled = original_disabled

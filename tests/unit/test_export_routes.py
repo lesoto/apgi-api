@@ -16,7 +16,7 @@ Also covers:
 import io
 from contextlib import asynccontextmanager
 from datetime import datetime, timedelta, timezone
-from typing import AsyncGenerator, Optional
+from typing import Any, AsyncGenerator, Generator, Optional
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
@@ -37,6 +37,17 @@ ADMIN_USER = TokenPayload(
     token_type="access",
     permissions=[],
 )
+
+
+@pytest.fixture(autouse=True)
+def _patch_trigger_webhook() -> Generator[None, None, None]:
+    """Patch trigger_webhook_on_completion to prevent RuntimeWarning from unawaited coroutine."""
+
+    async def noop_webhook(*args: Any, **kwargs: Any) -> None:
+        pass
+
+    with patch("app.tasks.experimental_tasks.trigger_webhook_on_completion", new=noop_webhook):
+        yield
 
 
 @asynccontextmanager

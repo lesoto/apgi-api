@@ -141,7 +141,7 @@ class TestIowaGamblingTaskExecution:
 
         with (
             patch("app.tasks.experimental_tasks.IowaGamblingTask") as mock_task_class,
-            patch("asyncio.run"),
+            patch("asyncio.run", side_effect=lambda coro: None),
         ):
             mock_instance = MagicMock()
             mock_instance.run_all_trials = MagicMock(
