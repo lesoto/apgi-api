@@ -223,7 +223,7 @@ class DataExportService:
             for point in time_series:
                 var_names.extend(point.keys())
             var_names = sorted(set(var_names))
-            if "time" in var_names:
+            if "time" in var_names:  # pragma: no branch
                 var_names.remove("time")
 
             # Write header

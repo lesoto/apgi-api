@@ -114,32 +114,68 @@ class TestTaskExecutor:
 
     async def test_submit_task_with_cycle_detection(self) -> None:
         """Test task submission with cycle detection (lines 137-140)."""
+        from unittest.mock import AsyncMock, MagicMock
+
         session_id = "session123"
         task_type = "iowa_gambling"
         parameters = {"num_trials": 50}
         user_id = "user123"
         task_executor = TaskExecutor()
 
-        with patch.object(task_executor.dependency_manager, "has_cycle", return_value=True):
-            with patch("app.database.connection.get_db_context"):
-                with pytest.raises(ValueError, match="Task dependency cycle detected"):
-                    await task_executor.submit_task(session_id, task_type, parameters, user_id)
+        mock_db = MagicMock()
+        mock_session = MagicMock()
+        mock_db.query.return_value.filter.return_value.filter.return_value.first.return_value = (
+            mock_session
+        )
+        mock_db.query.return_value.filter.return_value.first.return_value = MagicMock()
+
+        with patch(
+            "app.services.task_execution.task_executor.get_db_context"
+        ) as mock_ctx:
+            mock_ctx.return_value.__enter__.return_value = mock_db
+            with patch.object(
+                task_executor.task_submitter, "submit_task", new_callable=AsyncMock, return_value="task-123"
+            ):
+                with patch.object(task_executor.dependency_manager, "has_cycle", return_value=True):
+                    with pytest.raises(ValueError, match="Task dependency cycle detected"):
+                        await task_executor.submit_task(session_id, task_type, parameters, user_id)
 
     async def test_submit_task_without_strategy(self) -> None:
         """Test task submission when strategy is not available (line 149)."""
+        from unittest.mock import AsyncMock, MagicMock
+
         session_id = "session123"
         task_type = "iowa_gambling"
         parameters = {"num_trials": 50}
         user_id = "user123"
         task_executor = TaskExecutor()
 
-        with patch.object(task_executor.strategy_registry, "get", return_value=None):
-            with patch("app.database.connection.get_db_context"):
-                # Should use parameters as-is when no strategy
-                with patch.object(
-                    task_executor.task_submitter, "start_task_immediately"
-                ) as mock_start:
-                    await task_executor.submit_task(session_id, task_type, parameters, user_id)
-                    # Verify parameters were passed without validation
-                    call_args = mock_start.call_args
-                    assert call_args[1]["parameters"] == parameters
+        mock_db = MagicMock()
+        mock_session = MagicMock()
+        mock_db.query.return_value.filter.return_value.filter.return_value.first.return_value = (
+            mock_session
+        )
+
+        with patch(
+            "app.services.task_execution.task_executor.get_db_context"
+        ) as mock_ctx:
+            mock_ctx.return_value.__enter__.return_value = mock_db
+            with patch.object(
+                task_executor.task_submitter, "submit_task", new_callable=AsyncMock, return_value="task-456"
+            ):
+                with patch.object(task_executor.dependency_manager, "has_cycle", return_value=False):
+                    with patch.object(
+                        task_executor.dependency_manager, "can_start_task", return_value=True
+                    ):
+                        with patch.object(task_executor.strategy_registry, "get", return_value=None):
+                            with patch.object(
+                                task_executor.task_submitter,
+                                "start_task_immediately",
+                                new_callable=AsyncMock,
+                            ) as mock_start:
+                                await task_executor.submit_task(
+                                    session_id, task_type, parameters, user_id
+                                )
+                                # Verify parameters were passed without validation
+                                call_args = mock_start.call_args
+                                assert call_args[1]["parameters"] == parameters

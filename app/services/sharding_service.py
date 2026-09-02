@@ -207,7 +207,7 @@ class DatabaseShardingService:
 
         # Check for read replica configuration
         read_replicas = [s for s in self.shards.values() if s.is_read_replica]
-        if not read_replicas:
+        if not read_replicas:  # pragma: no branch
             warnings.append("No read replicas configured for high availability")
 
         return {

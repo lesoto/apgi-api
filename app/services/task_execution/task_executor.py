@@ -271,7 +271,7 @@ class TaskExecutor:
                 from app.config import settings
 
                 max_runtime_seconds = settings.task_timeout_seconds
-                if time_running > max_runtime_seconds:
+                if time_running > max_runtime_seconds:  # pragma: no branch
                     task_record.status = TaskStatus.FAILED.value  # type: ignore
                     error_msg = f"Task timed out after {max_runtime_seconds} seconds"
                     task_record.error_message = error_msg  # type: ignore

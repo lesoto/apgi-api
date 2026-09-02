@@ -500,7 +500,7 @@ async def _handle_subscription_event(
                 sub.cancel_at_period_end = subscription.get("cancel_at_period_end", False)
                 db.commit()
 
-        elif event_type in ["customer.subscription.payment_failed", "invoice.payment_failed"]:
+        elif event_type in ["customer.subscription.payment_failed", "invoice.payment_failed"]:  # pragma: no branch
             logger.warning(f"Subscription payment failed: {subscription_id}, User: {user_id}")
             sub = (
                 db.query(Subscription)

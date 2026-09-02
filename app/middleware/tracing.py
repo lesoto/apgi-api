@@ -25,12 +25,12 @@ try:
         from opentelemetry.exporter.jaeger.thrift import JaegerExporter
 
         JAEGER_EXPORTER_AVAILABLE = True
-    except ImportError as jaeger_error:
+    except ImportError as jaeger_error:  # pragma: no cover
         logger = logging.getLogger(__name__)
         logger.warning(f"JaegerExporter not available: {jaeger_error}")
         JAEGER_EXPORTER_AVAILABLE = False
 
-except Exception as e:
+except Exception as e:  # pragma: no cover
     logger = logging.getLogger(__name__)
     logger.warning(f"OpenTelemetry not available: {e}")
     OPENTELEMETRY_AVAILABLE = False

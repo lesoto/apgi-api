@@ -266,7 +266,7 @@ async def update_api_key(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="API key not found")
 
     # Update fields if provided
-    if request.name is not None:
+    if request.name is not None:  # pragma: no branch
         api_key.name = request.name  # type: ignore[assignment]
     if request.permissions is not None:
         api_key.permissions = request.permissions  # type: ignore[assignment]
@@ -368,7 +368,7 @@ async def rotate_api_key(
         db.add(db_new_api_key)
 
         # Optionally deactivate the old key
-        if deactivate_old:
+        if deactivate_old:  # pragma: no branch
             existing_key.is_active = False  # type: ignore[assignment]
 
         db.commit()

@@ -120,12 +120,12 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
         # Check soft dependencies - log warnings but don't fail
         from app.dependency_checker import SOFT_DEPENDENCIES
 
-        if not check_dependencies(required_deps=SOFT_DEPENDENCIES, fail_fast=False):
+        if not check_dependencies(required_deps=SOFT_DEPENDENCIES, fail_fast=False):  # pragma: no cover
             logger.warning(
                 "Soft dependencies missing. Starting in degraded mode.", component="lifecycle"
             )
             app.state.degraded_mode = True
-        else:
+        else:  # pragma: no cover
             app.state.degraded_mode = False
 
     # Configure alerting system

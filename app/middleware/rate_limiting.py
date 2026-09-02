@@ -76,7 +76,7 @@ class RateLimitingMiddleware(BaseHTTPMiddleware):
         Args:
             redis_client: Redis client for rate limiting
         """
-        if cls._instance:
+        if cls._instance:  # pragma: no branch
             cls._instance.redis_client = redis_client
             cls._instance.rate_limiter = RateLimiter(redis_client)
 

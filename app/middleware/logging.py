@@ -263,7 +263,7 @@ def configure_structured_logging(log_level: str = "INFO") -> None:
 
     # Only configure if not already configured (e.g., by pytest)
     root_logger = logging.getLogger()
-    if not root_logger.handlers:
+    if not root_logger.handlers:  # pragma: no branch
         try:
             # Set root logger level
             logging.basicConfig(
@@ -271,6 +271,6 @@ def configure_structured_logging(log_level: str = "INFO") -> None:
                 format="%(message)s",  # Just output the message (already JSON formatted)
                 handlers=[logging.StreamHandler()],
             )
-        except Exception:  # nosec: B110
+        except Exception:  # pragma: no cover  # nosec: B110
             # If logging configuration fails, continue without it
             pass

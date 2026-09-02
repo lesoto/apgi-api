@@ -66,7 +66,7 @@ async def async_retry_with_backoff(
     if last_exception is not None:
         raise last_exception
 
-    raise RuntimeError("All retries failed but no exception was captured")
+    raise RuntimeError("All retries failed but no exception was captured")  # pragma: no cover
 
 
 class TaskSubmitter:

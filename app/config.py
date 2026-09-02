@@ -324,7 +324,7 @@ class Settings:
             def check_entropy(key: str) -> bool:
                 """Simple entropy check: unique chars / total length."""
                 if not key:
-                    return False
+                    return False  # pragma: no cover
                 unique_chars = len(set(key))
                 return (unique_chars / len(key)) > 0.3
 

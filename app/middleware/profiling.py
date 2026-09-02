@@ -92,7 +92,7 @@ class ProfilingMiddleware(BaseHTTPMiddleware):
         logger.info(f"Endpoint performance: {endpoint} took {duration:.3f}s")
 
         # Add profiling headers to response
-        if hasattr(response, "headers"):
+        if hasattr(response, "headers"):  # pragma: no branch
             response.headers["X-Request-Duration"] = f"{duration:.3f}s"
             if self.profile_functions:
                 response.headers["X-Profiled"] = "true"

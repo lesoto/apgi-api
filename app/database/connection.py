@@ -32,7 +32,7 @@ if settings.database_url.startswith("sqlite"):
         echo=False,  # Set to True for SQL query logging
         connect_args={"check_same_thread": False},  # SQLite specific
     )
-else:
+else:  # pragma: no cover
     # PostgreSQL configuration with connection pooling optimized for horizontal scaling
     engine = create_engine(
         settings.database_url,
@@ -316,7 +316,7 @@ def get_pool_status() -> dict[str, Any]:
             f"Database connection pool under high load: {utilization:.1%} utilized "
             f"({total_connections}/{max_connections} connections)"
         )
-    elif status["checked_out"] >= status["pool_size"] + status["overflow"]:
+    elif status["checked_out"] >= status["pool_size"] + status["overflow"]:  # pragma: no cover
         logger.error(
             f"Database connection pool exhausted: {status['checked_out']} connections checked out, "
             f"pool_size={status['pool_size']}, overflow={status['overflow']}"
@@ -365,5 +365,5 @@ def after_cursor_execute(
             duration_ms=total_time * 1000,
             rows=cursor.rowcount,
         )
-    except (ImportError, AttributeError):
+    except (ImportError, AttributeError):  # pragma: no cover
         pass

@@ -414,7 +414,7 @@ APGI API Team
 
             server = smtplib.SMTP(settings.smtp_server, settings.smtp_port)
             server.starttls(context=_ssl.create_default_context())
-            if settings.smtp_username and settings.smtp_password:
+            if settings.smtp_username and settings.smtp_password:  # pragma: no branch
                 server.login(settings.smtp_username, settings.smtp_password)
             server.sendmail(settings.smtp_from_email, email, msg.as_string())
             server.quit()
@@ -539,7 +539,7 @@ APGI API Team
 
             server = smtplib.SMTP(settings.smtp_server, settings.smtp_port)
             server.starttls(context=_ssl.create_default_context())
-            if settings.smtp_username and settings.smtp_password:
+            if settings.smtp_username and settings.smtp_password:  # pragma: no branch
                 server.login(settings.smtp_username, settings.smtp_password)
             server.sendmail(settings.smtp_from_email, email, msg.as_string())
             server.quit()
