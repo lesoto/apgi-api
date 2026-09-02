@@ -6,7 +6,7 @@ Configuration settings for the standalone APGI REST API.
 
 import os
 import warnings
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, Set
 from urllib.parse import urlparse
 
 from dotenv import load_dotenv
@@ -240,6 +240,16 @@ class Settings:
             shard_url = os.getenv(f"DATABASE_SHARD_{i}_URL")
             if shard_url:
                 self.database_shard_urls[i] = shard_url
+
+        # K7 Identifiability Gate Settings (governing doc §3.6)
+        # The seven-dimensional latent APGI state vector is withheld from API
+        # responses per-parameter until each parameter individually clears the
+        # K7 identifiability test. None have cleared as of this writing,
+        # so this defaults to empty — nothing is exposed. Only flip a
+        # parameter on here once K7 has actually passed for it.
+        self.k7_cleared_parameters: Set[str] = {
+            p.strip() for p in os.getenv("K7_CLEARED_PARAMETERS", "").split(",") if p.strip()
+        }
 
         # Stripe Settings
         self.stripe_secret_key: str = os.getenv("STRIPE_SECRET_KEY", "sk_test_placeholder")

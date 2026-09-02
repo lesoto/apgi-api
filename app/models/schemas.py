@@ -1559,11 +1559,16 @@ class AllostaticState(BaseModel):
 
 
 class BodyState(BaseModel):
-    """Body state representation."""
+    """Body state representation.
 
-    heart_rate: float = Field(..., description="Heart rate")
-    cortisol: float = Field(..., description="Cortisol level")
-    temperature: float = Field(..., description="Body temperature")
+    Gated by K7 identifiability (governing doc §3.6, parameter
+    `interoceptive_body_state`): fields are omitted entirely from the
+    response until cleared, not defaulted to null.
+    """
+
+    heart_rate: Optional[float] = Field(None, description="Heart rate (K7-gated)")
+    cortisol: Optional[float] = Field(None, description="Cortisol level (K7-gated)")
+    temperature: Optional[float] = Field(None, description="Body temperature (K7-gated)")
 
 
 class IgnitionEvent(BaseModel):
@@ -1583,11 +1588,16 @@ class IgnitionHistoryResponse(BaseModel):
 
 
 class IgnitionState(BaseModel):
-    """Ignition state representation."""
+    """Ignition state representation.
+
+    `threshold` (theta_t) is gated by K7 identifiability (governing doc
+    §3.6, parameter `ignition_threshold`) and is omitted from the response
+    until cleared, not defaulted to null.
+    """
 
     ignition_occurred: bool = Field(..., description="Whether ignition has occurred")
     total_signal: float = Field(..., description="Total ignition signal")
-    threshold: float = Field(..., description="Ignition threshold")
+    threshold: Optional[float] = Field(None, description="Ignition threshold (K7-gated)")
     duration_ms: Optional[float] = Field(None, description="Ignition duration in milliseconds")
 
 
@@ -1660,10 +1670,15 @@ class UsersListResponse(BaseModel):
 
 
 class PrecisionState(BaseModel):
-    """Precision state representation."""
+    """Precision state representation.
 
-    exteroceptive: float = Field(..., description="Exteroceptive precision")
-    interoceptive: float = Field(..., description="Interoceptive precision")
+    Gated by K7 identifiability (governing doc §3.6, parameters
+    `precision_exteroceptive` / `precision_interoceptive`): fields are
+    omitted entirely from the response until cleared, not defaulted to null.
+    """
+
+    exteroceptive: Optional[float] = Field(None, description="Exteroceptive precision (K7-gated)")
+    interoceptive: Optional[float] = Field(None, description="Interoceptive precision (K7-gated)")
 
 
 class SelfModelState(BaseModel):
@@ -1707,25 +1722,44 @@ class WorkspaceState(BaseModel):
 
 
 class PredictionErrorsResponse(BaseModel):
-    """Response for prediction errors."""
+    """Response for prediction errors.
+
+    Gated by K7 identifiability (governing doc §3.6, parameters
+    `prediction_error_exteroceptive` / `prediction_error_interoceptive`):
+    fields are omitted entirely from the response until cleared, not
+    defaulted to null.
+    """
 
     session_id: str = Field(..., description="Session identifier")
     time_ms: float = Field(..., description="Current time in milliseconds")
-    prediction_errors: Dict[str, Any] = Field(..., description="Prediction errors")
-    exteroceptive_stats: Dict[str, Any] = Field(..., description="Exteroceptive statistics")
-    interoceptive_stats: Dict[str, Any] = Field(..., description="Interoceptive statistics")
+    prediction_errors: Optional[Dict[str, Any]] = Field(
+        None, description="Prediction errors (K7-gated)"
+    )
+    exteroceptive_stats: Optional[Dict[str, Any]] = Field(
+        None, description="Exteroceptive statistics (K7-gated)"
+    )
+    interoceptive_stats: Optional[Dict[str, Any]] = Field(
+        None, description="Interoceptive statistics (K7-gated)"
+    )
 
 
 class SomaticMarkersResponse(BaseModel):
-    """Response for somatic markers."""
+    """Response for somatic markers.
+
+    Gated by K7 identifiability (governing doc §3.6, parameter
+    `somatic_bias`): fields are omitted entirely from the response until
+    cleared, not defaulted to null/zero.
+    """
 
     session_id: str = Field(..., description="Session identifier")
     time_ms: float = Field(..., description="Current time in milliseconds")
-    num_markers: int = Field(..., description="Number of markers")
-    total_retrievals: int = Field(..., description="Total retrievals")
-    successful_retrievals: int = Field(..., description="Successful retrievals")
-    retrieval_rate: float = Field(..., description="Retrieval rate")
-    markers: list[Dict[str, Any]] = Field(..., description="Somatic markers")
+    num_markers: Optional[int] = Field(None, description="Number of markers (K7-gated)")
+    total_retrievals: Optional[int] = Field(None, description="Total retrievals (K7-gated)")
+    successful_retrievals: Optional[int] = Field(
+        None, description="Successful retrievals (K7-gated)"
+    )
+    retrieval_rate: Optional[float] = Field(None, description="Retrieval rate (K7-gated)")
+    markers: Optional[list[Dict[str, Any]]] = Field(None, description="Somatic markers (K7-gated)")
 
 
 # API Key Management Schemas

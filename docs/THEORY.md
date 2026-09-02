@@ -28,7 +28,7 @@ Traditional neuroscience correlates consciousness with:
 - Synchronized oscillations across brain regions
 - Integrated information across neural networks
 
-**APGI's perspective**: Consciousness emerges from *how* information flows, not just *where* it flows.
+**APGI's perspective (a theoretical hypothesis, not an established finding)**: consciousness may emerge from *how* information flows, not just *where* it flows.
 
 ## Core APGI Concepts
 
@@ -79,13 +79,13 @@ Raw Input Signal → [Precision Gate] → Passed to Higher Processing
 
 **Definition**: Coordinated, synchronized activation of distributed brain networks.
 
-When multiple brain regions activate together in a synchronized pattern, an "ignition event" occurs. This is the neural signature of consciousness.
+When multiple brain regions activate together in a synchronized pattern, an "ignition event" occurs. APGI's working hypothesis is that this is *a* neural correlate of consciousness — a proposed, unvalidated mapping, not an established or measured fact.
 
 Think of ignition like:
 
 - **Before ignition**: Different brain regions operating somewhat independently
 - **During ignition**: Networks synchronize, creating high integration
-- **Consciousness emerges**: The synchronized state corresponds to conscious awareness
+- **Proposed correspondence**: APGI hypothesizes that the synchronized state corresponds to conscious awareness, though this mapping has not been independently validated
 
 **Mathematical perspective**:
 
@@ -104,7 +104,7 @@ APGI models how the system transitions between states:
              (precision gates open)              (attention shifts)
 ```
 
-**Key insight**: Consciousness is not binary (on/off) but continuous and dynamic.
+**Key hypothesis** (part of APGI's theoretical model, not an established finding): consciousness is not binary (on/off) but continuous and dynamic.
 
 **State characteristics**:
 
@@ -345,7 +345,7 @@ Where ⊙ is element-wise multiplication (gating)
 - **Allostasis**: Predictive homeostasis; staying stable through anticipation
 - **Conscious**: Integrated, reported, effortful, unified
 - **Gate/Gating**: Filtering mechanism; controls information flow
-- **Ignition**: Synchronized activation; neural signature of consciousness
+- **Ignition**: Synchronized activation; APGI's proposed (unvalidated) correlate of consciousness
 - **Integration**: How much information is combined across networks
 - **Precision**: Certainty that a signal matters; controls gating
 - **Synchrony**: How aligned neural oscillations are
@@ -353,12 +353,12 @@ Where ⊙ is element-wise multiplication (gating)
 
 ## Summary
 
-APGI is a neuroscientific theory of consciousness that emphasizes:
+APGI is a theoretical, computational framework for modeling consciousness-related dynamics — not an established or independently validated neuroscientific theory — that proposes:
 
 1. **Allostasis**: The brain predicts and anticipates
 2. **Precision Gating**: Selective information filtering based on predictions
 3. **Ignition**: Synchronized network activation
-4. **Emergence**: Consciousness arises from this dynamic process
+4. **Emergence (hypothesized)**: Consciousness may arise from this dynamic process
 
 In our API, we implement APGI as a computational system where:
 
