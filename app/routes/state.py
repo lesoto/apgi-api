@@ -32,6 +32,7 @@ from app.models.schemas import (
 from app.routes.sessions import get_session_manager, validate_session_ownership
 from app.services.auth_manager import TokenPayload
 from app.services.authorization import Permission, get_current_user, require_permission
+from app.services.k7_gate import K7Parameter, is_cleared
 from app.services.session_manager import SessionManager
 
 logger = logging.getLogger(__name__)
@@ -51,6 +52,7 @@ router = APIRouter(
 @router.get(
     "/{session_id}/state",
     response_model=SystemStateResponse,
+    response_model_exclude_none=True,
     summary="Get complete system state",
     description="Retrieve the complete current state of all APGI subsystems for the specified session",
     dependencies=[Depends(require_permission(Permission.SESSION_READ))],
@@ -108,7 +110,11 @@ async def get_system_state(
             ignition=IgnitionState(
                 ignition_occurred=ignition_data.get("ignition_occurred", False),
                 total_signal=ignition_data.get("total_signal", 0.0),
-                threshold=ignition_data.get("threshold", 0.0),
+                threshold=(
+                    ignition_data.get("threshold", 0.0)
+                    if is_cleared(K7Parameter.IGNITION_THRESHOLD)
+                    else None
+                ),
                 duration_ms=ignition_data.get("duration_ms"),
             ),
             workspace=WorkspaceState(
@@ -117,14 +123,34 @@ async def get_system_state(
                 broadcast_duration_ms=workspace_data.get("broadcast_duration_ms"),
             ),
             body=BodyState(
-                heart_rate=body_data.get("heart_rate", 70.0),
-                cortisol=body_data.get("cortisol", 0.1),
-                temperature=body_data.get("temperature", 37.0),
+                heart_rate=(
+                    body_data.get("heart_rate", 70.0)
+                    if is_cleared(K7Parameter.INTEROCEPTIVE_BODY_STATE)
+                    else None
+                ),
+                cortisol=(
+                    body_data.get("cortisol", 0.1)
+                    if is_cleared(K7Parameter.INTEROCEPTIVE_BODY_STATE)
+                    else None
+                ),
+                temperature=(
+                    body_data.get("temperature", 37.0)
+                    if is_cleared(K7Parameter.INTEROCEPTIVE_BODY_STATE)
+                    else None
+                ),
             ),
             allostasis=AllostaticState(allostatic_load=allostasis_data.get("allostatic_load", 0.0)),
             precision=PrecisionState(
-                exteroceptive=precision_data.get("exteroceptive", 1.0),
-                interoceptive=precision_data.get("interoceptive", 1.0),
+                exteroceptive=(
+                    precision_data.get("exteroceptive", 1.0)
+                    if is_cleared(K7Parameter.PRECISION_EXTEROCEPTIVE)
+                    else None
+                ),
+                interoceptive=(
+                    precision_data.get("interoceptive", 1.0)
+                    if is_cleared(K7Parameter.PRECISION_INTEROCEPTIVE)
+                    else None
+                ),
             ),
             metabolism=MetabolicState(
                 reserves=metabolism_data.get("reserves", 1000.0),
@@ -331,6 +357,7 @@ async def get_ignition_history(  # noqa: C901
 @router.get(
     "/{session_id}/interoception",
     response_model=BodyState,
+    response_model_exclude_none=True,
     summary="Get interoceptive body state",
     description="Retrieve current interoceptive state including physiological parameters",
     dependencies=[Depends(require_permission(Permission.SESSION_READ))],
@@ -370,10 +397,11 @@ async def get_interoceptive_state(
         state = await sim_session.get_state()
         body_data = state.get("body", {})
 
+        cleared = is_cleared(K7Parameter.INTEROCEPTIVE_BODY_STATE)
         response = BodyState(
-            heart_rate=body_data.get("heart_rate", 70.0),
-            cortisol=body_data.get("cortisol", 0.1),
-            temperature=body_data.get("temperature", 37.0),
+            heart_rate=body_data.get("heart_rate", 70.0) if cleared else None,
+            cortisol=body_data.get("cortisol", 0.1) if cleared else None,
+            temperature=body_data.get("temperature", 37.0) if cleared else None,
         )
 
         logger.info(f"Retrieved interoceptive state for session {session_id}")
@@ -395,6 +423,7 @@ async def get_interoceptive_state(
 @router.get(
     "/{session_id}/prediction-errors",
     response_model=PredictionErrorsResponse,
+    response_model_exclude_none=True,
     summary="Get prediction errors",
     description="Retrieve hierarchical prediction errors from all levels of the predictive processing hierarchy",
     dependencies=[Depends(require_permission(Permission.SESSION_READ))],
@@ -433,12 +462,20 @@ async def get_prediction_errors(
         prediction_data = state.get("prediction", {})
 
         # Extract prediction errors
+        extero_cleared = is_cleared(K7Parameter.PREDICTION_ERROR_EXTEROCEPTIVE)
+        intero_cleared = is_cleared(K7Parameter.PREDICTION_ERROR_INTEROCEPTIVE)
         response = PredictionErrorsResponse(
             session_id=session_id,
             time_ms=state.get("time", 0.0),
-            prediction_errors=prediction_data.get("errors", {}),
-            exteroceptive_stats=prediction_data.get("exteroceptive_stats", {}),
-            interoceptive_stats=prediction_data.get("interoceptive_stats", {}),
+            prediction_errors=(
+                prediction_data.get("errors", {}) if (extero_cleared and intero_cleared) else None
+            ),
+            exteroceptive_stats=(
+                prediction_data.get("exteroceptive_stats", {}) if extero_cleared else None
+            ),
+            interoceptive_stats=(
+                prediction_data.get("interoceptive_stats", {}) if intero_cleared else None
+            ),
         )
 
         logger.info(f"Retrieved prediction errors for session {session_id}")
@@ -460,6 +497,7 @@ async def get_prediction_errors(
 @router.get(
     "/{session_id}/somatic-markers",
     response_model=SomaticMarkersResponse,
+    response_model_exclude_none=True,
     summary="Get somatic markers",
     description="Retrieve stored somatic markers (context-action-outcome associations)",
     dependencies=[Depends(require_permission(Permission.SESSION_READ))],
@@ -500,14 +538,17 @@ async def get_somatic_markers(
         interoception_data = state.get("interoception", {})
         somatic_data = interoception_data.get("somatic_markers", {})
 
+        cleared = is_cleared(K7Parameter.SOMATIC_BIAS)
         response = SomaticMarkersResponse(
             session_id=session_id,
             time_ms=state.get("time", 0.0),
-            num_markers=somatic_data.get("num_markers", 0),
-            total_retrievals=somatic_data.get("total_retrievals", 0),
-            successful_retrievals=somatic_data.get("successful_retrievals", 0),
-            retrieval_rate=somatic_data.get("retrieval_rate", 0.0),
-            markers=somatic_data.get("markers", []),
+            num_markers=somatic_data.get("num_markers", 0) if cleared else None,
+            total_retrievals=somatic_data.get("total_retrievals", 0) if cleared else None,
+            successful_retrievals=(
+                somatic_data.get("successful_retrievals", 0) if cleared else None
+            ),
+            retrieval_rate=somatic_data.get("retrieval_rate", 0.0) if cleared else None,
+            markers=somatic_data.get("markers", []) if cleared else None,
         )
 
         logger.info(f"Retrieved somatic markers for session {session_id}")

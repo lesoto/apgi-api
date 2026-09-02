@@ -146,8 +146,50 @@ class TestGetSystemState:
         data = resp.json()
         assert data["time_ms"] == 1000.0
         assert data["ignition"]["ignition_occurred"] is True
-        assert data["body"]["heart_rate"] == 85.0
         assert data["workspace"]["is_broadcasting"] is True
+        # K7-gated fields are withheld by default (governing doc §3.6):
+        # absent from the response, not present as null.
+        assert "threshold" not in data["ignition"]
+        assert data["body"] == {}
+        assert data["precision"] == {}
+
+    def test_get_system_state_k7_cleared_parameters_exposed(
+        self,
+        client: TestClient,
+        mock_manager: AsyncMock,
+        mock_db: MagicMock,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        """Once a parameter clears K7, its field is present with the real value."""
+        from app.services import k7_gate
+
+        monkeypatch.setattr(
+            k7_gate.settings,
+            "k7_cleared_parameters",
+            {
+                "ignition_threshold",
+                "precision_exteroceptive",
+                "precision_interoceptive",
+                "interoceptive_body_state",
+            },
+        )
+        self._setup_db(mock_db)
+        sim_session = _make_sim_session()
+        sim_session.get_state.return_value = {
+            "time": 1000.0,
+            "ignition": {"ignition_occurred": True, "total_signal": 2.5, "threshold": 2.0},
+            "body": {"heart_rate": 85.0, "cortisol": 0.15, "temperature": 37.5},
+            "precision": {"exteroceptive": 0.9, "interoceptive": 0.8},
+        }
+        mock_manager.get_session.return_value = sim_session
+
+        resp = client.get("/v1/sessions/sess-1/state")
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["ignition"]["threshold"] == 2.0
+        assert data["body"]["heart_rate"] == 85.0
+        assert data["precision"]["exteroceptive"] == 0.9
+        assert data["precision"]["interoceptive"] == 0.8
 
     def test_get_system_state_with_defaults(
         self, client: TestClient, mock_manager: AsyncMock, mock_db: MagicMock
@@ -163,9 +205,7 @@ class TestGetSystemState:
         data = resp.json()
         assert data["time_ms"] == 0.0
         assert data["ignition"]["ignition_occurred"] is False
-        assert data["body"]["heart_rate"] == 70.0
-        assert data["body"]["cortisol"] == 0.1
-        assert data["body"]["temperature"] == 37.0
+        assert data["body"] == {}
 
     def test_get_system_state_session_not_found_in_db(
         self, client: TestClient, mock_db: MagicMock
@@ -616,6 +656,34 @@ class TestGetInteroceptiveState:
         resp = client.get("/v1/sessions/sess-1/interoception")
         assert resp.status_code == 200
         data = resp.json()
+        # K7-gated (governing doc §3.6, `interoceptive_body_state`): withheld by default.
+        assert data == {}
+
+    def test_get_interoceptive_state_k7_cleared(
+        self,
+        client: TestClient,
+        mock_manager: AsyncMock,
+        mock_db: MagicMock,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        """Once cleared, interoceptive body state is present with real values."""
+        from app.services import k7_gate
+
+        monkeypatch.setattr(k7_gate.settings, "k7_cleared_parameters", {"interoceptive_body_state"})
+        self._setup_db(mock_db)
+        sim_session = _make_sim_session()
+        sim_session.get_state.return_value = {
+            "body": {
+                "heart_rate": 92.0,
+                "cortisol": 0.18,
+                "temperature": 37.2,
+            }
+        }
+        mock_manager.get_session.return_value = sim_session
+
+        resp = client.get("/v1/sessions/sess-1/interoception")
+        assert resp.status_code == 200
+        data = resp.json()
         assert data["heart_rate"] == 92.0
         assert data["cortisol"] == 0.18
         assert data["temperature"] == 37.2
@@ -632,9 +700,7 @@ class TestGetInteroceptiveState:
         resp = client.get("/v1/sessions/sess-1/interoception")
         assert resp.status_code == 200
         data = resp.json()
-        assert data["heart_rate"] == 70.0
-        assert data["cortisol"] == 0.1
-        assert data["temperature"] == 37.0
+        assert data == {}
 
     def test_get_interoceptive_state_session_not_found(
         self, client: TestClient, mock_db: MagicMock
@@ -701,8 +767,44 @@ class TestGetPredictionErrors:
         data = resp.json()
         assert data["session_id"] == "sess-1"
         assert data["time_ms"] == 5000.0
+        # K7-gated (governing doc §3.6, prediction error params): withheld by default.
+        assert "prediction_errors" not in data
+        assert "exteroceptive_stats" not in data
+        assert "interoceptive_stats" not in data
+
+    def test_get_prediction_errors_k7_cleared(
+        self,
+        client: TestClient,
+        mock_manager: AsyncMock,
+        mock_db: MagicMock,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        """Once both channels clear K7, prediction errors are present."""
+        from app.services import k7_gate
+
+        monkeypatch.setattr(
+            k7_gate.settings,
+            "k7_cleared_parameters",
+            {"prediction_error_exteroceptive", "prediction_error_interoceptive"},
+        )
+        self._setup_db(mock_db)
+        sim_session = _make_sim_session()
+        sim_session.get_state.return_value = {
+            "time": 5000.0,
+            "prediction": {
+                "errors": {"level_1": 0.5, "level_2": 0.3},
+                "exteroceptive_stats": {"mean": 0.4, "std": 0.1},
+                "interoceptive_stats": {"mean": 0.2, "std": 0.05},
+            },
+        }
+        mock_manager.get_session.return_value = sim_session
+
+        resp = client.get("/v1/sessions/sess-1/prediction-errors")
+        assert resp.status_code == 200
+        data = resp.json()
         assert data["prediction_errors"]["level_1"] == 0.5
         assert data["exteroceptive_stats"]["mean"] == 0.4
+        assert data["interoceptive_stats"]["mean"] == 0.2
 
     def test_get_prediction_errors_with_defaults(
         self, client: TestClient, mock_manager: AsyncMock, mock_db: MagicMock
@@ -718,9 +820,9 @@ class TestGetPredictionErrors:
         data = resp.json()
         assert data["session_id"] == "sess-1"
         assert data["time_ms"] == 0.0
-        assert data["prediction_errors"] == {}
-        assert data["exteroceptive_stats"] == {}
-        assert data["interoceptive_stats"] == {}
+        assert "prediction_errors" not in data
+        assert "exteroceptive_stats" not in data
+        assert "interoceptive_stats" not in data
 
     def test_get_prediction_errors_session_not_found(
         self, client: TestClient, mock_db: MagicMock
@@ -794,11 +896,48 @@ class TestGetSomaticMarkers:
         data = resp.json()
         assert data["session_id"] == "sess-1"
         assert data["time_ms"] == 3000.0
+        # K7-gated (governing doc §3.6, `somatic_bias`): withheld by default.
+        assert "num_markers" not in data
+        assert "total_retrievals" not in data
+        assert "successful_retrievals" not in data
+        assert "retrieval_rate" not in data
+        assert "markers" not in data
+
+    def test_get_somatic_markers_k7_cleared(
+        self,
+        client: TestClient,
+        mock_manager: AsyncMock,
+        mock_db: MagicMock,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        """Once somatic_bias clears K7, marker fields are present."""
+        from app.services import k7_gate
+
+        monkeypatch.setattr(k7_gate.settings, "k7_cleared_parameters", {"somatic_bias"})
+        self._setup_db(mock_db)
+        sim_session = _make_sim_session()
+        sim_session.get_state.return_value = {
+            "time": 3000.0,
+            "interoception": {
+                "somatic_markers": {
+                    "num_markers": 5,
+                    "total_retrievals": 100,
+                    "successful_retrievals": 85,
+                    "retrieval_rate": 0.85,
+                    "markers": [{"context": "threat", "action": "freeze", "gain": 0.9}],
+                }
+            },
+        }
+        mock_manager.get_session.return_value = sim_session
+
+        resp = client.get("/v1/sessions/sess-1/somatic-markers")
+        assert resp.status_code == 200
+        data = resp.json()
         assert data["num_markers"] == 5
         assert data["total_retrievals"] == 100
         assert data["successful_retrievals"] == 85
         assert data["retrieval_rate"] == 0.85
-        assert len(data["markers"]) == 2
+        assert len(data["markers"]) == 1
 
     def test_get_somatic_markers_with_defaults(
         self, client: TestClient, mock_manager: AsyncMock, mock_db: MagicMock
@@ -814,11 +953,8 @@ class TestGetSomaticMarkers:
         data = resp.json()
         assert data["session_id"] == "sess-1"
         assert data["time_ms"] == 0.0
-        assert data["num_markers"] == 0
-        assert data["total_retrievals"] == 0
-        assert data["successful_retrievals"] == 0
-        assert data["retrieval_rate"] == 0.0
-        assert data["markers"] == []
+        assert "num_markers" not in data
+        assert "markers" not in data
 
     def test_get_somatic_markers_session_not_found(
         self, client: TestClient, mock_db: MagicMock
