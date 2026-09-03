@@ -622,6 +622,12 @@ class AuditLog(Base):  # type: ignore[misc, valid-type]
     ip_address = Column(String(45), nullable=True, comment="Client IP address")
     user_agent = Column(Text, nullable=True, comment="Client user agent string")
     status = Column(String(20), nullable=False, default="success", comment="Action outcome")
+    signature = Column(
+        String(64),
+        nullable=True,
+        comment="HMAC-SHA256 over the canonical entry fields (app.services.audit_signing) — "
+        "NULL for legacy rows written before signing was added",
+    )
 
     # Relationships
     user = relationship("User", backref="audit_logs")
@@ -924,7 +930,9 @@ class Consent(Base):  # type: ignore[misc, valid-type]
 
     __table_args__ = (
         Index("idx_consents_participant_type", "participant_id", "consent_type"),
-        Index("idx_consents_participant_type_granted", "participant_id", "consent_type", "granted_at"),
+        Index(
+            "idx_consents_participant_type_granted", "participant_id", "consent_type", "granted_at"
+        ),
     )
 
     def __repr__(self) -> str:
@@ -1000,7 +1008,9 @@ class StudyEnrollment(Base):  # type: ignore[misc, valid-type]
     study = relationship("Study", back_populates="enrollments")
 
     __table_args__ = (
-        UniqueConstraint("participant_id", "study_id", name="uq_study_enrollments_participant_study"),
+        UniqueConstraint(
+            "participant_id", "study_id", name="uq_study_enrollments_participant_study"
+        ),
     )
 
     def __repr__(self) -> str:
@@ -1027,7 +1037,11 @@ class Battery(Base):  # type: ignore[misc, valid-type]
         index=True,
     )
     name = Column(String(200), nullable=False, comment="Battery name")
-    version = Column(String(20), nullable=False, comment="Battery version (identifiers.yaml: release_state.battery_version)")
+    version = Column(
+        String(20),
+        nullable=False,
+        comment="Battery version (identifiers.yaml: release_state.battery_version)",
+    )
     form_label = Column(String(10), nullable=False, default="A", comment="Parallel-form label")
     instrument_schema = Column(
         JSON, nullable=True, comment="Task/item schema describing this battery's contents"
@@ -1134,7 +1148,10 @@ class ParticipantSession(Base):  # type: ignore[misc, valid-type]
         comment="Set once scoring runs against this session",
     )
     session_index = Column(
-        Integer, nullable=False, default=1, comment="1-based repeated-measures index for this participant+study"
+        Integer,
+        nullable=False,
+        default=1,
+        comment="1-based repeated-measures index for this participant+study",
     )
     status: Mapped[ParticipantSessionStatus] = mapped_column(
         SQLEnum(ParticipantSessionStatus, values_callable=lambda x: [e.value for e in x]),
@@ -1202,11 +1219,15 @@ class TrialEvent(Base):  # type: ignore[misc, valid-type]
         nullable=False,
         index=True,
     )
-    task_type = Column(String(50), nullable=False, index=True, comment="Which task this trial belongs to")
+    task_type = Column(
+        String(50), nullable=False, index=True, comment="Which task this trial belongs to"
+    )
     trial_index = Column(Integer, nullable=False, comment="0-based trial index within the task")
     response_value = Column(JSON, nullable=True, comment="Scoring-relevant response summary")
     rt_ms = Column(Float, nullable=True, comment="Response time in milliseconds")
-    correct = Column(Boolean, nullable=True, comment="Whether the response was correct, if applicable")
+    correct = Column(
+        Boolean, nullable=True, comment="Whether the response was correct, if applicable"
+    )
     raw_gcs_object = Column(
         String(500), nullable=True, comment="Object path in the restricted raw-trial-events bucket"
     )
@@ -1221,7 +1242,10 @@ class TrialEvent(Base):  # type: ignore[misc, valid-type]
 
     __table_args__ = (
         UniqueConstraint(
-            "participant_session_id", "task_type", "trial_index", name="uq_trial_events_session_task_index"
+            "participant_session_id",
+            "task_type",
+            "trial_index",
+            name="uq_trial_events_session_task_index",
         ),
         Index("idx_trial_events_session", "participant_session_id"),
     )

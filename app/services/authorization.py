@@ -5,6 +5,7 @@ Role-Based Access Control (RBAC) for API endpoints.
 """
 
 import logging
+import uuid
 from enum import Enum
 from typing import Any, Awaitable, Callable, Dict, List, Optional, Set, cast
 
@@ -12,10 +13,12 @@ from fastapi import Depends, Request
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from sqlalchemy.orm import Session
 
+from app.config import settings
 from app.database.connection import get_db
 from app.database.models import AuditLog
 from app.exceptions import AuthorizationError, InvalidTokenError
 from app.models.schemas import TokenPayload as TokenPayload
+from app.services.audit_signing import sign_audit_entry
 from app.services.auth_manager import AuthManager
 
 logger = logging.getLogger(__name__)
@@ -523,7 +526,14 @@ def log_audit_event(
         return
 
     try:
+        audit_id = str(uuid.uuid4())
+        signature: Optional[str] = None
+        if settings.audit_signing_key:
+            signature = sign_audit_entry(
+                audit_id, user_id, action, resource_type, resource_id, status, details
+            )
         audit_log = AuditLog(
+            audit_id=audit_id,
             user_id=user_id,
             action=action,
             resource_type=resource_type,
@@ -532,6 +542,7 @@ def log_audit_event(
             ip_address=ip_address,
             user_agent=user_agent,
             status=status,
+            signature=signature,
         )
         db.add(audit_log)
         db.commit()
