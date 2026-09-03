@@ -47,7 +47,7 @@ async def create_study(
         user_id=current_user.user_id,
         action="study:create",
         resource_type="study",
-        resource_id=study.study_id,
+        resource_id=study.study_id,  # type: ignore[arg-type]
     )
     return study
 

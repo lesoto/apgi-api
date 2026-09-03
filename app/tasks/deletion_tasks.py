@@ -63,7 +63,7 @@ def _delete_raw_trial_events_from_gcs(participant_id: str, db: Session) -> int:
 
     deleted = 0
     try:
-        from google.cloud import storage  # type: ignore[import-not-found]
+        import google.cloud.storage as storage
 
         client = storage.Client(project=settings.gcp_project_id)
         bucket = client.bucket(settings.trial_events_bucket)
@@ -91,13 +91,17 @@ def _delete_from_bigquery(participant_id: str) -> None:
         return
 
     try:
-        from google.cloud import bigquery  # type: ignore[import-not-found]
+        from google.cloud import bigquery
 
         client = bigquery.Client(project=settings.gcp_project_id)
+        # nosec: B608 — the interpolated pieces are the trusted project ID and
+        # dataset name from server config (BigQuery has no bind-parameter
+        # syntax for table identifiers), not user input; the actual data
+        # value (participant_id) is passed as a real query parameter below.
         query = f"""
             DELETE FROM `{settings.gcp_project_id}.{settings.bigquery_deidentified_dataset}.participant_scores`
             WHERE participant_id = @participant_id
-        """
+        """  # nosec: B608
         job_config = bigquery.QueryJobConfig(
             query_parameters=[
                 bigquery.ScalarQueryParameter("participant_id", "STRING", participant_id)

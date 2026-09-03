@@ -47,7 +47,7 @@ async def create_battery(
         user_id=current_user.user_id,
         action="battery:create",
         resource_type="battery",
-        resource_id=battery.battery_id,
+        resource_id=battery.battery_id,  # type: ignore[arg-type]
     )
     return battery
 

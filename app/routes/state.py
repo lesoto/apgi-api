@@ -26,6 +26,7 @@ from app.models.schemas import (
     PredictionErrorsResponse,
     SelfModelState,
     SomaticMarkersResponse,
+    StateVectorResponse,
     SystemStateResponse,
     WorkspaceState,
 )
@@ -561,6 +562,69 @@ async def get_somatic_markers(
         )
     except Exception as e:
         logger.exception("Failed to get somatic markers")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="An internal error occurred",
+        )
+
+
+@router.get(
+    "/{session_id}/state-vector",
+    response_model=StateVectorResponse,
+    summary="Get the full latent APGI state vector (K7b-gated)",
+    description="Returns every component of the 7-dimensional latent state vector together, as "
+    "a single object. Gated on K7b — a stricter, separate identifiability test from the "
+    "per-parameter K7 gate the other /state endpoints use, because exposing every correlated "
+    "component together carries reconstruction risk that clearing K7 per-parameter does not "
+    "address on its own. Returns 403 while K7b has not cleared (the default).",
+    dependencies=[Depends(require_permission(Permission.SESSION_READ))],
+)
+async def get_state_vector(
+    session_id: str,
+    manager: SessionManager = Depends(get_session_manager),
+    current_user: TokenPayload = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> StateVectorResponse:
+    if not settings.k7b_cleared:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="The full state vector is withheld pending K7b identifiability clearance. "
+            "Individual components may be available via /state, /prediction-errors, and "
+            "/somatic-markers subject to their own K7 gates.",
+        )
+
+    await validate_session_ownership(session_id, current_user.user_id, manager, db)
+
+    try:
+        sim_session = await manager.get_session(session_id, current_user.user_id)
+        state = await sim_session.get_state()
+
+        ignition_data = state.get("ignition", {})
+        precision_data = state.get("precision", {})
+        prediction_data = state.get("prediction", {})
+        interoception_data = state.get("interoception", {})
+
+        return StateVectorResponse(
+            session_id=session_id,
+            time_ms=state.get("time", 0.0),
+            ignition_state=ignition_data.get("total_signal", 0.0),
+            ignition_threshold=ignition_data.get("threshold", 0.0),
+            precision_exteroceptive=precision_data.get("exteroceptive", 1.0),
+            precision_interoceptive=precision_data.get("interoceptive", 1.0),
+            prediction_error_exteroceptive=prediction_data.get("exteroceptive_stats", {}),
+            prediction_error_interoceptive=prediction_data.get("interoceptive_stats", {}),
+            somatic_bias=interoception_data.get("somatic_markers", {}),
+        )
+
+    except ValueError as e:
+        logger.warning(f"Session {session_id} not found: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail=f"Session {session_id} not found"
+        )
+    except HTTPException:
+        raise
+    except Exception:
+        logger.exception("Failed to get state vector")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="An internal error occurred",

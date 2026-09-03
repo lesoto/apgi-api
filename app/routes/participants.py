@@ -103,7 +103,7 @@ async def create_participant(
         user_id=current_user.user_id,
         action="participant:create",
         resource_type="participant",
-        resource_id=participant.participant_id,
+        resource_id=participant.participant_id,  # type: ignore[arg-type]
         ip_address=http_request.client.host if http_request.client else None,
     )
     return participant
@@ -145,8 +145,8 @@ async def delete_participant(
 
     participant.is_deleted = True  # type: ignore[assignment]
     participant.deleted_at = datetime.now(timezone.utc)  # type: ignore[assignment]
-    participant.encrypted_contact_email = None  # type: ignore[assignment]
-    participant.encrypted_demographics = None  # type: ignore[assignment]
+    participant.encrypted_contact_email = None
+    participant.encrypted_demographics = None
     db.commit()
 
     log_audit_event(
@@ -161,7 +161,7 @@ async def delete_participant(
     try:
         from app.tasks.deletion_tasks import erase_participant_data
 
-        erase_participant_data.delay(participant_id)  # type: ignore[attr-defined]
+        erase_participant_data.delay(participant_id)
     except Exception:
         logger.error(
             "Failed to enqueue cascading deletion task",

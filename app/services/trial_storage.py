@@ -49,7 +49,7 @@ def write_raw_trial_event(
     object_path = _object_path(participant_session_id, task_type, trial_index)
 
     try:
-        from google.cloud import storage  # type: ignore[import-not-found]
+        import google.cloud.storage as storage
 
         client = storage.Client(project=settings.gcp_project_id)
         bucket = client.bucket(settings.trial_events_bucket)
@@ -77,7 +77,7 @@ def read_raw_trial_event(object_path: str) -> Optional[dict[str, Any]]:
         return None
 
     try:
-        from google.cloud import storage  # type: ignore[import-not-found]
+        import google.cloud.storage as storage
 
         client = storage.Client(project=settings.gcp_project_id)
         bucket = client.bucket(settings.trial_events_bucket)

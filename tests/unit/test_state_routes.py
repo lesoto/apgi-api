@@ -1072,3 +1072,63 @@ class TestStateRoutesPermissions:
             )
         else:
             assert get_somatic_markers is not None
+
+
+class TestGetStateVector:
+    """Tests for the GET /{session_id}/state-vector endpoint (Phase 5, K7b gate)."""
+
+    def _setup_db(self, mock_db: MagicMock, user_id: str = "user-123") -> None:
+        session_model = _make_session_model(user_id=user_id)
+        mock_db.query.return_value.filter.return_value.filter.return_value.first.return_value = (
+            session_model
+        )
+
+    def test_state_vector_withheld_by_default(
+        self, client: TestClient, mock_manager: AsyncMock, mock_db: MagicMock
+    ) -> None:
+        """K7b defaults to not-cleared — the endpoint must refuse before even
+        touching the session manager."""
+        self._setup_db(mock_db)
+        resp = client.get("/v1/sessions/sess-1/state-vector")
+        assert resp.status_code == 403
+        mock_manager.get_session.assert_not_called()
+
+    def test_state_vector_exposed_once_k7b_cleared(
+        self, client: TestClient, mock_manager: AsyncMock, mock_db: MagicMock
+    ) -> None:
+        self._setup_db(mock_db)
+        sim_session = _make_sim_session()
+        sim_session.get_state.return_value = {
+            "time": 1000.0,
+            "ignition": {"total_signal": 2.5, "threshold": 2.0},
+            "precision": {"exteroceptive": 0.9, "interoceptive": 0.8},
+            "prediction": {
+                "exteroceptive_stats": {"mean_abs_error": 0.1},
+                "interoceptive_stats": {"mean_abs_error": 0.2},
+            },
+            "interoception": {"somatic_markers": {"retrieval_rate": 0.5}},
+        }
+        mock_manager.get_session.return_value = sim_session
+
+        with patch("app.routes.state.settings.k7b_cleared", True):
+            resp = client.get("/v1/sessions/sess-1/state-vector")
+
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["ignition_state"] == 2.5
+        assert data["ignition_threshold"] == 2.0
+        assert data["precision_exteroceptive"] == 0.9
+        assert data["precision_interoceptive"] == 0.8
+        assert data["prediction_error_exteroceptive"] == {"mean_abs_error": 0.1}
+        assert data["somatic_bias"] == {"retrieval_rate": 0.5}
+
+    def test_state_vector_session_not_found(
+        self, client: TestClient, mock_manager: AsyncMock, mock_db: MagicMock
+    ) -> None:
+        self._setup_db(mock_db)
+        mock_manager.get_session.side_effect = ValueError("not found")
+
+        with patch("app.routes.state.settings.k7b_cleared", True):
+            resp = client.get("/v1/sessions/sess-1/state-vector")
+
+        assert resp.status_code == 404
