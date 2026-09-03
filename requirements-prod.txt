@@ -1,28 +1,49 @@
-fastapi>=0.110.0
-uvicorn[standard]>=0.28.0
-starlette>=0.37.0
-pydantic>=2.8.0
-pydantic-settings>=2.3.0
-python-multipart>=0.0.9
-sqlalchemy>=2.0.30
-alembic>=1.13.0
-psycopg2-binary>=2.9.9
-asyncpg>=0.29.0
-redis>=5.0.1
-celery>=5.3.4
-kombu>=5.3.4
-pyjwt>=2.8.0
-bcrypt>=4.0.0,<5.0.0
-python-jose[cryptography]>=3.3.0
-httpx>=0.27.0
-prometheus-client>=0.19.0
-opentelemetry-distro>=1.25.0
-opentelemetry-instrumentation>=1.25.0
-opentelemetry-instrumentation-fastapi>=1.25.0
-opentelemetry-instrumentation-sqlalchemy>=1.25.0
-opentelemetry-instrumentation-redis>=1.25.0
-opentelemetry-exporter-jaeger>=1.21.0
-opentelemetry-exporter-otlp-proto-grpc>=1.25.0
-python-dotenv>=1.0.0
-pyyaml>=6.0.1
-psutil>=5.9.5
+# Exact pins for production deploys (Phase 2: "Dependency pinning and
+# vulnerability audit"). Regenerate with:
+#   pip install -r requirements-prod.in && pip freeze
+# and re-verify with `pip check` + `pip-audit` / `safety check` (both run in
+# CI — see .github/workflows/ci.yml's `security` job) before committing.
+#
+# NOTE ON A FIX: the previous opentelemetry-* pins here (`>=1.25.0`) were
+# never satisfiable — the instrumentation packages track a 0.x beta series
+# independent of opentelemetry-api/sdk's 1.x series and have never reached
+# 1.25.0, so `pip install -r requirements-prod.txt` failed in any clean
+# environment. opentelemetry-exporter-jaeger has also been dropped: the
+# Jaeger exporter is deprecated upstream, pulls in an old protobuf that
+# conflicts with the google-cloud-* clients added below, and is redundant
+# with the OTLP exporter already listed (Jaeger accepts OTLP directly).
+fastapi==0.141.1
+uvicorn[standard]==0.52.4
+starlette==1.6.0
+pydantic==2.13.5
+pydantic-settings==2.15.0
+python-multipart==0.0.32
+sqlalchemy==2.0.52
+alembic==1.19.1
+psycopg2-binary==2.9.12
+asyncpg==0.31.0
+redis==8.1.0
+celery==5.6.3
+kombu==5.6.2
+pyjwt==2.13.0
+bcrypt==4.3.0
+python-jose[cryptography]==3.5.0
+cryptography==50.0.1
+httpx==0.28.1
+prometheus-client==0.19.0
+opentelemetry-api==1.44.0
+opentelemetry-sdk==1.44.0
+opentelemetry-distro==0.65b0
+opentelemetry-instrumentation==0.65b0
+opentelemetry-instrumentation-fastapi==0.65b0
+opentelemetry-instrumentation-sqlalchemy==0.65b0
+opentelemetry-instrumentation-redis==0.65b0
+opentelemetry-exporter-otlp-proto-grpc==1.44.0
+python-dotenv==1.2.3
+pyyaml==6.0.3
+psutil==7.2.2
+stripe==15.6.1
+pyotp==2.10.0
+aiohttp==3.14.3
+google-cloud-storage==3.13.1
+google-cloud-bigquery==3.44.0

@@ -6,6 +6,7 @@ ORM models for persistent storage of sessions, tasks, and user data.
 
 import uuid
 from enum import Enum as PythonEnum
+from typing import Optional
 
 import sqlalchemy as sa
 from sqlalchemy import JSON, Boolean, Column, DateTime
@@ -16,6 +17,7 @@ from sqlalchemy.orm import Mapped, declarative_base, mapped_column, relationship
 from sqlalchemy.sql import func
 
 from app.config import settings
+from app.database.encryption import EncryptedString
 
 Base = declarative_base()
 
@@ -764,3 +766,465 @@ class ProcessedWebhookEvent(Base):  # type: ignore[misc, valid-type]
 
     def __repr__(self) -> str:
         return f"<ProcessedWebhookEvent(event_id={self.event_id}, type={self.event_type})>"
+
+
+# ============================================================================
+# Research Pilot Domain (Phase 2, governing doc §7)
+#
+# Participants, consent, studies, batteries, participant sessions, trial
+# events, and model versions — the schema behind the APGI research pilot.
+# Deliberately separate from the generic User/Session/Task simulation domain
+# above: a Participant is a human research subject, not an API account
+# (though a Participant MAY be linked to a User if the pilot requires
+# authenticated access — see Participant.user_id).
+# ============================================================================
+
+
+class ConsentType(str, PythonEnum):
+    """The two independently versioned consents every participant must grant."""
+
+    RESEARCH_PARTICIPATION = "research_participation"
+    DATA_SHARING = "data_sharing"
+
+
+class StudyStatus(str, PythonEnum):
+    """Lifecycle of a research study."""
+
+    DRAFT = "draft"
+    ACTIVE = "active"
+    COMPLETED = "completed"
+    ARCHIVED = "archived"
+
+
+class ParticipantSessionStatus(str, PythonEnum):
+    """Lifecycle of a single participant's administration of a battery."""
+
+    SCHEDULED = "scheduled"
+    IN_PROGRESS = "in_progress"
+    COMPLETED = "completed"
+    ABANDONED = "abandoned"
+
+
+class Participant(Base):  # type: ignore[misc, valid-type]
+    """A research pilot participant.
+
+    Contact/demographic fields are encrypted at the column level
+    (app/database/encryption.py) — even a full database dump does not expose
+    PII without PII_ENCRYPTION_KEY. `is_deleted` implements the erasure
+    contract for app/tasks/deletion_tasks.py: encrypted fields are
+    NULLed out immediately, and the row itself is retained (tombstoned)
+    only long enough to preserve referential integrity for de-identified
+    scoring records already exported.
+    """
+
+    __tablename__ = "participants"
+
+    participant_id = Column(
+        String(36),
+        primary_key=True,
+        default=lambda: str(uuid.uuid4()),
+        comment="Unique participant identifier",
+    )
+    user_id = Column(
+        String(36),
+        ForeignKey("users.user_id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+        comment="Linked API user account, if the participant has authenticated access",
+    )
+    external_ref = Column(
+        String(255),
+        nullable=True,
+        index=True,
+        comment="Pseudonymous external panel/recruitment ID (e.g. Prolific ID) — not itself PII",
+    )
+    encrypted_contact_email: Mapped[Optional[str]] = mapped_column(
+        EncryptedString(),
+        nullable=True,
+        comment="Encrypted contact email (PII)",
+    )
+    encrypted_demographics: Mapped[Optional[str]] = mapped_column(
+        EncryptedString(),
+        nullable=True,
+        comment="Encrypted JSON blob of self-reported demographics (PII)",
+    )
+    is_deleted = Column(
+        Boolean, nullable=False, default=False, comment="Right-to-erasure tombstone flag"
+    )
+    deleted_at = Column(DateTime(timezone=True), nullable=True, comment="Erasure timestamp")
+    created_at = Column(
+        DateTime(timezone=True),
+        nullable=False,
+        server_default=func.now(),
+        comment="Enrollment timestamp",
+    )
+
+    consents = relationship("Consent", back_populates="participant", cascade="all, delete-orphan")
+    enrollments = relationship(
+        "StudyEnrollment", back_populates="participant", cascade="all, delete-orphan"
+    )
+    sessions = relationship(
+        "ParticipantSession", back_populates="participant", cascade="all, delete-orphan"
+    )
+
+    __table_args__ = (Index("idx_participants_user", "user_id"),)
+
+    def __repr__(self) -> str:
+        return f"<Participant(participant_id={self.participant_id})>"
+
+
+class Consent(Base):  # type: ignore[misc, valid-type]
+    """A single versioned consent grant or revocation.
+
+    Consent is append-only: granting a new version, or revoking, inserts a
+    new row rather than mutating history — the full consent record is
+    itself part of the audit trail (governing doc §7.1). The *effective*
+    consent for a type is the most recent row with revoked_at IS NULL.
+    """
+
+    __tablename__ = "consents"
+
+    consent_id = Column(
+        String(36),
+        primary_key=True,
+        default=lambda: str(uuid.uuid4()),
+        comment="Unique consent record identifier",
+    )
+    participant_id = Column(
+        String(36),
+        ForeignKey("participants.participant_id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+        comment="Consenting participant",
+    )
+    consent_type: Mapped[ConsentType] = mapped_column(
+        SQLEnum(ConsentType, values_callable=lambda x: [e.value for e in x]),
+        nullable=False,
+        index=True,
+        comment="Which of the two required consents this record grants/revokes",
+    )
+    version = Column(String(20), nullable=False, comment="Version of the consent text granted")
+    consent_text_hash = Column(
+        String(64),
+        nullable=False,
+        comment="SHA-256 of the exact consent text shown, for tamper-evident audit",
+    )
+    granted_at = Column(
+        DateTime(timezone=True),
+        nullable=False,
+        server_default=func.now(),
+        comment="When this consent was granted",
+    )
+    revoked_at = Column(
+        DateTime(timezone=True), nullable=True, comment="When this consent was revoked, if ever"
+    )
+    ip_address = Column(String(45), nullable=True, comment="Client IP address at grant time")
+
+    participant = relationship("Participant", back_populates="consents")
+
+    __table_args__ = (
+        Index("idx_consents_participant_type", "participant_id", "consent_type"),
+        Index("idx_consents_participant_type_granted", "participant_id", "consent_type", "granted_at"),
+    )
+
+    def __repr__(self) -> str:
+        return f"<Consent(participant_id={self.participant_id}, type={self.consent_type}, v={self.version})>"
+
+
+class Study(Base):  # type: ignore[misc, valid-type]
+    """A research study — an OSF-registered protocol administering one or more batteries."""
+
+    __tablename__ = "studies"
+
+    study_id = Column(
+        String(36), primary_key=True, default=lambda: str(uuid.uuid4()), comment="Unique study ID"
+    )
+    name = Column(String(200), nullable=False, comment="Study name")
+    description = Column(Text, nullable=True, comment="Study description")
+    osf_registration_url = Column(
+        String(500), nullable=True, comment="OSF preregistration URL (identifiers.yaml: osf)"
+    )
+    status: Mapped[StudyStatus] = mapped_column(
+        SQLEnum(StudyStatus, values_callable=lambda x: [e.value for e in x]),
+        nullable=False,
+        default=StudyStatus.DRAFT,
+        index=True,
+        comment="Study lifecycle status",
+    )
+    created_at = Column(
+        DateTime(timezone=True),
+        nullable=False,
+        server_default=func.now(),
+        comment="Creation timestamp",
+    )
+
+    enrollments = relationship("StudyEnrollment", back_populates="study")
+    batteries = relationship("Battery", back_populates="study")
+    sessions = relationship("ParticipantSession", back_populates="study")
+
+    def __repr__(self) -> str:
+        return f"<Study(study_id={self.study_id}, name={self.name})>"
+
+
+class StudyEnrollment(Base):  # type: ignore[misc, valid-type]
+    """Join table: which participants are enrolled in which studies."""
+
+    __tablename__ = "study_enrollments"
+
+    enrollment_id = Column(
+        String(36),
+        primary_key=True,
+        default=lambda: str(uuid.uuid4()),
+        comment="Unique enrollment identifier",
+    )
+    participant_id = Column(
+        String(36),
+        ForeignKey("participants.participant_id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    study_id = Column(
+        String(36),
+        ForeignKey("studies.study_id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    enrolled_at = Column(
+        DateTime(timezone=True),
+        nullable=False,
+        server_default=func.now(),
+        comment="Enrollment timestamp",
+    )
+
+    participant = relationship("Participant", back_populates="enrollments")
+    study = relationship("Study", back_populates="enrollments")
+
+    __table_args__ = (
+        UniqueConstraint("participant_id", "study_id", name="uq_study_enrollments_participant_study"),
+    )
+
+    def __repr__(self) -> str:
+        return f"<StudyEnrollment(participant_id={self.participant_id}, study_id={self.study_id})>"
+
+
+class Battery(Base):  # type: ignore[misc, valid-type]
+    """A behavioural test battery (jsPsych tasks administered by apgi-battery).
+
+    `form_label` distinguishes parallel forms of the same battery (e.g. "A"
+    vs "B") administered across repeated sessions to reduce practice
+    effects — see app/services/scoring.py's parallel-form handling.
+    """
+
+    __tablename__ = "batteries"
+
+    battery_id = Column(
+        String(36), primary_key=True, default=lambda: str(uuid.uuid4()), comment="Unique battery ID"
+    )
+    study_id = Column(
+        String(36),
+        ForeignKey("studies.study_id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    name = Column(String(200), nullable=False, comment="Battery name")
+    version = Column(String(20), nullable=False, comment="Battery version (identifiers.yaml: release_state.battery_version)")
+    form_label = Column(String(10), nullable=False, default="A", comment="Parallel-form label")
+    instrument_schema = Column(
+        JSON, nullable=True, comment="Task/item schema describing this battery's contents"
+    )
+    created_at = Column(
+        DateTime(timezone=True),
+        nullable=False,
+        server_default=func.now(),
+        comment="Creation timestamp",
+    )
+
+    study = relationship("Study", back_populates="batteries")
+    sessions = relationship("ParticipantSession", back_populates="battery")
+
+    __table_args__ = (
+        UniqueConstraint(
+            "study_id", "name", "version", "form_label", name="uq_batteries_study_name_version_form"
+        ),
+    )
+
+    def __repr__(self) -> str:
+        return f"<Battery(battery_id={self.battery_id}, name={self.name}, form={self.form_label})>"
+
+
+class ModelVersion(Base):  # type: ignore[misc, valid-type]
+    """A released version of the scoring/model pipeline (apgi-analysis).
+
+    Threads identifiers.yaml's release_state.model_version through scored
+    data so every score can be traced to the exact pipeline that produced
+    it — required before release_state.current may ever advance to
+    "calibrated" (K1-K3 gates, governing doc §0.0).
+    """
+
+    __tablename__ = "model_versions"
+
+    model_version_id = Column(
+        String(36),
+        primary_key=True,
+        default=lambda: str(uuid.uuid4()),
+        comment="Unique model version identifier",
+    )
+    version = Column(String(20), nullable=False, unique=True, comment="Semantic model version")
+    feature_version = Column(String(20), nullable=True, comment="Feature-extraction version")
+    description = Column(Text, nullable=True, comment="What changed in this version")
+    is_active = Column(
+        Boolean,
+        nullable=False,
+        default=False,
+        comment="Whether this is the version new sessions are scored against",
+    )
+    released_at = Column(
+        DateTime(timezone=True),
+        nullable=False,
+        server_default=func.now(),
+        comment="Release timestamp",
+    )
+
+    sessions = relationship("ParticipantSession", back_populates="model_version")
+
+    def __repr__(self) -> str:
+        return f"<ModelVersion(version={self.version}, active={self.is_active})>"
+
+
+class ParticipantSession(Base):  # type: ignore[misc, valid-type]
+    """One participant's administration of one battery within one study.
+
+    `session_index` numbers repeated administrations for the same
+    participant+study (1, 2, 3, ...) — the basis for longitudinal metrics
+    (Phase 5: ICC/SEM/MDC95 per index) and for selecting which parallel
+    battery form to serve next.
+    """
+
+    __tablename__ = "participant_sessions"
+
+    participant_session_id = Column(
+        String(36),
+        primary_key=True,
+        default=lambda: str(uuid.uuid4()),
+        comment="Unique participant session identifier",
+    )
+    participant_id = Column(
+        String(36),
+        ForeignKey("participants.participant_id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    study_id = Column(
+        String(36),
+        ForeignKey("studies.study_id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    battery_id = Column(
+        String(36),
+        ForeignKey("batteries.battery_id", ondelete="RESTRICT"),
+        nullable=False,
+        index=True,
+    )
+    model_version_id = Column(
+        String(36),
+        ForeignKey("model_versions.model_version_id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+        comment="Set once scoring runs against this session",
+    )
+    session_index = Column(
+        Integer, nullable=False, default=1, comment="1-based repeated-measures index for this participant+study"
+    )
+    status: Mapped[ParticipantSessionStatus] = mapped_column(
+        SQLEnum(ParticipantSessionStatus, values_callable=lambda x: [e.value for e in x]),
+        nullable=False,
+        default=ParticipantSessionStatus.SCHEDULED,
+        index=True,
+    )
+    scores = Column(JSON, nullable=True, comment="Computed per-index scores once scoring completes")
+    started_at = Column(DateTime(timezone=True), nullable=True)
+    completed_at = Column(DateTime(timezone=True), nullable=True)
+    created_at = Column(
+        DateTime(timezone=True),
+        nullable=False,
+        server_default=func.now(),
+        comment="Creation timestamp",
+    )
+
+    participant = relationship("Participant", back_populates="sessions")
+    study = relationship("Study", back_populates="sessions")
+    battery = relationship("Battery", back_populates="sessions")
+    model_version = relationship("ModelVersion", back_populates="sessions")
+    trial_events = relationship(
+        "TrialEvent", back_populates="participant_session", cascade="all, delete-orphan"
+    )
+
+    __table_args__ = (
+        UniqueConstraint(
+            "participant_id",
+            "study_id",
+            "session_index",
+            name="uq_participant_sessions_participant_study_index",
+        ),
+        Index("idx_participant_sessions_participant", "participant_id"),
+        Index("idx_participant_sessions_study", "study_id"),
+        Index("idx_participant_sessions_status", "status"),
+    )
+
+    def __repr__(self) -> str:
+        return f"<ParticipantSession(id={self.participant_session_id}, index={self.session_index}, status={self.status})>"
+
+
+class TrialEvent(Base):  # type: ignore[misc, valid-type]
+    """One trial's lightweight, scoring-relevant summary.
+
+    The full raw event (RT distributions, keystroke/mouse logs, stimulus
+    payloads) is written to restricted Cloud Storage by
+    app/services/trial_storage.py; `raw_gcs_object` names that object. This
+    table stores only what scoring needs so scoring never has to read GCS
+    on the hot path, and so a GCS outage doesn't block trial ingestion's
+    acknowledgement to the client (the object write is attempted inline,
+    but this row is the durable record either way).
+    """
+
+    __tablename__ = "trial_events"
+
+    trial_event_id = Column(
+        String(36),
+        primary_key=True,
+        default=lambda: str(uuid.uuid4()),
+        comment="Unique trial event identifier",
+    )
+    participant_session_id = Column(
+        String(36),
+        ForeignKey("participant_sessions.participant_session_id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    task_type = Column(String(50), nullable=False, index=True, comment="Which task this trial belongs to")
+    trial_index = Column(Integer, nullable=False, comment="0-based trial index within the task")
+    response_value = Column(JSON, nullable=True, comment="Scoring-relevant response summary")
+    rt_ms = Column(Float, nullable=True, comment="Response time in milliseconds")
+    correct = Column(Boolean, nullable=True, comment="Whether the response was correct, if applicable")
+    raw_gcs_object = Column(
+        String(500), nullable=True, comment="Object path in the restricted raw-trial-events bucket"
+    )
+    received_at = Column(
+        DateTime(timezone=True),
+        nullable=False,
+        server_default=func.now(),
+        comment="Ingestion timestamp",
+    )
+
+    participant_session = relationship("ParticipantSession", back_populates="trial_events")
+
+    __table_args__ = (
+        UniqueConstraint(
+            "participant_session_id", "task_type", "trial_index", name="uq_trial_events_session_task_index"
+        ),
+        Index("idx_trial_events_session", "participant_session_id"),
+    )
+
+    def __repr__(self) -> str:
+        return f"<TrialEvent(id={self.trial_event_id}, task={self.task_type}, trial={self.trial_index})>"
