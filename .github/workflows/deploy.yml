@@ -1,0 +1,98 @@
+name: Deploy
+
+# Research deploys from every push to main; production only deploys from a
+# tagged release (v*), matching the ref restriction baked into each
+# environment's Workload Identity Federation provider in
+# deployment/terraform/gcp/wif.tf (github_deploy_ref). CI (ci.yml) must pass
+# on the same commit before either deploy job runs.
+
+on:
+  push:
+    branches: [main]
+    tags: ["v*"]
+
+env:
+  PYTHON_VERSION: "3.12"
+
+jobs:
+  test-gate:
+    name: Test gate
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: test
+          POSTGRES_PASSWORD: test
+          POSTGRES_DB: apgi_test
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5432:5432
+      redis:
+        image: redis:7-alpine
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 6379:6379
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Install dependencies
+        run: pip install -e ".[dev]"
+
+      - name: Run unit tests
+        env:
+          DATABASE_URL: postgresql://test:test@localhost:5432/apgi_test
+          REDIS_URL: redis://localhost:6379/0
+          ENVIRONMENT: test
+        run: pytest tests/unit/ -q
+
+  deploy-research:
+    name: Deploy to research
+    if: github.ref == 'refs/heads/main'
+    needs: test-gate
+    runs-on: ubuntu-latest
+    environment: research
+    permissions:
+      contents: read
+      id-token: write # required for WIF
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/deploy-cloud-run
+        with:
+          environment: research
+          project_id: ${{ vars.GCP_PROJECT_ID_RESEARCH }}
+          region: ${{ vars.GCP_REGION }}
+          workload_identity_provider: ${{ vars.GCP_WIF_PROVIDER_RESEARCH }}
+          service_account: ${{ vars.GCP_CI_DEPLOYER_SA_RESEARCH }}
+
+  deploy-production:
+    name: Deploy to production
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: test-gate
+    runs-on: ubuntu-latest
+    environment: production
+    permissions:
+      contents: read
+      id-token: write # required for WIF
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/deploy-cloud-run
+        with:
+          environment: production
+          project_id: ${{ vars.GCP_PROJECT_ID_PRODUCTION }}
+          region: ${{ vars.GCP_REGION }}
+          workload_identity_provider: ${{ vars.GCP_WIF_PROVIDER_PRODUCTION }}
+          service_account: ${{ vars.GCP_CI_DEPLOYER_SA_PRODUCTION }}

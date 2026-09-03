@@ -1,0 +1,99 @@
+# APGI canonical identifier block — SINGLE SOURCE OF TRUTH
+#
+# Nothing below is retyped anywhere. README.md, CITATION.cff, .zenodo.json,
+# the site footer, the OSF project wiki, the report footer and GET /v1/meta
+# are all generated from this file. `python scripts/generate_identifiers.py --check`
+# fails CI if any generated copy diverges from this source.
+#
+# To regenerate the derived files after editing this one:
+#   python scripts/generate_identifiers.py
+#
+# Fields marked TODO are outstanding items named in §0.0 of the empirical plan.
+
+schema_version: 1
+last_reviewed: 2026-09-03
+
+researcher:
+  orcid: "0009-0005-0328-2896"
+  orcid_url: "https://orcid.org/0009-0005-0328-2896"
+  family_names: "Pesochin"
+  given_names: "Dimitry"
+  affiliation: null             # independent researcher; ORCID is the trust anchor
+
+osf:
+  project_guid: "t5hcq"
+  project_url: "https://osf.io/t5hcq"
+  registration_instrument_guid: "yk29g"
+  registration_instrument_url: "https://osf.io/yk29g"
+  registration_criterion_guid: null
+  registration_criterion_url: null
+
+zenodo:
+  # VERIFY before citing. Zenodo mints a concept DOI (all versions) and a
+  # version DOI (this deposit). Prose cites the concept DOI; a reproducibility
+  # appendix cites the version DOI. Getting this backwards is uncorrectable
+  # after publication.
+  concept_doi: "10.5281/zenodo.21632264"   # TODO confirm this is the concept, not a version, DOI
+  concept_doi_url: "https://doi.org/10.5281/zenodo.21632264"
+  version_doi: null
+  resolves: "unverified"        # set to "verified" once doi.org resolves in a clean browser session
+
+code:
+  organisation: "https://github.com/apgiframework"
+  repositories:
+    - name: "apgi-api"
+      role: "apgi-core service"
+      # TODO (manual, one-time, requires the repo owner's Zenodo login):
+      #   1. Sign in to https://zenodo.org with the GitHub account that owns
+      #      this repository.
+      #   2. Go to https://zenodo.org/account/settings/github/ and flip the
+      #      toggle for apgiframework/apgi-api to ON.
+      #   3. Cut a GitHub Release (the `release.yml` workflow in this repo
+      #      tags on push to a `v*` tag) — Zenodo archives it automatically
+      #      and mints a version DOI under the concept DOI above.
+      #   4. Set this to true and fill zenodo.version_doi once step 3 has
+      #      produced a DOI. This flag cannot be flipped by CI or by an
+      #      agent — it reflects a real dashboard toggle only the account
+      #      owner can set.
+      zenodo_hook: false
+      citable: true
+    - name: "apgi-battery"
+      role: "jsPsych behavioural tasks"
+      zenodo_hook: false        # TODO — same manual step, on that repository
+      citable: true
+    - name: "apgi-analysis"
+      role: "PyMC pipeline; K7a structural, K7c recovery"
+      zenodo_hook: false        # TODO — same manual step, on that repository
+      citable: true
+
+web:
+  site: "https://apgiframework.com"
+  api: "https://api.apgiframework.com"
+  api_version: "v1"
+
+ethics:
+  reviewer: null                # TODO — commercial IRB or university committee (§7.3)
+  approval_number: null         # TODO — attaches to the OSF registration as a dated addendum
+  data_controller: null         # TODO — §7.2 requires a documented controller
+  privacy_review_completed: false
+
+infrastructure:
+  provider: "Google Cloud"
+  projects:
+    production: "TODO"
+    research: "TODO"
+  keyless_ci: true              # Workload Identity Federation; no service-account key files (§9.6)
+
+licences:
+  code: "Apache-2.0"
+  documentation: "CC-BY-4.0"
+  reference_dataset: "restricted"   # per research consent; not CC0 by default
+
+release_state:
+  # One of: pre-registered | pilot | calibrated  (§0.0)
+  # "calibrated" requires K1-K3 passed. Do not advance this label ahead of the gates.
+  current: "pre-registered"
+  battery_version: null
+  feature_version: null
+  model_version: null
+  reference_dataset_version: null

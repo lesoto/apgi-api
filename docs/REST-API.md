@@ -188,6 +188,36 @@ If you prefer to run services manually:
 - `GET /metrics` - Prometheus metrics
 - `GET /version` - API version information
 
+### Research Pilot (Participants, Consent, Studies, Batteries, Trials)
+
+- `POST /v1/participants` - Enroll a participant
+- `GET /v1/participants/{id}` - Get a participant
+- `DELETE /v1/participants/{id}` - Right-to-erasure (tombstones + enqueues cascading deletion)
+- `POST /v1/participants/{id}/consents` - Grant a versioned consent (`research_participation` or `data_sharing`)
+- `POST /v1/participants/{id}/consents/revoke` - Revoke a consent
+- `GET /v1/participants/{id}/consents/status` - Effective status of both required consents
+- `POST /v1/studies` / `GET /v1/studies` / `GET /v1/studies/{id}` - Studies (staff-only create)
+- `POST /v1/batteries` / `GET /v1/batteries/{id}` - Behavioural test batteries (staff-only create)
+- `POST /v1/participant-sessions` - Start a participant's administration of a battery
+- `POST /v1/participant-sessions/{id}/trials` - Ingest a batch of trial events
+- `POST /v1/participant-sessions/{id}/complete` - Session-completion contract (idempotent; triggers scoring)
+
+### Scoring, Norms, Psychometrics & Project Metadata
+
+- `GET /v1/norms` - Percentile + bootstrap CI against pooled empirical scores
+- `GET /v1/instrument/psychometrics` - Cronbach's alpha and related reliability stats
+- `GET /v1/meta` - Citation/DOI/licence metadata, generated from `identifiers.yaml`
+- `GET /v1/dataset-card` - Dataset card (release state, ethics disclosures, live counts)
+
+### Longitudinal Metrics & n-of-1 Experiments
+
+- `GET /v1/longitudinal/metrics` - ICC, SEM, MDC95 between two repeated-measures indices
+- `GET /v1/participants/{id}/change-report` - MDC-gated change classification (active subscription or staff)
+- `POST /v1/n-of-1/experiments` / `GET /v1/n-of-1/experiments/{id}` - Single-subject alternating-phase experiments
+- `POST /v1/n-of-1/experiments/{id}/observations` - Record an outcome observation
+- `GET /v1/n-of-1/experiments/{id}/analysis` - Phase means/SDs and a two-phase permutation-test contrast
+- `GET /v1/sessions/{id}/state-vector` - Full 7-dimensional latent state vector (K7b-gated, withheld by default)
+
 For detailed API documentation, visit <http://localhost:8000/docs> when the server is running.
 
 ## Configuration

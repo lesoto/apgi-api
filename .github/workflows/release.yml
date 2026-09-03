@@ -1,0 +1,34 @@
+name: Release
+
+# Cutting a GitHub Release from a v* tag is what triggers Zenodo to archive
+# the repository and mint a version DOI under the concept DOI in
+# identifiers.yaml — but only once the Zenodo GitHub hook has actually been
+# enabled by hand (see identifiers.yaml's code.repositories[].zenodo_hook
+# TODO). This workflow does not talk to Zenodo directly; Zenodo listens for
+# the release event itself once that one-time dashboard step is done.
+
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    name: Create GitHub Release
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Create release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ github.ref_name }}
+        run: |
+          gh release create "$TAG" \
+            --title "$TAG" \
+            --generate-notes \
+            --verify-tag

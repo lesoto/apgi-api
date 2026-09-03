@@ -83,13 +83,16 @@ Several routers require explicit initialization during lifespan (not at import t
 
 ### Key directories
 
-- `app/routes/` — FastAPI routers: `auth`, `users`, `sessions`, `templates`, `state`, `tasks`, `export`, `metrics`, `health`, `version`
-- `app/services/` — Business logic: `auth_manager`, `session_manager`, `user_management`, `task_executor`, `webhook_manager`, `cache_service`, `rate_limiter`, `authorization`
+- `app/routes/` — FastAPI routers: `auth`, `users`, `sessions`, `templates`, `state`, `tasks`, `export`, `metrics`, `health`, `version`, plus the research pilot surface: `participants`, `studies`, `batteries`, `trials`, `norms`, `instrument`, `meta`, `longitudinal`, `nof1`
+- `app/services/` — Business logic: `auth_manager`, `session_manager`, `user_management`, `task_executor`, `webhook_manager`, `cache_service`, `rate_limiter`, `authorization`, plus `consent`, `rls`, `audit_signing`, `scoring`, `bigquery_export`, `trial_storage`, `longitudinal_metrics`, `stats`, `identifiers`
 - `app/middleware/` — Starlette middleware classes
-- `app/database/models.py` — SQLAlchemy ORM (`User`, `Session`, `Task`, and related models)
+- `app/database/models.py` — SQLAlchemy ORM: the generic simulation domain (`User`, `Session`, `Task`, ...) and the research pilot domain (`Participant`, `Consent`, `Study`, `Battery`, `ModelVersion`, `ParticipantSession`, `TrialEvent`, `NOf1Experiment`, `NOf1Observation`)
 - `app/database/connection.py` — Engine and `SessionLocal` factory
-- `app/tasks/` — Celery task definitions (`experimental_tasks.py`) and `task_registry.py`
+- `app/database/encryption.py` — `EncryptedString` column type (Fernet) for participant PII
+- `app/tasks/` — Celery task definitions (`experimental_tasks.py`), `task_registry.py`, plus `scoring_tasks.py` and `deletion_tasks.py` (cascading right-to-erasure)
 - `app/celery_app.py` — Celery app configured to use Redis broker (db/1) and backend (db/2)
+- `identifiers.yaml` — single source of truth for citation/DOI/licence metadata; `scripts/generate_identifiers.py` regenerates README.md's identifier block, `CITATION.cff`, and `.zenodo.json` from it (CI fails on drift)
+- `deployment/terraform/gcp/` — GCP infrastructure as code (Cloud Run, Cloud SQL, Memorystore, Secret Manager, WIF, IAM matrix)
 
 ### Database
 
@@ -116,3 +119,10 @@ CURSOR_SIGNING_KEY=<random string, min 32 chars>
 ```
 
 Generate keys: `python -c "import secrets; print(secrets.token_urlsafe(32))"`
+
+Additional keys required for the research pilot domain (participants, consent, audit signing):
+
+```bash
+PII_ENCRYPTION_KEY=<Fernet key — python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())">
+AUDIT_SIGNING_KEY=<random string, min 32 chars>
+```

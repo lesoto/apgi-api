@@ -1,3 +1,10 @@
+# SUPERSEDED — kept for historical reference only.
+#
+# APGI's infrastructure provider is Google Cloud (identifiers.yaml:
+# infrastructure.provider). The live Terraform is in ../gcp/. This AWS
+# module predates that decision and is not applied anywhere; do not add
+# resources here.
+#
 # Terraform configuration for APGI API infrastructure
 # This creates the basic AWS infrastructure for the APGI API
 

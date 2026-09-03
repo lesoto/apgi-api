@@ -1701,6 +1701,28 @@ class SystemStateResponse(BaseModel):
     self_model: SelfModelState = Field(..., description="Self model state")
 
 
+class StateVectorResponse(BaseModel):
+    """The full 7-dimensional latent APGI state vector
+    x_t = [S_t, theta_t, Pi_e, Pi_i, |eps_e|, |eps_i|, beta] (governing doc
+    §3.6), gated as a single object behind K7b (app.services.k7_gate is the
+    per-parameter K7 gate used elsewhere; K7b is the stricter, separate test
+    for exposing every component together rather than piecemeal)."""
+
+    session_id: str = Field(..., description="Session identifier")
+    time_ms: float = Field(..., description="Current simulation time in milliseconds")
+    ignition_state: float = Field(..., description="S_t: total ignition signal")
+    ignition_threshold: float = Field(..., description="theta_t: ignition threshold")
+    precision_exteroceptive: float = Field(..., description="Pi_e")
+    precision_interoceptive: float = Field(..., description="Pi_i")
+    prediction_error_exteroceptive: Dict[str, Any] = Field(
+        ..., description="|eps_e| summary statistics"
+    )
+    prediction_error_interoceptive: Dict[str, Any] = Field(
+        ..., description="|eps_i| summary statistics"
+    )
+    somatic_bias: Dict[str, Any] = Field(..., description="beta: somatic marker bias summary")
+
+
 # Export Schemas
 class SummaryStatistics(BaseModel):
     """Summary statistics for export."""

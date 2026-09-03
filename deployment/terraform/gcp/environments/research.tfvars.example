@@ -1,0 +1,25 @@
+# Copy to research.tfvars (gitignored) and fill in the TODOs once the
+# research GCP project exists and identifiers.yaml's
+# infrastructure.projects.research is no longer "TODO".
+#
+# The research project holds pilot participant data under the two versioned
+# consents (Phase 2) — keep it a genuinely separate GCP project from
+# production, not just a separate Cloud Run service, so a production incident
+# can never cross-contaminate research data access.
+
+environment       = "research"
+project_id        = "TODO-apgi-research"
+region            = "us-central1"
+github_repository = "apgiframework/apgi-api"
+github_deploy_ref = "refs/heads/main"
+api_domain        = null # internal/staging use; no public custom domain
+
+db_tier               = "db-custom-1-3840"
+db_high_availability  = false
+redis_tier            = "BASIC"
+redis_memory_size_gb  = 1
+min_instances         = 0
+max_instances         = 5
+backup_retention_days = 14
+
+alert_notification_email = "TODO-research-oncall@apgiframework.com"

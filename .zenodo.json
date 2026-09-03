@@ -1,0 +1,28 @@
+{
+  "title": "APGI System API",
+  "description": "REST API for Allostatic Precision-Gated Ignition (APGI) consciousness modeling: participant consent, behavioural battery ingestion, scoring, norms, and psychometrics.",
+  "creators": [
+    {
+      "name": "Pesochin, Dimitry",
+      "orcid": "0009-0005-0328-2896"
+    }
+  ],
+  "license": "Apache-2.0",
+  "upload_type": "software",
+  "access_right": "open",
+  "keywords": [
+    "consciousness",
+    "allostasis",
+    "precision-weighting",
+    "active inference",
+    "psychometrics",
+    "REST API"
+  ],
+  "related_identifiers": [
+    {
+      "identifier": "https://osf.io/t5hcq",
+      "relation": "isSupplementTo",
+      "resource_type": "dataset"
+    }
+  ]
+}

@@ -16,7 +16,7 @@ from sqlalchemy.orm import Session
 from app.config import settings
 from app.database.connection import get_db
 from app.database.models import Order, ProcessedWebhookEvent, Subscription, User
-from app.models.schemas import ErrorResponse
+from app.models.schemas import ErrorResponse, TokenPayload
 from app.services.authorization import Permission, require_permission
 
 logger = logging.getLogger(__name__)
@@ -111,6 +111,79 @@ async def create_payment_intent(request: PaymentIntentCreateRequest) -> PaymentI
         )
 
 
+class CheckoutSessionCreateRequest(BaseModel):
+    items: list[dict[str, Any]]
+    currency: str = "usd"
+
+
+class CheckoutSessionCreateResponse(BaseModel):
+    checkout_url: str
+    session_id: str
+
+
+@router.post(
+    "/create-checkout-session",
+    response_model=CheckoutSessionCreateResponse,
+    status_code=status.HTTP_200_OK,
+    summary="Create a Stripe Checkout Session",
+    description="Hosted-checkout alternative to /create-intent — redirects the client to Stripe "
+    "instead of embedding Stripe Elements.",
+    dependencies=[Depends(require_permission(Permission.SESSION_READ))],
+)
+async def create_checkout_session(
+    request: CheckoutSessionCreateRequest,
+    current_user: TokenPayload = Depends(require_permission(Permission.SESSION_READ)),
+) -> CheckoutSessionCreateResponse:
+    line_items = []
+    for item in request.items:
+        item_id = item.get("id")
+        if not item_id or item_id not in PRODUCT_CATALOGUE:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST, detail=f"Unknown product: {item_id}"
+            )
+        product = PRODUCT_CATALOGUE[item_id]
+        line_items.append(
+            {
+                "price_data": {
+                    "currency": request.currency,
+                    "product_data": {"name": product["name"]},
+                    "unit_amount": product["price_cents"],
+                },
+                "quantity": item.get("quantity", 1),
+            }
+        )
+
+    if not line_items:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, detail="No valid items provided"
+        )
+
+    try:
+        checkout_session = stripe.checkout.Session.create(
+            mode="payment",
+            line_items=line_items,  # type: ignore[arg-type]
+            success_url=settings.stripe_checkout_success_url,
+            cancel_url=settings.stripe_checkout_cancel_url,
+            metadata={"user_id": current_user.user_id},
+        )
+        if not checkout_session.url:
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="Stripe did not return a checkout URL",
+            )
+        return CheckoutSessionCreateResponse(
+            checkout_url=checkout_session.url, session_id=checkout_session.id
+        )
+    except HTTPException:
+        raise
+    except Exception:
+        logger.error("Stripe Checkout Session creation failed", exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Payment service temporarily unavailable",
+        )
+
+
 @router.post(
     "/webhook",
     status_code=status.HTTP_200_OK,
@@ -174,7 +247,9 @@ async def stripe_webhook(request: Request, db: Session = Depends(get_db)) -> dic
         # Handle different event types
         success = False
         processing_error = None
-        if event_type == "payment_intent.succeeded":
+        if event_type == "checkout.session.completed":
+            success = await _handle_checkout_session_completed(db, event_data)
+        elif event_type == "payment_intent.succeeded":
             success = await _handle_payment_succeeded(db, event_data)
         elif event_type == "payment_intent.payment_failed":
             success = await _handle_payment_failed(db, event_data)
@@ -217,6 +292,33 @@ async def stripe_webhook(request: Request, db: Session = Depends(get_db)) -> dic
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Webhook processing failed",
         )
+
+
+async def _handle_checkout_session_completed(db: Session, checkout_session: dict[str, Any]) -> bool:
+    """Handle a completed hosted Checkout Session (create-checkout-session flow)."""
+    try:
+        checkout_session_id = checkout_session.get("id")
+        metadata = checkout_session.get("metadata", {})
+        user_id = metadata.get("user_id")
+        payment_status = checkout_session.get("payment_status")
+
+        if user_id:
+            existing_user = db.query(User).filter(User.user_id == user_id).first()
+            if not existing_user:
+                logger.error(
+                    f"Checkout session handler: Invalid user_id {user_id} for session {checkout_session_id}"
+                )
+                return False
+
+        logger.info(
+            f"Checkout session completed: {checkout_session_id}, user: {user_id}, "
+            f"payment_status: {payment_status}"
+        )
+        return True
+
+    except Exception as e:
+        logger.error(f"Failed to handle checkout session completion: {e}", exc_info=True)
+        return False
 
 
 async def _handle_payment_succeeded(db: Session, payment_intent: dict[str, Any]) -> bool:
@@ -500,7 +602,10 @@ async def _handle_subscription_event(
                 sub.cancel_at_period_end = subscription.get("cancel_at_period_end", False)
                 db.commit()
 
-        elif event_type in ["customer.subscription.payment_failed", "invoice.payment_failed"]:  # pragma: no branch
+        elif event_type in [
+            "customer.subscription.payment_failed",
+            "invoice.payment_failed",
+        ]:  # pragma: no branch
             logger.warning(f"Subscription payment failed: {subscription_id}, User: {user_id}")
             sub = (
                 db.query(Subscription)

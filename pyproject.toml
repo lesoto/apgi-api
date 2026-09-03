@@ -8,7 +8,7 @@ version = "1.0.0"
 description = "Standalone REST API for the APGI system"
 readme = "README.md"
 requires-python = ">=3.12"
-license = {text = "MIT"}
+license = {text = "Apache-2.0"}
 authors = [
     {name = "APGI Team", email = "team@apgi.example.com"}
 ]
@@ -16,7 +16,7 @@ keywords = ["api", "rest", "fastapi", "consciousness", "cognitive-science"]
 classifiers = [
     "Development Status :: 4 - Beta",
     "Intended Audience :: Science/Research",
-    "License :: OSI Approved :: MIT License",
+    "License :: OSI Approved :: Apache Software License",
     "Programming Language :: Python :: 3",
     "Programming Language :: Python :: 3.12",
     "Framework :: FastAPI",
@@ -40,12 +40,19 @@ dependencies = [
     "pyjwt>=2.8.0",
     "bcrypt>=4.0.0,<5.0.0",
     "python-jose[cryptography]>=3.3.0",
+    "cryptography>=42.0.0",
     "httpx>=0.27.0",
     "prometheus-client>=0.19.0",
     "python-dotenv>=1.0.0",
     "pyyaml>=6.0.1",
     "psutil>=5.9.5",
     "faker>=20.0.0",
+    # Hard runtime deps of app.routes.payments / app.services.auth_manager —
+    # previously missing here, which made `pip install -e ".[dev]"` (as used
+    # throughout .github/workflows/ci.yml) fail to import the app at all.
+    "stripe>=7.0.0",
+    "pyotp>=2.9.0",
+    "aiohttp>=3.9.0",
 ]
 
 [project.optional-dependencies]
@@ -60,6 +67,7 @@ dev = [
     "mypy>=1.9.0",
     "isort>=5.13.0",
     "types-psutil>=5.9.0",
+    "types-PyYAML>=6.0.0",
 ]
 
 [project.scripts]
@@ -70,10 +78,10 @@ apgi-seed = "app.cli:seed"
 apgi-clear-seed = "app.cli:clear_seed_data"
 
 [project.urls]
-Homepage = "https://github.com/apgi/standalone-api"
-Documentation = "https://docs.apgi.example.com"
-Repository = "https://github.com/apgi/standalone-api"
-Issues = "https://github.com/apgi/standalone-api/issues"
+Homepage = "https://apgiframework.com"
+Documentation = "https://github.com/apgiframework/apgi-api/tree/main/docs"
+Repository = "https://github.com/apgiframework/apgi-api"
+Issues = "https://github.com/apgiframework/apgi-api/issues"
 
 [tool.setuptools]
 packages = ["app"]

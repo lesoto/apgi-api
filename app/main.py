@@ -55,14 +55,23 @@ from app.routes import (
     admin,
     api_keys,
     auth,
+    batteries,
     export,
     health,
+    instrument,
+    longitudinal,
+    meta,
     metrics,
+    nof1,
+    norms,
+    participants,
     payments,
     sessions,
     state,
+    studies,
     tasks,
     templates,
+    trials,
     users,
     version,
     webhooks,
@@ -120,7 +129,9 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
         # Check soft dependencies - log warnings but don't fail
         from app.dependency_checker import SOFT_DEPENDENCIES
 
-        if not check_dependencies(required_deps=SOFT_DEPENDENCIES, fail_fast=False):  # pragma: no cover
+        if not check_dependencies(
+            required_deps=SOFT_DEPENDENCIES, fail_fast=False
+        ):  # pragma: no cover
             logger.warning(
                 "Soft dependencies missing. Starting in degraded mode.", component="lifecycle"
             )
@@ -380,6 +391,15 @@ All endpoints except `/health`, `/docs`, and `/openapi.json` require authenticat
     app.include_router(payments.router)
     app.include_router(api_keys.router)
     app.include_router(webhooks.router)
+    app.include_router(participants.router)
+    app.include_router(studies.router)
+    app.include_router(batteries.router)
+    app.include_router(trials.router)
+    app.include_router(norms.router)
+    app.include_router(instrument.router)
+    app.include_router(meta.router)
+    app.include_router(longitudinal.router)
+    app.include_router(nof1.router)
 
     # Mount static files for web UI
     web_dir = os.path.join(os.path.dirname(__file__), "..", "web")

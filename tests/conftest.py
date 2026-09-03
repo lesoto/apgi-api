@@ -12,6 +12,8 @@ from typing import Any, Callable, Generator
 os.environ.setdefault("JWT_SECRET_KEY", "test-secret-key-that-is-long-enough-32chars!")
 os.environ.setdefault("CURSOR_SIGNING_KEY", "test-cursor-key-that-is-long-enough-32chars!")
 os.environ.setdefault("WEBHOOK_SECRET_KEY", "test-webhook-key-that-is-long-enough-32c!")
+os.environ.setdefault("PII_ENCRYPTION_KEY", "lN_kr45h0MBU1IsgDfv-KKTb_CzurLv6th8gkekEzWM=")
+os.environ.setdefault("AUDIT_SIGNING_KEY", "test-audit-signing-key-that-is-long-enough-32c!")
 os.environ.setdefault("ENVIRONMENT", "development")
 os.environ.setdefault("DATABASE_URL", "sqlite:///:memory:")
 os.environ.setdefault("REDIS_URL", "redis://localhost:6379/1")

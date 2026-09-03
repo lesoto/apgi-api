@@ -259,6 +259,53 @@ class Settings:
         # Stripe webhook endpoint secret — required for signature verification.
         # Generate via Stripe dashboard → Webhooks → your endpoint → Signing secret.
         self.stripe_webhook_secret: Optional[str] = os.getenv("STRIPE_WEBHOOK_SECRET")
+        # Where the Stripe Checkout Session should send the participant back to.
+        self.stripe_checkout_success_url: str = os.getenv(
+            "STRIPE_CHECKOUT_SUCCESS_URL", f"{self.base_url}/web/checkout.html?status=success"
+        )
+        self.stripe_checkout_cancel_url: str = os.getenv(
+            "STRIPE_CHECKOUT_CANCEL_URL", f"{self.base_url}/web/checkout.html?status=cancelled"
+        )
+
+        # Research Pilot Settings (Phase 2, governing doc §7)
+        #
+        # Field-level encryption key for participant PII columns. Must be a
+        # Fernet key (32 url-safe base64-encoded bytes) — generate with
+        # `python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"`.
+        self.pii_encryption_key: Optional[str] = os.getenv("PII_ENCRYPTION_KEY")
+
+        # HMAC key used to sign audit log entries so tampering with the audit
+        # trail after the fact is detectable (score generation / report
+        # access events in particular — governing doc §7.4).
+        self.audit_signing_key: Optional[str] = os.getenv("AUDIT_SIGNING_KEY")
+
+        # The two consent types every participant must grant, independently
+        # versioned, before their data may be used for the corresponding
+        # purpose (governing doc §7.1 — "two separate versioned consents").
+        self.consent_current_versions: Dict[str, str] = {
+            "research_participation": os.getenv("CONSENT_VERSION_RESEARCH_PARTICIPATION", "1.0"),
+            "data_sharing": os.getenv("CONSENT_VERSION_DATA_SHARING", "1.0"),
+        }
+
+        # Restricted Cloud Storage for raw trial events, and the BigQuery
+        # dataset the de-identified export path writes into. Both are unset
+        # (feature disabled) in local/test environments by default.
+        self.trial_events_bucket: Optional[str] = os.getenv("TRIAL_EVENTS_BUCKET")
+        self.bigquery_deidentified_dataset: Optional[str] = os.getenv(
+            "BIGQUERY_DEIDENTIFIED_DATASET"
+        )
+        self.gcp_project_id: Optional[str] = os.getenv("GCP_PROJECT_ID")
+
+        # Minimum Detectable Change gate (Phase 5, §5.2): a longitudinal
+        # change report is only released to a subscriber once the observed
+        # change clears MDC95 for that index — never shown as a raw delta.
+        self.mdc_confidence_level: float = float(os.getenv("MDC_CONFIDENCE_LEVEL", "0.95"))
+
+        # K7b — a specific, narrower identifiability sub-test gating exposure
+        # of the full latent state VECTOR as a single object (as opposed to
+        # K7's per-parameter gating in app/services/k7_gate.py). Defaults to
+        # not cleared, same posture as K7.
+        self.k7b_cleared: bool = os.getenv("K7B_CLEARED", "false").lower() == "true"
 
         # Validate security settings after initialization
         self.__post_init__()
@@ -408,6 +455,38 @@ class Settings:
                     "Short keys are vulnerable to brute force attacks. "
                     "Use a secure, random key with at least 32 characters."
                 )
+
+        # Validate PII encryption key
+        if not self.pii_encryption_key:
+            if is_production:
+                errors.append(
+                    "PII_ENCRYPTION_KEY environment variable is not set. "
+                    "This is required to encrypt participant PII at rest in production."
+                )
+        else:
+            try:
+                from cryptography.fernet import Fernet
+
+                Fernet(self.pii_encryption_key.encode())
+            except Exception:
+                errors.append(
+                    "PII_ENCRYPTION_KEY is not a valid Fernet key. Generate one with "
+                    '`python -c "from cryptography.fernet import Fernet; '
+                    'print(Fernet.generate_key().decode())"`.'
+                )
+
+        # Validate audit signing key
+        if not self.audit_signing_key:
+            if is_production:
+                errors.append(
+                    "AUDIT_SIGNING_KEY environment variable is not set. "
+                    "This is required to sign audit log entries in production."
+                )
+        elif len(self.audit_signing_key) < 32:
+            errors.append(
+                "AUDIT_SIGNING_KEY is shorter than 32 characters. "
+                "Use a secure, random key with at least 32 characters."
+            )
 
         # Validate CORS origins
         if self.cors_origins == ["*"] or "*" in self.cors_origins:

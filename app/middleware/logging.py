@@ -47,6 +47,11 @@ class StructuredLogger:
         log_entry = {
             "timestamp": datetime.now(timezone.utc).isoformat() + "Z",
             "level": level,
+            # Cloud Logging buckets entries by this exact key; without it every
+            # entry lands at severity DEFAULT regardless of "level" above, which
+            # breaks severity-based Cloud Monitoring alert policies and Error
+            # Reporting's log-based detection on Cloud Run.
+            "severity": level,
             "logger": self.logger.name,
             "message": message,
             **kwargs,
