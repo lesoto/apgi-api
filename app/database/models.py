@@ -1192,6 +1192,20 @@ class ParticipantSession(Base):  # type: ignore[misc, valid-type]
     def __repr__(self) -> str:
         return f"<ParticipantSession(id={self.participant_session_id}, index={self.session_index}, status={self.status})>"
 
+    @property
+    def release_state(self) -> str:
+        """The project's current release_state.current label (identifiers.yaml),
+        threaded onto every session response so a client can tell whether
+        scores were produced under "pre-registered" / "pilot" / "calibrated"
+        conditions. Not a column — computed at read time so it always
+        reflects the live value rather than the value at scoring time.
+        Imported lazily (not at module scope) because app.services'
+        package __init__ imports modules that import app.database.models,
+        and models.py is loaded before that init completes."""
+        from app.services.identifiers import current_release_state
+
+        return current_release_state()
+
 
 class TrialEvent(Base):  # type: ignore[misc, valid-type]
     """One trial's lightweight, scoring-relevant summary.
@@ -1252,3 +1266,117 @@ class TrialEvent(Base):  # type: ignore[misc, valid-type]
 
     def __repr__(self) -> str:
         return f"<TrialEvent(id={self.trial_event_id}, task={self.task_type}, trial={self.trial_index})>"
+
+
+# ============================================================================
+# n-of-1 Experiment Engine (Phase 5)
+#
+# Single-subject experiments with an experimenter-defined alternating-phase
+# design (e.g. ["A", "B", "A", "B"]) and a scalar outcome recorded once per
+# observation — deliberately decoupled from ParticipantSession/TrialEvent,
+# since an n-of-1 outcome (e.g. a daily self-report) need not correspond to
+# a full battery administration.
+# ============================================================================
+
+
+class NOf1ExperimentStatus(str, PythonEnum):
+    ACTIVE = "active"
+    COMPLETED = "completed"
+
+
+class NOf1Experiment(Base):  # type: ignore[misc, valid-type]
+    """A single-subject alternating-phase experiment."""
+
+    __tablename__ = "nof1_experiments"
+
+    experiment_id = Column(
+        String(36),
+        primary_key=True,
+        default=lambda: str(uuid.uuid4()),
+        comment="Unique experiment ID",
+    )
+    participant_id = Column(
+        String(36),
+        ForeignKey("participants.participant_id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    study_id = Column(
+        String(36),
+        ForeignKey("studies.study_id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+    )
+    name = Column(String(200), nullable=False, comment="Experiment name")
+    phase_sequence: Mapped[list[str]] = mapped_column(
+        JSON, nullable=False, comment='Ordered phase labels, e.g. ["A", "B", "A", "B"]'
+    )
+    outcome_metric_name = Column(
+        String(100), nullable=False, comment="Name of the scalar outcome being tracked"
+    )
+    status: Mapped[NOf1ExperimentStatus] = mapped_column(
+        SQLEnum(NOf1ExperimentStatus, values_callable=lambda x: [e.value for e in x]),
+        nullable=False,
+        default=NOf1ExperimentStatus.ACTIVE,
+        index=True,
+    )
+    created_at = Column(
+        DateTime(timezone=True),
+        nullable=False,
+        server_default=func.now(),
+        comment="Creation timestamp",
+    )
+
+    participant = relationship("Participant")
+    observations = relationship(
+        "NOf1Observation", back_populates="experiment", cascade="all, delete-orphan"
+    )
+
+    __table_args__ = (Index("idx_nof1_experiments_participant", "participant_id"),)
+
+    def __repr__(self) -> str:
+        return f"<NOf1Experiment(id={self.experiment_id}, name={self.name})>"
+
+
+class NOf1Observation(Base):  # type: ignore[misc, valid-type]
+    """A single recorded outcome value within an n-of-1 experiment."""
+
+    __tablename__ = "nof1_observations"
+
+    observation_id = Column(
+        String(36),
+        primary_key=True,
+        default=lambda: str(uuid.uuid4()),
+        comment="Unique observation ID",
+    )
+    experiment_id = Column(
+        String(36),
+        ForeignKey("nof1_experiments.experiment_id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    sequence_index = Column(
+        Integer, nullable=False, comment="0-based order of this observation within the experiment"
+    )
+    phase_label = Column(
+        String(20), nullable=False, index=True, comment="Which phase this observation belongs to"
+    )
+    value = Column(Float, nullable=False, comment="Recorded outcome value")
+    recorded_at = Column(
+        DateTime(timezone=True),
+        nullable=False,
+        server_default=func.now(),
+        comment="Recording timestamp",
+    )
+
+    experiment = relationship("NOf1Experiment", back_populates="observations")
+
+    __table_args__ = (
+        UniqueConstraint(
+            "experiment_id", "sequence_index", name="uq_nof1_observations_experiment_sequence"
+        ),
+        Index("idx_nof1_observations_experiment", "experiment_id"),
+    )
+
+    def __repr__(self) -> str:
+        return f"<NOf1Observation(experiment_id={self.experiment_id}, phase={self.phase_label}, value={self.value})>"

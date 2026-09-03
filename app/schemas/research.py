@@ -161,6 +161,7 @@ class ParticipantSessionResponse(BaseModel):
     scores: Optional[dict[str, Any]] = None
     started_at: Optional[datetime] = None
     completed_at: Optional[datetime] = None
+    release_state: str
 
 
 # ---------------------------------------------------------------------------

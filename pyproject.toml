@@ -67,6 +67,7 @@ dev = [
     "mypy>=1.9.0",
     "isort>=5.13.0",
     "types-psutil>=5.9.0",
+    "types-PyYAML>=6.0.0",
 ]
 
 [project.scripts]

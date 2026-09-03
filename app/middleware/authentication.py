@@ -71,6 +71,8 @@ class AuthenticationMiddleware(BaseHTTPMiddleware):
         "/v1/users/reset-password",
         "/v1/users/reset-password/confirm",
         "/v1/payments/webhook",
+        "/v1/meta",
+        "/v1/dataset-card",
     }
 
     _redis_client = None

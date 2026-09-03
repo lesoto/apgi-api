@@ -161,11 +161,16 @@ async def create_checkout_session(
     try:
         checkout_session = stripe.checkout.Session.create(
             mode="payment",
-            line_items=line_items,
+            line_items=line_items,  # type: ignore[arg-type]
             success_url=settings.stripe_checkout_success_url,
             cancel_url=settings.stripe_checkout_cancel_url,
             metadata={"user_id": current_user.user_id},
         )
+        if not checkout_session.url:
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="Stripe did not return a checkout URL",
+            )
         return CheckoutSessionCreateResponse(
             checkout_url=checkout_session.url, session_id=checkout_session.id
         )

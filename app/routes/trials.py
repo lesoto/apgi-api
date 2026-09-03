@@ -157,7 +157,7 @@ async def create_participant_session(
         user_id=current_user.user_id,
         action="participant_session:create",
         resource_type="participant_session",
-        resource_id=session.participant_session_id,
+        resource_id=session.participant_session_id,  # type: ignore[arg-type]
         details={"session_index": next_index},
     )
     return session
@@ -210,7 +210,7 @@ async def ingest_trial_events(
         created.append(trial)
 
     if session.status == ParticipantSessionStatus.SCHEDULED:
-        session.status = ParticipantSessionStatus.IN_PROGRESS  # type: ignore[assignment]
+        session.status = ParticipantSessionStatus.IN_PROGRESS
         session.started_at = datetime.now(timezone.utc)  # type: ignore[assignment]
 
     db.commit()
@@ -244,7 +244,7 @@ async def complete_participant_session(
     )
 
     if session.status != ParticipantSessionStatus.COMPLETED:
-        session.status = ParticipantSessionStatus.COMPLETED  # type: ignore[assignment]
+        session.status = ParticipantSessionStatus.COMPLETED
         session.completed_at = datetime.now(timezone.utc)  # type: ignore[assignment]
         db.commit()
         db.refresh(session)
@@ -264,7 +264,7 @@ async def complete_participant_session(
         try:
             from app.tasks.scoring_tasks import score_participant_session
 
-            score_participant_session.delay(participant_session_id)  # type: ignore[attr-defined]
+            score_participant_session.delay(participant_session_id)
         except Exception:
             logger.info(
                 "Scoring task not enqueued (scoring pipeline not yet configured)",
@@ -275,5 +275,5 @@ async def complete_participant_session(
         participant_session_id=participant_session_id,
         status=session.status,
         trial_count=trial_count,
-        completed_at=session.completed_at,
+        completed_at=session.completed_at,  # type: ignore[arg-type]
     )
