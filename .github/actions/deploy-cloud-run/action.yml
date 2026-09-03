@@ -1,0 +1,81 @@
+name: Deploy apgi-core to Cloud Run
+description: >
+  Authenticates to GCP via Workload Identity Federation (no service-account
+  keys), builds and pushes the container image to Artifact Registry, runs
+  Alembic migrations against Cloud SQL through the Cloud SQL Auth Proxy, and
+  deploys the new image to Cloud Run.
+
+inputs:
+  environment:
+    required: true
+    description: "production or research"
+  project_id:
+    required: true
+  region:
+    required: true
+  workload_identity_provider:
+    required: true
+    description: "Full resource name — deployment/terraform/gcp output wif_provider_resource_name"
+  service_account:
+    required: true
+    description: "deployment/terraform/gcp output ci_deployer_service_account_email"
+
+runs:
+  using: composite
+  steps:
+    - id: auth
+      name: Authenticate to GCP via Workload Identity Federation
+      uses: google-github-actions/auth@v2
+      with:
+        workload_identity_provider: ${{ inputs.workload_identity_provider }}
+        service_account: ${{ inputs.service_account }}
+
+    - name: Set up Cloud SDK
+      uses: google-github-actions/setup-gcloud@v2
+
+    - name: Configure Docker for Artifact Registry
+      shell: bash
+      run: gcloud auth configure-docker ${{ inputs.region }}-docker.pkg.dev --quiet
+
+    - name: Build and push image
+      id: image
+      shell: bash
+      env:
+        IMAGE: ${{ inputs.region }}-docker.pkg.dev/${{ inputs.project_id }}/apgi-core/apgi-core:${{ github.sha }}
+      run: |
+        docker build -f deployment/Dockerfile -t "$IMAGE" .
+        docker push "$IMAGE"
+        echo "image=$IMAGE" >> "$GITHUB_OUTPUT"
+
+    - name: Run database migrations
+      shell: bash
+      run: |
+        curl -sSLo cloud-sql-proxy https://storage.googleapis.com/cloud-sql-connectors/cloud-sql-proxy/v2.11.4/cloud-sql-proxy.linux.amd64
+        chmod +x cloud-sql-proxy
+        CONNECTION_NAME=$(gcloud sql instances describe "apgi-${{ inputs.environment }}" --project="${{ inputs.project_id }}" --format='value(connectionName)')
+        ./cloud-sql-proxy --port 5433 "$CONNECTION_NAME" &
+        PROXY_PID=$!
+        sleep 5
+        DB_PASSWORD=$(gcloud secrets versions access latest --project="${{ inputs.project_id }}" --secret=DATABASE_URL | sed -n 's#.*://[^:]*:\([^@]*\)@.*#\1#p')
+        # DATABASE_URL secret already carries the full DSN for the Cloud SQL
+        # unix socket used inside Cloud Run; for the CI-side proxy we connect
+        # over TCP to localhost instead, reusing the same generated password.
+        export DATABASE_URL="postgresql://apgi_app:${DB_PASSWORD}@127.0.0.1:5433/apgi_${{ inputs.environment }}"
+        pip install -q alembic sqlalchemy psycopg2-binary
+        alembic upgrade head
+        kill $PROXY_PID
+
+    - name: Deploy to Cloud Run
+      shell: bash
+      run: |
+        gcloud run deploy apgi-core \
+          --project="${{ inputs.project_id }}" \
+          --region="${{ inputs.region }}" \
+          --image="${{ steps.image.outputs.image }}" \
+          --quiet
+
+    - name: Smoke-test the deployed revision
+      shell: bash
+      run: |
+        URL=$(gcloud run services describe apgi-core --project="${{ inputs.project_id }}" --region="${{ inputs.region }}" --format='value(status.url)')
+        curl -sSf "$URL/health" > /dev/null

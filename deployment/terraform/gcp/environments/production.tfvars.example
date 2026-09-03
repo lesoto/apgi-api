@@ -1,0 +1,20 @@
+# Copy to production.tfvars (gitignored) and fill in the TODOs once the
+# production GCP project exists and identifiers.yaml's
+# infrastructure.projects.production is no longer "TODO".
+
+environment       = "production"
+project_id        = "TODO-apgi-production"   # gcloud projects create ...
+region            = "us-central1"
+github_repository = "apgiframework/apgi-api"
+github_deploy_ref = "refs/tags/v" # production deploys only from tagged releases
+api_domain        = "api.apgiframework.com"
+
+db_tier               = "db-custom-2-7680"
+db_high_availability  = true
+redis_tier            = "STANDARD_HA"
+redis_memory_size_gb  = 2
+min_instances         = 1
+max_instances         = 20
+backup_retention_days = 30
+
+alert_notification_email = "TODO-oncall@apgiframework.com"

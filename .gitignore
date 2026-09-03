@@ -33,3 +33,13 @@ htmlcov/
 logs/
 *.log
 .mypy_cache/
+
+# Terraform
+**/.terraform/
+*.tfstate
+*.tfstate.*
+*.tfplan
+**/environments/*.tfvars
+!**/environments/*.tfvars.example
+crash.log
+crash.*.log
